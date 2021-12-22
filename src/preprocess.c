@@ -45,9 +45,9 @@ alloc_dp(int total_spec)
 {
     data_positions* dp = (data_positions*)malloc(sizeof(data_positions));
     dp->total_spec = total_spec;
-    dp->start_positions = (int*)malloc(sizeof(int)*total_spec);
-    dp->end_positions = (int*)malloc(sizeof(int)*total_spec);
-    dp->encoded_lengths = (int*)malloc(sizeof(int)*total_spec);
+    dp->start_positions = (int*)malloc(sizeof(int)*total_spec*2);
+    dp->end_positions = (int*)malloc(sizeof(int)*total_spec*2);
+    dp->encoded_lengths = (int*)malloc(sizeof(int)*total_spec*2);
     return dp;
 }
 
@@ -269,7 +269,7 @@ find_binary(char* input_map, data_format* df)
                 {
                     dp->end_positions[spec_index] = xml->total - tag_offset;
                     spec_index++;
-                    if (spec_index > dp->total_spec)
+                    if (spec_index > dp->total_spec * 2)
                     {
                         free(xml);
                         return dp;
@@ -372,7 +372,7 @@ get_cpu_count()
     
     np = get_nprocs_conf();
 
-    printf("%ld usable processors detected.\n", np);
+    printf("\t%ld usable processors detected.\n", np);
 
     return np;
 }
