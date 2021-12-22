@@ -16,6 +16,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 
 void* 
@@ -72,14 +74,44 @@ write_to_file(int fd, char* buff, size_t n)
 }
 
 void
-write_header(int fd)
+write_header(int fd, char* compression_method, char* md5)
+/**
+ * @brief Writes .msz header to file descriptor.
+ * Header format:
+ *              |================================================|
+ *              |        Content        |    Size    |  Offset   |
+ *              |================================================|
+ *              | Magic Tag (0x035F51B5)| 4    bytes |      0    |
+ *              | Version Major Number  | 4    bytes |      4    |
+ *              | Version Minor Number  | 4    bytes |      8    |
+ *              | Message Tag           | 128  bytes |     12    |
+ *              | Compression Method    | 4    bytes |    140    |
+ *              | MD5                   | 32   bytes |    144    |
+ *              | Reserved              | 336  bytes |    176    |
+ *              |================================================|
+ *              | Total Size            |  512 bytes |           |
+ *              |================================================|
+ */             
 {
-    char* magic_tag[4];
-    *magic_tag = MAGIC_TAG;
-    write_to_file(fd, magic_tag, 4);
+    char header_buff[512] = "";
+    // memset(header_buff, NULL, 512);
 
-    char header_text[128] = MESSAGE;
+    int* header_buff_cast = (int*)(&header_buff[0]);
 
-    write_to_file(fd, header_text, 128);
+    *header_buff_cast = MAGIC_TAG;
+
+    *(header_buff_cast+1) = FORMAT_VERSION_MAJOR;
+
+    *(header_buff_cast+2) = FORMAT_VERSION_MINOR;
+    
+    char message_buff[128] = MESSAGE;
+
+    memcpy(header_buff+12, message_buff, 128);
+
+    memcpy(header_buff+140, compression_method, 4);
+
+    memcpy(header_buff+144, md5, 32);
+
+    write_to_file(fd, header_buff, 512);
 
 }
