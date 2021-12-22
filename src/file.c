@@ -81,12 +81,12 @@ write_header(int fd, char* compression_method, char* md5)
  *              |================================================|
  *              |        Content        |    Size    |  Offset   |
  *              |================================================|
- *              | Magic Tag (0x035F51B5)| 4    bytes |      0    |
- *              | Version Major Number  | 4    bytes |      4    |
- *              | Version Minor Number  | 4    bytes |      8    |
+ *              | Magic Tag (0x035F51B5)|   4  bytes |      0    |
+ *              | Version Major Number  |   4  bytes |      4    |
+ *              | Version Minor Number  |   4  bytes |      8    |
  *              | Message Tag           | 128  bytes |     12    |
- *              | Compression Method    | 4    bytes |    140    |
- *              | MD5                   | 32   bytes |    144    |
+ *              | Compression Method    |   4  bytes |    140    |
+ *              | MD5                   |  32  bytes |    144    |
  *              | Reserved              | 336  bytes |    176    |
  *              |================================================|
  *              | Total Size            |  512 bytes |           |
