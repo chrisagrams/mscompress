@@ -1,0 +1,4 @@
+mscompress
+mscompress.dSYM/
+*.o
+*.msz

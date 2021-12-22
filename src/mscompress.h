@@ -5,6 +5,9 @@
 #define STATUS "Development"
 #define ADDRESS "chrisagrams@gmail.com"
 
+#define FORMAT_VERSION_MAJOR 1
+#define FORMAT_VERSION_MINOR 0
+
 #define BUFSIZE 4096
 
 #define MAGIC_TAG 0x035F51B5
@@ -77,7 +80,7 @@ void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 int write_to_file(int fd, char* buff, size_t n);
-void write_header(int fd);
+void write_header(int fd, char* compression_method, char* md5);
 
 /* preproccess.c */
 data_format* pattern_detect(char* input_map);
@@ -91,3 +94,8 @@ double* decode_binary(char* input_map, int start_position, int end_position, int
 /* compress.c */
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
+void * compress_xml(char* input_map, data_positions* dp);
+
+/* decompress.c */
+ZSTD_DCtx* alloc_dctx();
+void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);

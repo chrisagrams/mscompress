@@ -1,7 +1,7 @@
 CC = gcc
 
-# CFLAGS += -std=c99 -O3 -Wall -Wextra -pedantic
-CFLAGS += -g
+CFLAGS += -O3 -Wall -Wextra -pedantic
+# CFLAGS += -g
 
 OBJS = \
 	vendor/yxml/yxml.o \
@@ -20,6 +20,7 @@ OBJS = \
 	src/file.o \
 	src/decode.o \
 	src/compress.o \
+	src/decompress.o \
 	src/mscompress.o
 
 LIBS += -lz -lzstd -I./src -I./ 
