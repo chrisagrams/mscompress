@@ -95,20 +95,20 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
 }
 
 
-cmp_buff_t*
+cmp_blk_vector_t*
 alloc_cmp_buff(int allocation)
 /**
- * @brief Allocates a cmp_buff_t struct to store compressed blocks (cmp_block_t struct) in a vector.
+ * @brief Allocates a cmp_blk_vector_t struct to store compressed blocks (cmp_block_t struct) in a vector.
  * 
  * @param allocation Initial size of vector.
  * 
- * @return An allocated and populated cmp_buff_t struct.
+ * @return An allocated and populated cmp_blk_vector_t struct.
  * 
  */
 {
-    cmp_buff_t* r;
+    cmp_blk_vector_t* r;
 
-    r = (cmp_buff_t*)malloc(sizeof(cmp_buff_t));
+    r = (cmp_blk_vector_t*)malloc(sizeof(cmp_blk_vector_t));
     r->allocated = allocation;
     r->populated = 0;
     r->cmp_blks = (cmp_block_t**)malloc(sizeof(cmp_block_t*)*r->allocated);
@@ -118,15 +118,15 @@ alloc_cmp_buff(int allocation)
 
 
 void
-grow_cmp_buff(cmp_buff_t** cmp_buff)
+grow_cmp_buff(cmp_blk_vector_t** cmp_buff)
 /**
- * @brief Grows a cmp_buff_t struct. Deallocated old cmp_buff_t and replaces in place with new pointer.
+ * @brief Grows a cmp_blk_vector_t struct. Deallocated old cmp_blk_vector_t and replaces in place with new pointer.
  * 
- * @param cmp_buff A dereferenced pointer to desired cmp_buff_t to grow. New cmp_buff_t will be located at the same addresss.
+ * @param cmp_buff A dereferenced pointer to desired cmp_blk_vector_t to grow. New cmp_blk_vector_t will be located at the same addresss.
  * 
  */
 {
-    cmp_buff_t* new_cmp_buff;
+    cmp_blk_vector_t* new_cmp_buff;
     int i = 0;
 
     new_cmp_buff = alloc_cmp_buff((*cmp_buff)->allocated*2);
@@ -145,11 +145,11 @@ grow_cmp_buff(cmp_buff_t** cmp_buff)
 
 
 void
-append_cmp_block(cmp_buff_t** cmp_buff, cmp_block_t* buff)
+append_cmp_block(cmp_blk_vector_t** cmp_buff, cmp_block_t* buff)
 /**
  * @brief Appends a compressed block to the compressed block vector. Grows vector if needed.
  * 
- * @param cmp_buff A dereferenced pointer to cmp_buff_t vector.
+ * @param cmp_buff A dereferenced pointer to cmp_blk_vector_t vector.
  * 
  * @param buff Desired compressed block to append to vector.
  * 
@@ -248,7 +248,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 
 void
 cmp_xml_routine(ZSTD_CCtx* czstd,
-                cmp_buff_t** cmp_buff,
+                cmp_blk_vector_t** cmp_buff,
                 data_block_t* curr_block,
                 char* input,
                 size_t len,
@@ -317,7 +317,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 
 void
 cmp_xml_flush(ZSTD_CCtx* czstd,
-              cmp_buff_t** cmp_buff,
+              cmp_blk_vector_t** cmp_buff,
               data_block_t* curr_block,
               size_t cmp_blk_size,
               size_t* tot_size,
@@ -369,7 +369,7 @@ cmp_xml_flush(ZSTD_CCtx* czstd,
 }
 
 
-cmp_buff_t*
+cmp_blk_vector_t*
 compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 /**
  * @brief Main function to compress XML data within a .mzML data.
@@ -385,12 +385,12 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
  *                           block size (>10 MB). This gives the user the flexbility to test 
  *                           performance with different block sizes.
  * 
- * @return A cmp_buff_t struct representing a vector of compressed buffers to be written to disk.
+ * @return A cmp_blk_vector_t struct representing a vector of compressed buffers to be written to disk.
  */
 {
     ZSTD_CCtx* czstd;
 
-    cmp_buff_t* cmp_buff;
+    cmp_blk_vector_t* cmp_buff;
     data_block_t* curr_block;
 
     size_t len;

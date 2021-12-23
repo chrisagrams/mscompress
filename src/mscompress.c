@@ -159,7 +159,7 @@ main(int argc, char* argv[])
 
     printf("\nDecoding and compression...\n");
 
-    compress_xml(input_map, dp, 1e+6);
+    cmp_blk_vector_t* compressed_xml = compress_xml(input_map, dp, 1e+6);
 
     stop = clock();
 
