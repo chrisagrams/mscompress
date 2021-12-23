@@ -1,7 +1,7 @@
 CC = gcc
 
-# CFLAGS += -O3 -Wall -Wextra -pedantic
-CFLAGS += -g
+CFLAGS += -O3 -Wall -Wextra -pedantic
+DEBUG_CFLAGS += -g
 
 OBJS = \
 	vendor/yxml/yxml.o \
@@ -61,7 +61,15 @@ ifdef OPENMP
 endif
 
 mscompress: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) 
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+
+clean: 
+	rm $(OBJS) vendor/base64/lib/config.h ./mscompress ||:
+
+debug: CFLAGS = $(DEBUG_CFLAGS)
+
+debug: $(OBJS)
+	$(CC) $(CFLAGS) -o mscompress $^ $(LIBS)
 
 vendor/base64/lib/config.h:
 	@echo "#define HAVE_AVX2   $(HAVE_AVX2)"    > $@
@@ -85,5 +93,4 @@ vendor/base64/lib/arch/avx/codec.o:    CFLAGS += $(AVX_CFLAGS)
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $< $(LIBS)
 
-clean: 
-	rm $(OBJS) vendor/base64/lib/config.h
+
