@@ -1,7 +1,7 @@
 CC = gcc
 
-CFLAGS += -O3 -Wall -Wextra -pedantic
-# CFLAGS += -g
+# CFLAGS += -O3 -Wall -Wextra -pedantic
+CFLAGS += -g
 
 OBJS = \
 	vendor/yxml/yxml.o \

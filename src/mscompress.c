@@ -74,6 +74,8 @@ main(int argc, char* argv[])
 
     long cpu_count, n_threads;
 
+    size_t input_filesize;
+
     argp_parse (&argp, argc, argv, 0, 0, &args);
     
     if(args.in_file == NULL || args.out_file == NULL)
@@ -86,12 +88,15 @@ main(int argc, char* argv[])
     int input_fd, output_fd;
     
     input_fd = open(args.in_file, O_RDONLY);
-
+    
     if(input_fd < 0)
     {
       fprintf(stderr, "Error in opening input file descriptor.");
       exit(1);
     }
+
+    input_filesize = get_filesize(args.in_file);
+
 
     output_fd = open(args.out_file, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     
@@ -122,7 +127,7 @@ main(int argc, char* argv[])
     // Initialize stream encoder:
     base64_stream_encode_init(&state, 0);
 
-    printf("\tInput file: %s\n\t\tDevice blocksize: %d bytes\n", args.in_file, if_blksize);
+    printf("\tInput file: %s\n\t\tDevice blocksize: %d bytes\n\t\tFilesize: %ld bytes\n", args.in_file, if_blksize, input_filesize);
 
     printf("\tOutput file: %s\n\t\tDevice blocksize: %d bytes\n", args.out_file, of_blksize);
 
@@ -132,21 +137,15 @@ main(int argc, char* argv[])
 
     if (df == NULL)
         return -1;
-    // printf("%d %d %d %d\n", df->int_fmt, df->mz_fmt, df->compression, df->total_spec);
-
 
     data_positions* dp = find_binary((char*)input_map, df);
     if (dp == NULL)
         return -1;
-    
-    // get_encoded_lengths((char*) input_map, dp);
-    
+
+    dp->file_end = input_filesize;
+        
     
     stop = clock();
-
-    // for (int i = 0; i < dp->total_spec * 2; i++) {
-    //     printf("(%d, %d, %d)\n", dp->start_positions[i], dp->end_positions[i], dp->encoded_lengths[i]);
-    // }
 
     printf("\tDetected %d spectra.\n", df->total_spec);
 
@@ -158,28 +157,11 @@ main(int argc, char* argv[])
 
     start = clock();
 
-    compress_xml(input_map, dp);
+    printf("\nDecoding and compression...\n");
 
-    // cmp = zstd_compress(czstd, input_map+dp->end_positions[dp->total_spec*2], , &cmp_len, 1);
-    // decmp = zstd_decompress(dzstd, cmp, cmp_len, dp->start_positions[0]);
-    // printf("%.*s", dp->start_positions[0], (char*)decmp);
-    
-
-    // for (int i = 0; i < dp->total_spec; i++)
-    // {
-    //   size_t decoded_binary_len = 0;
-    //   size_t zstd_len = 0;
-    //   // double* bin = decode_binary((char*)input_map, dp->start_positions[i], dp->end_positions[i], df->compression, &decoded_binary_len);
-    //   char* cmp = (char*)zstd_compress(czstd, input_map, decoded_binary_len, &zstd_len, 1);
-      
-    //   char* decmp = (char*)zstd_decompress(dzstd, cmp, zstd_len, decoded_binary_len);
-    //   printf("%d\n", decmp);
-    //   // printf("spec no: %d\tdecoded_len: %ld\n", i, decoded_binary_len);
-    // }
+    compress_xml(input_map, dp, 1e+6);
 
     stop = clock();
-
-    printf("\nDecoding and compression...\n");
 
     printf("\tDecoding and compression time: %1.4fs\n", (double)(stop-start) / CLOCKS_PER_SEC);
 

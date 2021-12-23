@@ -45,6 +45,7 @@ alloc_dp(int total_spec)
 {
     data_positions* dp = (data_positions*)malloc(sizeof(data_positions));
     dp->total_spec = total_spec;
+    dp->file_end = 0;
     dp->start_positions = (int*)malloc(sizeof(int)*total_spec*2);
     dp->end_positions = (int*)malloc(sizeof(int)*total_spec*2);
     dp->encoded_lengths = (int*)malloc(sizeof(int)*total_spec*2);

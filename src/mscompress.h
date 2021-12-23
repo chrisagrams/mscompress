@@ -50,7 +50,29 @@ typedef struct dp
     int* end_positions;
     int* encoded_lengths;
     int total_spec;
+    size_t file_end;
 } data_positions;
+
+
+typedef struct
+{
+    char* mem;
+    size_t size;
+} cmp_block_t;
+
+typedef struct 
+{
+    char* mem;
+    size_t size;
+    size_t max_size;
+} data_block_t;
+
+typedef struct 
+{
+    cmp_block_t** cmp_blks;
+    int allocated;
+    int populated;
+} cmp_buff_t;
 
 
 #define _32i_ 1000519
@@ -79,6 +101,7 @@ typedef struct dp
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
+size_t get_filesize(char* path);
 int write_to_file(int fd, char* buff, size_t n);
 void write_header(int fd, char* compression_method, char* md5);
 
@@ -94,7 +117,7 @@ double* decode_binary(char* input_map, int start_position, int end_position, int
 /* compress.c */
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
-void * compress_xml(char* input_map, data_positions* dp);
+cmp_buff_t* compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size);
 
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();

@@ -56,6 +56,16 @@ get_blksize(char* path)
     return fi.st_blksize;
 }
 
+size_t
+get_filesize(char* path)
+{
+    struct stat fi;
+
+    stat(path, &fi);
+
+    return fi.st_size;
+}
+
 int
 write_to_file(int fd, char* buff, size_t n)
 {
