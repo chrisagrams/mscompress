@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/mscompress",
+            "args": ["-i/home/cgrams/Downloads/SP_HighGrade-PrCa-Set1_Fr12 (1).mzML", "-o./test.msz"],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "C build"
+        }
+    ],
+    "compounds": []
+}
