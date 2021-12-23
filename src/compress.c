@@ -300,7 +300,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 
         cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-        printf("\t[Block %d] Original size: %ld Compressed size: %ld\n", (*cmp_buff)->populated, curr_block->size, cmp_len);
+        printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, curr_block->size, cmp_len, (double)curr_block->size/cmp_len);
 
         *tot_size += curr_block->size; *tot_cmp += cmp_len;
 
@@ -359,7 +359,7 @@ cmp_xml_flush(ZSTD_CCtx* czstd,
 
     cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-    printf("\t[Block %d] Original size: %ld Compressed size: %ld\n", (*cmp_buff)->populated, curr_block->size, cmp_len);
+    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, curr_block->size, cmp_len, (double)curr_block->size/cmp_len);
 
     *tot_size += curr_block->size; *tot_cmp += cmp_len;
 
@@ -407,7 +407,9 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
     curr_block = alloc_data_block(cmp_blk_size);
 
     printf("\tUsing %ld byte block size.\n", cmp_blk_size);
-
+    printf("\t====================== Data blocks ===============================\n");
+    printf("\t||   Block index       Original size    Compressed size      %%  ||\n");
+    printf("\t||==============================================================||\n");
 
     len = dp->start_positions[0];                                     /* Base case: Position 0 to first <binary> tag */
 
@@ -436,6 +438,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 
     cmp_xml_flush(czstd, &cmp_buff, curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
+    printf("\t==================================================================\n");
     printf("\tXML size: %ld Compressed XML size: %ld (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
     /* Cleanup (curr_block already freed by cmp_xml_flush) */
