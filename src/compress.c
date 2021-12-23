@@ -222,7 +222,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 
     czstd = alloc_cctx();
 
-    cmp_buff = alloc_cmp_buff(10);              /* Start with 10 vectors, dynamically grow (x2) if run out of space */
+    cmp_buff = alloc_cmp_buff(10);                                    /* Start with 10 vectors, dynamically grow (x2) if run out of space */
 
     curr_block = alloc_data_block(cmp_blk_size);
 
