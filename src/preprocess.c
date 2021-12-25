@@ -15,7 +15,13 @@
 #include <string.h>
 #include <argp.h>
 #include <stdbool.h>
-#include <sys/sysinfo.h>
+#ifdef __linux__
+    #include <sys/sysinfo.h>
+#elif __APPLE__
+    #include <sys/sysctl.h>
+#elif _WIN32
+    #include <sysinfoapi.h>
+#endif
 #include "vendor/yxml/yxml.h"
 #include "vendor/base64/lib/config.h"
 #include "vendor/base64/include/libbase64.h"
@@ -360,7 +366,7 @@ get_encoded_lengths(char* input_map, data_positions* dp)
 
 /* === Start of system information functions === */
 
-long
+int
 get_cpu_count()
 /**
  * @brief A wrapper function to get the number of processor cores on a platform. 
@@ -369,11 +375,29 @@ get_cpu_count()
  * @return Number of configured (available) processors.
  */
 {
-    long np;
-    
-    np = get_nprocs_conf();
+    int np;
 
-    printf("\t%ld usable processors detected.\n", np);
+    #ifdef __linux__
+    
+        np = (int)get_nprocs_conf();
+
+    #elif __APPLE__
+
+        int mib[2];
+        size_t len;
+        mib[0] = CTL_HW;
+        mib[1] = HW_NCPU;
+        len = sizeof(np);
+        sysctl(mib, 2, &np, &len, NULL, 0);
+
+    #elif _WIN32
+        /* TODO */
+        SYSTEM_INFO sysinfo;
+        GetSystemInfo(&sysinfo);
+        np = sysinfo.dwNumberOfProcessors;
+    #endif
+
+    printf("\t%d usable processors detected.\n", np);
 
     return np;
 }
