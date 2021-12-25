@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "stdint.h": "c",
+        "stddef.h": "c",
+        "argp.h": "c",
+        "zlib.h": "c",
+        "libbase64.h": "c",
+        "config.h": "c",
+        "array": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "utility": "c"
+    },
+    "editor.bracketPairColorization.enabled": true
+}
