@@ -109,6 +109,8 @@ void write_header(int fd, char* compression_method, char* md5);
 data_format* pattern_detect(char* input_map);
 data_positions*find_binary(char* input_map, data_format* df);
 void get_encoded_lengths(char* input_map, data_positions* dp);
+
+/* sys.c */
 int get_cpu_count();
 
 /* decode.c */
