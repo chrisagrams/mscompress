@@ -249,7 +249,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 void
 cmp_xml_routine(ZSTD_CCtx* czstd,
                 cmp_blk_vector_t** cmp_buff,
-                data_block_t* curr_block,
+                data_block_t** curr_block,
                 char* input,
                 size_t len,
                 size_t cmp_blk_size,
@@ -294,23 +294,23 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
         exit(1);
     }
 
-    if(!append_mem(curr_block, input, len))
+    if(!append_mem(*curr_block, input, len))
     {
-        cmp = zstd_compress(czstd, curr_block->mem, curr_block->size, &cmp_len, 1);
+        cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
         cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-        printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, curr_block->size, cmp_len, (double)curr_block->size/cmp_len);
+        printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
-        *tot_size += curr_block->size; *tot_cmp += cmp_len;
+        *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
         append_cmp_block(cmp_buff, cmp_block);
 
-        dealloc_data_block(curr_block);
+        dealloc_data_block(*curr_block);
 
-        curr_block = alloc_data_block(cmp_blk_size);
+        *curr_block = alloc_data_block(cmp_blk_size);
 
-        append_mem(curr_block, input, len);
+        append_mem(*curr_block, input, len);
     }
 }
 
@@ -318,7 +318,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 void
 cmp_xml_flush(ZSTD_CCtx* czstd,
               cmp_blk_vector_t** cmp_buff,
-              data_block_t* curr_block,
+              data_block_t** curr_block,
               size_t cmp_blk_size,
               size_t* tot_size,
               size_t* tot_cmp)
@@ -350,22 +350,22 @@ cmp_xml_flush(ZSTD_CCtx* czstd,
     size_t cmp_len = 0;
 
 
-    if(curr_block->size > cmp_blk_size) {
-        fprintf(stderr, "err: cmp_blk_size too small (%ld > %ld)\n", curr_block->size, cmp_blk_size);
+    if((*curr_block)->size > cmp_blk_size) {
+        fprintf(stderr, "err: cmp_blk_size too small (%ld > %ld)\n", (*curr_block)->size, cmp_blk_size);
         exit(1);
     }
 
-    cmp = zstd_compress(czstd, curr_block->mem, curr_block->size, &cmp_len, 1);
+    cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
     cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, curr_block->size, cmp_len, (double)curr_block->size/cmp_len);
+    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
-    *tot_size += curr_block->size; *tot_cmp += cmp_len;
+    *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
     append_cmp_block(cmp_buff, cmp_block);
 
-    dealloc_data_block(curr_block);
+    dealloc_data_block(*curr_block);
 }
 
 
@@ -413,7 +413,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 
     len = dp->start_positions[0];                                     /* Base case: Position 0 to first <binary> tag */
 
-    cmp_xml_routine(czstd, &cmp_buff, curr_block,
+    cmp_xml_routine(czstd, &cmp_buff, &curr_block,
                     input_map,                                        /* Offset is 0 */
                     len, cmp_blk_size, &tot_size, &tot_cmp);
 
@@ -423,7 +423,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 
         len = dp->start_positions[i]-dp->end_positions[i-1];          /* Length is substring between start[i] - end[i-1] */
 
-        cmp_xml_routine(czstd, &cmp_buff, curr_block,
+        cmp_xml_routine(czstd, &cmp_buff, &curr_block,
                         input_map + dp->end_positions[i-1],           /* Offset is end of previous </binary> */
                         len, cmp_blk_size, &tot_size, &tot_cmp);
 
@@ -431,12 +431,12 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
 
     len = dp->file_end - dp->end_positions[dp->total_spec*2];         /* End case: from last </binary> to EOF */
 
-    cmp_xml_routine(czstd, &cmp_buff, curr_block,
+    cmp_xml_routine(czstd, &cmp_buff, &curr_block,
                     input_map + dp->end_positions[dp->total_spec*2],  /* Offset is end of last </binary> */
                     len, cmp_blk_size, &tot_size, &tot_cmp);
 
 
-    cmp_xml_flush(czstd, &cmp_buff, curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_xml_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     printf("\t==================================================================\n");
     printf("\tXML size: %ld Compressed XML size: %ld (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
