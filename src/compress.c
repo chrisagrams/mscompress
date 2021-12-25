@@ -439,7 +439,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
     cmp_xml_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     printf("\t==================================================================\n");
-    printf("\tXML size: %ld Compressed XML size: %ld (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
+    printf("\tXML size: %ld bytes. Compressed XML size: %ld bytes. (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
     /* Cleanup (curr_block already freed by cmp_xml_flush) */
     dealloc_cctx(czstd);
