@@ -161,6 +161,8 @@ main(int argc, char* argv[])
 
     cmp_blk_vector_t* compressed_xml = compress_xml(input_map, dp, 1e+7);
 
+    cmp_blk_vector_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7);
+
     stop = clock();
 
     printf("\tDecoding and compression time: %1.4fs\n", (double)(stop-start) / CLOCKS_PER_SEC);

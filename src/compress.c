@@ -247,7 +247,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 
 
 void
-cmp_xml_routine(ZSTD_CCtx* czstd,
+cmp_routine(ZSTD_CCtx* czstd,
                 cmp_blk_vector_t** cmp_buff,
                 data_block_t** curr_block,
                 char* input,
@@ -316,7 +316,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 
 
 void
-cmp_xml_flush(ZSTD_CCtx* czstd,
+cmp_flush(ZSTD_CCtx* czstd,
               cmp_blk_vector_t** cmp_buff,
               data_block_t** curr_block,
               size_t cmp_blk_size,
@@ -324,7 +324,7 @@ cmp_xml_flush(ZSTD_CCtx* czstd,
               size_t* tot_cmp)
 /**
  * @brief "Flushes" the current data block by compressing and appending to cmp_buff vector.
- * Handles the remainder of data blocks stored in the cmp_xml_routine that did not fully populate
+ * Handles the remainder of data blocks stored in the cmp_routine that did not fully populate
  * a data block to be compressed.
  * 
  * @param czstd A ZSTD compression context allocated by alloc_cctx() (one per thread).
@@ -368,6 +368,52 @@ cmp_xml_flush(ZSTD_CCtx* czstd,
     dealloc_data_block(*curr_block);
 }
 
+void
+cmp_xml_routine(ZSTD_CCtx* czstd,
+                cmp_blk_vector_t** cmp_buff,
+                data_block_t** curr_block,
+                char* input,
+                size_t len,
+                size_t cmp_blk_size,
+                size_t* tot_size,
+                size_t* tot_cmp)
+{
+    cmp_routine(czstd,
+                cmp_buff,
+                curr_block,
+                input,
+                len,
+                cmp_blk_size,
+                tot_size,
+                tot_cmp);
+}
+
+void
+cmp_binary_routine(ZSTD_CCtx* czstd,
+                   cmp_blk_vector_t** cmp_buff,
+                   data_block_t** curr_block,
+                   data_format* df,
+                   char* input,
+                   size_t len,
+                   size_t cmp_blk_size,
+                   size_t* tot_size,
+                   size_t* tot_cmp)
+{
+    size_t binary_len = 0;
+    double* binary_buff; 
+    
+    binary_buff = decode_binary(input, 0, len, df->compression, &binary_len);
+    cmp_routine(czstd,
+                cmp_buff,
+                curr_block,
+                (char*)binary_buff,
+                binary_len,
+                cmp_blk_size,
+                tot_size, tot_cmp);
+}
+
+
+
 
 cmp_blk_vector_t*
 compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
@@ -407,7 +453,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
     curr_block = alloc_data_block(cmp_blk_size);
 
     printf("\tUsing %ld byte block size.\n", cmp_blk_size);
-    printf("\t====================== Data blocks ===============================\n");
+    printf("\t========================== Data blocks ===========================\n");
     printf("\t||   Block index       Original size    Compressed size      %%  ||\n");
     printf("\t||==============================================================||\n");
 
@@ -436,12 +482,58 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size)
                     len, cmp_blk_size, &tot_size, &tot_cmp);
 
 
-    cmp_xml_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     printf("\t==================================================================\n");
     printf("\tXML size: %ld bytes. Compressed XML size: %ld bytes. (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
-    /* Cleanup (curr_block already freed by cmp_xml_flush) */
+    /* Cleanup (curr_block already freed by cmp_flush) */
+    dealloc_cctx(czstd);
+
+    return cmp_buff;
+}
+
+cmp_blk_vector_t*
+compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size)
+{
+    ZSTD_CCtx* czstd;
+
+    cmp_blk_vector_t* cmp_buff;
+    data_block_t* curr_block;
+
+    size_t len;
+
+    size_t tot_size =0;
+    size_t tot_cmp = 0;
+
+    int i = 0;
+
+    czstd = alloc_cctx();
+
+    cmp_buff = alloc_cmp_buff(10);
+
+    curr_block = alloc_data_block(cmp_blk_size);
+
+    printf("\t========================== Data blocks ===========================\n");
+    printf("\t||   Block index       Original size    Compressed size      %%  ||\n");
+    printf("\t||==============================================================||\n");
+
+    for(i; i < dp->total_spec * 2; i++)
+    {
+        len = dp->end_positions[i] - dp->start_positions[i];
+
+        cmp_binary_routine(czstd, &cmp_buff, &curr_block, df, 
+                           input_map+dp->start_positions[i],
+                           len, cmp_blk_size, &tot_size, &tot_cmp);
+    }
+
+    cmp_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+
+    printf("\t==================================================================\n");
+
+    printf("\tBinary size: %ld bytes. Compressed binary size: %ld bytes. (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
+
+    /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);
 
     return cmp_buff;
