@@ -33,7 +33,7 @@ else
 		LIBS += -largp -lz -lzstd -I./src -I./
 	endif
 	ifeq ($(UNAME_S),Linux)
-		LIBS += 
+		LIBS += -lz -lzstd -I./src -I./
 	endif
 endif
 
@@ -104,7 +104,6 @@ vendor/base64/lib/arch/sse42/codec.o:  CFLAGS += $(SSE42_CFLAGS)
 vendor/base64/lib/arch/avx/codec.o:    CFLAGS += $(AVX_CFLAGS)
 
 %.o: %.c
-	@echo $(LIBS)
 	$(CC) $(CFLAGS) -o $@ -c $< $(LIBS)
 
 
