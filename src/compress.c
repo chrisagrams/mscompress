@@ -116,34 +116,6 @@ alloc_cmp_buff()
     return r;
 }
 
-
-// void
-// grow_cmp_buff(cmp_blk_vector_t** cmp_buff)
-// /**
-//  * @brief Grows a cmp_blk_vector_t struct. Deallocated old cmp_blk_vector_t and replaces in place with new pointer.
-//  * 
-//  * @param cmp_buff A dereferenced pointer to desired cmp_blk_vector_t to grow. New cmp_blk_vector_t will be located at the same addresss.
-//  * 
-//  */
-// {
-//     cmp_blk_vector_t* new_cmp_buff;
-//     int i = 0;
-
-//     new_cmp_buff = alloc_cmp_buff((*cmp_buff)->allocated*2);
-
-//     for (i; i < (*cmp_buff)->populated; i++)
-//         new_cmp_buff->cmp_blks[i] = (*cmp_buff)->cmp_blks[i];
-
-//     new_cmp_buff->populated = (*cmp_buff)->populated;
-    
-//     free(*cmp_buff);
-
-//     *cmp_buff = new_cmp_buff;
-    
-//     return;
-// }
-
-
 void
 append_cmp_block(cmp_blk_queue_t* cmp_buff, cmp_block_t* buff)
 {

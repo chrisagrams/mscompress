@@ -122,6 +122,8 @@ main(int argc, char* argv[])
     int if_blksize = get_blksize(args.in_file);
     int of_blksize = get_blksize(args.out_file);
 
+    int blocksize = 1e+7;
+
     struct base64_state state;
 
     // Initialize stream encoder:
@@ -143,7 +145,8 @@ main(int argc, char* argv[])
         return -1;
 
     dp->file_end = input_filesize;
-        
+      
+    get_binary_divisions(dp, &blocksize, 8);
     
     stop = clock();
 
@@ -161,9 +164,9 @@ main(int argc, char* argv[])
 
     printf("\nDecoding and compression...\n");
 
-    cmp_blk_queue_t* compressed_xml = compress_xml(input_map, dp, 1e+7, output_fd);
+    cmp_blk_queue_t* compressed_xml = compress_xml(input_map, dp, blocksize, output_fd);
 
-    cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7, output_fd);
+    cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, blocksize, output_fd);
 
     stop = clock();
 

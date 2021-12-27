@@ -47,7 +47,7 @@ alloc_dp(int total_spec)
     dp->file_end = 0;
     dp->start_positions = (int*)malloc(sizeof(int)*total_spec*2);
     dp->end_positions = (int*)malloc(sizeof(int)*total_spec*2);
-    dp->encoded_lengths = (int*)malloc(sizeof(int)*total_spec*2);
+    dp->positions_len = (int*)malloc(sizeof(int)*total_spec*2);
     return dp;
 }
 
@@ -287,71 +287,64 @@ find_binary(char* input_map, data_format* df)
 
 }
 
-void
-get_encoded_lengths(char* input_map, data_positions* dp)
-/**
- * @brief Depreciated.
- * 
- */
-{
-    yxml_t* xml = alloc_yxml();
-
-    int spec_index = 0;
-    int in_binary_data_array = 0;
-
-    char attrbuf[11], *attrcur = NULL, *tmp;
-    for(; *input_map; input_map++)
-    {
-        yxml_ret_t r = yxml_parse(xml, *input_map);
-        if(r < 0)
-        {
-            free(xml);
-            // free(dp);
-            return;
-        }
-        switch(r)
-        {
-            case YXML_ELEMSTART:
-                if(strcmp(xml->elem, "binaryDataArray") == 0)
-                    in_binary_data_array = 1;
-                break;
-
-            case YXML_ELEMEND:
-                if(strcmp(xml->elem, "binaryDataArray") == 0){
-                    in_binary_data_array = 0;
-                }
-                break;
-            case YXML_ATTRSTART:
-                if(in_binary_data_array && strcmp(xml->attr, "encodedLength") == 0)
-                    attrcur = attrbuf;
-                break;
-            case YXML_ATTRVAL:
-                if(!attrcur)
-                    break;
-                tmp = xml->data;
-                while (*tmp && attrcur < attrbuf+sizeof(attrbuf))
-                    *(attrcur++) = *(tmp++);
-                if(attrcur == attrbuf+sizeof(attrbuf))
-                {
-                    free(xml);
-                    return;
-                }
-                *attrcur = 0;
-                break;
-            case YXML_ATTREND:
-                if(in_binary_data_array && attrcur) 
-                {
-                    dp->encoded_lengths[spec_index] = atoi(attrbuf);
-                    spec_index++;
-                    attrcur = NULL;
-                }
-                break;
-            
-            default:
-                /* TODO: handle errors. */
-                break;   
-        }
-    }
-}
 
 /* === End of XML traversal functions === */
+
+data_positions**
+get_binary_divisions(data_positions* dp, int* blocksize, int threads)
+{
+
+    data_positions** r;
+    int divisions = 0;
+    int i = 0;
+    int curr_size = 0;
+    int curr_div  = 0;
+    int curr_div_i = 0;
+    
+    divisions = dp->file_end/(*blocksize*threads);
+    // printf("divisions: %d\n", divisions);
+    if(divisions < threads)
+    {
+        divisions = threads;
+        *blocksize = dp->file_end/threads + 1;
+        printf("new blocksize: %d\n", *blocksize);
+    }
+
+    
+    r = (data_positions**)malloc(divisions*sizeof(data_positions*));
+
+    for(i; i < divisions; i++) 
+    {
+        r[i] = alloc_dp((dp->total_spec*2)/(divisions-1));
+        r[i]->total_spec = 0;
+    }
+
+    i = 0;
+
+    
+    for(i; i < dp->total_spec * 2; i++)
+    {
+        if(curr_size > *blocksize/2)
+        {
+            curr_div++;
+            curr_div_i = 0;
+            curr_size = 0;
+        }
+        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
+        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
+        r[curr_div]->total_spec++;
+        curr_size += dp->end_positions[i]-dp->start_positions[i];
+        curr_div_i++;
+    }
+
+    for(int x = 0; x<divisions; x++)
+    {
+        printf("division %d:\n", x);
+        for(int y = 0; y<r[x]->total_spec; y++)
+        {
+            printf("(%d,%d)\n", r[x]->start_positions[y], r[x]->end_positions[y]);
+        }
+    }
+
+    return r;
+}
