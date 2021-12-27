@@ -26,7 +26,7 @@ OBJS = \
 
 LIBS				:=
 ifeq ($(OS),Windows_NT)
-    detected_OS := Windows
+    UNAME_S := Windows
 else
     UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
@@ -76,8 +76,13 @@ mscompress: $(OBJS)
 	@echo $(LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
-clean: 
+ifeq ($(OS),Windows_NT)
+clean:
+	del $(OBJS) vendor/base64/lib/config.h ./mscompress
+else
+clean:
 	rm $(OBJS) vendor/base64/lib/config.h ./mscompress ||:
+endif
 
 debug: CFLAGS = $(DEBUG_CFLAGS)
 
