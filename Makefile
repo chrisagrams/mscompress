@@ -24,17 +24,15 @@ OBJS = \
 	src/decompress.o \
 	src/mscompress.o
 
-ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
+LIBS += -lz -lzstd -I./src -I./
+
+ifeq ($(OS),Windows_NT)
     detected_OS := Windows
 else
-    detected_OS := $(shell uname)  # same as "uname -s"
-endif
-
-
-LIBS += -lz -largp -lzstd -I./src -I./
-
-ifeq (detected_OS, Darwin)
-	LIBS += -largp
+    UNAME_S := $(shell uname)  
+	ifeq ($(UNAME_S),Darwin)
+		LIBS += -largp
+	endif
 endif
 
 HAVE_AVX2   = 0
