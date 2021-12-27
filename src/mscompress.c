@@ -161,9 +161,9 @@ main(int argc, char* argv[])
 
     printf("\nDecoding and compression...\n");
 
-    cmp_blk_vector_t* compressed_xml = compress_xml(input_map, dp, 1e+7, output_fd);
+    cmp_blk_queue_t* compressed_xml = compress_xml(input_map, dp, 1e+7, output_fd);
 
-    cmp_blk_vector_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7, output_fd);
+    cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7, output_fd);
 
     stop = clock();
 

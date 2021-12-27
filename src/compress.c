@@ -95,8 +95,8 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
 }
 
 
-cmp_blk_vector_t*
-alloc_cmp_buff(int allocation)
+cmp_blk_queue_t*
+alloc_cmp_buff()
 /**
  * @brief Allocates a cmp_blk_vector_t struct to store compressed blocks (cmp_block_t struct) in a vector.
  * 
@@ -106,79 +106,85 @@ alloc_cmp_buff(int allocation)
  * 
  */
 {
-    cmp_blk_vector_t* r;
+    cmp_blk_queue_t* r;
 
-    r = (cmp_blk_vector_t*)malloc(sizeof(cmp_blk_vector_t));
-    r->allocated = allocation;
+    r = (cmp_blk_queue_t*)malloc(sizeof(cmp_blk_queue_t));
     r->populated = 0;
-    r->cmp_blks = (cmp_block_t**)malloc(sizeof(cmp_block_t*)*r->allocated);
+    r->head = NULL;
+    r->tail = NULL;
 
     return r;
 }
 
 
-void
-grow_cmp_buff(cmp_blk_vector_t** cmp_buff)
-/**
- * @brief Grows a cmp_blk_vector_t struct. Deallocated old cmp_blk_vector_t and replaces in place with new pointer.
- * 
- * @param cmp_buff A dereferenced pointer to desired cmp_blk_vector_t to grow. New cmp_blk_vector_t will be located at the same addresss.
- * 
- */
-{
-    cmp_blk_vector_t* new_cmp_buff;
-    int i = 0;
+// void
+// grow_cmp_buff(cmp_blk_vector_t** cmp_buff)
+// /**
+//  * @brief Grows a cmp_blk_vector_t struct. Deallocated old cmp_blk_vector_t and replaces in place with new pointer.
+//  * 
+//  * @param cmp_buff A dereferenced pointer to desired cmp_blk_vector_t to grow. New cmp_blk_vector_t will be located at the same addresss.
+//  * 
+//  */
+// {
+//     cmp_blk_vector_t* new_cmp_buff;
+//     int i = 0;
 
-    new_cmp_buff = alloc_cmp_buff((*cmp_buff)->allocated*2);
+//     new_cmp_buff = alloc_cmp_buff((*cmp_buff)->allocated*2);
 
-    for (i; i < (*cmp_buff)->populated; i++)
-        new_cmp_buff->cmp_blks[i] = (*cmp_buff)->cmp_blks[i];
+//     for (i; i < (*cmp_buff)->populated; i++)
+//         new_cmp_buff->cmp_blks[i] = (*cmp_buff)->cmp_blks[i];
 
-    new_cmp_buff->populated = (*cmp_buff)->populated;
+//     new_cmp_buff->populated = (*cmp_buff)->populated;
     
-    free(*cmp_buff);
+//     free(*cmp_buff);
 
-    *cmp_buff = new_cmp_buff;
+//     *cmp_buff = new_cmp_buff;
     
-    return;
-}
+//     return;
+// }
 
 
 void
-append_cmp_block(cmp_blk_vector_t** cmp_buff, cmp_block_t* buff)
-/**
- * @brief Appends a compressed block to the compressed block vector. Grows vector if needed.
- * 
- * @param cmp_buff A dereferenced pointer to cmp_blk_vector_t vector.
- * 
- * @param buff Desired compressed block to append to vector.
- * 
- */
+append_cmp_block(cmp_blk_queue_t* cmp_buff, cmp_block_t* buff)
 {
-    if ((*cmp_buff)->populated == (*cmp_buff)->allocated) grow_cmp_buff(cmp_buff);
+    cmp_block_t* old_tail;
 
-    (*cmp_buff)->cmp_blks[(*cmp_buff)->populated] = buff;
-    (*cmp_buff)->populated++;
+    old_tail = cmp_buff->tail;
+    if(old_tail)
+    {
+        old_tail->next = buff;
+        cmp_buff->tail = buff;
+    }
+    else
+    {
+        cmp_buff->head = buff;
+        cmp_buff->tail = buff;
+    }
+    cmp_buff->populated++;
 
     return;
 }
 
 cmp_block_t*
-pop_cmp_block(cmp_blk_vector_t** cmp_buff)
+pop_cmp_block(cmp_blk_queue_t* cmp_buff)
 {
-    cmp_block_t* r;
-    int i = 0;
+    cmp_block_t* old_head;
 
-    if((*cmp_buff)->populated == 0) return NULL;
-
-    r = (*cmp_buff)->cmp_blks[0];
-
-    for(i; i < (*cmp_buff)->populated - 1; i++)
-        (*cmp_buff)->cmp_blks[i] = (*cmp_buff)->cmp_blks[i+1];
+    old_head = cmp_buff->head;
     
-    (*cmp_buff)->populated--;
+    if(cmp_buff->head == cmp_buff->tail)
+    {
+        cmp_buff->head = NULL;
+        cmp_buff->tail = NULL;
+    }
+    else
+        cmp_buff->head = old_head->next;
 
-    return r;
+    old_head->next = NULL;
+
+    cmp_buff->populated--;
+
+    return old_head;
 
 }
 
@@ -277,7 +283,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 
 void
 cmp_routine(ZSTD_CCtx* czstd,
-                cmp_blk_vector_t** cmp_buff,
+                cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
                 size_t len,
@@ -329,7 +335,7 @@ cmp_routine(ZSTD_CCtx* czstd,
 
         cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-        printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
+        printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
         *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
@@ -346,7 +352,7 @@ cmp_routine(ZSTD_CCtx* czstd,
 
 void
 cmp_flush(ZSTD_CCtx* czstd,
-              cmp_blk_vector_t** cmp_buff,
+              cmp_blk_queue_t* cmp_buff,
               data_block_t** curr_block,
               size_t cmp_blk_size,
               size_t* tot_size,
@@ -388,7 +394,7 @@ cmp_flush(ZSTD_CCtx* czstd,
 
     cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", (*cmp_buff)->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
+    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
     *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
@@ -412,11 +418,11 @@ write_cmp_blk(cmp_block_t* blk, int fd)
 }
 
 void
-cmp_dump(cmp_blk_vector_t** cmp_buff, int fd)
+cmp_dump(cmp_blk_queue_t* cmp_buff, int fd)
 {
     cmp_block_t* front;
 
-    while((*cmp_buff)->populated > 0)
+    while(cmp_buff->populated > 0)
     {
         front = pop_cmp_block(cmp_buff);
         printf("writing %ld bytes to disk\n", front->size);
@@ -428,7 +434,7 @@ cmp_dump(cmp_blk_vector_t** cmp_buff, int fd)
 
 void
 cmp_xml_routine(ZSTD_CCtx* czstd,
-                cmp_blk_vector_t** cmp_buff,
+                cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
                 size_t len,
@@ -448,7 +454,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 
 void
 cmp_binary_routine(ZSTD_CCtx* czstd,
-                   cmp_blk_vector_t** cmp_buff,
+                   cmp_blk_queue_t* cmp_buff,
                    data_block_t** curr_block,
                    data_format* df,
                    char* input,
@@ -473,7 +479,7 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
 
 
 
-cmp_blk_vector_t*
+cmp_blk_queue_t*
 compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 /**
  * @brief Main function to compress XML data within a .mzML data.
@@ -494,7 +500,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 {
     ZSTD_CCtx* czstd;
 
-    cmp_blk_vector_t* cmp_buff;
+    cmp_blk_queue_t* cmp_buff;
     data_block_t* curr_block;
 
     size_t len;
@@ -506,7 +512,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 
     czstd = alloc_cctx();
 
-    cmp_buff = alloc_cmp_buff(10);                                    /* Start with 10 vectors, dynamically grow (x2) if run out of space */
+    cmp_buff = alloc_cmp_buff();                                    /* Start with 10 vectors, dynamically grow (x2) if run out of space */
 
     curr_block = alloc_data_block(cmp_blk_size);
 
@@ -517,7 +523,7 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 
     len = dp->start_positions[0];                                     /* Base case: Position 0 to first <binary> tag */
 
-    cmp_xml_routine(czstd, &cmp_buff, &curr_block,
+    cmp_xml_routine(czstd, cmp_buff, &curr_block,
                     input_map,                                        /* Offset is 0 */
                     len, cmp_blk_size, &tot_size, &tot_cmp);
 
@@ -527,25 +533,25 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 
         len = dp->start_positions[i]-dp->end_positions[i-1];          /* Length is substring between start[i] - end[i-1] */
 
-        cmp_xml_routine(czstd, &cmp_buff, &curr_block,
+        cmp_xml_routine(czstd, cmp_buff, &curr_block,
                         input_map + dp->end_positions[i-1],           /* Offset is end of previous </binary> */
                         len, cmp_blk_size, &tot_size, &tot_cmp);
                         
-        cmp_dump(&cmp_buff, fd);
+        cmp_dump(cmp_buff, fd);
 
 
     }
 
     len = dp->file_end - dp->end_positions[dp->total_spec*2];         /* End case: from last </binary> to EOF */
 
-    cmp_xml_routine(czstd, &cmp_buff, &curr_block,
+    cmp_xml_routine(czstd, cmp_buff, &curr_block,
                     input_map + dp->end_positions[dp->total_spec*2],  /* Offset is end of last </binary> */
                     len, cmp_blk_size, &tot_size, &tot_cmp);
 
 
-    cmp_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(czstd, cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
-    cmp_dump(&cmp_buff, fd);
+    cmp_dump(cmp_buff, fd);
 
     printf("\t==================================================================\n");
     printf("\tXML size: %ld bytes. Compressed XML size: %ld bytes. (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
@@ -556,12 +562,12 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
     return cmp_buff;
 }
 
-cmp_blk_vector_t*
+cmp_blk_queue_t*
 compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size, int fd)
 {
     ZSTD_CCtx* czstd;
 
-    cmp_blk_vector_t* cmp_buff;
+    cmp_blk_queue_t* cmp_buff;
     data_block_t* curr_block;
 
     size_t len;
@@ -573,7 +579,7 @@ compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp
 
     czstd = alloc_cctx();
 
-    cmp_buff = alloc_cmp_buff(10);
+    cmp_buff = alloc_cmp_buff();
 
     curr_block = alloc_data_block(cmp_blk_size);
 
@@ -585,16 +591,16 @@ compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp
     {
         len = dp->end_positions[i] - dp->start_positions[i];
 
-        cmp_binary_routine(czstd, &cmp_buff, &curr_block, df, 
+        cmp_binary_routine(czstd, cmp_buff, &curr_block, df, 
                            input_map+dp->start_positions[i],
                            len, cmp_blk_size, &tot_size, &tot_cmp);
-        cmp_dump(&cmp_buff, fd);
+        cmp_dump(cmp_buff, fd);
 
     }
 
-    cmp_flush(czstd, &cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(czstd, cmp_buff, &curr_block, cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
-    cmp_dump(&cmp_buff, fd);
+    cmp_dump(cmp_buff, fd);
 
     printf("\t==================================================================\n");
 
