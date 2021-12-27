@@ -155,19 +155,19 @@ main(int argc, char* argv[])
     
     dzstd = alloc_dctx();
 
+    write_header(output_fd, "ZSTD", "d8e89b7e0044e0164b1e853516b90a05");
+
     start = clock();
 
     printf("\nDecoding and compression...\n");
 
-    cmp_blk_vector_t* compressed_xml = compress_xml(input_map, dp, 1e+7);
+    cmp_blk_vector_t* compressed_xml = compress_xml(input_map, dp, 1e+7, output_fd);
 
-    cmp_blk_vector_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7);
+    cmp_blk_vector_t* compressed_binary = compress_binary(input_map, dp, df, 1e+7, output_fd);
 
     stop = clock();
 
     printf("\tDecoding and compression time: %1.4fs\n", (double)(stop-start) / CLOCKS_PER_SEC);
-
-    write_header(output_fd, "ZSTD", "d8e89b7e0044e0164b1e853516b90a05");
 
     remove_mapping(input_map, input_fd);
     close(input_fd);

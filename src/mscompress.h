@@ -119,8 +119,8 @@ double* decode_binary(char* input_map, int start_position, int end_position, int
 /* compress.c */
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
-cmp_blk_vector_t* compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size);
-cmp_blk_vector_t* compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size);
+cmp_blk_vector_t* compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd);
+cmp_blk_vector_t* compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size, int fd);
 
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();
