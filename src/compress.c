@@ -274,7 +274,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 }
 
 compress_binary_args_t*
-alloc_compress_binary_args(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size)
+alloc_compress_binary_args(char* input_map, data_positions_t* dp, data_format_t* df, size_t cmp_blk_size)
 {
     compress_binary_args_t* r;
 
@@ -414,7 +414,7 @@ cmp_flush(ZSTD_CCtx* czstd,
 
     cmp_block = alloc_cmp_block(cmp, cmp_len);
 
-    printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
+    // printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
     *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
@@ -476,7 +476,7 @@ void
 cmp_binary_routine(ZSTD_CCtx* czstd,
                    cmp_blk_queue_t* cmp_buff,
                    data_block_t** curr_block,
-                   data_format* df,
+                   data_format_t* df,
                    char* input,
                    size_t len,
                    size_t cmp_blk_size,
@@ -500,13 +500,13 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
 
 
 cmp_blk_queue_t*
-compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
+compress_xml(char* input_map, data_positions_t* dp, size_t cmp_blk_size, int fd)
 /**
  * @brief Main function to compress XML data within a .mzML data.
  * 
  * @param input_map A mmap pointer to the .mzML file.
  * 
- * @param dp A data_positions struct populated by preprocess.c:find_binary()
+ * @param dp A data_positions_t struct populated by preprocess.c:find_binary()
  * 
  * @param cmp_blk_size The size of a data block before it is compressed. 
  *                     NOTE: If this value is set too small, the program will exit with error code 1.
@@ -585,6 +585,8 @@ compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd)
 void
 compress_binary(void* args)
 {
+    int tid;
+
     ZSTD_CCtx* czstd;
 
     compress_binary_args_t* cb_args;
@@ -598,6 +600,8 @@ compress_binary(void* args)
 
     int i = 0;
 
+    tid = get_thread_id();
+
     cb_args = (compress_binary_args_t*)args;
 
     czstd = alloc_cctx();
@@ -605,10 +609,6 @@ compress_binary(void* args)
     cmp_buff = alloc_cmp_buff();
 
     curr_block = alloc_data_block(cb_args->cmp_blk_size);
-
-    printf("\t========================== Data blocks ===========================\n");
-    printf("\t||   Block index       Original size    Compressed size      %%  ||\n");
-    printf("\t||==============================================================||\n");
 
     for(i; i < cb_args->dp->total_spec * 2; i++)
     {
@@ -622,10 +622,7 @@ compress_binary(void* args)
 
     cmp_flush(czstd, cmp_buff, &curr_block, cb_args->cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
-
-    printf("\t==================================================================\n");
-
-    printf("\tBinary size: %ld bytes. Compressed binary size: %ld bytes. (%1.2f%%)\n", tot_size, tot_cmp, (double)tot_size/tot_cmp);
+    printf("\tThread %03d: Binary size: %ld bytes. Compressed binary size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
     /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);
@@ -634,7 +631,7 @@ compress_binary(void* args)
 }
 
 void
-compress_binary_parallel(char* input_map, data_positions** binary_divisions, data_format* df, size_t cmp_blk_size, int divisions, int fd)
+compress_binary_parallel(char* input_map, data_positions_t** binary_divisions, data_format_t* df, size_t cmp_blk_size, int divisions, int fd)
 {
     cmp_blk_queue_t* compressed_binary;
     compress_binary_args_t* args[divisions];
@@ -649,7 +646,7 @@ compress_binary_parallel(char* input_map, data_positions** binary_divisions, dat
     for(i = 0; i < divisions; i++)
         pthread_create(&ptid[i], NULL, &compress_binary, (void*)args[i]);
 
-    for(int i = 0; i < divisions; i++)
+    for(i = 0; i < divisions; i++)
     {
         pthread_join(ptid[i], NULL);
         cmp_dump(args[i]->ret, fd);

@@ -31,18 +31,18 @@ alloc_yxml()
     return xml;
 }
 
-data_format*
+data_format_t*
 alloc_df()
 {
-    data_format* df = (data_format*)malloc(sizeof(data_format));
+    data_format_t* df = (data_format_t*)malloc(sizeof(data_format_t));
     df->populated = 0;
     return df;
 }
 
-data_positions*
+data_positions_t*
 alloc_dp(int total_spec)
 {
-    data_positions* dp = (data_positions*)malloc(sizeof(data_positions));
+    data_positions_t* dp = (data_positions_t*)malloc(sizeof(data_positions_t));
     dp->total_spec = total_spec;
     dp->file_end = 0;
     dp->start_positions = (int*)malloc(sizeof(int)*total_spec*2);
@@ -52,7 +52,7 @@ alloc_dp(int total_spec)
 }
 
 void
-free_dp(data_positions* dp)
+free_dp(data_positions_t* dp)
 {
     free(dp->start_positions);
     free(dp->end_positions);
@@ -65,9 +65,9 @@ free_dp(data_positions* dp)
 /* === Start of XML traversal functions === */
 
 int
-map_to_df(int acc, int* current_type, data_format* df)
+map_to_df(int acc, int* current_type, data_format_t* df)
 /**
- * @brief Map a accession number to the data_format struct.
+ * @brief Map a accession number to the data_format_t struct.
  * This function populates the original compression method, m/z data array format, and 
  * intensity data array format. 
  * 
@@ -75,9 +75,9 @@ map_to_df(int acc, int* current_type, data_format* df)
  * 
  * @param current_type A pass-by-reference variable to indicate if the traversal is within an m/z or intensity array.
  * 
- * @param df An allocated unpopulated data_format struct to be populated by this function
+ * @param df An allocated unpopulated data_format_t struct to be populated by this function
  * 
- * @return 1 if data_format struct is fully populated, 0 otherwise.
+ * @return 1 if data_format_t struct is fully populated, 0 otherwise.
  */
 {
     if (acc >= _mass_ && acc <= _no_comp_) 
@@ -122,19 +122,19 @@ map_to_df(int acc, int* current_type, data_format* df)
 
 
 
-data_format*
+data_format_t*
 pattern_detect(char* input_map)
 /**
  * @brief Detect the data type and encoding within .mzML file.
  * As the data types and encoding is consistent througout the entire .mzML document,
- * the function stops its traversal once all fields of the data_format struct are filled.
+ * the function stops its traversal once all fields of the data_format_t struct are filled.
  * 
  * @param input_map A mmap pointer to the .mzML file.
  * 
- * @return A populated data_format struct on success, NULL pointer on failure.
+ * @return A populated data_format_t struct on success, NULL pointer on failure.
  */
 {
-    data_format* df = alloc_df();
+    data_format_t* df = alloc_df();
     
     yxml_t* xml = alloc_yxml();
 
@@ -213,8 +213,8 @@ pattern_detect(char* input_map)
     return NULL;
 }
 
-data_positions*
-find_binary(char* input_map, data_format* df)
+data_positions_t*
+find_binary(char* input_map, data_format_t* df)
 /**
  * @brief Find the position of all binary data within .mzML file using the yxml library traversal.
  * As the file is mmaped, majority of the .mzML will be loaded into memory during this traversal.
@@ -222,14 +222,14 @@ find_binary(char* input_map, data_format* df)
  * 
  * @param input_map A mmap pointer to the .mzML file.
  * 
- * @param df A populated data_format struct from pattern_detect(). Use the total_spec field in the struct
+ * @param df A populated data_format_t struct from pattern_detect(). Use the total_spec field in the struct
  *  to stop the XML traversal once all spectra binary data are found (ignore the chromatogramList)
  *
- * @return A data_positions array populated with starting and ending positions of each data section on success.
+ * @return A data_positions_t array populated with starting and ending positions of each data section on success.
  *         NULL pointer on failure.
  */
 {
-    data_positions* dp = alloc_dp(df->total_spec);
+    data_positions_t* dp = alloc_dp(df->total_spec);
 
     yxml_t* xml = alloc_yxml();
 
@@ -290,11 +290,11 @@ find_binary(char* input_map, data_format* df)
 
 /* === End of XML traversal functions === */
 
-data_positions**
-get_binary_divisions(data_positions* dp, int* blocksize, int* divisions, int threads)
+data_positions_t**
+get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int threads)
 {
 
-    data_positions** r;
+    data_positions_t** r;
     int i = 0;
     int curr_size = 0;
     int curr_div  = 0;
@@ -310,7 +310,7 @@ get_binary_divisions(data_positions* dp, int* blocksize, int* divisions, int thr
     }
 
     
-    r = (data_positions**)malloc(*divisions*sizeof(data_positions*));
+    r = (data_positions_t**)malloc(*divisions*sizeof(data_positions_t*));
 
     for(i; i < *divisions; i++) 
     {

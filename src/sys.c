@@ -1,16 +1,17 @@
 #ifdef __linux__
     #include <sys/sysinfo.h>
     #include <sys/types.h>
-    #include <unistd.h>
     #include <sys/syscall.h>
+    #include <unistd.h>
 #elif __APPLE__
     #include <sys/sysctl.h>
 #elif _WIN32
     #include <sysinfoapi.h>
 #endif
-#include "mscompress.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "mscompress.h"
+
 
 int
 get_cpu_count()

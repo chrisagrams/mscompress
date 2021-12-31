@@ -135,12 +135,12 @@ main(int argc, char* argv[])
 
     printf("\nPreprocessing...\n");
 
-    data_format* df = pattern_detect((char*)input_map);
+    data_format_t* df = pattern_detect((char*)input_map);
 
     if (df == NULL)
         return -1;
 
-    data_positions* dp = find_binary((char*)input_map, df);
+    data_positions_t* dp = find_binary((char*)input_map, df);
     if (dp == NULL)
         return -1;
 
@@ -148,7 +148,7 @@ main(int argc, char* argv[])
       
     int divisions = 0;
 
-    data_positions** binary_divisions;
+    data_positions_t** binary_divisions;
 
     binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
     
