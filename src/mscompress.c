@@ -4,6 +4,7 @@
 #include <string.h>
 #include <argp.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
@@ -81,9 +82,11 @@ main(int argc, char* argv[])
     if(args.in_file == NULL || args.out_file == NULL)
         return -1;
     
-    clock_t start, stop, abs_start, abs_stop;
+    struct timeval start, stop, abs_start, abs_stop;
 
-    start = abs_start = clock();
+    gettimeofday(&abs_start, NULL);
+
+    gettimeofday(&start, NULL);
 
     int input_fd, output_fd;
     
@@ -152,11 +155,11 @@ main(int argc, char* argv[])
 
     binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
     
-    stop = clock();
+    gettimeofday(&stop, NULL);
 
     printf("\tDetected %d spectra.\n", df->total_spec);
 
-    printf("\tPreprocessing time: %1.4fs\n", (double)(stop-start) / CLOCKS_PER_SEC);  
+    printf("\tPreprocessing time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);  
 
     ZSTD_DCtx* dzstd;
     
@@ -164,7 +167,7 @@ main(int argc, char* argv[])
 
     write_header(output_fd, "ZSTD", "d8e89b7e0044e0164b1e853516b90a05");
 
-    start = clock();
+    gettimeofday(&start, NULL);
 
     printf("\nDecoding and compression...\n");
 
@@ -174,17 +177,17 @@ main(int argc, char* argv[])
 
     // cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, blocksize, output_fd);
 
-    stop = clock();
+    gettimeofday(&stop, NULL);
 
-    printf("\tDecoding and compression time: %1.4fs\n", (double)(stop-start) / CLOCKS_PER_SEC);
+    printf("\tDecoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
 
     remove_mapping(input_map, input_fd);
     close(input_fd);
     close(output_fd);
 
-    abs_stop = clock();
+    gettimeofday(&abs_stop, NULL);
 
-    printf("\n=== Operation finished in %1.4fs ===\n", (double)(abs_stop-abs_start) / CLOCKS_PER_SEC);
+    printf("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_usec-abs_start.tv_usec)/1e+6);
 
     return 0;
 }
