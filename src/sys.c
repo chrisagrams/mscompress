@@ -1,5 +1,8 @@
 #ifdef __linux__
     #include <sys/sysinfo.h>
+    #include <sys/types.h>
+    #include <unistd.h>
+    #include <sys/syscall.h>
 #elif __APPLE__
     #include <sys/sysctl.h>
 #elif _WIN32
@@ -47,4 +50,26 @@ get_cpu_count()
     printf("\t%d usable processors detected.\n", np);
 
     return np;
+}
+
+int
+get_thread_id()
+{
+    int tid;
+
+    #ifdef __linux__
+
+        tid = (int)syscall(__NR_gettid);
+    
+    #elif __APPLE__
+
+        tid = (int)pthread_getthreadid_np();
+
+    #elif _WIN32
+        
+        /* TODO */
+    
+    #endif
+
+    return tid;
 }

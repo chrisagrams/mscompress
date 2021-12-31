@@ -115,6 +115,8 @@ data_positions** get_binary_divisions(data_positions* dp, int* blocksize, int* d
 
 /* sys.c */
 int get_cpu_count();
+int get_thread_id();
+
 
 /* decode.c */
 double* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
