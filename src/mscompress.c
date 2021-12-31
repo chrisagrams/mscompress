@@ -117,7 +117,7 @@ main(int argc, char* argv[])
     
     cpu_count = get_cpu_count();
 
-    n_threads = cpu_count;
+    n_threads = 8;
 
     int if_blksize = get_blksize(args.in_file);
     int of_blksize = get_blksize(args.out_file);
@@ -146,7 +146,11 @@ main(int argc, char* argv[])
 
     dp->file_end = input_filesize;
       
-    get_binary_divisions(dp, &blocksize, 8);
+    int divisions = 0;
+
+    data_positions** binary_divisions;
+
+    binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
     
     stop = clock();
 
@@ -166,7 +170,9 @@ main(int argc, char* argv[])
 
     cmp_blk_queue_t* compressed_xml = compress_xml(input_map, dp, blocksize, output_fd);
 
-    cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, blocksize, output_fd);
+    compress_binary_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd);
+
+    // cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, blocksize, output_fd);
 
     stop = clock();
 

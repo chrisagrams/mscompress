@@ -291,36 +291,34 @@ find_binary(char* input_map, data_format* df)
 /* === End of XML traversal functions === */
 
 data_positions**
-get_binary_divisions(data_positions* dp, int* blocksize, int threads)
+get_binary_divisions(data_positions* dp, int* blocksize, int* divisions, int threads)
 {
 
     data_positions** r;
-    int divisions = 0;
     int i = 0;
     int curr_size = 0;
     int curr_div  = 0;
     int curr_div_i = 0;
     
-    divisions = dp->file_end/(*blocksize*threads);
-    // printf("divisions: %d\n", divisions);
-    if(divisions < threads)
+    *divisions = dp->file_end/(*blocksize*threads);
+
+    if(*divisions < threads)
     {
-        divisions = threads;
+        *divisions = threads;
         *blocksize = dp->file_end/threads + 1;
         printf("new blocksize: %d\n", *blocksize);
     }
 
     
-    r = (data_positions**)malloc(divisions*sizeof(data_positions*));
+    r = (data_positions**)malloc(*divisions*sizeof(data_positions*));
 
-    for(i; i < divisions; i++) 
+    for(i; i < *divisions; i++) 
     {
-        r[i] = alloc_dp((dp->total_spec*2)/(divisions-1));
+        r[i] = alloc_dp((dp->total_spec*2)/(*divisions-1));
         r[i]->total_spec = 0;
     }
 
     i = 0;
-
     
     for(i; i < dp->total_spec * 2; i++)
     {
@@ -335,15 +333,6 @@ get_binary_divisions(data_positions* dp, int* blocksize, int threads)
         r[curr_div]->total_spec++;
         curr_size += dp->end_positions[i]-dp->start_positions[i];
         curr_div_i++;
-    }
-
-    for(int x = 0; x<divisions; x++)
-    {
-        printf("division %d:\n", x);
-        for(int y = 0; y<r[x]->total_spec; y++)
-        {
-            printf("(%d,%d)\n", r[x]->start_positions[y], r[x]->end_positions[y]);
-        }
     }
 
     return r;

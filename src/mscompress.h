@@ -111,7 +111,7 @@ void write_header(int fd, char* compression_method, char* md5);
 data_format* pattern_detect(char* input_map);
 data_positions*find_binary(char* input_map, data_format* df);
 void get_encoded_lengths(char* input_map, data_positions* dp);
-data_positions** get_binary_divisions(data_positions* dp, int* blocksize, int threads);
+data_positions** get_binary_divisions(data_positions* dp, int* blocksize, int* divisions, int threads);
 
 /* sys.c */
 int get_cpu_count();
@@ -120,10 +120,20 @@ int get_cpu_count();
 double* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* compress.c */
+typedef struct {
+    char* input_map;
+    data_positions* dp;
+    data_format* df;
+    size_t cmp_blk_size;
+
+    cmp_blk_queue_t* ret;
+} compress_binary_args_t;
+    
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 cmp_blk_queue_t* compress_xml(char* input_map, data_positions* dp, size_t cmp_blk_size, int fd);
-cmp_blk_queue_t* compress_binary(char* input_map, data_positions* dp, data_format* df, size_t cmp_blk_size, int fd);
+void compress_binary(void* args);
+void compress_binary_parallel(char* input_map, data_positions** binary_divisions, data_format* df, size_t cmp_blk_size, int divisions, int fd);
 
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();
