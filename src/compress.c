@@ -610,7 +610,7 @@ compress_binary(void* args)
 
     curr_block = alloc_data_block(cb_args->cmp_blk_size);
 
-    for(i; i < cb_args->dp->total_spec * 2; i++)
+    for(i; i < cb_args->dp->total_spec; i++)
     {
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
