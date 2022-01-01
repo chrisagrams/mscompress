@@ -562,7 +562,7 @@ compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, si
     compress_args_t* args[divisions];
     pthread_t ptid[divisions];
     
-    int i = 0;
+    int i;
 
     for(i = 0; i < divisions; i++)
         args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
