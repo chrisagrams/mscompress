@@ -381,7 +381,7 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
     int curr_div_i = 0;
     int curr_bin_i = 0;
 
-    r = alloc_ddp(divisions, binary_divisions[i]->total_spec+1);
+    r = alloc_ddp(divisions, dp->total_spec);
 
     /* base case */
 
