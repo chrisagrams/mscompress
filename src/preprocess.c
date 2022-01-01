@@ -52,11 +52,51 @@ alloc_dp(int total_spec)
 }
 
 void
-free_dp(data_positions_t* dp)
+dealloc_dp(data_positions_t* dp)
 {
-    free(dp->start_positions);
-    free(dp->end_positions);
-    free(dp);
+    if(dp)
+    {
+        free(dp->start_positions);
+        free(dp->end_positions);
+        free(dp);
+    }
+}
+
+
+data_positions_t**
+alloc_ddp(int len, int total_spec)
+{
+    data_positions_t** r;
+    
+    int i;
+
+    r = (data_positions_t**)malloc(len*sizeof(data_positions_t*));
+
+    i = 0;
+
+    for(i; i < len; i++)
+    {
+        r[i] = alloc_dp(total_spec);
+        r[i]->total_spec = 0;
+    }
+
+    return r;
+}
+
+void
+free_ddp(data_positions_t** ddp, int divisions)
+{
+    int i;
+
+    if(ddp)
+    {
+        i = 0;
+        for(i; i < divisions; i++)
+            dealloc_dp(ddp[i]);
+
+        free(ddp);
+    }
+
 }
 
 /* === End of allocation and deallocation helper functions === */
@@ -282,7 +322,7 @@ find_binary(char* input_map, data_format_t* df)
                 break;
         }
     }
-    free_dp(dp);
+    dealloc_dp(dp);
     return NULL;
 
 }
@@ -309,14 +349,7 @@ get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int t
         printf("new blocksize: %d\n", *blocksize);
     }
 
-    
-    r = (data_positions_t**)malloc(*divisions*sizeof(data_positions_t*));
-
-    for(i; i < *divisions; i++) 
-    {
-        r[i] = alloc_dp((dp->total_spec*2)/(*divisions-1));
-        r[i]->total_spec = 0;
-    }
+    r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions-1));
 
     i = 0;
     
@@ -335,5 +368,73 @@ get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int t
         curr_div_i++;
     }
 
+    return r;
+}
+
+data_positions_t**
+get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions)
+{
+    data_positions_t** r;
+    
+    int i;
+    int curr_div  = 0;
+    int curr_div_i = 0;
+    int curr_bin_i = 0;
+
+    r = alloc_ddp(divisions, binary_divisions[i]->total_spec+1);
+
+    /* base case */
+
+    r[curr_div]->start_positions[curr_div_i] = 0;
+    r[curr_div]->end_positions[curr_div_i] = binary_divisions[0]->start_positions[0];
+    r[curr_div]->total_spec++;
+    curr_div_i++;
+    curr_bin_i++;
+
+    /* inductive step */
+
+    i = 0;
+
+    while(i < dp->total_spec * 2)
+    {
+        if(curr_bin_i > binary_divisions[curr_div]->total_spec - 1)
+        {
+            if(curr_div + 1 == divisions)
+                break;
+            r[curr_div]->end_positions[curr_div_i-1] = binary_divisions[curr_div+1]->start_positions[0];
+            curr_div++;
+
+            r[curr_div]->start_positions[0] = binary_divisions[curr_div]->end_positions[0];
+            r[curr_div]->end_positions[0] = binary_divisions[curr_div]->start_positions[1];
+            r[curr_div]->total_spec++;
+            curr_div_i = 1;
+            curr_bin_i = 2;
+        }
+        else
+        {
+            r[curr_div]->start_positions[curr_div_i] = binary_divisions[curr_div]->end_positions[curr_bin_i-1];
+            r[curr_div]->end_positions[curr_div_i] = binary_divisions[curr_div]->start_positions[curr_bin_i];
+            r[curr_div]->total_spec++;
+            curr_div_i++;
+            curr_bin_i++;
+            i++;
+        }   
+    }
+
+    /* end case */
+    r[curr_div]->start_positions[curr_div_i] = binary_divisions[curr_div]->end_positions[curr_bin_i-1];
+    r[curr_div]->end_positions[curr_div_i] = dp->file_end;
+    r[curr_div]->total_spec++;
+
+
+    // i = 0;
+    // for(i; i < divisions; i++)
+    // {
+    //     printf("division %d\n", i);
+    //     for(int j = 0; j < r[i]->total_spec; j++)
+    //     {
+    //         printf("(%d, %d)\n", r[i]->start_positions[j], r[i]->end_positions[j]);
+    //     }
+    // }
     return r;
 }

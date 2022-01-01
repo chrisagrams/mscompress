@@ -152,8 +152,11 @@ main(int argc, char* argv[])
     int divisions = 0;
 
     data_positions_t** binary_divisions;
+    data_positions_t** xml_divisions;
 
     binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
+    
+    xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
     
     gettimeofday(&stop, NULL);
 
@@ -180,6 +183,9 @@ main(int argc, char* argv[])
     gettimeofday(&stop, NULL);
 
     printf("\tDecoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
+
+    free_ddp(binary_divisions, divisions);
+    free_ddp(xml_divisions, divisions);
 
     remove_mapping(input_map, input_fd);
     close(input_fd);
