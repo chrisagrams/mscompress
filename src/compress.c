@@ -530,7 +530,7 @@ compress_routine(void* args)
 
     curr_block = alloc_data_block(cb_args->cmp_blk_size);
 
-    for(i; i < cb_args->dp->total_spec; i++)
+    for(; i < cb_args->dp->total_spec; i++)
     {
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
@@ -558,7 +558,6 @@ compress_routine(void* args)
 void
 compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int fd)
 {
-    cmp_blk_queue_t* compressed_binary;
     compress_args_t* args[divisions];
     pthread_t ptid[divisions];
     

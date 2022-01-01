@@ -83,7 +83,7 @@ void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 size_t get_filesize(char* path);
-int write_to_file(int fd, char* buff, size_t n);
+size_t write_to_file(int fd, char* buff, size_t n);
 void write_header(int fd, char* compression_method, char* md5);
 
 /* preproccess.c */

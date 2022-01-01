@@ -66,13 +66,13 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-int
+size_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
         exit(1);
     
-    int rv;
+    ssize_t rv;
 
     rv = write(fd, buff, n);
 
