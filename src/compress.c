@@ -441,14 +441,20 @@ void
 cmp_dump(cmp_blk_queue_t* cmp_buff, int fd)
 {
     cmp_block_t* front;
+    clock_t start;
+    clock_t stop;
 
     while(cmp_buff->populated > 0)
     {
         front = pop_cmp_block(cmp_buff);
-        printf("\tWriting %ld bytes to disk\n", front->size);
-        write_cmp_blk(front, fd);
-        dealloc_cmp_block(front);
 
+        start = clock();
+        write_cmp_blk(front, fd);
+        stop = clock();
+
+        printf("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size, (front->size/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+
+        dealloc_cmp_block(front);
     }
 }
 
