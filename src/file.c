@@ -81,6 +81,8 @@ write_to_file(int fd, char* buff, size_t n)
         fprintf(stderr, "Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
         exit(1);
     }
+
+    return rv;
 }
 
 void
