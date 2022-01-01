@@ -219,7 +219,7 @@ dealloc_data_block(data_block_t* db)
 
 
 cmp_block_t*
-alloc_cmp_block(char* mem, size_t size)
+alloc_cmp_block(char* mem, size_t size, size_t original_size)
 /**
  * @brief Allocates and populates a cmp_block_t struct to store a compressed block.
  * 
@@ -235,6 +235,7 @@ alloc_cmp_block(char* mem, size_t size)
     r = (cmp_block_t*)malloc(sizeof(cmp_block_t));
     r->mem = mem;
     r->size = size;
+    r->original_size = original_size;
     return r;
 }
 
@@ -300,6 +301,113 @@ dealloc_compress_args(compress_args_t* args)
     }
 }
 
+block_len_t*
+alloc_block_len(size_t original_size, size_t compressed_size)
+{
+    block_len_t* r;
+
+    r = (block_len_t*)malloc(sizeof(block_len_t*));
+
+    r->original_size = original_size;
+    r->compresssed_size = compressed_size;
+    r->next = NULL;
+
+    return r;
+}
+
+void
+dealloc_block_len(block_len_t* blk)
+{
+    if(blk)
+    {
+        free(blk);
+    }
+}
+
+block_len_queue_t*
+alloc_block_len_queue()
+{
+    block_len_queue_t* r;
+
+    r = (block_len_queue_t*)malloc(sizeof(block_len_queue_t));
+
+    r->head = NULL;
+    r->tail = NULL;
+    r->populated = 0;
+
+    return r;
+}
+
+
+void
+dealloc_block_len_queue(block_len_queue_t* queue)
+{
+    if(queue)
+    {
+        if(queue->head)
+        {
+            block_len_t* curr_head = queue->head;
+            block_len_t* new_head = curr_head->next;
+            while(new_head)
+            {
+                free(curr_head);
+                curr_head = new_head;
+                new_head = curr_head->next;
+            }
+        }
+        free(queue);
+    }
+}
+
+
+void
+append_block_len(block_len_queue_t* queue, size_t original_size, size_t compressed_size)
+{
+    block_len_t* old_tail;
+    block_len_t* blk;
+
+    blk = alloc_block_len(original_size, compressed_size);
+
+    old_tail = queue->tail;
+    if(old_tail)
+    {
+        old_tail->next = blk;
+        queue->tail = blk;
+    }
+    else
+    {
+        queue->head = blk;
+        queue->tail = blk;
+    }
+    queue->populated++;
+
+    return;
+}
+
+void
+dump_block_len_queue(block_len_queue_t* queue, int fd)
+{
+    block_len_t* curr;
+    char buff[sizeof(size_t)];
+
+    size_t* buff_cast = (size_t*)(&buff[0]);
+
+    curr = queue->head;
+
+    while(curr != NULL)
+    {
+        *buff_cast = curr->original_size;
+        write_to_file(fd, buff, sizeof(size_t));
+
+        *buff_cast = curr->compresssed_size;
+        write_to_file(fd, buff, sizeof(size_t));
+
+        curr = curr->next;
+    }
+
+    dealloc_block_len_queue(queue);
+}
+
 
 void
 cmp_routine(ZSTD_CCtx* czstd,
@@ -353,7 +461,7 @@ cmp_routine(ZSTD_CCtx* czstd,
     {
         cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
-        cmp_block = alloc_cmp_block(cmp, cmp_len);
+        cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
         // printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
@@ -412,7 +520,7 @@ cmp_flush(ZSTD_CCtx* czstd,
 
     cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
-    cmp_block = alloc_cmp_block(cmp, cmp_len);
+    cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
     // printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
@@ -438,7 +546,7 @@ write_cmp_blk(cmp_block_t* blk, int fd)
 }
 
 void
-cmp_dump(cmp_blk_queue_t* cmp_buff, int fd)
+cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue, int fd)
 {
     cmp_block_t* front;
     clock_t start;
@@ -447,6 +555,8 @@ cmp_dump(cmp_blk_queue_t* cmp_buff, int fd)
     while(cmp_buff->populated > 0)
     {
         front = pop_cmp_block(cmp_buff);
+
+        append_block_len(blk_len_queue, front->original_size, front->size);
 
         start = clock();
         write_cmp_blk(front, fd);
@@ -555,13 +665,16 @@ compress_routine(void* args)
     cb_args->ret = cmp_buff;
 }
 
-void
+block_len_queue_t*
 compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int fd)
 {
+    block_len_queue_t* blk_len_queue;
     compress_args_t* args[divisions];
     pthread_t ptid[divisions];
     
     int i;
+
+    blk_len_queue = alloc_block_len_queue();
 
     for(i = 0; i < divisions; i++)
         args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
@@ -573,7 +686,9 @@ compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, si
     for(i = 0; i < divisions; i++)
     {
         pthread_join(ptid[i], NULL);
-        cmp_dump(args[i]->ret, fd);
+        cmp_dump(args[i]->ret, blk_len_queue, fd);
         dealloc_compress_args(args[i]);
     }
+
+    return blk_len_queue;
 }

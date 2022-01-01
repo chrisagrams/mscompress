@@ -45,9 +45,9 @@ alloc_dp(int total_spec)
     data_positions_t* dp = (data_positions_t*)malloc(sizeof(data_positions_t));
     dp->total_spec = total_spec;
     dp->file_end = 0;
-    dp->start_positions = (int*)malloc(sizeof(int)*total_spec*2);
-    dp->end_positions = (int*)malloc(sizeof(int)*total_spec*2);
-    dp->positions_len = (int*)malloc(sizeof(int)*total_spec*2);
+    dp->start_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+    dp->end_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+    dp->positions_len = (off_t*)malloc(sizeof(off_t)*total_spec*2);
     return dp;
 }
 
@@ -437,4 +437,22 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
     //     }
     // }
     return r;
+}
+
+void
+dump_dp(data_positions_t* dp, int fd)
+{
+    char buff[sizeof(off_t)];
+    off_t* buff_cast = (off_t*)(&buff[0]);
+    int i;
+
+    for(i = 0; i < dp->total_spec * 2; i++)
+    {
+        *buff_cast = dp->start_positions[i];
+        write_to_file(fd, buff, sizeof(off_t));
+        *buff_cast = dp->end_positions[i];
+        write_to_file(fd, buff, sizeof(off_t));
+    }
+
+    return;
 }

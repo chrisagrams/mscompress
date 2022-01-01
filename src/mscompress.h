@@ -1,5 +1,6 @@
 #include <argp.h>
 #include <zstd.h>
+#include <sys/types.h>
 
 #define VERSION "0.0.1"
 #define STATUS "Development"
@@ -34,9 +35,9 @@ typedef struct
 
 typedef struct
 {
-    int* start_positions;
-    int* end_positions;
-    int* positions_len;
+    off_t* start_positions;
+    off_t* end_positions;
+    off_t* positions_len;
     int total_spec;
     size_t file_end;
 } data_positions_t;
@@ -53,6 +54,7 @@ typedef struct
 {
     char* mem;
     size_t size;
+    size_t original_size;
     struct cmp_block_t* next;
 } cmp_block_t;
 
@@ -63,6 +65,35 @@ typedef struct
 
     int populated;
 } cmp_blk_queue_t;
+
+typedef struct 
+{
+    size_t original_size;
+    size_t compresssed_size;
+    struct block_len_t* next;
+
+} block_len_t;
+
+
+typedef struct 
+{
+    block_len_t* head;
+    block_len_t* tail;
+
+    int populated;
+} block_len_queue_t;
+
+
+
+typedef struct
+{
+    off_t xml_blk_pos;
+    off_t binary_blk_pos;
+    off_t dp_pos;
+} footer_t;
+
+
+
 
 
 #define _32i_ 1000519
@@ -84,7 +115,9 @@ int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
-void write_header(int fd, char* compression_method, char* md5);
+void write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5);
+off_t get_offset(int fd);
+void write_footer(footer_t footer, int fd);
 
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);
@@ -93,6 +126,7 @@ void get_encoded_lengths(char* input_map, data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
+void dump_dp(data_positions_t* dp, int fd);
 
 /* sys.c */
 int get_cpu_count();
@@ -115,7 +149,8 @@ typedef struct {
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
-void compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int fd);
+block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int fd);
+void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();

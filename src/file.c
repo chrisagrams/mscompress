@@ -85,24 +85,31 @@ write_to_file(int fd, char* buff, size_t n)
     return rv;
 }
 
+off_t
+get_offset(int fd)
+{
+    return lseek(fd, 0, SEEK_CUR);
+}
+
 void
-write_header(int fd, char* compression_method, char* md5)
+write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5)
 /**
  * @brief Writes .msz header to file descriptor.
  * Header format:
- *              |================================================|
- *              |        Content        |    Size    |  Offset   |
- *              |================================================|
- *              | Magic Tag (0x035F51B5)|   4  bytes |      0    |
- *              | Version Major Number  |   4  bytes |      4    |
- *              | Version Minor Number  |   4  bytes |      8    |
- *              | Message Tag           | 128  bytes |     12    |
- *              | Compression Method    |   4  bytes |    140    |
- *              | MD5                   |  32  bytes |    144    |
- *              | Reserved              | 336  bytes |    176    |
- *              |================================================|
- *              | Total Size            |  512 bytes |           |
- *              |================================================|
+ *              |====================================================|
+ *              |        Content            |    Size    |  Offset   |
+ *              |====================================================|
+ *              | Magic Tag (0x035F51B5)    |   4  bytes |      0    |
+ *              | Version Major Number      |   4  bytes |      4    |
+ *              | Version Minor Number      |   4  bytes |      8    |
+ *              | Message Tag               | 128  bytes |     12    |
+ *              | XML Compression Method    |   4  bytes |    140    |
+ *              | Binary Compression Method |   4  bytes |    144    |
+ *              | MD5                       |  32  bytes |    148    |
+ *              | Reserved                  | 336  bytes |    180    |
+ *              |====================================================|
+ *              | Total Size                |  512 bytes |           |
+ *              |====================================================|
  */             
 {
     char header_buff[512] = "";
@@ -120,10 +127,21 @@ write_header(int fd, char* compression_method, char* md5)
 
     memcpy(header_buff+12, message_buff, 128);
 
-    memcpy(header_buff+140, compression_method, 4);
+    memcpy(header_buff+140, xml_compression_method, 4);
 
-    memcpy(header_buff+144, md5, 32);
+    memcpy(header_buff+144, binary_compression_method, 4);
+
+    memcpy(header_buff+148, md5, 32);
 
     write_to_file(fd, header_buff, 512);
 
+}
+
+void
+write_footer(footer_t footer, int fd)
+{
+    char buff[sizeof(footer_t)];
+    footer_t* buff_cast = (footer_t*)(&buff[0]);
+    *buff_cast = footer;
+    write_to_file(fd, buff, sizeof(footer_t));
 }

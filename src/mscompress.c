@@ -77,6 +77,8 @@ main(int argc, char* argv[])
 
     size_t input_filesize;
 
+    footer_t footer;
+
     argp_parse (&argp, argc, argv, 0, 0, &args);
     
     if(args.in_file == NULL || args.out_file == NULL)
@@ -168,16 +170,33 @@ main(int argc, char* argv[])
     
     dzstd = alloc_dctx();
 
-    write_header(output_fd, "ZSTD", "d8e89b7e0044e0164b1e853516b90a05");
+    write_header(output_fd, "ZSTD", "ZSTD", "d8e89b7e0044e0164b1e853516b90a05");
 
     gettimeofday(&start, NULL);
 
     printf("\nDecoding and compression...\n");
 
-    compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, output_fd);  /* Compress XML */
+    block_len_queue_t* xml_block_lens;
+    block_len_queue_t* binary_block_lens;
 
-    compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd); /* Compress binary */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, output_fd);  /* Compress XML */
 
+    binary_block_lens = compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd); /* Compress binary */
+
+    footer.xml_blk_pos = get_offset(output_fd);
+
+    dump_block_len_queue(xml_block_lens, output_fd);
+
+    footer.binary_blk_pos = get_offset(output_fd);
+
+    dump_block_len_queue(binary_block_lens, output_fd);
+
+    footer.dp_pos = get_offset(output_fd);
+
+    dump_dp(dp, output_fd);
+
+    write_footer(footer, output_fd);
+    
     gettimeofday(&stop, NULL);
 
     printf("\tDecoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
