@@ -110,13 +110,12 @@ typedef struct {
     size_t cmp_blk_size;
 
     cmp_blk_queue_t* ret;
-} compress_binary_args_t;
+} compress_args_t;
     
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
-cmp_blk_queue_t* compress_xml(char* input_map, data_positions_t* dp, size_t cmp_blk_size, int fd);
-void compress_binary(void* args);
-void compress_binary_parallel(char* input_map, data_positions_t** binary_divisions, data_format_t* df, size_t cmp_blk_size, int divisions, int fd);
+void compress_routine(void* args);
+void compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int fd);
 
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();

@@ -174,11 +174,9 @@ main(int argc, char* argv[])
 
     printf("\nDecoding and compression...\n");
 
-    cmp_blk_queue_t* compressed_xml = compress_xml(input_map, dp, blocksize, output_fd);
+    compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, output_fd);  /* Compress XML */
 
-    compress_binary_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd);
-
-    // cmp_blk_queue_t* compressed_binary = compress_binary(input_map, dp, df, blocksize, output_fd);
+    compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd); /* Compress binary */
 
     gettimeofday(&stop, NULL);
 
