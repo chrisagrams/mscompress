@@ -120,9 +120,12 @@ int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 size_t get_filesize(char* path);
 ssize_t write_to_file(int fd, char* buff, size_t n);
+ssize_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5);
 off_t get_offset(int fd);
 void write_footer(footer_t footer, int fd);
+footer_t* read_footer(int fd);
+
 int is_mzml(int fd);
 int is_msz(int fd);
 
@@ -134,6 +137,7 @@ data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, i
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
 void dump_dp(data_positions_t* dp, int fd);
+data_positions_t* read_dp(void* input_map, long dp_position, long eof);
 
 /* sys.c */
 int get_cpu_count();
@@ -162,3 +166,12 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd);
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
+
+/* queue.c */
+block_len_t* alloc_block_len(size_t original_size, size_t compressed_size);
+void dealloc_block_len(block_len_t* blk);
+block_len_queue_t* alloc_block_len_queue();
+void dealloc_block_len_queue(block_len_queue_t* queue);
+void append_block_len(block_len_queue_t* queue, size_t original_size, size_t compressed_size);
+void dump_block_len_queue(block_len_queue_t* queue, int fd);
+block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);

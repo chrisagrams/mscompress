@@ -331,6 +331,26 @@ main(int argc, char* argv[])
       free_ddp(binary_divisions, divisions);
       free_ddp(xml_divisions, divisions);
     }
+
+    else if (operation == DECOMPRESS)
+    {
+      printf("\tDetected .msz file, reading header and footer...\n");
+
+      block_len_queue_t* xml_blks;
+      block_len_queue_t* binary_blks;
+      data_positions_t* dp;
+      footer_t* msz_footer;
+      msz_footer = read_footer(fds[0]);
+
+      printf("\tXML block position: %ld\n", msz_footer->xml_blk_pos);
+      printf("\tBinary block position: %ld\n", msz_footer->binary_blk_pos);
+      printf("\tdp block position: %ld\n", msz_footer->dp_pos);
+      printf("\tEOF position: %ld\n", input_filesize);
+
+      xml_blks = read_block_len_queue(input_map, msz_footer->xml_blk_pos, msz_footer->binary_blk_pos);
+      binary_blks = read_block_len_queue(input_map, msz_footer->binary_blk_pos, msz_footer->dp_pos);
+      dp = read_dp(input_map, msz_footer->dp_pos, input_filesize);
+    }
     
     remove_mapping(input_map, fds[0]);
     close(fds[0]);

@@ -167,6 +167,22 @@ write_footer(footer_t footer, int fd)
     write_to_file(fd, buff, sizeof(footer_t));
 }
 
+footer_t*
+read_footer(int fd)
+{
+    char* buff;
+
+    buff = (char*)malloc(sizeof(footer_t));
+
+    lseek(fd, -sizeof(footer_t), SEEK_END);
+
+    read_from_file(fd, buff, sizeof(footer_t));
+
+    lseek(fd, 0, SEEK_SET);
+
+    return (footer_t*)buff;
+}
+
 
 int
 is_msz(int fd)

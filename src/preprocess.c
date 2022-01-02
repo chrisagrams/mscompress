@@ -463,3 +463,31 @@ dump_dp(data_positions_t* dp, int fd)
 
     return;
 }
+
+data_positions_t*
+read_dp(void* input_map, long dp_position, long eof)
+{
+    data_positions_t* r;
+    int size;
+    long diff;
+    int i;
+    int j;
+
+    diff = eof - dp_position;
+    size = diff / (sizeof(off_t)*2*2);
+
+    r = alloc_dp(size);
+
+    j = dp_position;
+
+    for(i = 0; i < size * 2; i++)
+    {
+        r->start_positions[i] = *(off_t*)(&input_map[0]+j);
+        j+=sizeof(off_t);
+        r->end_positions[i] = *(off_t*)(&input_map[0]+j);
+        j+=sizeof(off_t);
+    }
+
+    return r;
+
+}

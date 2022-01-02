@@ -16,6 +16,7 @@ OBJS = \
 	vendor/base64/lib/lib.o \
 	vendor/base64/lib/codec_choose.o \
 	vendor/base64/lib/tables/tables.o \
+	src/queue.o \
 	src/sys.o \
 	src/preprocess.o \
 	src/file.o \
