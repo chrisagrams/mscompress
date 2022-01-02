@@ -2,8 +2,8 @@
 #include <zstd.h>
 #include <sys/types.h>
 
-#define VERSION "0.0.1"
-#define STATUS "Development"
+#define VERSION "MSCompress 0.0.1"
+#define STATUS "Dev"
 #define ADDRESS "chrisagrams@gmail.com"
 
 #define FORMAT_VERSION_MAJOR 1
@@ -16,10 +16,11 @@
 
 struct arguments
 {
-  char *args[0];            /* ARG1 and ARG2 */
-  char *in_file;            /* Argument for -i */
-  char *out_file;           /* Argument for -o */
-  int version;              /* The -v flag */
+  char *args[2];            /* ARG1 and ARG2 */
+  int verbose;              /* The -v flag */
+  int threads;
+  int blocksize;
+  int checksum; 
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state);
@@ -109,15 +110,21 @@ typedef struct
 #define _mass_ 1000514
 
 
+#define COMPRESS 1
+#define DECOMPRESS 2
+
+
 /* file.c */
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 size_t get_filesize(char* path);
-size_t write_to_file(int fd, char* buff, size_t n);
+ssize_t write_to_file(int fd, char* buff, size_t n);
 void write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5);
 off_t get_offset(int fd);
 void write_footer(footer_t footer, int fd);
+int is_mzml(int fd);
+int is_msz(int fd);
 
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);

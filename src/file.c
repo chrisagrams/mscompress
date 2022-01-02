@@ -66,7 +66,7 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-size_t
+ssize_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
@@ -83,6 +83,27 @@ write_to_file(int fd, char* buff, size_t n)
     }
 
     return rv;
+}
+
+ssize_t
+read_from_file(int fd, void* buff, size_t n)
+{
+    if(fd < 0)
+        exit(1);
+    
+
+    ssize_t rv;
+
+    rv = read(fd, buff, n);
+
+    if (rv < 0)
+    {
+        fprintf(stderr, "Error in read.\n");
+        exit(1);
+    }
+
+    return rv;
+    
 }
 
 off_t
@@ -144,4 +165,48 @@ write_footer(footer_t footer, int fd)
     footer_t* buff_cast = (footer_t*)(&buff[0]);
     *buff_cast = footer;
     write_to_file(fd, buff, sizeof(footer_t));
+}
+
+
+int
+is_msz(int fd)
+{
+    char buff [512];
+    char magic_buff[4];
+    int* magic_buff_cast = (int*)(&magic_buff[0]);
+    *magic_buff_cast = MAGIC_TAG;
+
+    ssize_t rv;
+
+    rv = read_from_file(fd, (void*)&buff, 512); /* Read 512 byte header from file*/ 
+
+    lseek(fd, 0, SEEK_SET);
+    
+    if(rv != 512)
+        return 0;
+
+    if(strncmp(buff, magic_buff, 4) == 0)
+        return 1;
+    
+    return 0;
+    
+}
+
+int
+is_mzml(int fd)
+{
+    char buff[512];
+    ssize_t rv;
+
+    rv = read_from_file(fd, (void*)&buff, 512);
+    lseek(fd, 0, SEEK_SET);
+    
+    if(rv != 512)
+        return 0;
+    
+    if(strstr(buff, "indexedmzML") != NULL)
+        return 1;
+
+    return 0;
+        
 }
