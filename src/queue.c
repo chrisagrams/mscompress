@@ -1,6 +1,114 @@
 #include "mscompress.h"
 #include <stdlib.h>
 
+cmp_blk_queue_t*
+alloc_cmp_buff()
+/**
+ * @brief Allocates a cmp_blk_queue struct that represents a double-linked-list 
+ * of compressed blocks (cmp_block_t) to write to disk as a LIFO queue.
+ * 
+ * @return An allocated cmp_blk_queue_t struct.
+ * 
+ */
+{
+    cmp_blk_queue_t* r;
+
+    r = (cmp_blk_queue_t*)malloc(sizeof(cmp_blk_queue_t));
+    r->populated = 0;
+    r->head = NULL;
+    r->tail = NULL;
+
+    return r;
+}
+
+void
+dealloc_cmp_buff(cmp_blk_queue_t* queue)
+/**
+ * @brief Deallocates a cmp_blk_queue and all of its children.
+ * Traverses through double-linked-list and frees all cmp_block_t.
+ * 
+ * @param queue A cmp_blk_queue_t to deallocate
+ * 
+ * @return None.
+ * 
+ */
+{
+    if(queue)
+    {
+        if(queue->head)
+        {
+            cmp_block_t* curr_head = queue->head;
+            cmp_block_t* new_head = curr_head->next;
+            while(new_head)
+            {
+                free(curr_head);
+                curr_head = new_head;
+                new_head = curr_head->next;
+            }
+        }
+        free(queue);
+    }
+}
+
+void
+append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk)
+/**
+ * @brief Append a compressed block to the queue.
+ * Appends to end of double-linked-list in O(1).
+ * 
+ * @param queue A cmp_blk_queue_t queue.
+ * 
+ * @param blk A compressed block to append.
+ * 
+ * @return None.
+ * 
+ */
+{
+    cmp_block_t* old_tail;
+
+    old_tail = queue->tail;
+    if(old_tail)
+    {
+        old_tail->next = blk;
+        queue->tail = blk;
+    }
+    else
+    {
+        queue->head = blk;
+        queue->tail = blk;
+    }
+    queue->populated++;
+
+    return;
+}
+
+cmp_block_t*
+pop_cmp_block(cmp_blk_queue_t* queue)
+/**
+ * @brief Removes a compressed block from the front of the queue.
+ * 
+ */
+{
+    cmp_block_t* old_head;
+
+    old_head = queue->head;
+    
+    if(queue->head == queue->tail)
+    {
+        queue->head = NULL;
+        queue->tail = NULL;
+    }
+    else
+        queue->head = old_head->next;
+
+    old_head->next = NULL;
+
+    queue->populated--;
+
+    return old_head;
+
+}
+
 block_len_t*
 alloc_block_len(size_t original_size, size_t compressed_size)
 {

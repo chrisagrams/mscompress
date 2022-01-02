@@ -168,6 +168,10 @@ ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 
 /* queue.c */
+cmp_blk_queue_t* alloc_cmp_buff();
+void dealloc_cmp_buff(cmp_blk_queue_t* queue);
+void append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk);
+cmp_block_t* pop_cmp_block(cmp_blk_queue_t* queue);
 block_len_t* alloc_block_len(size_t original_size, size_t compressed_size);
 void dealloc_block_len(block_len_t* blk);
 block_len_queue_t* alloc_block_len_queue();
