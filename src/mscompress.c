@@ -127,7 +127,7 @@ main(int argc, char* argv[])
     int if_blksize = get_blksize(args.in_file);
     int of_blksize = get_blksize(args.out_file);
 
-    int blocksize = 1e+7;
+    long blocksize = 1e+7;
 
     struct base64_state state;
 
@@ -162,9 +162,7 @@ main(int argc, char* argv[])
     
     gettimeofday(&stop, NULL);
 
-    printf("\tDetected %d spectra.\n", df->total_spec);
-
-    printf("\tPreprocessing time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);  
+    printf("Preprocessing time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);  
 
     ZSTD_DCtx* dzstd;
     
@@ -199,7 +197,7 @@ main(int argc, char* argv[])
     
     gettimeofday(&stop, NULL);
 
-    printf("\tDecoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
+    printf("Decoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
 
     free_ddp(binary_divisions, divisions);
     free_ddp(xml_divisions, divisions);

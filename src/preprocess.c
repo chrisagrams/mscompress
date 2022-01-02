@@ -311,6 +311,7 @@ find_binary(char* input_map, data_format_t* df)
                     spec_index++;
                     if (spec_index > dp->total_spec * 2)
                     {
+                        printf("\tDetected %d spectra.\n", df->total_spec);
                         free(xml);
                         return dp;
                     }
@@ -331,12 +332,12 @@ find_binary(char* input_map, data_format_t* df)
 /* === End of XML traversal functions === */
 
 data_positions_t**
-get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int threads)
+get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int threads)
 {
 
     data_positions_t** r;
     int i = 0;
-    int curr_size = 0;
+    long curr_size = 0;
     int curr_div  = 0;
     int curr_div_i = 0;
     
@@ -346,17 +347,22 @@ get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int t
     {
         *divisions = threads;
         *blocksize = dp->file_end/threads + 1;
-        printf("new blocksize: %d\n", *blocksize);
+        printf("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
+
+    printf("\tUsing %d divisions over %d threads.\n", *divisions, threads);
 
     r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions-1));
 
     i = 0;
+
+    printf("\t=== Divisions distribution (bytes%%/spec%%) ===\n\t");
     
-    for(i; i < dp->total_spec * 2; i++)
+    for(; i < dp->total_spec * 2; i++)
     {
         if(curr_size > *blocksize/2)
         {
+            printf("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
             curr_div++;
             curr_div_i = 0;
             curr_size = 0;
@@ -368,6 +374,7 @@ get_binary_divisions(data_positions_t* dp, int* blocksize, int* divisions, int t
         curr_div_i++;
     }
 
+    printf("\n");
     return r;
 }
 
