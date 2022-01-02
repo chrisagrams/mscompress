@@ -66,13 +66,13 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-int
+ssize_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
         exit(1);
     
-    int rv;
+    ssize_t rv;
 
     rv = write(fd, buff, n);
 
@@ -81,26 +81,56 @@ write_to_file(int fd, char* buff, size_t n)
         fprintf(stderr, "Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
         exit(1);
     }
+
+    return rv;
+}
+
+ssize_t
+read_from_file(int fd, void* buff, size_t n)
+{
+    if(fd < 0)
+        exit(1);
+    
+
+    ssize_t rv;
+
+    rv = read(fd, buff, n);
+
+    if (rv < 0)
+    {
+        fprintf(stderr, "Error in read.\n");
+        exit(1);
+    }
+
+    return rv;
+    
+}
+
+off_t
+get_offset(int fd)
+{
+    return lseek(fd, 0, SEEK_CUR);
 }
 
 void
-write_header(int fd, char* compression_method, char* md5)
+write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5)
 /**
  * @brief Writes .msz header to file descriptor.
  * Header format:
- *              |================================================|
- *              |        Content        |    Size    |  Offset   |
- *              |================================================|
- *              | Magic Tag (0x035F51B5)|   4  bytes |      0    |
- *              | Version Major Number  |   4  bytes |      4    |
- *              | Version Minor Number  |   4  bytes |      8    |
- *              | Message Tag           | 128  bytes |     12    |
- *              | Compression Method    |   4  bytes |    140    |
- *              | MD5                   |  32  bytes |    144    |
- *              | Reserved              | 336  bytes |    176    |
- *              |================================================|
- *              | Total Size            |  512 bytes |           |
- *              |================================================|
+ *              |====================================================|
+ *              |        Content            |    Size    |  Offset   |
+ *              |====================================================|
+ *              | Magic Tag (0x035F51B5)    |   4  bytes |      0    |
+ *              | Version Major Number      |   4  bytes |      4    |
+ *              | Version Minor Number      |   4  bytes |      8    |
+ *              | Message Tag               | 128  bytes |     12    |
+ *              | XML Compression Method    |   4  bytes |    140    |
+ *              | Binary Compression Method |   4  bytes |    144    |
+ *              | MD5                       |  32  bytes |    148    |
+ *              | Reserved                  | 336  bytes |    180    |
+ *              |====================================================|
+ *              | Total Size                |  512 bytes |           |
+ *              |====================================================|
  */             
 {
     char header_buff[512] = "";
@@ -118,10 +148,81 @@ write_header(int fd, char* compression_method, char* md5)
 
     memcpy(header_buff+12, message_buff, 128);
 
-    memcpy(header_buff+140, compression_method, 4);
+    memcpy(header_buff+140, xml_compression_method, 4);
 
-    memcpy(header_buff+144, md5, 32);
+    memcpy(header_buff+144, binary_compression_method, 4);
+
+    memcpy(header_buff+148, md5, 32);
 
     write_to_file(fd, header_buff, 512);
 
+}
+
+void
+write_footer(footer_t footer, int fd)
+{
+    char buff[sizeof(footer_t)];
+    footer_t* buff_cast = (footer_t*)(&buff[0]);
+    *buff_cast = footer;
+    write_to_file(fd, buff, sizeof(footer_t));
+}
+
+footer_t*
+read_footer(int fd)
+{
+    char* buff;
+
+    buff = (char*)malloc(sizeof(footer_t));
+
+    lseek(fd, -sizeof(footer_t), SEEK_END);
+
+    read_from_file(fd, buff, sizeof(footer_t));
+
+    lseek(fd, 0, SEEK_SET);
+
+    return (footer_t*)buff;
+}
+
+
+int
+is_msz(int fd)
+{
+    char buff [512];
+    char magic_buff[4];
+    int* magic_buff_cast = (int*)(&magic_buff[0]);
+    *magic_buff_cast = MAGIC_TAG;
+
+    ssize_t rv;
+
+    rv = read_from_file(fd, (void*)&buff, 512); /* Read 512 byte header from file*/ 
+
+    lseek(fd, 0, SEEK_SET);
+    
+    if(rv != 512)
+        return 0;
+
+    if(strncmp(buff, magic_buff, 4) == 0)
+        return 1;
+    
+    return 0;
+    
+}
+
+int
+is_mzml(int fd)
+{
+    char buff[512];
+    ssize_t rv;
+
+    rv = read_from_file(fd, (void*)&buff, 512);
+    lseek(fd, 0, SEEK_SET);
+    
+    if(rv != 512)
+        return 0;
+    
+    if(strstr(buff, "indexedmzML") != NULL)
+        return 1;
+
+    return 0;
+        
 }

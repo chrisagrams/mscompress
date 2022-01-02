@@ -117,7 +117,7 @@ decode_binary(char* input_map, int start_position, int end_position, int compres
  * 
  * @param end_position The end position of base64 data within a <binary></binary> element within the .mzML document.
  * 
- * @param compression_method Given by data_format struct, the encoding of the binary data within the .mzML document given by preprocess.c:pattern_detect()
+ * @param compression_method Given by data_format_t struct, the encoding of the binary data within the .mzML document given by preprocess.c:pattern_detect()
  * 
  * @param out_len A pass-by-reference return value of the length of the resulting decoded binary data.
  * 
