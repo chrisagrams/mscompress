@@ -247,7 +247,11 @@ compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, 
 
     printf("\nDecoding and compression...\n");
 
+    footer->xml_pos = get_offset(output_fd);
+
     xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, output_fd);  /* Compress XML */
+
+    footer->binary_pos = get_offset(output_fd);
 
     binary_block_lens = compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd); /* Compress binary */
 
@@ -266,6 +270,36 @@ compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, 
     write_footer(*footer, output_fd);
     
     printf("Decoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
+}
+
+
+void
+get_compression_scheme(void* input_map, char** xml_compression_type, char** binary_compression_type)
+{      
+  *xml_compression_type = get_header_xml_compresssion_type(input_map);
+  *binary_compression_type = get_header_binary_compression_type(input_map);
+
+  printf("\tXML compression scheme: %.*s\n", XML_COMPRESSION_METHOD_SIZE, *xml_compression_type);
+  printf("\tBinary compression scheme: %.*s\n", BINARY_COMPRESSION_METHOD_SIZE, *binary_compression_type);
+}
+
+void
+parse_footer(footer_t** footer, void* input_map, long input_filesize,
+            block_len_queue_t** xml_blks, block_len_queue_t** binary_blks, data_positions_t** dp)
+{
+
+      *footer = read_footer(input_map, input_filesize);
+
+      printf("\tXML position: %ld\n", (*footer)->xml_pos);
+      printf("\tBinary position: %ld\n", (*footer)->binary_pos);
+      printf("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
+      printf("\tBinary blocks position: %ld\n", (*footer)->binary_blk_pos);
+      printf("\tdp block position: %ld\n", (*footer)->dp_pos);
+      printf("\tEOF position: %ld\n", input_filesize);
+
+      *xml_blks = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->binary_blk_pos);
+      *binary_blks = read_block_len_queue(input_map, (*footer)->binary_blk_pos, (*footer)->dp_pos);
+      *dp = read_dp(input_map, (*footer)->dp_pos, input_filesize);
 }
 
 int 
@@ -324,7 +358,7 @@ main(int argc, char* argv[])
 
       preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, n_threads, &dp, &df, &binary_divisions, &xml_divisions);
 
-      write_header(fds[1], "ZSTD", "ZSTD", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+      write_header(fds[1], "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
       compress_mzml((char*)input_map, blocksize, divisions, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
 
@@ -340,17 +374,33 @@ main(int argc, char* argv[])
       block_len_queue_t* binary_blks;
       data_positions_t* dp;
       footer_t* msz_footer;
-      msz_footer = read_footer(fds[0]);
+      char* xml_compression_type;
+      char* binary_compression_type;
 
-      printf("\tXML block position: %ld\n", msz_footer->xml_blk_pos);
-      printf("\tBinary block position: %ld\n", msz_footer->binary_blk_pos);
-      printf("\tdp block position: %ld\n", msz_footer->dp_pos);
-      printf("\tEOF position: %ld\n", input_filesize);
+      blocksize = get_header_blocksize(input_map);
 
-      xml_blks = read_block_len_queue(input_map, msz_footer->xml_blk_pos, msz_footer->binary_blk_pos);
-      binary_blks = read_block_len_queue(input_map, msz_footer->binary_blk_pos, msz_footer->dp_pos);
-      dp = read_dp(input_map, msz_footer->dp_pos, input_filesize);
+      get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
+
+      parse_footer(&msz_footer, input_map, input_filesize, &xml_blks, &binary_blks, &dp);
+
+      divisions = xml_blks->populated;
+      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, 0);
+
+    //   long offset = 512;
+    //   void* out;
+    //   block_len_t* front;
+    //   front = pop_block_len(xml_blks);
+    //   while(front != NULL)
+    //   {
+    //     out = decmp_block(input_map, offset, front->compressed_size, front->original_size);
+    //     write_to_file(fds[1], out, front->original_size);
+    //     offset += front->compressed_size;
+    //     front = pop_block_len(xml_blks);
+    //   }
+      decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, dp, pop_block_len(xml_blks), pop_block_len(binary_blks));
+
     }
+
     
     remove_mapping(input_map, fds[0]);
     close(fds[0]);

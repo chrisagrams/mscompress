@@ -341,9 +341,10 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
     int curr_div  = 0;
     int curr_div_i = 0;
     
-    *divisions = dp->file_end/(*blocksize*threads);
+    if(*divisions == 0)
+        *divisions = dp->file_end/(*blocksize*threads);
 
-    if(*divisions < threads)
+    if(*divisions < threads && threads > 0)
     {
         *divisions = threads;
         *blocksize = dp->file_end/threads + 1;

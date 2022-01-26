@@ -34,7 +34,6 @@ void *
 zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 {
     void* out_buff;
-    size_t buff_len = 0;
     size_t decmp_len = 0;
 
     out_buff = alloc_ztsd_dbuff(org_len);
@@ -45,5 +44,27 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
         return NULL;
 
     return out_buff;
+
+}
+
+void*
+decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, size_t compressed_len, size_t decompressed_len)
+{
+    return zstd_decompress(dctx, input_map+offset, compressed_len, decompressed_len);
+}
+
+void*
+decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk)
+{
+    ZSTD_DCtx* dctx;
+    void* decmp_xml;
+    void* decmp_binary;
+
+    dctx = alloc_dctx();
+
+    decmp_xml = decmp_block(dctx, input_map, xml_offset, xml_blk->compressed_size, xml_blk->original_size);
+    decmp_binary = decmp_block(dctx, input_map, binary_offset, binary_blk->compressed_size, binary_blk->original_size);
+
+    return NULL;
 
 }

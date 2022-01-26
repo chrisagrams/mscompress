@@ -20,6 +20,7 @@ OBJS = \
 	src/sys.o \
 	src/preprocess.o \
 	src/file.o \
+	src/encode.o \
 	src/decode.o \
 	src/compress.o \
 	src/decompress.o \

@@ -92,6 +92,9 @@ pop_cmp_block(cmp_blk_queue_t* queue)
     cmp_block_t* old_head;
 
     old_head = queue->head;
+
+    if(old_head == NULL)
+        return NULL;
     
     if(queue->head == queue->tail)
     {
@@ -117,7 +120,7 @@ alloc_block_len(size_t original_size, size_t compressed_size)
     r = (block_len_t*)malloc(sizeof(block_len_t*));
 
     r->original_size = original_size;
-    r->compresssed_size = compressed_size;
+    r->compressed_size = compressed_size;
     r->next = NULL;
 
     return r;
@@ -192,6 +195,32 @@ append_block_len(block_len_queue_t* queue, size_t original_size, size_t compress
     return;
 }
 
+block_len_t*
+pop_block_len(block_len_queue_t* queue)
+{
+    block_len_t* old_head;
+
+    old_head = queue->head;
+
+    if(old_head == NULL)
+        return NULL;
+    
+    if(queue->head == queue->tail)
+    {
+        queue->head = NULL;
+        queue->tail = NULL;
+    }
+    else
+        queue->head = old_head->next;
+
+    old_head->next = NULL;
+
+    queue->populated--;
+
+    return old_head;
+
+}
+
 void
 dump_block_len_queue(block_len_queue_t* queue, int fd)
 {
@@ -207,7 +236,7 @@ dump_block_len_queue(block_len_queue_t* queue, int fd)
         *buff_cast = curr->original_size;
         write_to_file(fd, buff, sizeof(size_t));
 
-        *buff_cast = curr->compresssed_size;
+        *buff_cast = curr->compressed_size;
         write_to_file(fd, buff, sizeof(size_t));
 
         curr = curr->next;

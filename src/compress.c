@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 #include <pthread.h>
 
 
@@ -406,9 +407,11 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
                    size_t* tot_cmp)
 {
     size_t binary_len = 0;
-    double* binary_buff; 
+    Bytef* binary_buff; 
     
     binary_buff = decode_binary(input, 0, len, df->compression, &binary_len);
+    // size_t test_len = 0;
+    // char* test = encode_binary(binary_buff, &test_len);
     cmp_routine(czstd,
                 cmp_buff,
                 curr_block,
@@ -486,8 +489,9 @@ compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, si
         args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
 
     
-    for(i = 0; i < divisions; i++)
+    for(i = 0; i < divisions; i++) {
         pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
+                pthread_join(ptid[i], NULL);}
 
     for(i = 0; i < divisions; i++)
     {

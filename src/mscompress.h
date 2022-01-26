@@ -1,5 +1,6 @@
 #include <argp.h>
 #include <zstd.h>
+#include <zlib.h>
 #include <sys/types.h>
 
 #define VERSION "MSCompress 0.0.1"
@@ -10,9 +11,21 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
+#define ZLIB_BUFF_FACTOR 256000
 
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
+
+#define MESSAGE_SIZE 128
+#define MESSAGE_OFFSET 12
+#define XML_COMPRESSION_METHOD_SIZE 4
+#define XML_COMPRESSION_METHOD_OFFSET 140
+#define BINARY_COMPRESSION_METHOD_SIZE 4
+#define BINARY_COMPRESSION_METHOD_OFFSET 144
+#define BLOCKSIZE_OFFSET 148
+#define MD5_OFFSET 156
+#define MD5_SIZE 32
+#define HEADER_SIZE 512
 
 struct arguments
 {
@@ -70,7 +83,7 @@ typedef struct
 typedef struct 
 {
     size_t original_size;
-    size_t compresssed_size;
+    size_t compressed_size;
     struct block_len_t* next;
 
 } block_len_t;
@@ -88,6 +101,8 @@ typedef struct
 
 typedef struct
 {
+    off_t xml_pos;
+    off_t binary_pos;
     off_t xml_blk_pos;
     off_t binary_blk_pos;
     off_t dp_pos;
@@ -121,10 +136,13 @@ int get_blksize(char* path);
 size_t get_filesize(char* path);
 ssize_t write_to_file(int fd, char* buff, size_t n);
 ssize_t read_from_file(int fd, void* buff, size_t n);
-void write_header(int fd, char* xml_compression_method, char* binary_compression_method, char* md5);
+void write_header(int fd, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
 off_t get_offset(int fd);
+long get_header_blocksize(void* input_map);
+char* get_header_xml_compresssion_type(void* input_map);
+char* get_header_binary_compression_type(void* input_map);
 void write_footer(footer_t footer, int fd);
-footer_t* read_footer(int fd);
+footer_t* read_footer(void* input_map, long filesize);
 
 int is_mzml(int fd);
 int is_msz(int fd);
@@ -145,7 +163,12 @@ int get_thread_id();
 
 
 /* decode.c */
-double* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
+Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
+
+/* encode.c */
+char* encode_binary(char* src, size_t* out_len);
+Bytef*
+encode_zlib(Bytef* src, size_t* out_len, size_t src_len);
 
 /* compress.c */
 typedef struct {
@@ -166,7 +189,7 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd);
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
-
+void* decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk);
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
 void dealloc_cmp_buff(cmp_blk_queue_t* queue);
@@ -177,5 +200,6 @@ void dealloc_block_len(block_len_t* blk);
 block_len_queue_t* alloc_block_len_queue();
 void dealloc_block_len_queue(block_len_queue_t* queue);
 void append_block_len(block_len_queue_t* queue, size_t original_size, size_t compressed_size);
+block_len_t* pop_block_len(block_len_queue_t* queue);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);
