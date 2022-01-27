@@ -5,6 +5,7 @@
     #include <unistd.h>
 #elif __APPLE__
     #include <sys/sysctl.h>
+    #include <pthread.h>
 #elif _WIN32
     #include <sysinfoapi.h>
 #endif
@@ -64,7 +65,8 @@ get_thread_id()
     
     #elif __APPLE__
 
-        tid = (int)pthread_getthreadid_np();
+        // tid = (int)pthread_getthreadid_np();
+        pthread_threadid_np(NULL, &tid);
 
     #elif _WIN32
         
