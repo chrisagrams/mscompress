@@ -55,7 +55,7 @@ static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
   struct arguments *arguments = state->input;
-
+  long blksize;
   switch (key)
     {
     case 'v':
@@ -67,7 +67,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
         argp_error(state, "Number of threads cannot be less than 1.");
       break;
     case 'b':
-      long blksize = parse_blocksize(arg);
+      blksize = parse_blocksize(arg);
       if(blksize == -1)
         argp_error(state, "Unkown size suffix. (KB, MB, GB)");
       arguments->blocksize = blksize;
@@ -203,7 +203,7 @@ void prepare_threads(struct arguments args, long* n_threads)
     printf("\tUsing %d threads.\n", *n_threads);
 }
 
-void
+int
 preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long n_threads, data_positions_t** dp, data_format_t** df, data_positions_t*** binary_divisions, data_positions_t*** xml_divisions)
 {
   struct timeval start, stop;
