@@ -57,7 +57,7 @@ get_cpu_count()
 int
 get_thread_id()
 {
-    int tid;
+    uint64_t tid;
 
     #ifdef __linux__
 
@@ -65,7 +65,6 @@ get_thread_id()
     
     #elif __APPLE__
 
-        // tid = (int)pthread_getthreadid_np();
         pthread_threadid_np(NULL, &tid);
 
     #elif _WIN32
@@ -74,5 +73,5 @@ get_thread_id()
     
     #endif
 
-    return tid;
+    return (int)tid;
 }
