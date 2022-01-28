@@ -420,6 +420,8 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
                 binary_len,
                 cmp_blk_size,
                 tot_size, tot_cmp);
+                
+    free(binary_buff);
 }
 
 void

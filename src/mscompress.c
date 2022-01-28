@@ -364,8 +364,6 @@ main(int argc, char* argv[])
 
       compress_mzml((char*)input_map, blocksize, divisions, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
 
-      free_ddp(binary_divisions, divisions);
-      free_ddp(xml_divisions, divisions);
     }
 
     else if (operation == DECOMPRESS)
@@ -403,6 +401,11 @@ main(int argc, char* argv[])
 
     }
 
+    dealloc_dp(dp);
+
+    free_ddp(xml_divisions, divisions);
+
+    free_ddp(binary_divisions, divisions);
     
     remove_mapping(input_map, fds[0]);
     close(fds[0]);

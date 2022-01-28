@@ -62,7 +62,6 @@ dealloc_dp(data_positions_t* dp)
     }
 }
 
-
 data_positions_t**
 alloc_ddp(int len, int total_spec)
 {
@@ -94,7 +93,7 @@ free_ddp(data_positions_t** ddp, int divisions)
         for(i; i < divisions; i++)
             dealloc_dp(ddp[i]);
 
-        free(ddp);
+        free(*ddp);
     }
 
 }

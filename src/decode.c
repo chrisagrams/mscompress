@@ -82,7 +82,14 @@ decode_binary(char* input_map, int start_position, int end_position, int compres
         zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
         
         *out_len = decmp_size + ZLIB_SIZE_OFFSET;
-        return decmp_output->mem;
+
+        free(b64_out_buff);        
+        
+        Bytef* r = decmp_output->mem;
+
+        free(decmp_output);
+
+        return r;
     }
 
     *out_len = b64_out_len;
