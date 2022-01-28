@@ -12,7 +12,7 @@ encode_base64(zlib_block_t* zblk, size_t src_len, size_t* out_len)
 {
     char* b64_out_buff;
 
-    b64_out_buff = (char*)malloc(sizeof(char)*src_len*(4/3));
+    b64_out_buff = (char*)malloc(sizeof(char)*src_len*2);
 
     base64_encode(zblk->buff, src_len, b64_out_buff, out_len, 0);
 
@@ -45,6 +45,7 @@ encode_binary(char** src, size_t* out_len)
 
     *src += (ZLIB_SIZE_OFFSET + org_len);
 
+    free(decmp_input);
     free(decmp_header);
 
     return encode_base64(cmp_output, zlib_len, out_len);
