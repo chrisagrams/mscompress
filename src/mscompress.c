@@ -229,7 +229,7 @@ preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* bloc
 
   gettimeofday(&stop, NULL);
 
-  printf("Preprocessing time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);  
+  printf("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
 
 }
 
@@ -271,7 +271,7 @@ compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, 
 
     gettimeofday(&stop, NULL);
 
-    printf("Decoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
+    printf("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
 }
 
 
@@ -415,7 +415,7 @@ main(int argc, char* argv[])
 
     gettimeofday(&abs_stop, NULL);
 
-    printf("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_usec-abs_start.tv_usec)/1e+6);
+    printf("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_sec-abs_start.tv_sec)+((abs_stop.tv_usec-abs_start.tv_usec)/1e+6));
 
     return 0;
 }
