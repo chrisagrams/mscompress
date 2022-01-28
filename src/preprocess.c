@@ -178,7 +178,7 @@ pattern_detect(char* input_map)
     
     yxml_t* xml = alloc_yxml();
 
-    char attrbuf[11], *attrcur = NULL, *tmp; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
+    char attrbuf[11] = {NULL}, *attrcur = NULL, *tmp = NULL; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
     
     int in_cvParam = 0;                      /* Boolean representing if currently inside of cvParam tag. */
     int current_type = 0;                    /* A pass-by-reference variable to indicate to map_to_df of current binary data array type (m/z or intensity) */
