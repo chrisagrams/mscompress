@@ -122,6 +122,9 @@ zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len)
     
     deflateEnd(d); 
     dealloc_z_stream(d);
+
+    zlib_realloc(output, r); // shrink the 256k buffer down to only what is in use
+
     return r;
 } 
 
@@ -162,6 +165,8 @@ zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len)
 
     inflateEnd(i);
     dealloc_z_stream(i);
+
+    zlib_realloc(output, r); // shrink the 256k buffer down to only what is in use
 
     return r;
 }
