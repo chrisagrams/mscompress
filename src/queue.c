@@ -244,6 +244,8 @@ dump_block_len_queue(block_len_queue_t* queue, int fd)
         dealloc_block_len(prev);
     }
 
+    free(queue);
+
     // dealloc_block_len_queue(queue);
 }
 
