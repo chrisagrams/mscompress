@@ -268,7 +268,9 @@ compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, 
     dump_dp(dp, output_fd);
 
     write_footer(*footer, output_fd);
-    
+
+    gettimeofday(&stop, NULL);
+
     printf("Decoding and compression time: %1.4fs\n", (stop.tv_usec-start.tv_usec)/1e+6);
 }
 
