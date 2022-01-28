@@ -52,7 +52,7 @@ typedef struct
 {
     off_t* start_positions;
     off_t* end_positions;
-    off_t* positions_len;
+    // off_t* positions_len;
     int total_spec;
     size_t file_end;
 } data_positions_t;
@@ -165,6 +165,8 @@ data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** bi
 void free_ddp(data_positions_t** ddp, int divisions);
 void dump_dp(data_positions_t* dp, int fd);
 data_positions_t* read_dp(void* input_map, long dp_position, long eof);
+void dealloc_df(data_format_t* df);
+void dealloc_dp(data_positions_t* dp);
 
 /* sys.c */
 int get_cpu_count();

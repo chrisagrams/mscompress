@@ -149,7 +149,6 @@ alloc_block_len_queue()
     return r;
 }
 
-
 void
 dealloc_block_len_queue(block_len_queue_t* queue)
 {
@@ -225,6 +224,7 @@ void
 dump_block_len_queue(block_len_queue_t* queue, int fd)
 {
     block_len_t* curr;
+    block_len_t* prev; 
     char buff[sizeof(size_t)];
 
     size_t* buff_cast = (size_t*)(&buff[0]);
@@ -239,10 +239,12 @@ dump_block_len_queue(block_len_queue_t* queue, int fd)
         *buff_cast = curr->compressed_size;
         write_to_file(fd, buff, sizeof(size_t));
 
+        prev = curr;
         curr = curr->next;
+        dealloc_block_len(prev);
     }
 
-    dealloc_block_len_queue(queue);
+    // dealloc_block_len_queue(queue);
 }
 
 block_len_queue_t*

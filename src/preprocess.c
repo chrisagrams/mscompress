@@ -39,6 +39,13 @@ alloc_df()
     return df;
 }
 
+void
+dealloc_df(data_format_t* df)
+{
+    if(df)
+        free(df);
+}
+
 data_positions_t*
 alloc_dp(int total_spec)
 {
@@ -47,7 +54,7 @@ alloc_dp(int total_spec)
     dp->file_end = 0;
     dp->start_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
     dp->end_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
-    dp->positions_len = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+    // dp->positions_len = (off_t*)malloc(sizeof(off_t)*total_spec*2);
     return dp;
 }
 
@@ -93,7 +100,7 @@ free_ddp(data_positions_t** ddp, int divisions)
         for(i; i < divisions; i++)
             dealloc_dp(ddp[i]);
 
-        free(*ddp);
+        free(ddp);
     }
 
 }

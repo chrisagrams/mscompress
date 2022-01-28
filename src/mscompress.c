@@ -403,6 +403,8 @@ main(int argc, char* argv[])
 
     dealloc_dp(dp);
 
+    dealloc_df(df);
+
     free_ddp(xml_divisions, divisions);
 
     free_ddp(binary_divisions, divisions);
