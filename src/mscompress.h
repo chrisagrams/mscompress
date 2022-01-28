@@ -12,6 +12,7 @@
 
 #define BUFSIZE 4096
 #define ZLIB_BUFF_FACTOR 256000
+#define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
@@ -109,7 +110,15 @@ typedef struct
 } footer_t;
 
 
+typedef struct
+{
+    Bytef* mem;
+    Bytef* buff;
+    size_t size;
+    size_t len;
+    size_t offset;
 
+} zlib_block_t;
 
 
 #define _32i_ 1000519
@@ -166,7 +175,7 @@ int get_thread_id();
 Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-char* encode_binary(char* src, size_t* out_len);
+char* encode_binary(char** src, size_t* out_len);
 Bytef*
 encode_zlib(Bytef* src, size_t* out_len, size_t src_len);
 
@@ -190,6 +199,7 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd);
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void* decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk);
+
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
 void dealloc_cmp_buff(cmp_blk_queue_t* queue);
@@ -203,3 +213,12 @@ void append_block_len(block_len_queue_t* queue, size_t original_size, size_t com
 block_len_t* pop_block_len(block_len_queue_t* queue);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);
+
+/* zl.c */
+
+zlib_block_t* zlib_alloc(int offset);
+void zlib_dealloc(zlib_block_t* blk);
+int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
+void* zlib_pop_header(zlib_block_t* blk);
+uInt  zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
+uInt zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len);

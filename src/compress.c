@@ -412,6 +412,7 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     binary_buff = decode_binary(input, 0, len, df->compression, &binary_len);
     // size_t test_len = 0;
     // char* test = encode_binary(binary_buff, &test_len);
+    // int cmp = strcmp(input, test);
     cmp_routine(czstd,
                 cmp_buff,
                 curr_block,
