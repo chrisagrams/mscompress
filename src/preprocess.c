@@ -309,7 +309,7 @@ find_binary(char* input_map, data_format_t* df)
                 {
                     dp->end_positions[spec_index] = xml->total - tag_offset;
                     spec_index++;
-                    if (spec_index > dp->total_spec * 2)
+                    if (spec_index >= dp->total_spec * 2)
                     {
                         printf("\tDetected %d spectra.\n", df->total_spec);
                         free(xml);
