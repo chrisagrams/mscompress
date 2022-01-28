@@ -117,7 +117,7 @@ alloc_block_len(size_t original_size, size_t compressed_size)
 {
     block_len_t* r;
 
-    r = (block_len_t*)malloc(sizeof(block_len_t*));
+    r = (block_len_t*)malloc(sizeof(block_len_t));
 
     r->original_size = original_size;
     r->compressed_size = compressed_size;
