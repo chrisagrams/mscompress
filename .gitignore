@@ -2,3 +2,4 @@ mscompress
 mscompress.dSYM/
 *.o
 *.msz
+vgcore.*

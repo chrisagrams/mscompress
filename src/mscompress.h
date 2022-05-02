@@ -201,7 +201,7 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd);
 /* decompress.c */
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
-void* decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk);
+void * decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk, size_t* out_len);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

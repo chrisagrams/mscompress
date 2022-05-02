@@ -65,10 +65,11 @@ decmp_binary_block(void* decmp_binary, size_t blk_size)
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
         consumed += binary_len;
     }
+    // binary_str = encode_binary((&decmp_binary), &binary_len);
 }
 
 void*
-decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk)
+decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk, size_t* out_len)
 {
     ZSTD_DCtx* dctx;
     void* decmp_xml;
@@ -81,9 +82,35 @@ decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positio
 
     size_t binary_len; 
     char* binary_str;
-    // binary_str = encode_binary((char*) decmp_binary, &binary_len);
-    decmp_binary_block(decmp_binary, binary_blk->original_size);
 
-    return NULL;
+    off_t buff_off = 0;
+    off_t xml_off = 0;
+
+    off_t len = dp->end_positions[dp->total_spec*2-1];
+    off_t curr_len = dp->start_positions[0];
+
+
+    char* buff = malloc(len);
+
+    memcpy(buff, decmp_xml, curr_len);
+    buff_off += curr_len;
+    xml_off += curr_len;
+    int i = 0;
+
+    while(xml_off < xml_blk->original_size)
+    {
+        binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
+        memcpy(buff+buff_off, binary_str, binary_len);
+        buff_off+=binary_len;
+        curr_len = dp->start_positions[i+1]-dp->end_positions[i];
+        memcpy(buff+buff_off, decmp_xml+xml_off, curr_len);
+        buff_off+=curr_len;
+        xml_off += curr_len;
+        i++;
+    }
+
+    *out_len = xml_blk->original_size;
+
+    return buff;
 
 }

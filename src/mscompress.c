@@ -397,8 +397,9 @@ main(int argc, char* argv[])
     //     offset += front->compressed_size;
     //     front = pop_block_len(xml_blks);
     //   }
-      decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, dp, pop_block_len(xml_blks), pop_block_len(binary_blks));
-
+      size_t test_len = 0;
+      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, dp, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len);
+      write_to_file(fds[1], test, test_len);
     }
 
     dealloc_dp(dp);
