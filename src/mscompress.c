@@ -162,7 +162,7 @@ prepare_fds(char* input_path, char** output_path, char** input_map, int* input_f
 
   if(*output_path)
   {
-    output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+    output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
     if(output_fd < 0)
     {
       fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
@@ -178,7 +178,7 @@ prepare_fds(char* input_path, char** output_path, char** input_map, int* input_f
   else if(type == DECOMPRESS)
     *output_path = change_extension(input_path, ".mzML\0");
 
-  output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+  output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
   if(output_fd < 0)
   {
     fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
@@ -234,7 +234,16 @@ preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* bloc
 }
 
 void 
-compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, data_positions_t* dp, data_format_t* df, data_positions_t** binary_divisions, data_positions_t** xml_divisions, int output_fd)
+compress_mzml(char* input_map,
+              long blocksize,
+              int divisions,
+              int threads,
+              footer_t* footer,
+              data_positions_t* dp,
+              data_format_t* df,
+              data_positions_t** binary_divisions,
+              data_positions_t** xml_divisions,
+              int output_fd)
 {
 
     block_len_queue_t* xml_block_lens;
@@ -249,11 +258,11 @@ compress_mzml(char* input_map, long blocksize, int divisions, footer_t* footer, 
 
     footer->xml_pos = get_offset(output_fd);
 
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, output_fd);  /* Compress XML */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, threads, output_fd);  /* Compress XML */
 
     footer->binary_pos = get_offset(output_fd);
 
-    binary_block_lens = compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, output_fd); /* Compress binary */
+    binary_block_lens = compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress binary */
 
     footer->xml_blk_pos = get_offset(output_fd);
 
@@ -362,7 +371,7 @@ main(int argc, char* argv[])
 
       write_header(fds[1], "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
-      compress_mzml((char*)input_map, blocksize, divisions, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
+      compress_mzml((char*)input_map, blocksize, divisions, n_threads, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
 
     }
 
@@ -384,7 +393,7 @@ main(int argc, char* argv[])
       parse_footer(&msz_footer, input_map, input_filesize, &xml_blks, &binary_blks, &dp);
 
       divisions = xml_blks->populated;
-      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, 0);
+      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
 
     //   long offset = 512;
     //   void* out;
@@ -405,9 +414,9 @@ main(int argc, char* argv[])
       binary_blk = pop_block_len(binary_blks);
 
       char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, dp, xml_blk, binary_blk, &test_len);
-      char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, dp, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
+      // char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, dp, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
       write_to_file(fds[1], test, test_len);
-      write_to_file(fds[1], test2, test_len_2);
+      // write_to_file(fds[1], test2, test_len_2);
     }
 
     dealloc_dp(dp);

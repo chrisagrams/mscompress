@@ -33,10 +33,10 @@ ifeq ($(OS),Windows_NT)
 else
     UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
-		LIBS += -largp -lz -lzstd -lpthread -I./src -I./
+		LIBS += -largp -lz -lm -lzstd -lpthread -I./src -I./
 	endif
 	ifeq ($(UNAME_S),Linux)
-		LIBS += -lz -lzstd -lpthread -I./src -I./
+		LIBS += -lz -lm -lzstd -lpthread -I./src -I./
 	endif
 endif
 
