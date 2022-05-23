@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <argp.h>
 #include <stdbool.h>
 #include "vendor/yxml/yxml.h"
@@ -348,7 +349,11 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
     int curr_div_i = 0;
     
     if(*divisions == 0)
-        *divisions = dp->file_end/(*blocksize*threads);
+        *divisions = ceil((((double)dp->file_end)/(*blocksize)));
+    
+    // while(*divisions%threads != 0) {
+    //     (*divisions)++;
+    // }
 
     if(*divisions < threads && threads > 0)
     {

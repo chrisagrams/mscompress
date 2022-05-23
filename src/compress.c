@@ -482,7 +482,7 @@ compress_parallel(char* input_map,
                   data_positions_t** ddp,
                   data_format_t* df,
                   size_t cmp_blk_size,
-                  int divisions, int fd)
+                  int divisions, int threads, int fd)
 {
     block_len_queue_t* blk_len_queue;
     compress_args_t* args[divisions];
@@ -492,18 +492,36 @@ compress_parallel(char* input_map,
 
     blk_len_queue = alloc_block_len_queue();
 
-    for(i = 0; i < divisions; i++)
-        args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
+    // for(i = 0; i < divisions; i++)
+    //     args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
 
-    for(i = 0; i < divisions; i++)
-        pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
+    // for(i = 0; i < divisions; i++)
+    //     pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
 
-    for(i = 0; i < divisions; i++)
+    // for(i = 0; i < divisions; i++)
+    // {
+    //     pthread_join(ptid[i], NULL);
+    //     cmp_dump(args[i]->ret, blk_len_queue, fd);
+    //     dealloc_compress_args(args[i]);
+    // }
+    int divisions_used = 0;
+
+    while(divisions_used < divisions)
     {
-        pthread_join(ptid[i], NULL);
-        cmp_dump(args[i]->ret, blk_len_queue, fd);
-        dealloc_compress_args(args[i]);
-    }
+        
+        for(i = divisions_used; i < divisions_used+threads; i++)
+            args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
 
+        for(i = divisions_used; i < divisions_used+threads; i++)
+            pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
+
+        for(i = divisions_used; i < divisions_used+threads; i++)
+        {
+            pthread_join(ptid[i], NULL);
+            cmp_dump(args[i]->ret, blk_len_queue, fd);
+            dealloc_compress_args(args[i]);
+        }
+        divisions_used += threads;
+    }
     return blk_len_queue;
 }
