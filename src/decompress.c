@@ -69,7 +69,13 @@ decmp_binary_block(void* decmp_binary, size_t blk_size)
 }
 
 void*
-decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk, size_t* out_len)
+decmp_routine(void* input_map,
+              long xml_offset,
+              long binary_offset,
+              data_positions_t* dp,
+              block_len_t* xml_blk,
+              block_len_t* binary_blk,
+              size_t* out_len)
 {
     ZSTD_DCtx* dctx;
     void* decmp_xml;
@@ -95,6 +101,7 @@ decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positio
     memcpy(buff, decmp_xml, curr_len);
     buff_off += curr_len;
     xml_off += curr_len;
+
     int i = 0;
 
     while(xml_off < xml_blk->original_size)
@@ -109,7 +116,7 @@ decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positio
         i++;
     }
 
-    *out_len = xml_blk->original_size;
+    *out_len = buff_off;
 
     return buff;
 
