@@ -192,6 +192,15 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 compress_args_t*
 alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, size_t cmp_blk_size)
 {
+/**
+ * @brief Allocates and initializes a compress_args_t struct to be passed to compress_routine.
+ * 
+ * @param input_map Pointer representing position within mmap'ed mzML file.
+ * 
+ * @param dp  
+ * 
+ */
+
     compress_args_t* r;
 
     r = (compress_args_t*)malloc(sizeof(compress_args_t));
