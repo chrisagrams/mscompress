@@ -467,7 +467,7 @@ compress_routine(void* args)
 
         if(cb_args->df)
             cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 
-                           cb_args->input_map+cb_args->dp->start_positions[i],
+                           cb_args->input_map + cb_args->dp->start_positions[i],
                            len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
         else
             cmp_xml_routine(czstd, cmp_buff, &curr_block,
@@ -501,18 +501,6 @@ compress_parallel(char* input_map,
 
     blk_len_queue = alloc_block_len_queue();
 
-    // for(i = 0; i < divisions; i++)
-    //     args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
-
-    // for(i = 0; i < divisions; i++)
-    //     pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
-
-    // for(i = 0; i < divisions; i++)
-    // {
-    //     pthread_join(ptid[i], NULL);
-    //     cmp_dump(args[i]->ret, blk_len_queue, fd);
-    //     dealloc_compress_args(args[i]);
-    // }
     int divisions_used = 0;
 
     while(divisions_used < divisions)
