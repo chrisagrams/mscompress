@@ -110,6 +110,8 @@ typedef struct
     off_t xml_blk_pos;
     off_t binary_blk_pos;
     off_t dp_pos;
+    size_t num_spectra;
+    off_t file_end;
 } footer_t;
 
 
@@ -167,7 +169,7 @@ data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, i
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
 void dump_dp(data_positions_t* dp, int fd);
-data_positions_t* read_dp(void* input_map, long dp_position, long eof);
+data_positions_t* read_dp(void* input_map, long dp_position, size_t num_spectra, long eof);
 void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
 

@@ -479,7 +479,7 @@ dump_dp(data_positions_t* dp, int fd)
 }
 
 data_positions_t*
-read_dp(void* input_map, long dp_position, long eof)
+read_dp(void* input_map, long dp_position, size_t num_spectra, long eof)
 {
     data_positions_t* r;
     int size;
@@ -488,7 +488,7 @@ read_dp(void* input_map, long dp_position, long eof)
     int j;
 
     diff = eof - dp_position;
-    size = diff / (sizeof(off_t)*2*2);
+    size = num_spectra;
 
     r = alloc_dp(size);
 

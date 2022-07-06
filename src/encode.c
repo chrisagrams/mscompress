@@ -32,12 +32,12 @@ encode_binary(char** src, size_t* out_len)
 
     zlib_block_t* cmp_output;
 
-    if(**src == '\0')
-    {
-        fprintf(stderr, "encode_binary received NULL\n");
-        // exit(1);
-        return NULL;
-    }
+    // if(**src == '\0')
+    // {
+    //     fprintf(stderr, "encode_binary received NULL\n");
+    //     // exit(1);
+    //     return NULL;
+    // }
 
     decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
     decmp_input->mem = *src;

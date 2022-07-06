@@ -89,11 +89,11 @@ decmp_routine(void* input_map,
     size_t binary_len; 
     char* binary_str;
 
-    off_t buff_off = 0;
-    off_t xml_off = 0;
+    int64_t buff_off = 0;
+    int64_t xml_off = 0;
 
-    off_t len = dp->end_positions[dp->total_spec*2-1];
-    off_t curr_len = dp->start_positions[0];
+    int64_t len = dp->file_end;
+    int64_t curr_len = dp->end_positions[0];
 
 
     char* buff = malloc(len);
@@ -102,7 +102,7 @@ decmp_routine(void* input_map,
     buff_off += curr_len;
     xml_off += curr_len;
 
-    int i = 0;
+    int i = 1;
 
     while(xml_off < xml_blk->original_size)
     {
@@ -115,7 +115,12 @@ decmp_routine(void* input_map,
         }
         memcpy(buff+buff_off, binary_str, binary_len);
         buff_off+=binary_len;
-        curr_len = dp->start_positions[i+1]-dp->end_positions[i];
+        curr_len = dp->end_positions[i]-dp->start_positions[i];
+        if (curr_len < 0) //temp fix
+        {
+            *out_len = buff_off;
+            return buff;
+        }
         memcpy(buff+buff_off, decmp_xml+xml_off, curr_len);
         buff_off+=curr_len;
         xml_off += curr_len;

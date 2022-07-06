@@ -282,6 +282,10 @@ compress_mzml(char* input_map,
 
     dump_dp(dp, output_fd);
 
+    footer->num_spectra = dp->total_spec;
+
+    footer->file_end = dp->file_end;
+
     write_footer(*footer, output_fd);
 
     gettimeofday(&stop, NULL);
@@ -313,10 +317,12 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
       printf("\tBinary blocks position: %ld\n", (*footer)->binary_blk_pos);
       printf("\tdp block position: %ld\n", (*footer)->dp_pos);
       printf("\tEOF position: %ld\n", input_filesize);
+      printf("\tOriginal file end: %ld\n", (*footer)->file_end);
 
       *xml_blks = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->binary_blk_pos);
       *binary_blks = read_block_len_queue(input_map, (*footer)->binary_blk_pos, (*footer)->dp_pos);
-      *dp = read_dp(input_map, (*footer)->dp_pos, input_filesize);
+      *dp = read_dp(input_map, (*footer)->dp_pos, (*footer)->num_spectra, input_filesize);
+      (*dp) -> file_end = (*footer)->file_end;
 }
 
 int 
@@ -410,6 +416,9 @@ main(int argc, char* argv[])
 
       divisions = xml_blks->populated;
       binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
+      xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
+      dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+      (*xml_divisions) -> file_end = dp->file_end;
 
     //   long offset = 512;
     //   void* out;
@@ -429,7 +438,7 @@ main(int argc, char* argv[])
       xml_blk = pop_block_len(xml_blks);
       binary_blk = pop_block_len(binary_blks);
 
-      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, dp, xml_blk, binary_blk, &test_len);
+      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, *xml_divisions, xml_blk, binary_blk, &test_len);
       // char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, dp, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
       write_to_file(fds[1], test, test_len);
       // write_to_file(fds[1], test2, test_len_2);
