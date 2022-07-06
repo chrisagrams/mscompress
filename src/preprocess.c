@@ -362,9 +362,11 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
         printf("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
+    *divisions = 1;
+
     printf("\tUsing %d divisions over %d threads.\n", *divisions, threads);
 
-    r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions-1));
+    r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions));
 
     i = 0;
 

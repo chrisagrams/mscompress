@@ -107,6 +107,12 @@ decmp_routine(void* input_map,
     while(xml_off < xml_blk->original_size)
     {
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
+        if(binary_str == NULL)
+        {
+            //if encode_binary returns null, dump all buff contents to file for debug
+            *out_len = buff_off;
+            return buff;
+        }
         memcpy(buff+buff_off, binary_str, binary_len);
         buff_off+=binary_len;
         curr_len = dp->start_positions[i+1]-dp->end_positions[i];

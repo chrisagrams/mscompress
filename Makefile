@@ -25,6 +25,7 @@ OBJS = \
 	src/compress.o \
 	src/decompress.o \
 	src/zl.o \
+	src/debug.o \
 	src/mscompress.o
 
 LIBS				:=

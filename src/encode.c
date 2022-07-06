@@ -35,7 +35,8 @@ encode_binary(char** src, size_t* out_len)
     if(**src == '\0')
     {
         fprintf(stderr, "encode_binary received NULL\n");
-        exit(1);
+        // exit(1);
+        return NULL;
     }
 
     decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);

@@ -73,7 +73,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
       arguments->blocksize = blksize;
       break;
     case ARGP_KEY_ARG:
-      if (state->arg_num >= 2)
+      if (state->arg_num >= 3)
       {
         argp_usage(state);
       }
@@ -131,7 +131,7 @@ change_extension(char* input, char* extension)
 }
 
 int
-prepare_fds(char* input_path, char** output_path, char** input_map, int* input_filesize, int* fds)
+prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, int* input_filesize, int* fds)
 {
   int input_fd;
   int output_fd;
@@ -150,6 +150,11 @@ prepare_fds(char* input_path, char** output_path, char** input_map, int* input_f
     exit(1);
   }
 
+  if(debug_output)
+  {
+    fds[2] = open(debug_output, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    printf("\tDEBUG OUTPUT: %s\n", debug_output);
+  }
 
   type = determine_filetype(input_fd);
 
@@ -185,6 +190,7 @@ prepare_fds(char* input_path, char** output_path, char** input_map, int* input_f
     exit(1);
   }
   fds[1] = output_fd;
+
   return type;
 
 }
@@ -330,17 +336,18 @@ main(int argc, char* argv[])
     data_format_t* df = NULL;
 
 
-    int fds[2] = {-1, -1};
+    int fds[3] = {-1, -1, -1};
     void* input_map = NULL;
     size_t input_filesize = 0;
     long n_threads = 0;
     int operation = -1;
 
     args.verbose = 0;
-    args.blocksize = 1e+7;
+    args.blocksize = 1e+8;
     args.threads = 0;
     args.args[0] = NULL;
     args.args[1] = NULL;
+    args.args[2] = NULL;
     
     argp_parse (&argp, argc, argv, 0, 0, &args);
 
@@ -354,7 +361,7 @@ main(int argc, char* argv[])
 
     prepare_threads(args, &n_threads);
 
-    operation = prepare_fds(args.args[0], &args.args[1], &input_map, &input_filesize, &fds);
+    operation = prepare_fds(args.args[0], &args.args[1], args.args[2], &input_map, &input_filesize, &fds);
 
     // Initialize stream encoder:
     base64_stream_encode_init(&state, 0);
@@ -368,6 +375,15 @@ main(int argc, char* argv[])
       printf("\tDetected .mzML file, starting compression...\n");
 
       preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, n_threads, &dp, &df, &binary_divisions, &xml_divisions);
+
+      #if DEBUG == 1
+        dprintf(fds[2], "=== Begin binary divisions ===\n");
+        dump_divisions_to_file(binary_divisions, divisions, n_threads, fds[2]);
+        dprintf(fds[2], "=== End binary divisions ===\n");
+        dprintf(fds[2], "=== Begin XML divisions ===\n");
+        dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+        dprintf(fds[2], "=== End XML divisions ===\n");
+      #endif
 
       write_header(fds[1], "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 

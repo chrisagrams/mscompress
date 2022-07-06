@@ -29,9 +29,11 @@
 #define MD5_SIZE 32
 #define HEADER_SIZE 512
 
+#define DEBUG 1
+
 struct arguments
 {
-  char *args[2];            /* ARG1 and ARG2 */
+  char *args[3];            /* ARG1 and ARG2 */
   int verbose;              /* The -v flag */
   int threads;
   int blocksize;
@@ -225,3 +227,7 @@ int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);
 uInt  zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
 uInt zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len);
+
+
+/* debug.c */
+void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, int fd);
