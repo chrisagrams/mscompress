@@ -90,10 +90,10 @@ decmp_routine(void* input_map,
     char* binary_str;
 
     int64_t buff_off = 0;
-    int64_t xml_off = 0;
+    int64_t xml_off = dp->start_positions[0];
 
     int64_t len = dp->file_end;
-    int64_t curr_len = dp->end_positions[0];
+    int64_t curr_len = dp->end_positions[0]-dp->start_positions[0];
 
 
     char* buff = malloc(len);

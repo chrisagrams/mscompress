@@ -7,6 +7,7 @@ dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, int f
     int j;
     for (i; i < divisions; i++)
     {
+        dprintf(fd, "=== DIVISION %d ===\n", i);
         j = 0;
         for(j; j < ddp[i]->total_spec; j++)
         {

@@ -417,8 +417,9 @@ main(int argc, char* argv[])
       divisions = xml_blks->populated;
       binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
-      dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+      dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]); // debug
       (*xml_divisions) -> file_end = dp->file_end;
+      xml_divisions[1] -> file_end = dp->file_end;
 
     //   long offset = 512;
     //   void* out;
@@ -439,9 +440,9 @@ main(int argc, char* argv[])
       binary_blk = pop_block_len(binary_blks);
 
       char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, *xml_divisions, xml_blk, binary_blk, &test_len);
-      // char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, dp, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
+      char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, *xml_divisions, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
       write_to_file(fds[1], test, test_len);
-      // write_to_file(fds[1], test2, test_len_2);
+      write_to_file(fds[1], test2, test_len_2);
     }
 
     dealloc_dp(dp);
