@@ -187,7 +187,8 @@ Bytef*
 encode_zlib(Bytef* src, size_t* out_len, size_t src_len);
 
 /* compress.c */
-typedef struct {
+typedef struct 
+{
     char* input_map;
     data_positions_t* dp;
     data_format_t* df;
@@ -203,9 +204,25 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, da
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 
 /* decompress.c */
+typedef struct
+{
+    char* input_map;
+    data_positions_t* dp;
+    block_len_t* xml_blk;
+    block_len_t* binary_blk;
+    off_t footer_xml_offset;
+    off_t footer_binary_offset;
+
+    char* ret;
+    size_t ret_len;
+
+
+} decompress_args_t;
+
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
-void * decmp_routine(void* input_map, long xml_offset, long binary_offset, data_positions_t* dp, block_len_t* xml_blk, block_len_t* binary_blk, size_t* out_len);
+void decompress_routine(void* args);
+void decompress_parallel(char* input_map, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

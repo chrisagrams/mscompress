@@ -444,7 +444,7 @@ compress_routine(void* args)
     cmp_blk_queue_t* cmp_buff;
     data_block_t* curr_block;
 
-    size_t len;
+    size_t len = 0;
 
     size_t tot_size = 0;
     size_t tot_cmp = 0;
@@ -464,11 +464,11 @@ compress_routine(void* args)
     for(; i < cb_args->dp->total_spec; i++)
     {
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
-
+        
         if(cb_args->df)
             cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 
-                           cb_args->input_map + cb_args->dp->start_positions[i],
-                           len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
+                        cb_args->input_map + cb_args->dp->start_positions[i],
+                        len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
         else
             cmp_xml_routine(czstd, cmp_buff, &curr_block,
                         cb_args->input_map + cb_args->dp->start_positions[i],           

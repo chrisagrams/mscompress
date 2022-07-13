@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 ZSTD_DCtx*
 alloc_dctx()
@@ -68,23 +69,61 @@ decmp_binary_block(void* decmp_binary, size_t blk_size)
     // binary_str = encode_binary((&decmp_binary), &binary_len);
 }
 
-void*
-decmp_routine(void* input_map,
-              long xml_offset,
-              long binary_offset,
-              data_positions_t* dp,
-              block_len_t* xml_blk,
-              block_len_t* binary_blk,
-              size_t* out_len)
+decompress_args_t*
+alloc_decompress_args(char* input_map,
+                      data_positions_t* dp,
+                      block_len_t* xml_blk,
+                      block_len_t* binary_blk,
+                      off_t footer_xml_offset,
+                      off_t footer_binary_offset)
 {
+    decompress_args_t* r;
+    
+    r = (decompress_args_t*)malloc(sizeof(decompress_args_t));
+
+    r->input_map = input_map;
+    r->dp = dp;
+    r->xml_blk = xml_blk;
+    r->binary_blk = binary_blk;
+    r->footer_xml_offset = footer_xml_offset;
+    r->footer_binary_offset = footer_binary_offset;
+
+    r->ret = NULL;
+    r->ret_len = 0;
+
+    return r;
+}
+
+void
+dealloc_decompress_args(decompress_args_t* args)
+{
+    if(args)
+    {
+        if(args->ret) free(args->ret);
+        free(args);
+    }
+}
+
+void
+decompress_routine(void* args)
+{
+    int tid;
+
     ZSTD_DCtx* dctx;
+
+    decompress_args_t* db_args;
+
     void* decmp_xml;
     void* decmp_binary;
 
+    tid = get_thread_id();
+
     dctx = alloc_dctx();
 
-    decmp_xml = decmp_block(dctx, input_map, xml_offset, xml_blk->compressed_size, xml_blk->original_size);
-    decmp_binary = decmp_block(dctx, input_map, binary_offset, binary_blk->compressed_size, binary_blk->original_size);
+    db_args = (decompress_args_t*)args;
+
+    decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_offset, db_args->xml_blk->compressed_size, db_args->xml_blk->original_size);
+    decmp_binary = decmp_block(dctx, db_args->input_map, db_args->footer_binary_offset, db_args->binary_blk->compressed_size, db_args->binary_blk->original_size);
 
     size_t binary_len; 
     char* binary_str;
@@ -92,11 +131,15 @@ decmp_routine(void* input_map,
     int64_t buff_off = 0;
     int64_t xml_off = 0;
 
+    data_positions_t* dp = db_args->dp;
+
     int64_t len = dp->file_end;
     int64_t curr_len = dp->end_positions[0]-dp->start_positions[0];
 
 
     char* buff = malloc(len);
+
+    db_args->ret = buff;
 
     memcpy(buff, decmp_xml, curr_len);
     buff_off += curr_len;
@@ -104,23 +147,24 @@ decmp_routine(void* input_map,
 
     int i = 1;
 
-    int64_t bound = xml_blk->original_size;
+    int64_t bound = db_args->xml_blk->original_size;
+
     while(xml_off < bound)
     {
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
         if(binary_str == NULL)
         {
             //if encode_binary returns null, dump all buff contents to file for debug
-            *out_len = buff_off;
-            return buff;
+            db_args->ret_len = buff_off;
+            return;
         }
         memcpy(buff+buff_off, binary_str, binary_len);
         buff_off+=binary_len;
         curr_len = dp->end_positions[i]-dp->start_positions[i];
         if (curr_len < 0) //temp fix
         {
-            *out_len = buff_off;
-            return buff;
+            db_args->ret_len = buff_off;
+            return;
         }
         memcpy(buff+buff_off, decmp_xml+xml_off, curr_len);
         buff_off+=curr_len;
@@ -128,8 +172,69 @@ decmp_routine(void* input_map,
         i++;
     }
 
-    *out_len = buff_off;
+    db_args->ret_len = buff_off;
 
-    return buff;
+    printf("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
 
+    return;
+
+}
+
+void
+decompress_parallel(char* input_map,
+                    block_len_queue_t* xml_blks,
+                    block_len_queue_t* binary_blks,
+                    data_positions_t** ddp,
+                    footer_t* msz_footer,
+                    int divisions, int threads, int fd)
+{
+    decompress_args_t* args[divisions];
+    pthread_t ptid[divisions];
+
+
+    block_len_t* xml_blk;
+    block_len_t* binary_blk;
+    off_t footer_xml_offset = msz_footer->xml_pos;
+    off_t footer_binary_offset = msz_footer->binary_pos;
+    
+
+    int i;
+
+    int divisions_used = 0;
+
+    clock_t start;
+    clock_t stop;
+    
+    while(divisions_used < divisions)
+    {
+        for(i = divisions_used; i < divisions_used+threads; i++)
+        {
+            xml_blk = pop_block_len(xml_blks);
+            binary_blk = pop_block_len(binary_blks);
+
+            args[i] = alloc_decompress_args(input_map, ddp[i], xml_blk, binary_blk, footer_xml_offset, footer_binary_offset);
+
+            footer_xml_offset += xml_blk->compressed_size;
+            footer_binary_offset += binary_blk->compressed_size;
+        }
+
+        for(i = divisions_used; i < divisions_used+threads; i++)
+            pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
+
+        for(i = divisions_used; i < divisions_used+threads; i++)
+        {
+            pthread_join(ptid[i], NULL);
+
+            start = clock();
+            write_to_file(fd, args[i]->ret, args[i]->ret_len);
+            stop = clock();
+
+            printf("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, ((double)args[i]->ret_len/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+
+            dealloc_decompress_args(args[i]);
+        }
+        divisions_used += threads;
+    }
+
+    return;
 }

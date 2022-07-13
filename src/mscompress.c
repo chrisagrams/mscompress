@@ -349,7 +349,7 @@ main(int argc, char* argv[])
     int operation = -1;
 
     args.verbose = 0;
-    args.blocksize = 1e+8;
+    args.blocksize = 1e+9;
     args.threads = 0;
     args.args[0] = NULL;
     args.args[1] = NULL;
@@ -418,31 +418,33 @@ main(int argc, char* argv[])
       binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
       dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]); // debug
-      (*xml_divisions) -> file_end = dp->file_end;
-      xml_divisions[1] -> file_end = dp->file_end;
 
-    //   long offset = 512;
-    //   void* out;
-    //   block_len_t* front;
-    //   front = pop_block_len(xml_blks);
-    //   while(front != NULL)
-    //   {
-    //     out = decmp_block(input_map, offset, front->compressed_size, front->original_size);
-    //     write_to_file(fds[1], out, front->original_size);
-    //     offset += front->compressed_size;
-    //     front = pop_block_len(xml_blks);
-    //   }
-      size_t test_len = 0;
-      size_t test_len_2 = 0;
-      block_len_t* xml_blk;
-      block_len_t* binary_blk;
-      xml_blk = pop_block_len(xml_blks);
-      binary_blk = pop_block_len(binary_blks);
 
-      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, xml_divisions[0], xml_blk, binary_blk, &test_len);
-      char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, xml_divisions[1], pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
-      write_to_file(fds[1], test, test_len);
-      write_to_file(fds[1], test2, test_len_2);
+      // size_t len = 0;
+      // block_len_t* xml_blk;
+      // block_len_t* binary_blk;
+      // off_t footer_xml_offset = msz_footer->xml_pos;
+      // off_t footer_binary_offset = msz_footer->binary_pos;
+
+      // char* output;
+
+      // for(int i = 0; i < divisions; i++)
+      // {
+      //   xml_blk = pop_block_len(xml_blks);
+      //   binary_blk = pop_block_len(binary_blks);
+
+      //   output = (char*)decmp_routine(input_map, footer_xml_offset, footer_binary_offset, xml_divisions[i], xml_blk, binary_blk, &len);
+        
+      //   footer_xml_offset += xml_blk->compressed_size;
+      //   footer_binary_offset += binary_blk->compressed_size;
+
+      //   write_to_file(fds[1], output, len);
+      // }
+
+      printf("\nDecompression and encoding...\n");
+
+      decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
+
     }
 
     dealloc_dp(dp);
