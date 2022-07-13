@@ -66,7 +66,6 @@ decmp_binary_block(void* decmp_binary, size_t blk_size)
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
         consumed += binary_len;
     }
-    // binary_str = encode_binary((&decmp_binary), &binary_len);
 }
 
 decompress_args_t*
@@ -191,12 +190,10 @@ decompress_parallel(char* input_map,
     decompress_args_t* args[divisions];
     pthread_t ptid[divisions];
 
-
     block_len_t* xml_blk;
     block_len_t* binary_blk;
     off_t footer_xml_offset = msz_footer->xml_pos;
     off_t footer_binary_offset = msz_footer->binary_pos;
-    
 
     int i;
 
@@ -207,7 +204,7 @@ decompress_parallel(char* input_map,
     
     while(divisions_used < divisions)
     {
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
         {
             xml_blk = pop_block_len(xml_blks);
             binary_blk = pop_block_len(binary_blks);
@@ -218,10 +215,10 @@ decompress_parallel(char* input_map,
             footer_binary_offset += binary_blk->compressed_size;
         }
 
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
             pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
 
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
         {
             pthread_join(ptid[i], NULL);
 
@@ -235,6 +232,4 @@ decompress_parallel(char* input_map,
         }
         divisions_used += threads;
     }
-
-    return;
 }
