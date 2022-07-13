@@ -409,6 +409,7 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
     r[curr_div]->start_positions[curr_div_i] = 0;
     r[curr_div]->end_positions[curr_div_i] = binary_divisions[0]->start_positions[0];
     r[curr_div]->total_spec++;
+    r[curr_div]->file_end = dp->file_end;
     curr_div_i++;
     curr_bin_i++;
 
@@ -422,13 +423,14 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
         {
             if(curr_div + 1 == divisions)
                 break;
+            r[curr_div]->file_end = dp->file_end;
             r[curr_div]->end_positions[curr_div_i-1] = binary_divisions[curr_div+1]->start_positions[0];
             curr_div++;
             
             /* First xml division of 0 length, start binary first */
             r[curr_div]->start_positions[0] = binary_divisions[curr_div]->end_positions[0];
             r[curr_div]->end_positions[0] = binary_divisions[curr_div]->end_positions[0];
-
+            r[curr_div]->total_spec++;
 
             r[curr_div]->start_positions[1] = binary_divisions[curr_div]->end_positions[0];
             r[curr_div]->end_positions[1] = binary_divisions[curr_div]->start_positions[1];
@@ -451,17 +453,8 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
     r[curr_div]->start_positions[curr_div_i] = binary_divisions[curr_div]->end_positions[curr_bin_i-1];
     r[curr_div]->end_positions[curr_div_i] = dp->file_end;
     r[curr_div]->total_spec++;
+    r[curr_div]->file_end = dp->file_end;
 
-
-    // i = 0;
-    // for(i; i < divisions; i++)
-    // {
-    //     printf("division %d\n", i);
-    //     for(int j = 0; j < r[i]->total_spec; j++)
-    //     {
-    //         printf("(%d, %d)\n", r[i]->start_positions[j], r[i]->end_positions[j]);
-    //     }
-    // }
     return r;
 }
 
