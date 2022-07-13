@@ -424,11 +424,16 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
                 break;
             r[curr_div]->end_positions[curr_div_i-1] = binary_divisions[curr_div+1]->start_positions[0];
             curr_div++;
-
+            
+            /* First xml division of 0 length, start binary first */
             r[curr_div]->start_positions[0] = binary_divisions[curr_div]->end_positions[0];
-            r[curr_div]->end_positions[0] = binary_divisions[curr_div]->start_positions[1];
+            r[curr_div]->end_positions[0] = binary_divisions[curr_div]->end_positions[0];
+
+
+            r[curr_div]->start_positions[1] = binary_divisions[curr_div]->end_positions[0];
+            r[curr_div]->end_positions[1] = binary_divisions[curr_div]->start_positions[1];
             r[curr_div]->total_spec++;
-            curr_div_i = 1;
+            curr_div_i = 2;
             curr_bin_i = 2;
         }
         else

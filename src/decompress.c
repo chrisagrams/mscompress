@@ -90,7 +90,7 @@ decmp_routine(void* input_map,
     char* binary_str;
 
     int64_t buff_off = 0;
-    int64_t xml_off = dp->start_positions[0];
+    int64_t xml_off = 0;
 
     int64_t len = dp->file_end;
     int64_t curr_len = dp->end_positions[0]-dp->start_positions[0];
@@ -104,7 +104,8 @@ decmp_routine(void* input_map,
 
     int i = 1;
 
-    while(xml_off < xml_blk->original_size)
+    int64_t bound = xml_blk->original_size;
+    while(xml_off < bound)
     {
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
         if(binary_str == NULL)

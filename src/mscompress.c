@@ -439,8 +439,8 @@ main(int argc, char* argv[])
       xml_blk = pop_block_len(xml_blks);
       binary_blk = pop_block_len(binary_blks);
 
-      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, *xml_divisions, xml_blk, binary_blk, &test_len);
-      char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, *xml_divisions, pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
+      char* test = (char*)decmp_routine(input_map, msz_footer->xml_pos, msz_footer->binary_pos, xml_divisions[0], xml_blk, binary_blk, &test_len);
+      char* test2 = (char*)decmp_routine(input_map, msz_footer->xml_pos+xml_blk->compressed_size, msz_footer->binary_pos+binary_blk->compressed_size, xml_divisions[1], pop_block_len(xml_blks), pop_block_len(binary_blks), &test_len_2);
       write_to_file(fds[1], test, test_len);
       write_to_file(fds[1], test2, test_len_2);
     }
