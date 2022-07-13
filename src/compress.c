@@ -349,6 +349,13 @@ cmp_flush(ZSTD_CCtx* czstd,
 
 void
 write_cmp_blk(cmp_block_t* blk, int fd)
+/**
+ * @brief Writes cmp_block_t block to file. Program exits if writing to file fails.
+ * 
+ * @param blk A cmp_block_t with mem and size populated.
+ * 
+ * @param fd File descriptor to write to.
+ */
 {
     int rv;
 
@@ -362,7 +369,19 @@ write_cmp_blk(cmp_block_t* blk, int fd)
 }
 
 void
-cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue, int fd)
+cmp_dump(cmp_blk_queue_t* cmp_buff,
+         block_len_queue_t* blk_len_queue,
+         int fd)
+/**
+ * @brief Pops cmp_block_t from queue, appends block_len to block_len_queue, and writes cmp_block_t to file.
+ *        Write to disk is timed to display write speed.
+ * 
+ * @param cmp_buff A cmp_blk_queue_t to pop from.
+ * 
+ * @param blk_len_queue A block_len_queue_t to append a block_len_t to.
+ * 
+ * @param fd File descriptor to write cmp_blk to.
+ */
 {
     cmp_block_t* front;
     clock_t start;
@@ -393,6 +412,9 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
                 size_t cmp_blk_size,
                 size_t* tot_size,
                 size_t* tot_cmp)
+/**
+ * @brief cmp_routine wrapper for XML data.
+ */
 {
     cmp_routine(czstd,
                 cmp_buff,
@@ -414,14 +436,16 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
                    size_t cmp_blk_size,
                    size_t* tot_size,
                    size_t* tot_cmp)
+/**
+ * @brief cmp_routine wrapper for binary data. 
+ *        Decodes base64 binary with encoding specified within df->compression before compression.
+ */
 {
     size_t binary_len = 0;
     Bytef* binary_buff; 
     
     binary_buff = decode_binary(input, 0, len, df->compression, &binary_len);
-    // size_t test_len = 0;
-    // char* test = encode_binary(binary_buff, &test_len);
-    // int cmp = strcmp(input, test);
+
     cmp_routine(czstd,
                 cmp_buff,
                 curr_block,
@@ -435,6 +459,14 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
 
 void
 compress_routine(void* args)
+/**
+ * @brief Compress routine. Iterates through data_positions and compresses XML and binary with a single pass.
+ *        Returns a cmp_blk_queue containing a linked-list queue of compressed blocks. 
+ *        Return value is stored within args->ret.
+ * 
+ * @param args Function arguments allocated and populated by alloc_compress_args
+ */
+
 {
     int tid;
 
@@ -492,6 +524,23 @@ compress_parallel(char* input_map,
                   data_format_t* df,
                   size_t cmp_blk_size,
                   int divisions, int threads, int fd)
+/**
+ * @brief Creates and executes compression threads using compress_routine.
+ * 
+ * @param input_map Pointer representing position within mmap'ed mzML file.
+ * 
+ * @param ddp An array of data_positions_t struct with size equals to divisions.
+ * 
+ * @param df Data format struct.
+ * 
+ * @param cmp_blk_size The size of a data block before it is compressed. 
+ * 
+ * @param divisions Number of divisions within ddp.
+ * 
+ * @param threads Number of threads to create at a given time.
+ * 
+ * @param fd File descriptor to write to.
+ */
 {
     block_len_queue_t* blk_len_queue;
     compress_args_t* args[divisions];
@@ -506,13 +555,13 @@ compress_parallel(char* input_map,
     while(divisions_used < divisions)
     {
         
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
             args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
 
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
             pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
 
-        for(i = divisions_used; i < divisions_used+threads; i++)
+        for(i = divisions_used; i < divisions_used + threads; i++)
         {
             pthread_join(ptid[i], NULL);
             cmp_dump(args[i]->ret, blk_len_queue, fd);
