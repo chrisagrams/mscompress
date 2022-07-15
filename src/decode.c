@@ -1,3 +1,15 @@
+/**
+ * @file decode.c
+ * @author Chris Grams (chrisagrams@gmail.com)
+ * @brief A collection of functions to decode base64 and zlib compressed strings to raw binary. 
+ *        Uses https://github.com/aklomp/base64.git library for base64 decoding.
+ * @version 0.0.1
+ * @date 2021-12-21
+ * 
+ * @copyright 
+ * 
+ */
+
 #include "mscompress.h"
 #include "vendor/base64/include/libbase64.h"
 #include <stdio.h>
@@ -26,7 +38,7 @@ decode_base64(char* src, size_t src_len, size_t* out_len)
 
     char* b64_out_buff;
 
-    b64_out_buff = (char*)malloc(sizeof(char)*src_len);
+    b64_out_buff = (char*)malloc(sizeof(char) * src_len);
 
     b64_ret = base64_decode(src, src_len, b64_out_buff, out_len, 0);
 
@@ -67,9 +79,9 @@ decode_binary(char* input_map, int start_position, int end_position, int compres
     char* b64_out_buff;
     zlib_block_t* decmp_output;
 
-    size_t len = end_position-start_position;
+    size_t len = end_position - start_position;
 
-    b64_out_buff = decode_base64(input_map+start_position, len, &b64_out_len);
+    b64_out_buff = decode_base64(input_map + start_position, len, &b64_out_len);
     
     if (!b64_out_buff)
         return NULL;
