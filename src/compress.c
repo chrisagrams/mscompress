@@ -384,8 +384,7 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
  */
 {
     cmp_block_t* front;
-    clock_t start;
-    clock_t stop;
+    clock_t start, stop;
 
     while(cmp_buff->populated > 0)
     {
