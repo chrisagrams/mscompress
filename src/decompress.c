@@ -7,6 +7,12 @@
 
 ZSTD_DCtx*
 alloc_dctx()
+/**
+ * @brief Creates a ZSTD decompression context and handles errors.
+ * 
+ * @return A ZSTD decompression context on success. Exits on error.
+ * 
+ */
 {
     ZSTD_DCtx* dctx;
     dctx = ZSTD_createDCtx();
@@ -22,12 +28,6 @@ alloc_dctx()
 void*
 alloc_ztsd_dbuff(size_t buff_len)
 {
-    // size_t bound;
-
-    // bound = ZSTD_decompressBound(src_len);
-
-    // *buff_len = bound;
-
     return malloc(buff_len);
 }
 
@@ -112,8 +112,7 @@ decompress_routine(void* args)
 
     decompress_args_t* db_args;
 
-    void* decmp_xml;
-    void* decmp_binary;
+    void *decmp_xml, *decmp_binary;
 
     tid = get_thread_id();
 
@@ -127,14 +126,12 @@ decompress_routine(void* args)
     size_t binary_len; 
     char* binary_str;
 
-    int64_t buff_off = 0;
-    int64_t xml_off = 0;
+    int64_t buff_off, xml_off = 0;
 
     data_positions_t* dp = db_args->dp;
 
     int64_t len = dp->file_end;
-    int64_t curr_len = dp->end_positions[0]-dp->start_positions[0];
-
+    int64_t curr_len = dp->end_positions[0] - dp->start_positions[0];
 
     char* buff = malloc(len);
 
@@ -150,33 +147,23 @@ decompress_routine(void* args)
 
     while(xml_off < bound)
     {
+        /* encode binary and copy over to buffer */
         binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
-        if(binary_str == NULL)
-        {
-            //if encode_binary returns null, dump all buff contents to file for debug
-            db_args->ret_len = buff_off;
-            return;
-        }
-        memcpy(buff+buff_off, binary_str, binary_len);
-        buff_off+=binary_len;
-        curr_len = dp->end_positions[i]-dp->start_positions[i];
-        if (curr_len < 0) //temp fix
-        {
-            db_args->ret_len = buff_off;
-            return;
-        }
-        memcpy(buff+buff_off, decmp_xml+xml_off, curr_len);
-        buff_off+=curr_len;
+        memcpy(buff + buff_off, binary_str, binary_len);
+        buff_off += binary_len;
+
+        /* copy over xml to buffer */
+        curr_len = dp->end_positions[i] - dp->start_positions[i];
+        memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
+        buff_off += curr_len;
         xml_off += curr_len;
+
         i++;
     }
 
     db_args->ret_len = buff_off;
 
     printf("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
-
-    return;
-
 }
 
 void
@@ -190,8 +177,7 @@ decompress_parallel(char* input_map,
     decompress_args_t* args[divisions];
     pthread_t ptid[divisions];
 
-    block_len_t* xml_blk;
-    block_len_t* binary_blk;
+    block_len_t *xml_blk, *binary_blk;
     off_t footer_xml_offset = msz_footer->xml_pos;
     off_t footer_binary_offset = msz_footer->binary_pos;
 
@@ -199,8 +185,7 @@ decompress_parallel(char* input_map,
 
     int divisions_used = 0;
 
-    clock_t start;
-    clock_t stop;
+    clock_t start, stop;
     
     while(divisions_used < divisions)
     {
