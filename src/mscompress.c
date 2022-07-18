@@ -382,6 +382,12 @@ main(int argc, char* argv[])
 
       preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, n_threads, &dp, &df, &binary_divisions, &xml_divisions);
 
+      if (divisions < n_threads)
+      {
+        n_threads = divisions;
+        printf("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
+      }
+
       #if DEBUG == 1
         dprintf(fds[2], "=== Begin binary divisions ===\n");
         dump_divisions_to_file(binary_divisions, divisions, n_threads, fds[2]);
@@ -418,7 +424,12 @@ main(int argc, char* argv[])
       binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
       dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]); // debug
-
+      
+      if (divisions < n_threads)
+      {
+        n_threads = divisions;
+        printf("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
+      }
 
       // size_t len = 0;
       // block_len_t* xml_blk;

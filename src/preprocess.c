@@ -362,8 +362,6 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
         printf("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
-    // *divisions = 1;
-
     printf("\tUsing %d divisions over %d threads.\n", *divisions, threads);
 
     r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions));
@@ -374,7 +372,7 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
     
     for(; i < dp->total_spec * 2; i++)
     {
-        if(curr_size > *blocksize/2)
+        if(curr_size > (*blocksize/2))
         {
             printf("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
             curr_div++;
@@ -384,11 +382,15 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
         r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
         r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
         r[curr_div]->total_spec++;
-        curr_size += dp->end_positions[i]-dp->start_positions[i];
+        curr_size += (dp->end_positions[i] - dp->start_positions[i]);
         curr_div_i++;
     }
 
     printf("\n");
+
+    if(curr_div != *divisions)
+        *divisions = curr_div+1;
+
     return r;
 }
 
