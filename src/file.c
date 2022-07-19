@@ -194,6 +194,13 @@ get_header_binary_compression_type(void* input_map)
 
 void
 write_footer(footer_t footer, int fd)
+/**
+ * @brief Writes a footer_t struct to file descritor.
+ * 
+ * @param footer A populated footer_t struct.
+ * 
+ * @param fd Output file descriptor to write to. 
+ */
 {
     char buff[sizeof(footer_t)];
     footer_t* buff_cast = (footer_t*)(&buff[0]);
@@ -203,6 +210,15 @@ write_footer(footer_t footer, int fd)
 
 footer_t*
 read_footer(void* input_map, long filesize)
+/**
+ * @brief Maps footer section of mmap'ed input file to a footer_t* pointer. 
+ * 
+ * @param input_map mmap'ed input file.
+ * 
+ * @param filesize Size of input filesize. 
+ * 
+ * @return Pointer to a footer_t struct located at the footer section of mmap'ed file.
+ */
 {
     footer_t* footer;
 
@@ -213,6 +229,14 @@ read_footer(void* input_map, long filesize)
 
 int
 is_msz(int fd)
+/**
+ * @brief Determines if file on file descriptor fd is an msz file.
+ *        Reads first 512 bytes of file and looks for MAGIC_TAG.
+ * 
+ * @param fd File descriptor to read.
+ * 
+ * @return 1 if file is a msz file. 0 otherwise.
+ */
 {
     char buff [512];
     char magic_buff[4];
@@ -237,6 +261,14 @@ is_msz(int fd)
 
 int
 is_mzml(int fd)
+/**
+ * @brief Determines if file on file descriptor fd is an mzML file.
+ *        Reads first 512 bytes of file and looks for substring "indexedmzML".
+ * 
+ * @param fd File descriptor to read.
+ * 
+ * @return 1 if file is a mzML file. 0 otherwise.
+ */
 {
     char buff[512];
     ssize_t rv;
@@ -256,6 +288,15 @@ is_mzml(int fd)
 
 int
 determine_filetype(int fd)
+/**
+ * @brief Determines what file is on file descriptor fd.
+ * 
+ * @param fd File descriptor to read.
+ * 
+ * @return COMPRESS (1) if file is a mzML file.
+ *         DECOMPRESS (2) if file is a msz file.
+ *         -1 on error.
+ */
 {
   if(is_mzml(fd))
   {
@@ -275,6 +316,15 @@ determine_filetype(int fd)
 
 char*
 change_extension(char* input, char* extension)
+/**
+ * @brief Changes a path string's extension.
+ * 
+ * @param input Original path string.
+ * 
+ * @param extension Desired extension to append.
+ * 
+ * @return Malloc'd char array with new path string.
+ */
 {
   char* x;
   char* r;
@@ -347,7 +397,7 @@ prepare_fds(char* input_path,
     *output_path = change_extension(input_path, ".mzML\0");
 
   output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
-  
+
   if(output_fd < 0)
   {
     fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
