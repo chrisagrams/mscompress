@@ -192,7 +192,6 @@ get_header_binary_compression_type(void* input_map)
     return buff;
 }
 
-
 void
 write_footer(footer_t footer, int fd)
 {
@@ -211,7 +210,6 @@ read_footer(void* input_map, long filesize)
 
     return footer;
 }
-
 
 int
 is_msz(int fd)
@@ -254,4 +252,109 @@ is_mzml(int fd)
 
     return 0;
         
+}
+
+int
+determine_filetype(int fd)
+{
+  if(is_mzml(fd))
+  {
+    print("\t.mzML file detected.\n");
+    return COMPRESS;
+  }
+  else if(is_msz(fd))
+  {
+    print("\t.msz file detected.\n");
+    return DECOMPRESS;
+  }  
+  else
+    fprintf(stderr, "Invalid input file.\n");
+  return -1;
+
+}
+
+char*
+change_extension(char* input, char* extension)
+{
+  char* x;
+  char* r;
+
+  r = (char*)malloc(sizeof(char)*strlen(input));
+
+  strcpy(r, input);
+  x = strrchr(r, '.');
+  strcpy(x, extension);
+
+  return r;
+}
+
+int
+prepare_fds(char* input_path,
+            char** output_path,
+            char* debug_output,
+            char** input_map,
+            int* input_filesize,
+            int* fds)
+{
+  int input_fd;
+  int output_fd;
+  int type;
+
+  if(input_path)
+    input_fd = open(input_path, O_RDONLY);
+  else
+  {
+    fprintf(stderr, "No input file specified.");
+    exit(1);
+  }
+  if(input_fd < 0)
+  {
+    fprintf(stderr, "Error in opening input file descriptor. (%s)\n", strerror(errno));
+    exit(1);
+  }
+
+  if(debug_output)
+  {
+    fds[2] = open(debug_output, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    print("\tDEBUG OUTPUT: %s\n", debug_output);
+  }
+
+  type = determine_filetype(input_fd);
+
+  if(type != COMPRESS && type != DECOMPRESS)
+    exit(1);
+
+  fds[0] = input_fd;
+  *input_map = get_mapping(input_fd);
+  *input_filesize = get_filesize(input_path);
+
+  if(*output_path)
+  {
+    output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    if(output_fd < 0)
+    {
+      fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
+      exit(1);
+    }
+    fds[1] = output_fd;
+    return type;
+  }
+   
+
+  if(type == COMPRESS)
+    *output_path = change_extension(input_path, ".msz\0");
+  else if(type == DECOMPRESS)
+    *output_path = change_extension(input_path, ".mzML\0");
+
+  output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+  
+  if(output_fd < 0)
+  {
+    fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
+    exit(1);
+  }
+  fds[1] = output_fd;
+
+  return type;
+
 }

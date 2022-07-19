@@ -159,6 +159,7 @@ char* get_header_xml_compresssion_type(void* input_map);
 char* get_header_binary_compression_type(void* input_map);
 void write_footer(footer_t footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
+int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, int* input_filesize, int* fds);
 
 int is_mzml(int fd);
 int is_msz(int fd);
