@@ -108,6 +108,13 @@ read_from_file(int fd, void* buff, size_t n)
 
 off_t
 get_offset(int fd)
+/**
+ * @brief Get current offset within a file descriptor
+ * 
+ * @param fd Opened file descriptor.
+ * 
+ * @return Numeric offset within file descriptor.
+ */
 {
     return lseek(fd, 0, SEEK_CUR);
 }
@@ -164,30 +171,51 @@ write_header(int fd, char* xml_compression_method, char* binary_compression_meth
 
 long
 get_header_blocksize(void* input_map)
+/**
+ * @brief Gets blocksize stored in header.
+ * 
+ * @param input_map mmap'ed input file.
+ * 
+ * @return long value representing blocksize.
+ */
 {
     long* r;
-    r = (long*)(&input_map[0]+BLOCKSIZE_OFFSET);
+    r = (long*)(&input_map[0] + BLOCKSIZE_OFFSET);
     return *r;
 }
 
 char*
 get_header_xml_compresssion_type(void* input_map)
+/**
+ * @brief Gets XML compression type stored in header.
+ * 
+ * @param input_map mmap'ed input file.
+ * 
+ * @return Malloc'd char array with XML compression type string.
+ */
 {
     char* buff;
 
     buff = (char*)malloc(XML_COMPRESSION_METHOD_SIZE);
-    memcpy(buff, input_map+XML_COMPRESSION_METHOD_OFFSET, XML_COMPRESSION_METHOD_SIZE);
+    memcpy(buff, input_map + XML_COMPRESSION_METHOD_OFFSET, XML_COMPRESSION_METHOD_SIZE);
 
     return buff;
 }
 
 char*
 get_header_binary_compression_type(void* input_map)
+/**
+ * @brief Gets binary compression type stored in header.
+ * 
+ * @param input_map mmap'ed input file.
+ * 
+ * @return Malloc'd char array with binary compression type string.
+ */
 {
     char* buff;
     
     buff = (char*)malloc(BINARY_COMPRESSION_METHOD_SIZE);
-    memcpy(buff, input_map+BINARY_COMPRESSION_METHOD_OFFSET, BINARY_COMPRESSION_METHOD_SIZE);
+    memcpy(buff, input_map + BINARY_COMPRESSION_METHOD_OFFSET, BINARY_COMPRESSION_METHOD_SIZE);
 
     return buff;
 }
@@ -321,7 +349,7 @@ change_extension(char* input, char* extension)
  * 
  * @param input Original path string.
  * 
- * @param extension Desired extension to append.
+ * @param extension Desired extension to append. MUST be NULL terminated.
  * 
  * @return Malloc'd char array with new path string.
  */
@@ -345,6 +373,30 @@ prepare_fds(char* input_path,
             char** input_map,
             int* input_filesize,
             int* fds)
+/**
+ * @brief Prepares all required file descriptors, creates/opens files, determines filetypes, and handles errors.
+ * 
+ * @param input_path Path of input file.
+ * 
+ * @param output_path Reference to output path. 
+ *                    If empty, output_path will equals input_path with changed extension.
+ * 
+ * @param debug_output Path of debug dump file. (Optional)
+ * 
+ * @param input_map Reference to input_map for mmap.
+ *                  On success, input_path will be mmap'ed here.
+ * 
+ * @param input_filesize Reference to input_filesize.
+ *                       On success, input_filesize will contain the filesize of input_path.
+ * 
+ * @param fds An array of (3) file descriptors.
+ *            On success, will contain non-negative values.
+ *            fds[3] = {input_fd, output_fd, debug_fd}
+ * 
+ * @return COMPRESS (1) if file is a mzML file.
+ *         DECOMPRESS (2) if file is a msz file.
+ *         Exit (Errno: 1) on error.
+ */
 {
   int input_fd;
   int output_fd;
@@ -357,6 +409,7 @@ prepare_fds(char* input_path,
     fprintf(stderr, "No input file specified.");
     exit(1);
   }
+
   if(input_fd < 0)
   {
     fprintf(stderr, "Error in opening input file descriptor. (%s)\n", strerror(errno));
@@ -403,8 +456,8 @@ prepare_fds(char* input_path,
     fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
     exit(1);
   }
+
   fds[1] = output_fd;
 
   return type;
-
 }
