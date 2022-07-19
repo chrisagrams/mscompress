@@ -205,6 +205,7 @@ void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* ou
 void compress_routine(void* args);
 block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
+void compress_mzml(char* input_map, long blocksize, int divisions, int threads, footer_t* footer, data_positions_t* dp, data_format_t* df, data_positions_t** binary_divisions, data_positions_t** xml_divisions, int output_fd);
 
 /* decompress.c */
 typedef struct

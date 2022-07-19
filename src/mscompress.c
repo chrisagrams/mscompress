@@ -249,61 +249,6 @@ preprocess_mzml(char* input_map,
 
 }
 
-void 
-compress_mzml(char* input_map,
-              long blocksize,
-              int divisions,
-              int threads,
-              footer_t* footer,
-              data_positions_t* dp,
-              data_format_t* df,
-              data_positions_t** binary_divisions,
-              data_positions_t** xml_divisions,
-              int output_fd)
-{
-
-    block_len_queue_t* xml_block_lens;
-
-    block_len_queue_t* binary_block_lens;
-
-    struct timeval start, stop;
-
-    gettimeofday(&start, NULL);
-
-    print("\nDecoding and compression...\n");
-
-    footer->xml_pos = get_offset(output_fd);
-
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, threads, output_fd);  /* Compress XML */
-
-    footer->binary_pos = get_offset(output_fd);
-
-    binary_block_lens = compress_parallel((char*)input_map, binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress binary */
-
-    footer->xml_blk_pos = get_offset(output_fd);
-
-    dump_block_len_queue(xml_block_lens, output_fd);
-
-    footer->binary_blk_pos = get_offset(output_fd);
-
-    dump_block_len_queue(binary_block_lens, output_fd);
-
-    footer->dp_pos = get_offset(output_fd);
-
-    dump_dp(dp, output_fd);
-
-    footer->num_spectra = dp->total_spec;
-
-    footer->file_end = dp->file_end;
-
-    write_footer(*footer, output_fd);
-
-    gettimeofday(&stop, NULL);
-
-    print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
-}
-
-
 void
 get_compression_scheme(void* input_map, char** xml_compression_type, char** binary_compression_type)
 {      
