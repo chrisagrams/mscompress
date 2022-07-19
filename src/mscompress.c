@@ -212,7 +212,15 @@ void prepare_threads(struct arguments args, long* n_threads)
 }
 
 int
-preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long n_threads, data_positions_t** dp, data_format_t** df, data_positions_t*** binary_divisions, data_positions_t*** xml_divisions)
+preprocess_mzml(char* input_map,
+                long input_filesize,
+                int* divisions,
+                long* blocksize,
+                long* n_threads,
+                data_positions_t** dp,
+                data_format_t** df,
+                data_positions_t*** binary_divisions,
+                data_positions_t*** xml_divisions)
 {
   struct timeval start, stop;
 
@@ -384,13 +392,7 @@ main(int argc, char* argv[])
     {
       print("\tDetected .mzML file, starting compression...\n");
 
-      preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, n_threads, &dp, &df, &binary_divisions, &xml_divisions);
-
-      if (divisions < n_threads)
-      {
-        n_threads = divisions;
-        print("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
-      }
+      preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, &n_threads, &dp, &df, &binary_divisions, &xml_divisions);
 
       #if DEBUG == 1
         dprintf(fds[2], "=== Begin binary divisions ===\n");
@@ -425,37 +427,10 @@ main(int argc, char* argv[])
       parse_footer(&msz_footer, input_map, input_filesize, &xml_blks, &binary_blks, &dp);
 
       divisions = xml_blks->populated;
-      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, n_threads);
+      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
       dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]); // debug
       
-      if (divisions < n_threads)
-      {
-        n_threads = divisions;
-        print("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
-      }
-
-      // size_t len = 0;
-      // block_len_t* xml_blk;
-      // block_len_t* binary_blk;
-      // off_t footer_xml_offset = msz_footer->xml_pos;
-      // off_t footer_binary_offset = msz_footer->binary_pos;
-
-      // char* output;
-
-      // for(int i = 0; i < divisions; i++)
-      // {
-      //   xml_blk = pop_block_len(xml_blks);
-      //   binary_blk = pop_block_len(binary_blks);
-
-      //   output = (char*)decmp_routine(input_map, footer_xml_offset, footer_binary_offset, xml_divisions[i], xml_blk, binary_blk, &len);
-        
-      //   footer_xml_offset += xml_blk->compressed_size;
-      //   footer_binary_offset += binary_blk->compressed_size;
-
-      //   write_to_file(fds[1], output, len);
-      // }
-
       print("\nDecompression and encoding...\n");
 
       decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);

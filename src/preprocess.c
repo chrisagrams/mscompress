@@ -339,7 +339,7 @@ find_binary(char* input_map, data_format_t* df)
 /* === End of XML traversal functions === */
 
 data_positions_t**
-get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int threads)
+get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads)
 {
 
     data_positions_t** r;
@@ -350,19 +350,15 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
     
     if(*divisions == 0)
         *divisions = ceil((((double)dp->file_end)/(*blocksize)));
-    
-    // while(*divisions%threads != 0) {
-    //     (*divisions)++;
-    // }
 
-    if(*divisions < threads && threads > 0)
+    if(*divisions < *threads && *threads > 0)
     {
-        *divisions = threads;
-        *blocksize = dp->file_end/threads + 1;
+        *divisions = *threads;
+        *blocksize = dp->file_end/(*threads) + 1;
         print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
-    print("\tUsing %d divisions over %d threads.\n", *divisions, threads);
+    print("\tUsing %d divisions over %d threads.\n", *divisions, *threads);
 
     r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions));
 
@@ -390,6 +386,12 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
 
     if(curr_div != *divisions)
         *divisions = curr_div+1;
+    
+    if (*divisions < *threads)
+    {
+        *threads = *divisions;
+        print("\tNEW: Using %d divisions over %d threads.\n", *divisions, *threads);
+    }
 
     return r;
 }
