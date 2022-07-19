@@ -70,7 +70,7 @@ ssize_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
-        exit(1);
+      exit(1);
     
     ssize_t rv;
 
@@ -89,7 +89,7 @@ ssize_t
 read_from_file(int fd, void* buff, size_t n)
 {
     if(fd < 0)
-        exit(1);
+      exit(1);
     
 
     ssize_t rv;
@@ -147,23 +147,23 @@ write_header(int fd, char* xml_compression_method, char* binary_compression_meth
 
     *header_buff_cast = MAGIC_TAG;
 
-    *(header_buff_cast+1) = FORMAT_VERSION_MAJOR;
+    *(header_buff_cast + 1) = FORMAT_VERSION_MAJOR;
 
-    *(header_buff_cast+2) = FORMAT_VERSION_MINOR;
+    *(header_buff_cast + 2) = FORMAT_VERSION_MINOR;
     
     char message_buff[MESSAGE_SIZE] = MESSAGE;
 
-    memcpy(header_buff+MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
+    memcpy(header_buff + MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
 
-    memcpy(header_buff+XML_COMPRESSION_METHOD_OFFSET, xml_compression_method, XML_COMPRESSION_METHOD_SIZE);
+    memcpy(header_buff + XML_COMPRESSION_METHOD_OFFSET, xml_compression_method, XML_COMPRESSION_METHOD_SIZE);
 
-    memcpy(header_buff+BINARY_COMPRESSION_METHOD_OFFSET, binary_compression_method, BINARY_COMPRESSION_METHOD_SIZE);
+    memcpy(header_buff + BINARY_COMPRESSION_METHOD_OFFSET, binary_compression_method, BINARY_COMPRESSION_METHOD_SIZE);
 
-    long* header_buff_cast_long = (long*)(&header_buff[0]+BLOCKSIZE_OFFSET);
+    long* header_buff_cast_long = (long*)(&header_buff[0] + BLOCKSIZE_OFFSET);
 
     *header_buff_cast_long = blocksize;
 
-    memcpy(header_buff+MD5_OFFSET, md5, MD5_SIZE);
+    memcpy(header_buff + MD5_OFFSET, md5, MD5_SIZE);
 
     write_to_file(fd, header_buff, HEADER_SIZE);
 
@@ -250,7 +250,7 @@ read_footer(void* input_map, long filesize)
 {
     footer_t* footer;
 
-    footer = (footer_t*)(&input_map[0]+filesize-sizeof(footer_t));
+    footer = (footer_t*)(&input_map[0] + filesize - sizeof(footer_t));
 
     return footer;
 }
@@ -357,7 +357,7 @@ change_extension(char* input, char* extension)
   char* x;
   char* r;
 
-  r = (char*)malloc(sizeof(char)*strlen(input));
+  r = (char*)malloc(sizeof(char) * strlen(input));
 
   strcpy(r, input);
   x = strrchr(r, '.');
