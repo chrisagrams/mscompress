@@ -174,6 +174,7 @@ void dump_dp(data_positions_t* dp, int fd);
 data_positions_t* read_dp(void* input_map, long dp_position, size_t num_spectra, long eof);
 void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
+int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long* n_threads, data_positions_t** dp, data_format_t** df, data_positions_t*** binary_divisions, data_positions_t*** xml_divisions);
 
 /* sys.c */
 int get_cpu_count();

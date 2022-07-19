@@ -16,6 +16,7 @@
 #include <math.h>
 #include <argp.h>
 #include <stdbool.h>
+#include <sys/time.h>
 #include "vendor/yxml/yxml.h"
 #include "vendor/base64/lib/config.h"
 #include "vendor/base64/include/libbase64.h"
@@ -505,5 +506,43 @@ read_dp(void* input_map, long dp_position, size_t num_spectra, long eof)
     }
 
     return r;
+
+}
+
+int
+preprocess_mzml(char* input_map,
+                long input_filesize,
+                int* divisions,
+                long* blocksize,
+                long* n_threads,
+                data_positions_t** dp,
+                data_format_t** df,
+                data_positions_t*** binary_divisions,
+                data_positions_t*** xml_divisions)
+{
+  struct timeval start, stop;
+
+  gettimeofday(&start, NULL);
+
+  print("\nPreprocessing...\n");
+
+  *df = pattern_detect((char*)input_map);
+
+  if (*df == NULL)
+      return -1;
+
+  *dp = find_binary((char*)input_map, *df);
+  if (*dp == NULL)
+      return -1;
+
+  (*dp)->file_end = input_filesize;
+
+  *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
+
+  *xml_divisions = get_xml_divisions(*dp, *binary_divisions, *divisions);
+
+  gettimeofday(&stop, NULL);
+
+  print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
 
 }

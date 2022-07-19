@@ -211,44 +211,6 @@ void prepare_threads(struct arguments args, long* n_threads)
     print("\tUsing %d threads.\n", *n_threads);
 }
 
-int
-preprocess_mzml(char* input_map,
-                long input_filesize,
-                int* divisions,
-                long* blocksize,
-                long* n_threads,
-                data_positions_t** dp,
-                data_format_t** df,
-                data_positions_t*** binary_divisions,
-                data_positions_t*** xml_divisions)
-{
-  struct timeval start, stop;
-
-  gettimeofday(&start, NULL);
-
-  print("\nPreprocessing...\n");
-
-  *df = pattern_detect((char*)input_map);
-
-  if (*df == NULL)
-      return -1;
-
-  *dp = find_binary((char*)input_map, *df);
-  if (*dp == NULL)
-      return -1;
-
-  (*dp)->file_end = input_filesize;
-
-  *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
-
-  *xml_divisions = get_xml_divisions(*dp, *binary_divisions, *divisions);
-
-  gettimeofday(&stop, NULL);
-
-  print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
-
-}
-
 void
 get_compression_scheme(void* input_map, char** xml_compression_type, char** binary_compression_type)
 {      
@@ -374,8 +336,11 @@ main(int argc, char* argv[])
       divisions = xml_blks->populated;
       binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
-      dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]); // debug
       
+      #if DEBUG == 1
+        dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+      #endif
+
       print("\nDecompression and encoding...\n");
 
       decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
