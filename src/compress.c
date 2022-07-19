@@ -279,7 +279,7 @@ cmp_routine(ZSTD_CCtx* czstd,
 
         cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
-        // printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
+        // print("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
         *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
@@ -338,7 +338,7 @@ cmp_flush(ZSTD_CCtx* czstd,
 
     cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
-    // printf("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
+    // print("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n", cmp_buff->populated, (*curr_block)->size, cmp_len, (double)(*curr_block)->size/cmp_len);
 
     *tot_size += (*curr_block)->size; *tot_cmp += cmp_len;
 
@@ -396,7 +396,7 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
         write_cmp_blk(front, fd);
         stop = clock();
 
-        printf("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size, ((double)front->size/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+        print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size, ((double)front->size/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
 
         dealloc_cmp_block(front);
     }
@@ -509,7 +509,7 @@ compress_routine(void* args)
 
     cmp_flush(czstd, cmp_buff, &curr_block, cb_args->cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
-    printf("\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
+    print("\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
     /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);

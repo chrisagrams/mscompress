@@ -163,7 +163,7 @@ decompress_routine(void* args)
 
     db_args->ret_len = buff_off;
 
-    printf("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
+    print("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
 }
 
 void
@@ -211,7 +211,7 @@ decompress_parallel(char* input_map,
             write_to_file(fd, args[i]->ret, args[i]->ret_len);
             stop = clock();
 
-            printf("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, ((double)args[i]->ret_len/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, ((double)args[i]->ret_len/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
 
             dealloc_decompress_args(args[i]);
         }

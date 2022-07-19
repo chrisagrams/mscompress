@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include "mscompress.h"
 
 
@@ -50,7 +51,7 @@ get_cpu_count()
         np = sysinfo.dwNumberOfProcessors;
     #endif
 
-    printf("\t%d usable processors detected.\n", np);
+    print("\t%d usable processors detected.\n", np);
 
     return np;
 }
@@ -75,4 +76,20 @@ get_thread_id()
     #endif
 
     return (int)tid;
+}
+
+int
+print(const char* format, ...)
+/**
+ * @brief printf() wrapper to print to console. Checks if program is running in verbose mode before printing.
+ *        Drop-in replacement to printf().
+ */
+{
+    if (verbose)
+    {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);    
+    }
 }

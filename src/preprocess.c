@@ -318,7 +318,7 @@ find_binary(char* input_map, data_format_t* df)
                     spec_index++;
                     if (spec_index >= dp->total_spec * 2)
                     {
-                        printf("\tDetected %d spectra.\n", df->total_spec);
+                        print("\tDetected %d spectra.\n", df->total_spec);
                         free(xml);
                         return dp;
                     }
@@ -359,22 +359,22 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
     {
         *divisions = threads;
         *blocksize = dp->file_end/threads + 1;
-        printf("\tUsing new blocksize: %ld bytes.\n", *blocksize);
+        print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
-    printf("\tUsing %d divisions over %d threads.\n", *divisions, threads);
+    print("\tUsing %d divisions over %d threads.\n", *divisions, threads);
 
     r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions));
 
     i = 0;
 
-    printf("\t=== Divisions distribution (bytes%%/spec%%) ===\n\t");
+    print("\t=== Divisions distribution (bytes%%/spec%%) ===\n\t");
     
     for(; i < dp->total_spec * 2; i++)
     {
         if(curr_size > (*blocksize/2))
         {
-            printf("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
+            print("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
             curr_div++;
             curr_div_i = 0;
             curr_size = 0;
@@ -386,7 +386,7 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int 
         curr_div_i++;
     }
 
-    printf("\n");
+    print("\n");
 
     if(curr_div != *divisions)
         *divisions = curr_div+1;

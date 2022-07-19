@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include "vendor/yxml/yxml.h"
 
+int verbose = 0;
+
 const char *argp_program_version = VERSION " " STATUS;
 const char *argp_program_bug_address = ADDRESS;
 static char doc[] = MESSAGE "\n" "MSCompress is used to compress mass spec raw data with high efficiency.";
@@ -101,12 +103,12 @@ determine_filetype(int fd)
 {
   if(is_mzml(fd))
   {
-    printf("\t.mzML file detected.\n");
+    print("\t.mzML file detected.\n");
     return COMPRESS;
   }
   else if(is_msz(fd))
   {
-    printf("\t.msz file detected.\n");
+    print("\t.msz file detected.\n");
     return DECOMPRESS;
   }  
   else
@@ -153,7 +155,7 @@ prepare_fds(char* input_path, char** output_path, char* debug_output, char** inp
   if(debug_output)
   {
     fds[2] = open(debug_output, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
-    printf("\tDEBUG OUTPUT: %s\n", debug_output);
+    print("\tDEBUG OUTPUT: %s\n", debug_output);
   }
 
   type = determine_filetype(input_fd);
@@ -206,7 +208,7 @@ void prepare_threads(struct arguments args, long* n_threads)
     else
       *n_threads = args.threads;
     
-    printf("\tUsing %d threads.\n", *n_threads);
+    print("\tUsing %d threads.\n", *n_threads);
 }
 
 int
@@ -216,7 +218,7 @@ preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* bloc
 
   gettimeofday(&start, NULL);
 
-  printf("\nPreprocessing...\n");
+  print("\nPreprocessing...\n");
 
   *df = pattern_detect((char*)input_map);
 
@@ -235,7 +237,7 @@ preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* bloc
 
   gettimeofday(&stop, NULL);
 
-  printf("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
+  print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
 
 }
 
@@ -260,7 +262,7 @@ compress_mzml(char* input_map,
 
     gettimeofday(&start, NULL);
 
-    printf("\nDecoding and compression...\n");
+    print("\nDecoding and compression...\n");
 
     footer->xml_pos = get_offset(output_fd);
 
@@ -290,7 +292,7 @@ compress_mzml(char* input_map,
 
     gettimeofday(&stop, NULL);
 
-    printf("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
+    print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
 }
 
 
@@ -300,8 +302,8 @@ get_compression_scheme(void* input_map, char** xml_compression_type, char** bina
   *xml_compression_type = get_header_xml_compresssion_type(input_map);
   *binary_compression_type = get_header_binary_compression_type(input_map);
 
-  printf("\tXML compression scheme: %.*s\n", XML_COMPRESSION_METHOD_SIZE, *xml_compression_type);
-  printf("\tBinary compression scheme: %.*s\n", BINARY_COMPRESSION_METHOD_SIZE, *binary_compression_type);
+  print("\tXML compression scheme: %.*s\n", XML_COMPRESSION_METHOD_SIZE, *xml_compression_type);
+  print("\tBinary compression scheme: %.*s\n", BINARY_COMPRESSION_METHOD_SIZE, *binary_compression_type);
 }
 
 void
@@ -311,13 +313,13 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
 
       *footer = read_footer(input_map, input_filesize);
 
-      printf("\tXML position: %ld\n", (*footer)->xml_pos);
-      printf("\tBinary position: %ld\n", (*footer)->binary_pos);
-      printf("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-      printf("\tBinary blocks position: %ld\n", (*footer)->binary_blk_pos);
-      printf("\tdp block position: %ld\n", (*footer)->dp_pos);
-      printf("\tEOF position: %ld\n", input_filesize);
-      printf("\tOriginal file end: %ld\n", (*footer)->file_end);
+      print("\tXML position: %ld\n", (*footer)->xml_pos);
+      print("\tBinary position: %ld\n", (*footer)->binary_pos);
+      print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
+      print("\tBinary blocks position: %ld\n", (*footer)->binary_blk_pos);
+      print("\tdp block position: %ld\n", (*footer)->dp_pos);
+      print("\tEOF position: %ld\n", input_filesize);
+      print("\tOriginal file end: %ld\n", (*footer)->file_end);
 
       *xml_blks = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->binary_blk_pos);
       *binary_blks = read_block_len_queue(input_map, (*footer)->binary_blk_pos, (*footer)->dp_pos);
@@ -357,13 +359,15 @@ main(int argc, char* argv[])
     
     argp_parse (&argp, argc, argv, 0, 0, &args);
 
-    blocksize = args.blocksize;    
+    blocksize = args.blocksize;
+
+    verbose = args.verbose;    
 
     gettimeofday(&abs_start, NULL);
 
-    printf("=== %s ===\n", MESSAGE);
+    print("=== %s ===\n", MESSAGE);
 
-    printf("\nPreparing...\n");
+    print("\nPreparing...\n");
 
     prepare_threads(args, &n_threads);
 
@@ -372,20 +376,20 @@ main(int argc, char* argv[])
     // Initialize stream encoder:
     base64_stream_encode_init(&state, 0);
 
-    printf("\tInput file: %s\n\t\tFilesize: %ld bytes\n", args.args[0], input_filesize);
+    print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", args.args[0], input_filesize);
 
-    printf("\tOutput file: %s\n", args.args[1]);
+    print("\tOutput file: %s\n", args.args[1]);
 
     if(operation == COMPRESS)
     {
-      printf("\tDetected .mzML file, starting compression...\n");
+      print("\tDetected .mzML file, starting compression...\n");
 
       preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, n_threads, &dp, &df, &binary_divisions, &xml_divisions);
 
       if (divisions < n_threads)
       {
         n_threads = divisions;
-        printf("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
+        print("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
       }
 
       #if DEBUG == 1
@@ -405,7 +409,7 @@ main(int argc, char* argv[])
 
     else if (operation == DECOMPRESS)
     {
-      printf("\tDetected .msz file, reading header and footer...\n");
+      print("\tDetected .msz file, reading header and footer...\n");
 
       block_len_queue_t* xml_blks;
       block_len_queue_t* binary_blks;
@@ -428,7 +432,7 @@ main(int argc, char* argv[])
       if (divisions < n_threads)
       {
         n_threads = divisions;
-        printf("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
+        print("\tNEW: Using %d divisions over %d threads.\n", divisions, n_threads);
       }
 
       // size_t len = 0;
@@ -452,7 +456,7 @@ main(int argc, char* argv[])
       //   write_to_file(fds[1], output, len);
       // }
 
-      printf("\nDecompression and encoding...\n");
+      print("\nDecompression and encoding...\n");
 
       decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
 
@@ -472,7 +476,7 @@ main(int argc, char* argv[])
 
     gettimeofday(&abs_stop, NULL);
 
-    printf("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_sec-abs_start.tv_sec)+((abs_stop.tv_usec-abs_start.tv_usec)/1e+6));
+    print("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_sec-abs_start.tv_sec)+((abs_stop.tv_usec-abs_start.tv_usec)/1e+6));
 
     return 0;
 }

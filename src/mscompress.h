@@ -31,6 +31,8 @@
 
 #define DEBUG 1
 
+extern int verbose;
+
 struct arguments
 {
   char *args[3];            /* ARG1 and ARG2 */
@@ -176,6 +178,7 @@ void dealloc_dp(data_positions_t* dp);
 /* sys.c */
 int get_cpu_count();
 int get_thread_id();
+int print(const char* format, ...);
 
 
 /* decode.c */
