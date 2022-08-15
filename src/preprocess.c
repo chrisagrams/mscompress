@@ -355,13 +355,13 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     if(*divisions < *threads && *threads > 0)
     {
         *divisions = *threads;
-        *blocksize = dp->file_end/(*threads) + 1;
+        *blocksize = dp->file_end/(*threads);
         print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
     print("\tUsing %d divisions over %d threads.\n", *divisions, *threads);
 
-    r = alloc_ddp(*divisions, (dp->total_spec*2)/(*divisions));
+    r = alloc_ddp(*divisions, (dp->total_spec*2));
 
     i = 0;
 
@@ -369,7 +369,7 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     
     for(; i < dp->total_spec * 2; i++)
     {
-        if(curr_size > (*blocksize/2))
+        if(curr_size > (*blocksize))
         {
             print("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
             curr_div++;
@@ -383,15 +383,18 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
         curr_div_i++;
     }
 
+    print("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
     print("\n");
 
     if(curr_div != *divisions)
-        *divisions = curr_div+1;
+        *divisions = curr_div + 1;
     
     if (*divisions < *threads)
     {
         *threads = *divisions;
         print("\tNEW: Using %d divisions over %d threads.\n", *divisions, *threads);
+        *blocksize = dp->file_end/(*threads);
+        print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
     return r;

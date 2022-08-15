@@ -11,8 +11,8 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
-// #define ZLIB_BUFF_FACTOR 256000
-#define ZLIB_BUFF_FACTOR 4096
+#define ZLIB_BUFF_FACTOR 256000
+// #define ZLIB_BUFF_FACTOR 4096
 #define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
 #define MAGIC_TAG 0x035F51B5
@@ -29,7 +29,7 @@
 #define MD5_SIZE 32
 #define HEADER_SIZE 512
 
-#define DEBUG 0
+#define DEBUG 1
 
 extern int verbose;
 
