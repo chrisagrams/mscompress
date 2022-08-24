@@ -167,7 +167,7 @@ main(int argc, char* argv[])
     int operation = -1;
 
     args.verbose = 0;
-    args.blocksize = 1e+9;
+    args.blocksize = 1e+10;
     args.threads = 0;
     args.args[0] = NULL;
     args.args[1] = NULL;
