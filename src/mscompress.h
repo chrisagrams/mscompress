@@ -20,11 +20,12 @@
 
 #define MESSAGE_SIZE 128
 #define MESSAGE_OFFSET 12
+#define BINARY_ENCODING_OFFSET 140
 #define XML_COMPRESSION_METHOD_SIZE 4
-#define XML_COMPRESSION_METHOD_OFFSET 140
+#define XML_COMPRESSION_METHOD_OFFSET 144
 #define BINARY_COMPRESSION_METHOD_SIZE 4
-#define BINARY_COMPRESSION_METHOD_OFFSET 144
-#define BLOCKSIZE_OFFSET 148
+#define BINARY_COMPRESSION_METHOD_OFFSET 148
+#define BLOCKSIZE_OFFSET 152
 #define MD5_OFFSET 156
 #define MD5_SIZE 32
 #define HEADER_SIZE 512
@@ -152,9 +153,10 @@ int get_blksize(char* path);
 size_t get_filesize(char* path);
 ssize_t write_to_file(int fd, char* buff, size_t n);
 ssize_t read_from_file(int fd, void* buff, size_t n);
-void write_header(int fd, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
+void write_header(int fd, int binary_encoding, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
 off_t get_offset(int fd);
 long get_header_blocksize(void* input_map);
+int get_header_binary_encoding(void* input_map);
 char* get_header_xml_compresssion_type(void* input_map);
 char* get_header_binary_compression_type(void* input_map);
 void write_footer(footer_t footer, int fd);
@@ -211,6 +213,7 @@ void compress_mzml(char* input_map, long blocksize, int divisions, int threads, 
 typedef struct
 {
     char* input_map;
+    int binary_encoding;
     data_positions_t* dp;
     block_len_t* xml_blk;
     block_len_t* binary_blk;
@@ -226,7 +229,7 @@ typedef struct
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
-void decompress_parallel(char* input_map, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
+void decompress_parallel(char* input_map, int binary_encoding, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
