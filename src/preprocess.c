@@ -337,6 +337,19 @@ find_binary(char* input_map, data_format_t* df)
 }
 
 
+long
+encodedLength_sum(data_positions_t* dp)
+{
+    int i = 0;
+    long res = 0;
+
+    for(; i < dp->total_spec * 2; i++)
+        res += dp->end_positions[i]-dp->start_positions[i];
+    
+    return res;
+}
+
+
 /* === End of XML traversal functions === */
 
 data_positions_t**
@@ -541,6 +554,10 @@ preprocess_mzml(char* input_map,
   (*dp)->file_end = input_filesize;
 
   *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
+
+//   long sum = encodedLength_sum(*dp);
+// 
+//   print("\tencodedLengths sum: %ld\n", sum);
 
   *xml_divisions = get_xml_divisions(*dp, *binary_divisions, *divisions);
 

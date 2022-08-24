@@ -170,6 +170,7 @@ int is_msz(int fd);
 data_format_t* pattern_detect(char* input_map);
 data_positions_t*find_binary(char* input_map, data_format_t* df);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
+long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
