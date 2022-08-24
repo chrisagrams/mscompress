@@ -187,9 +187,7 @@ int print(const char* format, ...);
 Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-char* encode_binary(char** src, size_t* out_len);
-Bytef*
-encode_zlib(Bytef* src, size_t* out_len, size_t src_len);
+char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* compress.c */
 typedef struct 
@@ -247,6 +245,7 @@ block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);
 /* zl.c */
 
 zlib_block_t* zlib_alloc(int offset);
+void zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);

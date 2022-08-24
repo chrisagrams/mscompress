@@ -46,15 +46,15 @@ encode_base64(zlib_block_t* zblk, size_t src_len, size_t* out_len)
 }
 
 char*
-encode_binary(char** src, size_t* out_len)
+encode_binary(char** src, int compression_method, size_t* out_len)
 /**
- * @brief Takes in a raw binary string, returns a zlib compressed and base64 encoded string.
+ * @brief Takes in a raw binary string, returns either a zlib compressed + base64 encoded string or base64 encoded string.
  * 
  * @param src Pointer to source string. src pointer will point to the end of the string on return.
  * 
  * @param out_len Return by reference of output string length.
  * 
- * @return A zlib compressed and base64 encoded string.
+ * @return A zlib compressed + base64 encoded string or base64 encoded string.
  * 
  */
 {
@@ -66,8 +66,11 @@ encode_binary(char** src, size_t* out_len)
 
     zlib_block_t* cmp_output;
 
+    char* res;
+ 
     decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
     decmp_input->mem = *src;
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
     cmp_output = zlib_alloc(0);
 
@@ -75,12 +78,24 @@ encode_binary(char** src, size_t* out_len)
 
     uint16_t org_len = *(uint16_t*)decmp_header;
 
-    zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
+    if(compression_method == _zlib_)
+    {
+
+        zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
+
+        free(decmp_input);
+        free(decmp_header);
+
+        res = encode_base64(cmp_output, zlib_len, out_len);
+    }
+
+    else if (compression_method == _no_comp_)
+    {
+        res = encode_base64(decmp_input, org_len, out_len);
+    }
 
     *src += (ZLIB_SIZE_OFFSET + org_len);
 
-    free(decmp_input);
-    free(decmp_header);
-
-    return encode_base64(cmp_output, zlib_len, out_len);
+    return res;
+    
 }

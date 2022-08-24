@@ -63,7 +63,7 @@ decmp_binary_block(void* decmp_binary, size_t blk_size)
 
     while(consumed < blk_size)
     {
-        binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
+        binary_str = encode_binary(((char**)&decmp_binary), _no_comp_, &binary_len);
         consumed += binary_len;
     }
 }
@@ -148,7 +148,7 @@ decompress_routine(void* args)
     while(xml_off < bound)
     {
         /* encode binary and copy over to buffer */
-        binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
+        binary_str = encode_binary(((char**)&decmp_binary), _no_comp_, &binary_len);
         memcpy(buff + buff_off, binary_str, binary_len);
         buff_off += binary_len;
 
