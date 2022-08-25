@@ -79,6 +79,8 @@ decode_binary(char* input_map, int start_position, int end_position, int compres
     char* b64_out_buff;
     zlib_block_t* decmp_output;
 
+    uint16_t decmp_size;
+
     size_t len = end_position - start_position;
 
     b64_out_buff = decode_base64(input_map + start_position, len, &b64_out_len);
@@ -86,25 +88,38 @@ decode_binary(char* input_map, int start_position, int end_position, int compres
     if (!b64_out_buff)
         return NULL;
 
+    decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
+
     if(compression_method == _zlib_)
     {
-
-        decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
-        uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
-        zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
+        decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    }
+    
+    else if(compression_method == _no_comp_)
+    {
+        decmp_size = b64_out_len;
         
-        *out_len = decmp_size + ZLIB_SIZE_OFFSET;
+        memcpy(decmp_output->buff, b64_out_buff, b64_out_len);
 
-        free(b64_out_buff);        
-        
-        Bytef* r = decmp_output->mem;
-
-        free(decmp_output);
-
-        return r;
+        zlib_realloc(decmp_output, b64_out_len);
     }
 
-    *out_len = b64_out_len;
-    return b64_out_buff;
+    else
+    {
+        fprintf(stderr, "Unknown compression method in decode_binary. \n");
+        exit(-1);
+    }
+
+    zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
+
+    free(b64_out_buff);
+    
+    *out_len = decmp_size + ZLIB_SIZE_OFFSET;
+    
+    Bytef* r = decmp_output->mem;
+
+    free(decmp_output);
+
+    return r;
 
 }

@@ -11,8 +11,8 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
-// #define ZLIB_BUFF_FACTOR 256000
-#define ZLIB_BUFF_FACTOR 4096
+#define ZLIB_BUFF_FACTOR 512000
+// #define ZLIB_BUFF_FACTOR 4096
 #define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
 #define MAGIC_TAG 0x035F51B5
@@ -20,16 +20,17 @@
 
 #define MESSAGE_SIZE 128
 #define MESSAGE_OFFSET 12
+#define BINARY_ENCODING_OFFSET 140
 #define XML_COMPRESSION_METHOD_SIZE 4
-#define XML_COMPRESSION_METHOD_OFFSET 140
+#define XML_COMPRESSION_METHOD_OFFSET 144
 #define BINARY_COMPRESSION_METHOD_SIZE 4
-#define BINARY_COMPRESSION_METHOD_OFFSET 144
-#define BLOCKSIZE_OFFSET 148
+#define BINARY_COMPRESSION_METHOD_OFFSET 148
+#define BLOCKSIZE_OFFSET 152
 #define MD5_OFFSET 156
 #define MD5_SIZE 32
 #define HEADER_SIZE 512
 
-#define DEBUG 0
+#define DEBUG 1
 
 extern int verbose;
 
@@ -152,9 +153,10 @@ int get_blksize(char* path);
 size_t get_filesize(char* path);
 ssize_t write_to_file(int fd, char* buff, size_t n);
 ssize_t read_from_file(int fd, void* buff, size_t n);
-void write_header(int fd, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
+void write_header(int fd, int binary_encoding, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
 off_t get_offset(int fd);
 long get_header_blocksize(void* input_map);
+int get_header_binary_encoding(void* input_map);
 char* get_header_xml_compresssion_type(void* input_map);
 char* get_header_binary_compression_type(void* input_map);
 void write_footer(footer_t footer, int fd);
@@ -168,6 +170,7 @@ int is_msz(int fd);
 data_format_t* pattern_detect(char* input_map);
 data_positions_t*find_binary(char* input_map, data_format_t* df);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
+long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
@@ -187,9 +190,7 @@ int print(const char* format, ...);
 Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-char* encode_binary(char** src, size_t* out_len);
-Bytef*
-encode_zlib(Bytef* src, size_t* out_len, size_t src_len);
+char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* compress.c */
 typedef struct 
@@ -213,6 +214,7 @@ void compress_mzml(char* input_map, long blocksize, int divisions, int threads, 
 typedef struct
 {
     char* input_map;
+    int binary_encoding;
     data_positions_t* dp;
     block_len_t* xml_blk;
     block_len_t* binary_blk;
@@ -228,7 +230,7 @@ typedef struct
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
-void decompress_parallel(char* input_map, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
+void decompress_parallel(char* input_map, int binary_encoding, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
@@ -247,6 +249,7 @@ block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);
 /* zl.c */
 
 zlib_block_t* zlib_alloc(int offset);
+void zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);

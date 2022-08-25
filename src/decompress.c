@@ -54,22 +54,9 @@ decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, size_t compressed_len
     return zstd_decompress(dctx, input_map+offset, compressed_len, decompressed_len);
 }
 
-void*
-decmp_binary_block(void* decmp_binary, size_t blk_size)
-{
-    size_t binary_len; 
-    char* binary_str;
-    size_t consumed = 0;
-
-    while(consumed < blk_size)
-    {
-        binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
-        consumed += binary_len;
-    }
-}
-
 decompress_args_t*
 alloc_decompress_args(char* input_map,
+                      int binary_encoding,
                       data_positions_t* dp,
                       block_len_t* xml_blk,
                       block_len_t* binary_blk,
@@ -81,6 +68,7 @@ alloc_decompress_args(char* input_map,
     r = (decompress_args_t*)malloc(sizeof(decompress_args_t));
 
     r->input_map = input_map;
+    r->binary_encoding = binary_encoding;
     r->dp = dp;
     r->xml_blk = xml_blk;
     r->binary_blk = binary_blk;
@@ -148,7 +136,7 @@ decompress_routine(void* args)
     while(xml_off < bound)
     {
         /* encode binary and copy over to buffer */
-        binary_str = encode_binary(((char**)&decmp_binary), &binary_len);
+        binary_str = encode_binary(((char**)&decmp_binary), db_args->binary_encoding, &binary_len);
         memcpy(buff + buff_off, binary_str, binary_len);
         buff_off += binary_len;
 
@@ -168,6 +156,7 @@ decompress_routine(void* args)
 
 void
 decompress_parallel(char* input_map,
+                    int binary_encoding, 
                     block_len_queue_t* xml_blks,
                     block_len_queue_t* binary_blks,
                     data_positions_t** ddp,
@@ -194,7 +183,7 @@ decompress_parallel(char* input_map,
             xml_blk = pop_block_len(xml_blks);
             binary_blk = pop_block_len(binary_blks);
 
-            args[i] = alloc_decompress_args(input_map, ddp[i], xml_blk, binary_blk, footer_xml_offset, footer_binary_offset);
+            args[i] = alloc_decompress_args(input_map, binary_encoding, ddp[i], xml_blk, binary_blk, footer_xml_offset, footer_binary_offset);
 
             footer_xml_offset += xml_blk->compressed_size;
             footer_binary_offset += binary_blk->compressed_size;

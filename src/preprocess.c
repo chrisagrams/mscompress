@@ -337,6 +337,19 @@ find_binary(char* input_map, data_format_t* df)
 }
 
 
+long
+encodedLength_sum(data_positions_t* dp)
+{
+    int i = 0;
+    long res = 0;
+
+    for(; i < dp->total_spec * 2; i++)
+        res += dp->end_positions[i]-dp->start_positions[i];
+    
+    return res;
+}
+
+
 /* === End of XML traversal functions === */
 
 data_positions_t**
@@ -355,7 +368,7 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     if(*divisions < *threads && *threads > 0)
     {
         *divisions = *threads;
-        *blocksize = dp->file_end/(*threads) + 1;
+        *blocksize = dp->file_end/(*threads);
         print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
@@ -369,7 +382,7 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     
     for(; i < dp->total_spec * 2; i++)
     {
-        if(curr_size > (*blocksize/2))
+        if(curr_size > (*blocksize))
         {
             print("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
             curr_div++;
@@ -390,15 +403,18 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
         curr_div_i++;
     }
 
+    print("(%2.4f%%/%2.2f%%) ", (double)curr_size/dp->file_end*100,(double)(r[curr_div]->total_spec)/dp->total_spec*100);
     print("\n");
 
     if(curr_div != *divisions)
-        *divisions = curr_div+1;
+        *divisions = curr_div + 1;
     
     if (*divisions < *threads)
     {
         *threads = *divisions;
         print("\tNEW: Using %d divisions over %d threads.\n", *divisions, *threads);
+        *blocksize = dp->file_end/(*threads);
+        print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
     }
 
     return r;
@@ -545,6 +561,10 @@ preprocess_mzml(char* input_map,
   (*dp)->file_end = input_filesize;
 
   *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
+
+//   long sum = encodedLength_sum(*dp);
+// 
+//   print("\tencodedLengths sum: %ld\n", sum);
 
   *xml_divisions = get_xml_divisions(*dp, *binary_divisions, *divisions);
 

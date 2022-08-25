@@ -167,7 +167,7 @@ main(int argc, char* argv[])
     int operation = -1;
 
     args.verbose = 0;
-    args.blocksize = 1e+9;
+    args.blocksize = 1e+10;
     args.threads = 0;
     args.args[0] = NULL;
     args.args[1] = NULL;
@@ -211,7 +211,7 @@ main(int argc, char* argv[])
         dprintf(fds[2], "=== End XML divisions ===\n");
       #endif
 
-      write_header(fds[1], "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+      write_header(fds[1], df->compression, "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
       compress_mzml((char*)input_map, blocksize, divisions, n_threads, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
 
@@ -227,8 +227,13 @@ main(int argc, char* argv[])
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
+      int binary_encoding;
 
       blocksize = get_header_blocksize(input_map);
+
+      binary_encoding = get_header_binary_encoding(input_map);
+
+      print("\tBinary_encoding: %d\n", binary_encoding);
 
       get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
 
@@ -244,7 +249,7 @@ main(int argc, char* argv[])
 
       print("\nDecompression and encoding...\n");
 
-      decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
+      decompress_parallel(input_map, binary_encoding, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
 
     }
 
