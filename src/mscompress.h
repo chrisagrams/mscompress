@@ -1,6 +1,6 @@
 #include <argp.h>
 #include <zstd.h>
-#include <zlib.h>
+#include "vendor/zlib/zlib.h"
 #include <sys/types.h>
 
 #define VERSION "MSCompress 0.0.1"

@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <zlib.h>
+#include "vendor/zlib/zlib.h"
 
 
 char*

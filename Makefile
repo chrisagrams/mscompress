@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS += -O3 -Wall -Wextra -pedantic
+CFLAGS += -O3 -Wall -Wextra -pedantic -msse4.2
 DEBUG_CFLAGS += -g
 
 OBJS = \
@@ -34,10 +34,10 @@ ifeq ($(OS),Windows_NT)
 else
     UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
-		LIBS += -largp -lz -lm -lzstd -lpthread -I./src -I./
+		LIBS += -largp -lm -lzstd -lpthread -I./src -I./
 	endif
 	ifeq ($(UNAME_S),Linux)
-		LIBS += -lz -lm -lzstd -lpthread -I./src -I./
+		LIBS += -lm -lzstd -lpthread -I./src -I./ -L./vendor/zlib/ -l:libz.so
 	endif
 endif
 
@@ -102,7 +102,7 @@ vendor/base64/lib/config.h:
 	@echo "#define HAVE_SSE42  $(HAVE_SSE42)"  >> $@
 	@echo "#define HAVE_AVX    $(HAVE_AVX)"    >> $@
 
-$(OBJS): vendor/base64/lib/config.h
+$(OBJS): vendor/base64/lib/config.h vendor/zlib/zlib.h 
 
 vendor/base64/ib/arch/avx2/codec.o:   CFLAGS += $(AVX2_CFLAGS)
 vendor/base64/lib/arch/neon32/codec.o: CFLAGS += $(NEON32_CFLAGS)
