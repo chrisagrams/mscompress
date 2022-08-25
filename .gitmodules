@@ -2,6 +2,6 @@
 	path = vendor/base64
 	url = https://github.com/aklomp/base64.git
 
-[submodule "vendor/cloudflare-zlib"]
-	path = vendor/cloudflare-zlib
+[submodule "vendor/zlib"]
+	path = vendor/zlib
 	url = https://github.com/cloudflare/zlib.git
