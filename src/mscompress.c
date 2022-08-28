@@ -114,12 +114,12 @@ void prepare_threads(struct arguments args, long* n_threads)
 
 void
 get_compression_scheme(void* input_map, char** xml_compression_type, char** binary_compression_type)
+//TODO
 {      
-  *xml_compression_type = get_header_xml_compresssion_type(input_map);
-  *binary_compression_type = get_header_binary_compression_type(input_map);
-
-  print("\tXML compression scheme: %.*s\n", XML_COMPRESSION_METHOD_SIZE, *xml_compression_type);
-  print("\tBinary compression scheme: %.*s\n", BINARY_COMPRESSION_METHOD_SIZE, *binary_compression_type);
+  *xml_compression_type = "ZSTD";
+  *binary_compression_type = "ZSTD";
+  print("\tXML compression scheme: %.*s\n", 0, *xml_compression_type);
+  print("\tBinary compression scheme: %.*s\n", 0, *binary_compression_type);
 }
 
 void
@@ -202,6 +202,10 @@ main(int argc, char* argv[])
 
       preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, &n_threads, &dp, &df, &binary_divisions, &xml_divisions);
 
+      df->target_xml_format = _ZSTD_compression_;
+      df->target_mz_format = _ZSTD_compression_;
+      df->target_int_format = _ZSTD_compression_;
+
       #if DEBUG == 1
         dprintf(fds[2], "=== Begin binary divisions ===\n");
         dump_divisions_to_file(binary_divisions, divisions, n_threads, fds[2]);
@@ -211,7 +215,7 @@ main(int argc, char* argv[])
         dprintf(fds[2], "=== End XML divisions ===\n");
       #endif
 
-      write_header(fds[1], df->compression, "ZSTD", "ZSTD", blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+      write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
       compress_mzml((char*)input_map, blocksize, divisions, n_threads, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
 
@@ -223,7 +227,6 @@ main(int argc, char* argv[])
 
       block_len_queue_t* xml_blks;
       block_len_queue_t* binary_blks;
-      data_positions_t* dp;
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
@@ -231,7 +234,9 @@ main(int argc, char* argv[])
 
       blocksize = get_header_blocksize(input_map);
 
-      binary_encoding = get_header_binary_encoding(input_map);
+      df = get_header_df(input_map);
+
+      binary_encoding = df->source_compression;
 
       print("\tBinary_encoding: %d\n", binary_encoding);
 
@@ -240,7 +245,8 @@ main(int argc, char* argv[])
       parse_footer(&msz_footer, input_map, input_filesize, &xml_blks, &binary_blks, &dp);
 
       divisions = xml_blks->populated;
-      binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
+      // binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
+      binary_divisions = new_get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
       xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
       
       #if DEBUG == 1
