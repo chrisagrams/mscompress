@@ -1,6 +1,6 @@
 #include <argp.h>
 #include <zstd.h>
-#include <zlib.h>
+#include "vendor/zlib/zlib.h"
 #include <sys/types.h>
 
 #define VERSION "MSCompress 0.0.1"
@@ -20,17 +20,14 @@
 
 #define MESSAGE_SIZE 128
 #define MESSAGE_OFFSET 12
-#define BINARY_ENCODING_OFFSET 140
-#define XML_COMPRESSION_METHOD_SIZE 4
-#define XML_COMPRESSION_METHOD_OFFSET 144
-#define BINARY_COMPRESSION_METHOD_SIZE 4
-#define BINARY_COMPRESSION_METHOD_OFFSET 148
-#define BLOCKSIZE_OFFSET 152
-#define MD5_OFFSET 156
+#define DATA_FORMAT_T_OFFSET 140
+#define DATA_FORMAT_T_SIZE 28   /* ignores private members */
+#define BLOCKSIZE_OFFSET 168
+#define MD5_OFFSET 176
 #define MD5_SIZE 32
 #define HEADER_SIZE 512
 
-#define DEBUG 1
+#define DEBUG 0
 
 extern int verbose;
 
@@ -45,14 +42,32 @@ struct arguments
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state);
 
+typedef char* (*Algo)(void*);
+typedef Algo (*Algo_ptr)();
+
 typedef struct
 {
-    int mz_fmt;
-    int int_fmt;
-    int compression;
-    int total_spec;
+
+    /* source information (source mzML) */
+    int source_mz_fmt;
+    int source_int_fmt;
+    int source_compression;
+    int source_total_spec;
+
+    /* target information */
+    int target_xml_format;
+    int target_mz_format;
+    int target_int_format;
+
+    /* runtime variables, not written to disk. */
     int populated;
+    Algo_ptr target_xml_fun;
+    Algo_ptr target_mz_fun;
+    Algo_ptr target_int_fun;
+
+
 } data_format_t;
+
 
 typedef struct
 {
@@ -71,6 +86,7 @@ typedef struct
     size_t max_size;
 } data_block_t;
 
+
 typedef struct
 {
     char* mem;
@@ -79,6 +95,7 @@ typedef struct
     struct cmp_block_t* next;
 } cmp_block_t;
 
+
 typedef struct 
 {
     cmp_block_t* head;
@@ -86,6 +103,7 @@ typedef struct
 
     int populated;
 } cmp_blk_queue_t;
+
 
 typedef struct 
 {
@@ -103,7 +121,6 @@ typedef struct
 
     int populated;
 } block_len_queue_t;
-
 
 
 typedef struct
@@ -142,6 +159,11 @@ typedef struct
 #define _mass_ 1000514
 
 
+#define _ZSTD_compression_ 4700001
+#define _cast_64_to_32_    4700002
+#define _log2_transform_   4700003
+
+
 #define COMPRESS 1
 #define DECOMPRESS 2
 
@@ -153,12 +175,10 @@ int get_blksize(char* path);
 size_t get_filesize(char* path);
 ssize_t write_to_file(int fd, char* buff, size_t n);
 ssize_t read_from_file(int fd, void* buff, size_t n);
-void write_header(int fd, int binary_encoding, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5);
+void write_header(int fd, data_format_t* df, long blocksize, char* md5);
 off_t get_offset(int fd);
 long get_header_blocksize(void* input_map);
-int get_header_binary_encoding(void* input_map);
-char* get_header_xml_compresssion_type(void* input_map);
-char* get_header_binary_compression_type(void* input_map);
+data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, int* input_filesize, int* fds);
@@ -169,11 +189,14 @@ int is_msz(int fd);
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);
 data_positions_t*find_binary(char* input_map, data_format_t* df);
+data_positions_t* find_binary_quick(char* input_map, data_format_t* df);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
+data_positions_t** new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
+Algo map_fun(int fun_num);
 void dump_dp(data_positions_t* dp, int fd);
 data_positions_t* read_dp(void* input_map, long dp_position, size_t num_spectra, long eof);
 void dealloc_df(data_format_t* df);

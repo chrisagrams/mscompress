@@ -29,6 +29,13 @@ yxml_t*
 alloc_yxml()
 {
     yxml_t* xml = (yxml_t*)malloc(sizeof(yxml_t) + BUFSIZE);
+
+    if(!xml)
+    {
+        fprintf(stderr, "malloc failure alloc_yxml().\n");
+        exit(-1);
+    }
+
     yxml_init(xml, xml+1, BUFSIZE);
     return xml;
 }
@@ -37,6 +44,13 @@ data_format_t*
 alloc_df()
 {
     data_format_t* df = (data_format_t*)malloc(sizeof(data_format_t));
+
+    if(!df)
+    {
+        fprintf(stderr, "malloc failure in alloc_df().\n");
+        exit(-1);
+    }
+
     df->populated = 0;
     return df;
 }
@@ -46,17 +60,48 @@ dealloc_df(data_format_t* df)
 {
     if(df)
         free(df);
+    else
+    {
+        fprintf(stderr, "delloc_df received null.\n");
+        exit(-1);
+    }
+}
+
+
+void
+populate_df_target(data_format_t* df, int target_xml_format, int target_mz_format, int target_int_format)
+{
+    df->target_xml_format = target_xml_format;
+    df->target_mz_format = target_mz_format;
+    df->target_int_format = target_int_format;
+
+    df->target_xml_fun = map_fun(target_xml_format);
+    df->target_mz_fun = map_fun(target_mz_format);
+    df->target_int_fun = map_fun(target_int_format);
 }
 
 data_positions_t*
 alloc_dp(int total_spec)
 {
     data_positions_t* dp = (data_positions_t*)malloc(sizeof(data_positions_t));
+
+    if(!dp)
+    {
+        fprintf(stderr, "malloc failure in alloc_dp().\n");
+        exit(-1);
+    }
+
     dp->total_spec = total_spec;
     dp->file_end = 0;
     dp->start_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
     dp->end_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
-    // dp->positions_len = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+
+    if(!dp->start_positions || !dp->end_positions)
+    {
+        fprintf(stderr, "inner malloc failure in alloc_dp().\n");
+        exit(-1);
+    }
+
     return dp;
 }
 
@@ -65,9 +110,26 @@ dealloc_dp(data_positions_t* dp)
 {
     if(dp)
     {
-        free(dp->start_positions);
-        free(dp->end_positions);
+        if(dp->start_positions)
+            free(dp->start_positions);
+        else
+        {
+            fprintf(stderr, "dp->start_positions is null.\n");
+            exit(-1);
+        }
+        if(dp->end_positions)
+            free(dp->end_positions);
+        else
+        {
+            fprintf(stderr, "dp->end_positions is null.\n");
+            exit(-1);
+        }
         free(dp);
+    }
+    else
+    {
+        fprintf(stderr, "dealloc_dp() received null pointer.\n");
+        exit(-1);
     }
 }
 
@@ -79,6 +141,12 @@ alloc_ddp(int len, int total_spec)
     int i;
 
     r = (data_positions_t**)malloc(len*sizeof(data_positions_t*));
+
+    if(!r)
+    {
+        fprintf(stderr, "malloc failure in alloc_ddp().\n");
+        exit(-1);
+    }
 
     i = 0;
 
@@ -96,6 +164,12 @@ free_ddp(data_positions_t** ddp, int divisions)
 {
     int i;
 
+    if (divisions < 1)
+    {
+        fprintf(stderr, "invalid divisions in free_dp().\n");
+        exit(-1);
+    }
+
     if(ddp)
     {
         i = 0;
@@ -104,11 +178,32 @@ free_ddp(data_positions_t** ddp, int divisions)
 
         free(ddp);
     }
+    else
+    {
+        fprintf(stderr, "free_dp() received null pointer.\n");
+        exit(-1);
+    }
 
 }
 
 /* === End of allocation and deallocation helper functions === */
-
+ 
+char* fun1(void* args)
+{
+    return "Hello world";
+}
+ 
+Algo map_fun(int fun_num)
+{
+    switch(fun_num)
+    {
+        case _ZSTD_compression_:
+            return &fun1;
+        default:
+            fprintf(stderr, "Target format not implemented in this version of mscompress.\n");
+            exit(-1);
+    }
+}
 
 /* === Start of XML traversal functions === */
 
@@ -139,21 +234,21 @@ map_to_df(int acc, int* current_type, data_format_t* df)
                 *current_type = _mass_;
                 break;
             case _zlib_:
-                df->compression = _zlib_;
+                df->source_compression = _zlib_;
                 break;
             case _no_comp_:
-                df->compression = _no_comp_;
+                df->source_compression = _no_comp_;
                 break;
             default:
                 if(acc >= _32i_ && acc <= _64d_) {
                     if (*current_type == _intensity_) 
                     {
-                        df->int_fmt = acc;
+                        df->source_int_fmt = acc;
                         df->populated++;
                     }
                     else if (*current_type == _mass_) 
                     {
-                        df->mz_fmt = acc;
+                        df->source_mz_fmt = acc;
                         df->populated++;
                     }
                     if (df->populated >= 2)
@@ -237,7 +332,7 @@ pattern_detect(char* input_map)
             case YXML_ATTREND:
                 if(attrcur && (strcmp(xml->elem, "spectrumList") == 0) && (strcmp(xml->attr, "count") == 0))
                 {
-                    df->total_spec = atoi(attrbuf);
+                    df->source_total_spec = atoi(attrbuf);
                     attrcur = NULL;
                 }
                 else if(in_cvParam && attrcur) 
@@ -277,7 +372,7 @@ find_binary(char* input_map, data_format_t* df)
  *         NULL pointer on failure.
  */
 {
-    data_positions_t* dp = alloc_dp(df->total_spec);
+    data_positions_t* dp = alloc_dp(df->source_total_spec);
 
     yxml_t* xml = alloc_yxml();
 
@@ -319,7 +414,7 @@ find_binary(char* input_map, data_format_t* df)
                     spec_index++;
                     if (spec_index >= dp->total_spec * 2)
                     {
-                        print("\tDetected %d spectra.\n", df->total_spec);
+                        print("\tDetected %d spectra.\n", df->source_total_spec);
                         free(xml);
                         return dp;
                     }
@@ -335,6 +430,71 @@ find_binary(char* input_map, data_format_t* df)
     return NULL;
 
 }
+
+
+data_positions_t*
+find_binary_quick(char* input_map, data_format_t* df)
+{
+    data_positions_t* dp = alloc_dp(df->source_total_spec);
+
+    char* ptr = input_map;
+
+    int curr = 0; 
+
+    int curr_scan = 0;
+    int curr_ms_level = 0;
+
+    char* e;
+
+    int bound = df->source_total_spec * 2;
+
+    while (ptr)
+    {
+        if(curr == bound)
+            break;
+        ptr = strstr(ptr, "scan=") + 5;
+        e = strstr(ptr, "\"");
+        curr_scan = strtol(ptr, &e, 10);
+
+        ptr = e;
+
+        ptr = strstr(ptr, "\"ms level\"") + 18;
+        e = strstr(ptr, "\"");
+        curr_ms_level = strtol(ptr, &e, 10);
+
+        ptr = e;
+
+
+        ptr = strstr(ptr, "<binary>") + 8;
+        dp->start_positions[curr] = ptr - input_map;
+
+        
+        ptr = strstr(ptr, "</binary>");
+        dp->end_positions[curr] = ptr - input_map;
+
+        // scan_nums[curr] = curr_scan;
+        // ms_levels[curr++] = curr_ms_level;
+        curr++;
+
+
+        ptr = strstr(ptr, "<binary>") + 8;
+        dp->start_positions[curr] = ptr - input_map;
+
+        
+        ptr = strstr(ptr, "</binary>");
+        dp->end_positions[curr] = ptr - input_map;
+
+        // scan_nums[curr] = curr_scan;
+        // ms_levels[curr++] = curr_ms_level;
+        curr++;
+    
+    }
+
+    dp->total_spec = df->source_total_spec;
+
+    return dp;
+}
+
 
 
 long
@@ -421,6 +581,56 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
 }
 
 data_positions_t**
+new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads)
+{
+    data_positions_t** r;
+
+    int i = 0;
+    int curr_div = 0;
+    int curr_div_i = 0;
+    int curr_size = 0;
+
+    *divisions = *threads;
+
+    r = alloc_ddp(*divisions, dp->total_spec);
+
+    long encoded_sum = encodedLength_sum(dp);
+
+    *blocksize = encoded_sum/(*divisions);
+
+    int bound = dp->total_spec * 2;
+
+    for(i; i < bound; i++)
+    {
+        if(curr_size >= *blocksize)
+        {
+            curr_div++;
+            curr_div_i = 0;
+            curr_size = 0;
+            if(curr_div > *divisions)
+                break;
+        }
+        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
+        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
+        r[curr_div]->total_spec++;
+        curr_size += (dp->end_positions[i] - dp->start_positions[i]);
+        curr_div_i++;
+    }
+
+    curr_div--;
+
+    /* add the remainder to the last division */
+    for(i; i < bound; i++)
+    {
+        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
+        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
+        r[curr_div]->total_spec++;
+    }
+
+    return r;
+}
+
+data_positions_t**
 get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions)
 {
     data_positions_t** r;
@@ -489,17 +699,12 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
 void
 dump_dp(data_positions_t* dp, int fd)
 {
-    char buff[sizeof(off_t)];
-    off_t* buff_cast = (off_t*)(&buff[0]);
-    int i;
+    char* buff;
 
-    for(i = 0; i < dp->total_spec * 2; i++)
-    {
-        *buff_cast = dp->start_positions[i];
-        write_to_file(fd, buff, sizeof(off_t));
-        *buff_cast = dp->end_positions[i];
-        write_to_file(fd, buff, sizeof(off_t));
-    }
+    buff = (char*)dp->start_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
+    buff = (char*)dp->end_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
 
     return;
 }
@@ -508,28 +713,15 @@ data_positions_t*
 read_dp(void* input_map, long dp_position, size_t num_spectra, long eof)
 {
     data_positions_t* r;
-    int size;
-    long diff;
-    int i;
-    int j;
 
-    diff = eof - dp_position;
-    size = num_spectra;
+    r = (data_positions_t*)malloc(sizeof(data_positions_t));
 
-    r = alloc_dp(size);
-
-    j = dp_position;
-
-    for(i = 0; i < size * 2; i++)
-    {
-        r->start_positions[i] = *(off_t*)(&input_map[0]+j);
-        j+=sizeof(off_t);
-        r->end_positions[i] = *(off_t*)(&input_map[0]+j);
-        j+=sizeof(off_t);
-    }
+    r->start_positions = (off_t*)(input_map + dp_position);
+    r->end_positions = (off_t*)(input_map + dp_position + (sizeof(off_t)*num_spectra*2));
+    r->total_spec = num_spectra;
+    r->file_end = eof;
 
     return r;
-
 }
 
 int
@@ -554,13 +746,16 @@ preprocess_mzml(char* input_map,
   if (*df == NULL)
       return -1;
 
-  *dp = find_binary((char*)input_map, *df);
+//   *dp = find_binary((char*)input_map, *df);
+  *dp = find_binary_quick((char*)input_map, *df);
+
   if (*dp == NULL)
       return -1;
 
   (*dp)->file_end = input_filesize;
 
-  *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
+//   *binary_divisions = get_binary_divisions(*dp, blocksize, divisions, n_threads);
+  *binary_divisions = new_get_binary_divisions(*dp, blocksize, divisions, n_threads);
 
 //   long sum = encodedLength_sum(*dp);
 // 

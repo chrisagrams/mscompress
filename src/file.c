@@ -120,7 +120,7 @@ get_offset(int fd)
 }
 
 void
-write_header(int fd, int binary_encoding, char* xml_compression_method, char* binary_compression_method, long blocksize, char* md5)
+write_header(int fd, data_format_t* df, long blocksize, char* md5)
 /**
  * @brief Writes .msz header to file descriptor.
  * Header format:
@@ -131,12 +131,16 @@ write_header(int fd, int binary_encoding, char* xml_compression_method, char* bi
  *              | Version Major Number      |   4  bytes |      4    |
  *              | Version Minor Number      |   4  bytes |      8    |
  *              | Message Tag               | 128  bytes |     12    |
- *              | Original Binary Encoding  |   4  bytes |    140    |
- *              | XML Compression Method    |   4  bytes |    144    |
- *              | Binary Compression Method |   4  bytes |    148    |
- *              | Blocksize                 |   8  bytes |    152    |
- *              | MD5                       |  32  bytes |    160    |
- *              | Reserved                  | 324  bytes |    192    |
+ *              | Source m/z format         |   4  bytes |    140    |
+ *              | Source intensity format   |   4  bytes |    144    |
+ *              | Source compression format |   4  bytes |    148    |
+ *              | Source spectrum count     |   4  bytes |    152    |
+ *              | Target XML format         |   4  bytes |    156    |
+ *              | Target m/z format         |   4  bytes |    160    |
+ *              | Target intensity format   |   4  bytes |    164    |
+ *              | Blocksize                 |   8  bytes |    168    |
+ *              | MD5                       |  32  bytes |    176    |
+ *              | Reserved                  |  304 bytes |    208    |
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|
@@ -156,11 +160,7 @@ write_header(int fd, int binary_encoding, char* xml_compression_method, char* bi
 
     memcpy(header_buff + MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
 
-    *(header_buff_cast + 35) = binary_encoding;
-
-    memcpy(header_buff + XML_COMPRESSION_METHOD_OFFSET, xml_compression_method, XML_COMPRESSION_METHOD_SIZE);
-
-    memcpy(header_buff + BINARY_COMPRESSION_METHOD_OFFSET, binary_compression_method, BINARY_COMPRESSION_METHOD_SIZE);
+    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df, DATA_FORMAT_T_SIZE);
 
     long* header_buff_cast_long = (long*)(&header_buff[0] + BLOCKSIZE_OFFSET);
 
@@ -187,48 +187,18 @@ get_header_blocksize(void* input_map)
     return *r;
 }
 
-int
-get_header_binary_encoding(void* input_map)
+data_format_t*
+get_header_df(void* input_map)
 {
-  int* r;
-  r = (int*)(&input_map[0] + BINARY_ENCODING_OFFSET);
-  return *r;
-}
+  data_format_t* r;
+  
+  r = (data_format_t*)malloc(sizeof(data_format_t));
+  
+  memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
+  
+  r->populated = 2;
 
-char*
-get_header_xml_compresssion_type(void* input_map)
-/**
- * @brief Gets XML compression type stored in header.
- * 
- * @param input_map mmap'ed input file.
- * 
- * @return Malloc'd char array with XML compression type string.
- */
-{
-    char* buff;
-
-    buff = (char*)malloc(XML_COMPRESSION_METHOD_SIZE);
-    memcpy(buff, input_map + XML_COMPRESSION_METHOD_OFFSET, XML_COMPRESSION_METHOD_SIZE);
-
-    return buff;
-}
-
-char*
-get_header_binary_compression_type(void* input_map)
-/**
- * @brief Gets binary compression type stored in header.
- * 
- * @param input_map mmap'ed input file.
- * 
- * @return Malloc'd char array with binary compression type string.
- */
-{
-    char* buff;
-    
-    buff = (char*)malloc(BINARY_COMPRESSION_METHOD_SIZE);
-    memcpy(buff, input_map + BINARY_COMPRESSION_METHOD_OFFSET, BINARY_COMPRESSION_METHOD_SIZE);
-
-    return buff;
+  return r;
 }
 
 void
