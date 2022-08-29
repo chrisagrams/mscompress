@@ -45,6 +45,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state);
 typedef char* (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
 
+typedef char* (*decode_fun)(char*, int, int, size_t*);
+typedef Algo (*decode_fun_ptr)();
+
 typedef struct
 {
 

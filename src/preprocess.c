@@ -585,7 +585,7 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
 
     *divisions = *threads;
 
-    r = alloc_ddp(*divisions, dp->total_spec);
+    r = alloc_ddp(*divisions, (int)ceil(dp->total_spec/(*divisions)*2));
 
     long encoded_sum = encodedLength_sum(dp);
 

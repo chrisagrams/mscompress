@@ -258,6 +258,7 @@ main(int argc, char* argv[])
       decompress_parallel(input_map, binary_encoding, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
 
     }
+    print("\nCleaning up...\n");
 
     // dealloc_dp(dp);
 
