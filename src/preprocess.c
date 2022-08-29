@@ -692,17 +692,12 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
 void
 dump_dp(data_positions_t* dp, int fd)
 {
-    char buff[sizeof(off_t)];
-    off_t* buff_cast = (off_t*)(&buff[0]);
-    int i;
+    char* buff;
 
-    for(i = 0; i < dp->total_spec * 2; i++)
-    {
-        *buff_cast = dp->start_positions[i];
-        write_to_file(fd, buff, sizeof(off_t));
-        *buff_cast = dp->end_positions[i];
-        write_to_file(fd, buff, sizeof(off_t));
-    }
+    buff = (char*)dp->start_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
+    buff = (char*)dp->end_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
 
     return;
 }
@@ -711,28 +706,15 @@ data_positions_t*
 read_dp(void* input_map, long dp_position, size_t num_spectra, long eof)
 {
     data_positions_t* r;
-    int size;
-    long diff;
-    int i;
-    int j;
 
-    diff = eof - dp_position;
-    size = num_spectra;
+    r = (data_positions_t*)malloc(sizeof(data_positions_t));
 
-    r = alloc_dp(size);
-
-    j = dp_position;
-
-    for(i = 0; i < size * 2; i++)
-    {
-        r->start_positions[i] = *(off_t*)(&input_map[0]+j);
-        j+=sizeof(off_t);
-        r->end_positions[i] = *(off_t*)(&input_map[0]+j);
-        j+=sizeof(off_t);
-    }
+    r->start_positions = (off_t*)(input_map + dp_position);
+    r->end_positions = (off_t*)(input_map + dp_position + (sizeof(off_t)*num_spectra*2));
+    r->total_spec = num_spectra;
+    r->file_end = eof;
 
     return r;
-
 }
 
 int

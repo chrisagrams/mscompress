@@ -259,7 +259,7 @@ main(int argc, char* argv[])
 
     }
 
-    dealloc_dp(dp);
+    // dealloc_dp(dp);
 
     dealloc_df(df);
 
