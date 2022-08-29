@@ -549,6 +549,13 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
             curr_div_i = 0;
             curr_size = 0;
         }
+
+        if (curr_div >= *divisions)
+        {
+            fprintf(stderr, "err: curr_div > divisions\ncurr_div: %d\ndivisions: %d\ncurr_div_i: %d\ncurr_size: %d\ni: %d\ntotal_spec: %d\n",
+             curr_div, *divisions, curr_div_i, curr_size, i, dp->total_spec * 2);
+            exit(-1);
+        }
         r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
         r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
         r[curr_div]->total_spec++;

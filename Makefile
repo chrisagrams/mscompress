@@ -78,7 +78,8 @@ endif
 
 mscompress: $(OBJS)
 	@echo $(LIBS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	cd ./vendor/zlib && ./configure && make static
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) ./vendor/zlib/libz.a
 
 ifeq ($(OS),Windows_NT)
 clean:
@@ -91,7 +92,8 @@ endif
 debug: CFLAGS = $(DEBUG_CFLAGS)
 
 debug: $(OBJS)
-	$(CC) $(CFLAGS) -o mscompress $^ $(LIBS)
+	cd ./vendor/zlib && ./configure && make static
+	$(CC) $(CFLAGS) -o mscompress $^ $(LIBS) ./vendor/zlib/libz.a
 
 vendor/base64/lib/config.h:
 	@echo "#define HAVE_AVX2   $(HAVE_AVX2)"    > $@
