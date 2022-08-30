@@ -48,7 +48,7 @@ typedef Algo (*Algo_ptr)();
 typedef char* (*decode_fun)(char*, int, int, size_t*);
 typedef decode_fun (*decode_fun_ptr)();
 
-typedef char* (*encode_fun)(char**, size_t*);
+typedef void(*encode_fun)(char**, char*, size_t*);
 typedef encode_fun (*encode_fun_ptr)();
 
 typedef struct

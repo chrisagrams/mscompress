@@ -36,7 +36,7 @@ base64_alloc(size_t size)
 }
 
 void
-decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
+decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 /**
  * @brief Wrapper function for base64 libary. 
  * Allocates memory for base64_decode function call and takes care of errors.
@@ -52,7 +52,7 @@ decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
 {
     int b64_ret;
 
-    b64_ret = base64_decode(src, src_len, buff, out_len, 0);
+    b64_ret = base64_decode(src, src_len, dest, out_len, 0);
 
     if(b64_ret == 0) 
     {

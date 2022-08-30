@@ -19,8 +19,8 @@
 #include "vendor/zlib/zlib.h"
 
 
-char*
-encode_base64(zlib_block_t* zblk, size_t src_len, size_t* out_len)
+void
+encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 /**
  * @brief Takes a zlib compressed block (zlib_block_t) and returns a base64 encoded string.
  * 
@@ -34,19 +34,19 @@ encode_base64(zlib_block_t* zblk, size_t src_len, size_t* out_len)
  * 
  */
 {
-    char* b64_out_buff;
+    // char* b64_out_buff;
 
-    b64_out_buff = (char*)malloc(sizeof(char)*src_len*2);
+    // b64_out_buff = (char*)malloc(sizeof(char)*src_len*2);
 
-    base64_encode(zblk->buff, src_len, b64_out_buff, out_len, 0);
+    base64_encode(zblk->buff, src_len, dest, out_len, 0);
 
     free(zblk);
 
-    return b64_out_buff;
+    // return b64_out_buff;
 }
 
-char*
-encode_zlib_fun(char** src, size_t* out_len)
+void
+encode_zlib_fun(char** src, char* dest, size_t* out_len)
 {
     Bytef* zlib_encoded;
 
@@ -55,8 +55,6 @@ encode_zlib_fun(char** src, size_t* out_len)
     zlib_block_t* decmp_input;
 
     zlib_block_t* cmp_output;
-
-    char* res;
  
     decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
     decmp_input->mem = *src;
@@ -73,15 +71,13 @@ encode_zlib_fun(char** src, size_t* out_len)
     free(decmp_input);
     free(decmp_header);
 
-    res = encode_base64(cmp_output, zlib_len, out_len);
+    encode_base64(cmp_output, dest, zlib_len, out_len);
     
     *src += (ZLIB_SIZE_OFFSET + org_len);
-
-    return res;
 }
 
-char*
-encode_no_comp_fun(char** src, size_t* out_len)
+void
+encode_no_comp_fun(char** src, char* dest, size_t* out_len)
 {
     Bytef* zlib_encoded;
 
@@ -90,8 +86,6 @@ encode_no_comp_fun(char** src, size_t* out_len)
     zlib_block_t* decmp_input;
 
     zlib_block_t* cmp_output;
-
-    char* res;
  
     decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
     decmp_input->mem = *src;
@@ -103,12 +97,9 @@ encode_no_comp_fun(char** src, size_t* out_len)
 
     uint16_t org_len = *(uint16_t*)decmp_header;
 
-    res = encode_base64(decmp_input, org_len, out_len);
+    encode_base64(decmp_input, dest, org_len, out_len);
 
     *src += (ZLIB_SIZE_OFFSET + org_len);
-
-    return res;
-        
 }
 
 encode_fun_ptr

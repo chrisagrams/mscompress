@@ -112,7 +112,6 @@ decompress_routine(void* args)
     decmp_binary = decmp_block(dctx, db_args->input_map, db_args->footer_binary_offset, db_args->binary_blk->compressed_size, db_args->binary_blk->original_size);
 
     size_t binary_len = 0;
-    char* binary_str;
 
     int64_t buff_off, xml_off = 0;
 
@@ -136,8 +135,7 @@ decompress_routine(void* args)
     while(xml_off < bound)
     {
         /* encode binary and copy over to buffer */
-        binary_str = db_args->df->encode_source_compression_fun(((char**)&decmp_binary), &binary_len);
-        memcpy(buff + buff_off, binary_str, binary_len);
+        db_args->df->encode_source_compression_fun(((char**)&decmp_binary), buff + buff_off, &binary_len);
         buff_off += binary_len;
 
         /* copy over xml to buffer */
