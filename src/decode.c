@@ -70,6 +70,24 @@ decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
 
 char*
 zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+/**
+ * @brief Decodes an mzML binary block with "zlib" encoding.
+ *        Decodes base64 string, zlib decodes the string, and appends resulting binary
+ *        buffer with the length of the buffer stored within the first ZLIB_SIZE_OFFSET
+ *        bytes of the buffer.
+ *        Decoded binary data starts at b64_out_buff + ZLIB_SIZE_OFFSET.
+ * 
+ * @param input_map Pointer representing mmap'ed mzML file.
+ * 
+ * @param start_position Position of first byte of <binary> block.
+ * 
+ * @param end_position Position of last byte of </binary> block.
+ * 
+ * @param out_len Contains resulting buffer size on return.
+ * 
+ * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing length of decoded binary
+ *         and resulting decoded binary buffer.
+ */
 {
     int zlib_ret;
 
@@ -109,6 +127,23 @@ zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
 
 char*
 no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+/**
+ * @brief Decodes an mzML binary block with "no comp" encoding.
+ *        Decodes base64 string and appends a binary buffer with the length of the 
+ *        buffer stored within the first ZLIB_SIZE_OFFSET bytes of the buffer.
+ *        Decoded binary data starts at b64_out_buff + ZLIB_SIZE_OFFSET.
+ * 
+ * @param input_map Pointer representing mmap'ed mzML file.
+ * 
+ * @param start_position Position of first byte of <binary> block.
+ * 
+ * @param end_position Position of last byte of </binary> block.
+ * 
+ * @param out_len Contains resulting buffer size on return.
+ * 
+ * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing length of decoded binary
+ *         and resulting decoded binary buffer.
+ */
 {
 
     char* b64_out_buff;
@@ -132,6 +167,14 @@ no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_l
 
 decode_fun_ptr
 set_decode_fun(int compression_method)
+/**
+ * @brief Returns appropriate decode function based on mzML file binary compression method.
+ * 
+ * @param compression_method Integer representing accession value of binary compression method.
+ * 
+ * @return A decode_fun_ptr representing a function pointer to appropriate decoding function.
+ *         Exits program on failure.
+ */
 {
     switch (compression_method)
     {
