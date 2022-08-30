@@ -206,7 +206,7 @@ main(int argc, char* argv[])
       df->target_mz_format = _ZSTD_compression_;
       df->target_int_format = _ZSTD_compression_;
       
-      df->source_compression_fun = set_decode_fun(df->source_compression);
+      df->decode_source_compression_fun = set_decode_fun(df->source_compression);
 
       #if DEBUG == 1
         dprintf(fds[2], "=== Begin binary divisions ===\n");
@@ -232,15 +232,17 @@ main(int argc, char* argv[])
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
-      int binary_encoding;
+      // int binary_encoding;
 
       blocksize = get_header_blocksize(input_map);
 
       df = get_header_df(input_map);
 
-      binary_encoding = df->source_compression;
+      df->encode_source_compression_fun = set_encode_fun(df->source_compression);
 
-      print("\tBinary_encoding: %d\n", binary_encoding);
+      // binary_encoding = df->source_compression;
+
+      // print("\tBinary_encoding: %d\n", binary_encoding);
 
       get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
 
@@ -257,7 +259,7 @@ main(int argc, char* argv[])
 
       print("\nDecompression and encoding...\n");
 
-      decompress_parallel(input_map, binary_encoding, xml_blks, binary_blks, xml_divisions, msz_footer, divisions, n_threads, fds[1]);
+      decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, df, msz_footer, divisions, n_threads, fds[1]);
 
     }
     print("\nCleaning up...\n");

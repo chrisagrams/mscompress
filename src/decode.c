@@ -62,7 +62,7 @@ decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
 }
 
 char*
-zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+decode_zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
 /**
  * @brief Decodes an mzML binary block with "zlib" encoding.
  *        Decodes base64 string, zlib decodes the string, and appends resulting binary
@@ -116,7 +116,7 @@ zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
 }
 
 char*
-no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+decode_no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_len)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 
@@ -169,9 +169,9 @@ set_decode_fun(int compression_method)
     switch (compression_method)
     {
     case _zlib_:
-       return zlib_fun;
+       return decode_zlib_fun;
     case _no_comp_:
-        return no_comp_fun;
+        return decode_no_comp_fun;
     default:
         fprintf(stderr, "Unknown source compression method.\n");
         exit(-1);

@@ -56,8 +56,8 @@ decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, size_t compressed_len
 
 decompress_args_t*
 alloc_decompress_args(char* input_map,
-                      int binary_encoding,
                       data_positions_t* dp,
+                      data_format_t* df,
                       block_len_t* xml_blk,
                       block_len_t* binary_blk,
                       off_t footer_xml_offset,
@@ -68,8 +68,8 @@ alloc_decompress_args(char* input_map,
     r = (decompress_args_t*)malloc(sizeof(decompress_args_t));
 
     r->input_map = input_map;
-    r->binary_encoding = binary_encoding;
     r->dp = dp;
+    r->df = df;
     r->xml_blk = xml_blk;
     r->binary_blk = binary_blk;
     r->footer_xml_offset = footer_xml_offset;
@@ -111,7 +111,7 @@ decompress_routine(void* args)
     decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_offset, db_args->xml_blk->compressed_size, db_args->xml_blk->original_size);
     decmp_binary = decmp_block(dctx, db_args->input_map, db_args->footer_binary_offset, db_args->binary_blk->compressed_size, db_args->binary_blk->original_size);
 
-    size_t binary_len; 
+    size_t binary_len = 0;
     char* binary_str;
 
     int64_t buff_off, xml_off = 0;
@@ -136,7 +136,7 @@ decompress_routine(void* args)
     while(xml_off < bound)
     {
         /* encode binary and copy over to buffer */
-        binary_str = encode_binary(((char**)&decmp_binary), db_args->binary_encoding, &binary_len);
+        binary_str = db_args->df->encode_source_compression_fun(((char**)&decmp_binary), &binary_len);
         memcpy(buff + buff_off, binary_str, binary_len);
         buff_off += binary_len;
 
@@ -156,10 +156,10 @@ decompress_routine(void* args)
 
 void
 decompress_parallel(char* input_map,
-                    int binary_encoding, 
                     block_len_queue_t* xml_blks,
                     block_len_queue_t* binary_blks,
                     data_positions_t** ddp,
+                    data_format_t* df,
                     footer_t* msz_footer,
                     int divisions, int threads, int fd)
 {
@@ -183,7 +183,7 @@ decompress_parallel(char* input_map,
             xml_blk = pop_block_len(xml_blks);
             binary_blk = pop_block_len(binary_blks);
 
-            args[i] = alloc_decompress_args(input_map, binary_encoding, ddp[i], xml_blk, binary_blk, footer_xml_offset, footer_binary_offset);
+            args[i] = alloc_decompress_args(input_map, ddp[i], df, xml_blk, binary_blk, footer_xml_offset, footer_binary_offset);
 
             footer_xml_offset += xml_blk->compressed_size;
             footer_binary_offset += binary_blk->compressed_size;

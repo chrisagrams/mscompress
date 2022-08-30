@@ -48,6 +48,9 @@ typedef Algo (*Algo_ptr)();
 typedef char* (*decode_fun)(char*, int, int, size_t*);
 typedef decode_fun (*decode_fun_ptr)();
 
+typedef char* (*encode_fun)(char**, size_t*);
+typedef encode_fun (*encode_fun_ptr)();
+
 typedef struct
 {
 
@@ -64,7 +67,8 @@ typedef struct
 
     /* runtime variables, not written to disk. */
     int populated;
-    decode_fun_ptr source_compression_fun;
+    decode_fun_ptr decode_source_compression_fun;
+    encode_fun_ptr encode_source_compression_fun;
     Algo_ptr target_xml_fun;
     Algo_ptr target_mz_fun;
     Algo_ptr target_int_fun;
@@ -218,7 +222,8 @@ decode_fun_ptr set_decode_fun(int compression_method);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-char* encode_binary(char** src, int compression_method, size_t* out_len);
+encode_fun_ptr set_encode_fun(int compression_method);
+// char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* compress.c */
 typedef struct 
@@ -244,6 +249,7 @@ typedef struct
     char* input_map;
     int binary_encoding;
     data_positions_t* dp;
+    data_format_t* df;
     block_len_t* xml_blk;
     block_len_t* binary_blk;
     off_t footer_xml_offset;
@@ -258,7 +264,7 @@ typedef struct
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
-void decompress_parallel(char* input_map, int binary_encoding, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, footer_t* msz_footer, int divisions, int threads, int fd);
+void decompress_parallel(char* input_map, block_len_queue_t* xml_blks, block_len_queue_t* binary_blks, data_positions_t** ddp, data_format_t* df, footer_t* msz_footer, int divisions, int threads, int fd);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
