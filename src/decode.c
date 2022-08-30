@@ -35,7 +35,7 @@ base64_alloc(size_t size)
     return r;
 }
 
-char*
+void
 decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
 /**
  * @brief Wrapper function for base64 libary. 
@@ -52,21 +52,14 @@ decode_base64(char* src, char* buff, size_t src_len, size_t* out_len)
 {
     int b64_ret;
 
-    char* b64_out_buff;
-
-    // b64_out_buff = (char*)malloc(sizeof(char) * src_len);
-
     b64_ret = base64_decode(src, src_len, buff, out_len, 0);
 
     if(b64_ret == 0) 
     {
-        // free(b64_out_buff);
-        return NULL;
+        fprintf(stderr, "base64_decode returned with an error.\n");
+        exit(-1);
     }
-
-    return b64_out_buff;
 }
-
 
 char*
 zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
@@ -89,9 +82,6 @@ zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
  *         and resulting decoded binary buffer.
  */
 {
-    int zlib_ret;
-
-    size_t zlib_out_len = 0;
     size_t b64_out_len = 0;
 
     char* b64_out_buff;
