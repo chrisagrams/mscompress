@@ -205,6 +205,8 @@ main(int argc, char* argv[])
       df->target_xml_format = _ZSTD_compression_;
       df->target_mz_format = _ZSTD_compression_;
       df->target_int_format = _ZSTD_compression_;
+      
+      df->source_compression_fun = set_decode_fun(df->source_compression);
 
       #if DEBUG == 1
         dprintf(fds[2], "=== Begin binary divisions ===\n");

@@ -444,7 +444,7 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     size_t binary_len = 0;
     Bytef* binary_buff; 
     
-    binary_buff = decode_binary(input, 0, len, df->source_compression, &binary_len);
+    binary_buff = df->source_compression_fun(input, 0, len, &binary_len);
 
     cmp_routine(czstd,
                 cmp_buff,

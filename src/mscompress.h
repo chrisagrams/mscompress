@@ -46,7 +46,7 @@ typedef char* (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
 
 typedef char* (*decode_fun)(char*, int, int, size_t*);
-typedef Algo (*decode_fun_ptr)();
+typedef decode_fun (*decode_fun_ptr)();
 
 typedef struct
 {
@@ -64,6 +64,7 @@ typedef struct
 
     /* runtime variables, not written to disk. */
     int populated;
+    decode_fun_ptr source_compression_fun;
     Algo_ptr target_xml_fun;
     Algo_ptr target_mz_fun;
     Algo_ptr target_int_fun;
@@ -213,7 +214,8 @@ int print(const char* format, ...);
 
 
 /* decode.c */
-Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
+decode_fun_ptr set_decode_fun(int compression_method);
+// Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
 char* encode_binary(char** src, int compression_method, size_t* out_len);

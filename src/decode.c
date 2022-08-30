@@ -130,15 +130,17 @@ no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_l
     return b64_out_buff;
 }
 
-Bytef*
-decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len)
+decode_fun_ptr
+set_decode_fun(int compression_method)
 {
-    if(compression_method == _zlib_)
-        return (Bytef*)zlib_fun(input_map, start_position, end_position, out_len);
-    else if(compression_method == _no_comp_)
-        return (Bytef*)no_comp_fun(input_map, start_position, end_position, out_len);
-    else
+    switch (compression_method)
     {
+    case _zlib_:
+       return zlib_fun;
+    case _no_comp_:
+        return no_comp_fun;
+    default:
+        fprintf(stderr, "Unknown source compression method.\n");
         exit(-1);
     }
 }
