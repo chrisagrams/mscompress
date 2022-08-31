@@ -267,14 +267,20 @@ main(int argc, char* argv[])
     // dealloc_dp(dp);
 
     dealloc_df(df);
+    print("\tFreed df\n");
 
     free_ddp(xml_divisions, divisions);
+    print("\tFreed xml_divisions\n");
 
     free_ddp(binary_divisions, divisions);
-    
+    print("\tFreed binary_divisions\n");
+
     remove_mapping(input_map, fds[0]);
+    print("\tRemoved mmap\n");
+
     close(fds[0]);
     close(fds[1]);
+    print("\tClosed file descriptors\n");
 
     gettimeofday(&abs_stop, NULL);
 

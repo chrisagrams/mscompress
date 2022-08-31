@@ -11,7 +11,8 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
-#define ZLIB_BUFF_FACTOR 512000
+#define ZLIB_BUFF_FACTOR 1024000
+// #define ZLIB_BUFF_FACTOR 512000
 // #define ZLIB_BUFF_FACTOR 4096
 #define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
@@ -36,7 +37,7 @@ struct arguments
   char *args[3];            /* ARG1 and ARG2 */
   int verbose;              /* The -v flag */
   int threads;
-  int blocksize;
+  long blocksize;
   int checksum; 
 };
 

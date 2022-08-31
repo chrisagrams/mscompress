@@ -596,13 +596,13 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
 
     long encoded_sum = encodedLength_sum(dp);
 
-    *blocksize = encoded_sum/(*divisions);
+    long bs = encoded_sum/(*divisions);
 
     int bound = dp->total_spec * 2;
 
     for(i; i < bound; i++)
     {
-        if(curr_size >= *blocksize)
+        if(curr_size >= bs)
         {
             curr_div++;
             curr_div_i = 0;
