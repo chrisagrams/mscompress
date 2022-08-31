@@ -352,7 +352,7 @@ prepare_fds(char* input_path,
             char** output_path,
             char* debug_output,
             char** input_map,
-            int* input_filesize,
+            long* input_filesize,
             int* fds)
 /**
  * @brief Prepares all required file descriptors, creates/opens files, determines filetypes, and handles errors.

@@ -190,7 +190,7 @@ long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
-int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, int* input_filesize, int* fds);
+int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
 
 int is_mzml(int fd);
 int is_msz(int fd);
