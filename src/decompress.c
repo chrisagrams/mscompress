@@ -116,21 +116,6 @@ get_lowest(int i_0, int i_1, int i_2)
     return ret;
 }
 
-int
-get_highest(long i_0, long i_1, long i_2)
-{
-    int ret = -1;
-
-    if(i_0 > i_1 && i_0 > i_2) 
-        ret = 0;
-    else if (i_1 > i_0 && i_1 > i_2)
-        ret = 1;
-    else if (i_2 > i_0 && i_2 > i_1)
-        ret = 2;    
-
-    return ret;
-}
-
 void
 decompress_routine(void* args)
 {
@@ -154,7 +139,9 @@ decompress_routine(void* args)
 
     size_t binary_len = 0;
 
-    int64_t buff_off, xml_off = 0;
+    int64_t buff_off = 0,
+            xml_off = 0, mz_off = 0, int_off = 0;
+    int64_t xml_i = 0, mz_i = 0, int_i = 0;        
 
     //determine starting block (xml, mz, int)
 
@@ -166,13 +153,44 @@ decompress_routine(void* args)
 
     block = get_lowest(xml_start, mz_start, int_start);
 
-    int end_block = get_highest(
-        db_args->xml_divisions[db_args->division]->end_positions[db_args->xml_divisions[db_args->division]->total_spec-1],
-        db_args->mz_binary_divisions[db_args->division]->end_positions[db_args->mz_binary_divisions[db_args->division]->total_spec-1],
-        db_args->int_binary_divisions[db_args->division]->end_positions[db_args->int_binary_divisions[db_args->division]->total_spec-1]);
 
+    long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
 
-    long len = 0;   
+    char* buff = malloc(len);
+
+    int64_t curr_len = 0;
+
+    while(block != -1)
+    {
+        switch (block)
+        {
+        case 0: // xml
+            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
+            xml_off += curr_len;
+            buff_off += curr_len;
+            xml_i++;
+            block++;
+            break;
+        case 1: // mz
+            curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
+            db_args->df->target_mz_fun(((char**)&decmp_mz_binary), buff + buff_off, &binary_len);
+            buff_off += curr_len;
+            mz_i++;
+            block++;
+            break;
+        case 2:
+            curr_len = db_args->int_binary_divisions[db_args->division]->end_positions[int_i] - db_args->int_binary_divisions[db_args->division]->start_positions[int_i];
+            db_args->df->target_int_fun(((char**)&decmp_int_binary), buff + buff_off, &binary_len);
+            buff_off += curr_len;
+            int_i++;
+            block = 0;
+            break;
+        case -1:
+            break;
+        }
+    }
+
 
     // data_positions_t* dp = db_args->dp;
 
