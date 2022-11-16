@@ -124,23 +124,38 @@ get_compression_scheme(void* input_map, char** xml_compression_type, char** bina
 
 void
 parse_footer(footer_t** footer, void* input_map, long input_filesize,
-            block_len_queue_t** xml_blks, block_len_queue_t** binary_blks, data_positions_t** dp)
+            block_len_queue_t**xml_block_lens,
+            block_len_queue_t** mz_binary_block_lens,
+            block_len_queue_t** int_binary_block_lens,
+            data_positions_t*** mz_binary_divisions,
+            data_positions_t*** int_binary_divisions,
+            data_positions_t*** xml_divisions,
+            int* divisions)
 {
 
       *footer = read_footer(input_map, input_filesize);
 
       print("\tXML position: %ld\n", (*footer)->xml_pos);
-      print("\tBinary position: %ld\n", (*footer)->binary_pos);
+      print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
+      print("\tint binary position: %ld\n", (*footer)->int_binary_pos);
       print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-      print("\tBinary blocks position: %ld\n", (*footer)->binary_blk_pos);
-      print("\tdp block position: %ld\n", (*footer)->dp_pos);
+      print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
+      print("\tint binary blocks position: %ld\n", (*footer)->int_binary_blk_pos);
+      print("\txml_ddp_pos block position: %ld\n", (*footer)->xml_ddp_pos);
+      print("\tmz_ddp_pos block position: %ld\n", (*footer)->mz_ddp_pos);
+      print("\tint_ddp_pos block position: %ld\n", (*footer)->int_ddp_pos);
       print("\tEOF position: %ld\n", input_filesize);
       print("\tOriginal file end: %ld\n", (*footer)->file_end);
 
-      *xml_blks = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->binary_blk_pos);
-      *binary_blks = read_block_len_queue(input_map, (*footer)->binary_blk_pos, (*footer)->dp_pos);
-      *dp = read_dp(input_map, (*footer)->dp_pos, (*footer)->num_spectra, input_filesize);
-      (*dp) -> file_end = (*footer)->file_end;
+      *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
+      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->int_binary_blk_pos);
+      *int_binary_block_lens = read_block_len_queue(input_map, (*footer)->int_binary_blk_pos, (*footer)->xml_ddp_pos);
+
+      *xml_divisions = read_ddp(input_map, (*footer)->xml_ddp_pos);
+      *mz_binary_divisions = read_ddp(input_map, (*footer)->mz_ddp_pos);
+      *int_binary_divisions = read_ddp(input_map, (*footer)->int_ddp_pos);
+
+      *divisions = (*footer)->divisions;
 }
 
 int 
@@ -148,17 +163,13 @@ main(int argc, char* argv[])
 {
     struct arguments args;
 
-    footer_t footer;
     struct timeval abs_start, abs_stop;
     long blocksize = 0;
     struct base64_state state;
     int divisions = 0;
 
-    data_positions_t* dp = NULL;
-    data_positions_t** binary_divisions = NULL;
-    data_positions_t** xml_divisions = NULL;
-    data_format_t* df = NULL;
-
+    data_positions_t **ddp, **mz_binary_divisions, **int_binary_divisions, **xml_divisions;
+    data_format_t* df;
 
     int fds[3] = {-1, -1, -1};
     void* input_map = NULL;
@@ -187,9 +198,10 @@ main(int argc, char* argv[])
 
     prepare_threads(args, &n_threads);
 
+    // Open file descriptors and mmap.
     operation = prepare_fds(args.args[0], &args.args[1], args.args[2], &input_map, &input_filesize, &fds);
 
-    // Initialize stream encoder:
+    // Initialize b64 encoder.
     base64_stream_encode_init(&state, 0);
 
     print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", args.args[0], input_filesize);
@@ -198,85 +210,112 @@ main(int argc, char* argv[])
 
     if(operation == COMPRESS)
     {
+      footer_t* footer = calloc(1, sizeof(footer_t));
+
       print("\tDetected .mzML file, starting compression...\n");
 
-      preprocess_mzml((char*)input_map, input_filesize, &divisions, &blocksize, &n_threads, &dp, &df, &binary_divisions, &xml_divisions);
+      // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
+      preprocess_mzml((char*)input_map,
+                       input_filesize,
+                       &divisions,
+                       &blocksize,
+                       &n_threads,
+                       &ddp,
+                       &df,
+                       &mz_binary_divisions,
+                       &int_binary_divisions,
+                       &xml_divisions);
 
+      // TODO: target format switch
       df->target_xml_format = _ZSTD_compression_;
       df->target_mz_format = _ZSTD_compression_;
       df->target_int_format = _ZSTD_compression_;
       
       df->decode_source_compression_fun = set_decode_fun(df->source_compression);
 
-      #if DEBUG == 1
-        dprintf(fds[2], "=== Begin binary divisions ===\n");
-        dump_divisions_to_file(binary_divisions, divisions, n_threads, fds[2]);
-        dprintf(fds[2], "=== End binary divisions ===\n");
-        dprintf(fds[2], "=== Begin XML divisions ===\n");
-        dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
-        dprintf(fds[2], "=== End XML divisions ===\n");
-      #endif
+      // #if DEBUG == 1
+      //   dprintf(fds[2], "=== Begin binary divisions ===\n");
+      //   dump_divisions_to_file(binary_divisions, divisions, n_threads, fds[2]);
+      //   dprintf(fds[2], "=== End binary divisions ===\n");
+      //   dprintf(fds[2], "=== Begin XML divisions ===\n");
+      //   dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+      //   dprintf(fds[2], "=== End XML divisions ===\n");
+      // #endif
 
+      //Write df header to file.
       write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
-      compress_mzml((char*)input_map, blocksize, divisions, n_threads, &footer, dp, df, binary_divisions, xml_divisions, fds[1]);
-
+      //Start compress routine.
+      compress_mzml((char*)input_map,
+                     blocksize,
+                     divisions,
+                     n_threads,
+                     footer,
+                     ddp,
+                     df,
+                     mz_binary_divisions,
+                     int_binary_divisions,
+                     xml_divisions,
+                     fds[1]);
     }
 
     else if (operation == DECOMPRESS)
     {
       print("\tDetected .msz file, reading header and footer...\n");
 
-      block_len_queue_t* xml_blks;
-      block_len_queue_t* binary_blks;
+      block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *int_binary_block_lens;
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
-      // int binary_encoding;
+      // // int binary_encoding;
 
-      blocksize = get_header_blocksize(input_map);
+      // blocksize = get_header_blocksize(input_map);
 
       df = get_header_df(input_map);
 
       df->encode_source_compression_fun = set_encode_fun(df->source_compression);
 
-      // binary_encoding = df->source_compression;
+      // // binary_encoding = df->source_compression;
 
-      // print("\tBinary_encoding: %d\n", binary_encoding);
+      // // print("\tBinary_encoding: %d\n", binary_encoding);
 
       get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
 
-      parse_footer(&msz_footer, input_map, input_filesize, &xml_blks, &binary_blks, &dp);
+      parse_footer(&msz_footer, input_map, input_filesize,
+                   &xml_block_lens, 
+                   &mz_binary_block_lens,
+                   &int_binary_block_lens,
+                   &mz_binary_divisions,
+                   &int_binary_divisions,
+                   &xml_divisions,
+                   &divisions);
 
-      divisions = xml_blks->populated;
-      // binary_divisions = get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
-      binary_divisions = new_get_binary_divisions(dp, &blocksize, &divisions, &n_threads);
-      xml_divisions = get_xml_divisions(dp, binary_divisions, divisions);
-      
-      #if DEBUG == 1
-        dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
-      #endif
+     
+      // #if DEBUG == 1
+      //   dump_divisions_to_file(xml_divisions, divisions, n_threads, fds[2]);
+      // #endif
 
       print("\nDecompression and encoding...\n");
 
-      decompress_parallel(input_map, xml_blks, binary_blks, xml_divisions, df, msz_footer, divisions, n_threads, fds[1]);
+      decompress_parallel(input_map,
+                          xml_block_lens,
+                          mz_binary_block_lens,
+                          int_binary_block_lens,
+                          mz_binary_divisions,
+                          int_binary_divisions,
+                          xml_divisions,
+                          df, msz_footer, divisions, n_threads, fds[1]);
 
     }
     print("\nCleaning up...\n");
 
-    // dealloc_dp(dp);
+    // free_ddp(xml_divisions, divisions);
+    // free_ddp(mz_binary_divisions, divisions);
+    // free_ddp(int_binary_divisions, divisions);
 
     dealloc_df(df);
-    print("\tFreed df\n");
-
-    free_ddp(xml_divisions, divisions);
-    print("\tFreed xml_divisions\n");
-
-    free_ddp(binary_divisions, divisions);
-    print("\tFreed binary_divisions\n");
 
     remove_mapping(input_map, fds[0]);
-    print("\tRemoved mmap\n");
 
     close(fds[0]);
     close(fds[1]);
