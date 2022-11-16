@@ -63,6 +63,7 @@ alloc_decompress_args(char* input_map,
                       data_positions_t** mz_binary_divisions,
                       data_positions_t** int_binary_divisions,
                       data_positions_t** xml_divisions,
+                      int division,
                       off_t footer_xml_off,
                       off_t footer_mz_bin_off,
                       off_t footer_int_bin_off)
@@ -79,6 +80,7 @@ alloc_decompress_args(char* input_map,
     r->mz_binary_divisions = mz_binary_divisions;
     r->int_binary_divisions = int_binary_divisions;
     r->xml_divisions = xml_divisions;
+    r->division = division;
     r->footer_xml_off = footer_xml_off;
     r->footer_mz_bin_off = footer_mz_bin_off;
     r->footer_int_bin_off = footer_int_bin_off;
@@ -97,6 +99,36 @@ dealloc_decompress_args(decompress_args_t* args)
         if(args->ret) free(args->ret);
         free(args);
     }
+}
+
+int
+get_lowest(int i_0, int i_1, int i_2)
+{
+    int ret = -1;
+
+    if(i_0 < i_1 && i_0 < i_2) 
+        ret = 0;
+    else if (i_1 < i_0 && i_1 < i_2)
+        ret = 1;
+    else if (i_2 < i_0 && i_2 < i_1)
+        ret = 2;    
+
+    return ret;
+}
+
+int
+get_highest(long i_0, long i_1, long i_2)
+{
+    int ret = -1;
+
+    if(i_0 > i_1 && i_0 > i_2) 
+        ret = 0;
+    else if (i_1 > i_0 && i_1 > i_2)
+        ret = 1;
+    else if (i_2 > i_0 && i_2 > i_1)
+        ret = 2;    
+
+    return ret;
 }
 
 void
@@ -123,6 +155,24 @@ decompress_routine(void* args)
     size_t binary_len = 0;
 
     int64_t buff_off, xml_off = 0;
+
+    //determine starting block (xml, mz, int)
+
+    int block = -1; // xml = 0, mz = 1, int = 2, error = -1
+
+    off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
+          mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
+          int_start = db_args->int_binary_divisions[db_args->division]->start_positions[0];
+
+    block = get_lowest(xml_start, mz_start, int_start);
+
+    int end_block = get_highest(
+        db_args->xml_divisions[db_args->division]->end_positions[db_args->xml_divisions[db_args->division]->total_spec-1],
+        db_args->mz_binary_divisions[db_args->division]->end_positions[db_args->mz_binary_divisions[db_args->division]->total_spec-1],
+        db_args->int_binary_divisions[db_args->division]->end_positions[db_args->int_binary_divisions[db_args->division]->total_spec-1]);
+
+
+    long len = 0;   
 
     // data_positions_t* dp = db_args->dp;
 
@@ -203,6 +253,7 @@ decompress_parallel(char* input_map,
                                             mz_binary_divisions,
                                             int_binary_divisions,
                                             xml_divisions,
+                                            i,
                                             footer_xml_off + msz_footer->xml_pos,
                                             footer_mz_bin_off + msz_footer->mz_binary_pos,
                                             footer_int_bin_off + msz_footer->int_binary_pos);

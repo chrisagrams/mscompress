@@ -263,6 +263,7 @@ typedef struct
     data_positions_t** mz_binary_divisions;
     data_positions_t** int_binary_divisions;
     data_positions_t** xml_divisions;
+    int division;
     off_t footer_xml_off;
     off_t footer_mz_bin_off;
     off_t footer_int_bin_off;
