@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <assert.h>
 
 ZSTD_DCtx*
 alloc_dctx()
@@ -116,6 +117,64 @@ get_lowest(int i_0, int i_1, int i_2)
     return ret;
 }
 
+
+void
+algo_encode_zlib (void* args)
+{
+    algo_args* a_args = (algo_args*)args;
+
+    size_t zlib_len = 0;
+
+    zlib_block_t *decmp_input, *cmp_output;
+
+    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input->mem = *(a_args->src);
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+
+    cmp_output = zlib_alloc(0);
+
+    void* decmp_header = zlib_pop_header(decmp_input);
+
+    uint16_t org_len = *(uint16_t*)decmp_header;
+
+    zlib_len = (size_t)zlib_compress(((Bytef*)*(a_args->src)) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
+
+    free(decmp_input);
+    free(decmp_header);
+
+    encode_base64(cmp_output, a_args->dest, zlib_len, a_args->dest_len);
+
+    *(a_args->src) += (ZLIB_SIZE_OFFSET + org_len);
+    
+    return;
+}
+
+void
+algo_encode_no_comp (void* args)
+{
+    algo_args* a_args = (algo_args*)args;
+    
+    size_t zlib_len = 0;
+
+    zlib_block_t *decmp_input, *cmp_output;
+
+    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input->mem = *(a_args->src);
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+
+    cmp_output = zlib_alloc(0);
+
+    void* decmp_header = zlib_pop_header(decmp_input);
+
+    uint16_t org_len = *(uint16_t*)decmp_header;
+
+    encode_base64(decmp_input, a_args->dest, a_args->src_len, a_args->dest_len);
+
+    *(a_args->src) += (ZLIB_SIZE_OFFSET + org_len);
+    
+    return;
+}
+
 void
 decompress_routine(void* args)
 {
@@ -145,7 +204,7 @@ decompress_routine(void* args)
 
     //determine starting block (xml, mz, int)
 
-    int block = -1; // xml = 0, mz = 1, int = 2, error = -1
+    int block = -1; // xml = 0/2, mz = 1, int = 3, error = -1
 
     off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
           mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
@@ -153,12 +212,16 @@ decompress_routine(void* args)
 
     block = get_lowest(xml_start, mz_start, int_start);
 
-
     long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
 
     char* buff = malloc(len);
+    db_args->ret = buff;
 
     int64_t curr_len = 0;
+
+    algo_args* a_args = (algo_args*)malloc(sizeof(algo_args));
+    size_t algo_output_len = 0;
+    a_args->dest_len = &algo_output_len;
 
     while(block != -1)
     {
@@ -166,22 +229,43 @@ decompress_routine(void* args)
         {
         case 0: // xml
             curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            assert(curr_len > 0 && curr_len < len);
+            memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
+            xml_off += curr_len;
+            buff_off += curr_len;
+            xml_i++;
+            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec+1)
+                block = -1;
+            else
+                block++;
+            break;
+        case 1: // mz
+            curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
+            assert(curr_len > 0 && curr_len < len);
+            a_args->src = (char**)&decmp_mz_binary;
+            a_args->src_len = curr_len;
+            a_args->dest = buff+buff_off;
+            db_args->df->target_mz_fun((void*)a_args);
+            buff_off += curr_len;
+            mz_i++;
+            block++;
+            break;
+        case 2: // xml
+            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            assert(curr_len > 0 && curr_len < len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
             xml_i++;
             block++;
             break;
-        case 1: // mz
-            curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
-            db_args->df->target_mz_fun(((char**)&decmp_mz_binary), buff + buff_off, &binary_len);
-            buff_off += curr_len;
-            mz_i++;
-            block++;
-            break;
-        case 2:
+        case 3:
             curr_len = db_args->int_binary_divisions[db_args->division]->end_positions[int_i] - db_args->int_binary_divisions[db_args->division]->start_positions[int_i];
-            db_args->df->target_int_fun(((char**)&decmp_int_binary), buff + buff_off, &binary_len);
+            assert(curr_len > 0 && curr_len < len);
+            a_args->src = (char**)&decmp_int_binary;
+            a_args->src_len = curr_len;
+            a_args->dest = buff+buff_off;
+            db_args->df->target_int_fun((void*)a_args);
             buff_off += curr_len;
             int_i++;
             block = 0;
@@ -191,6 +275,7 @@ decompress_routine(void* args)
         }
     }
 
+    db_args->ret_len = buff_off;
 
     // data_positions_t* dp = db_args->dp;
 

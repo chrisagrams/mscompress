@@ -43,7 +43,7 @@ struct arguments
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state);
 
-typedef char* (*Algo)(void*);
+typedef void (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
 
 typedef char* (*decode_fun)(char*, int, int, size_t*);
@@ -231,6 +231,7 @@ decode_fun_ptr set_decode_fun(int compression_method);
 
 /* encode.c */
 encode_fun_ptr set_encode_fun(int compression_method);
+void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* compress.c */
@@ -274,6 +275,14 @@ typedef struct
 
 } decompress_args_t;
 
+typedef struct
+{
+    char** src;
+    size_t src_len;
+    char* dest;
+    size_t* dest_len;
+} algo_args;
+
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
@@ -287,6 +296,9 @@ void decompress_parallel(char* input_map,
                     data_format_t* df,
                     footer_t* msz_footer,
                     int divisions, int threads, int fd);
+void algo_encode_no_comp (void* args);
+void algo_encode_zlib (void* args);
+
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
