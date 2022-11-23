@@ -673,9 +673,9 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
     r = alloc_ddp(divisions, div_bound + divisions); // allocate extra room for remainders
 
 
-    for(; i < bound; i++)
+    for(; i <= bound; i++)
     {
-        if(curr_div_i >= div_bound)
+        if(curr_div_i > div_bound)
         {
             r[curr_div]->file_end = dp->file_end;
             curr_div++;
@@ -694,7 +694,7 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
     curr_div--;
 
     // put remainder in last division
-    for(; i < bound; i++)
+    for(; i <= bound; i++)
     {
         r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
         r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];

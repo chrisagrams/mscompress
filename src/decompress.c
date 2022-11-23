@@ -234,7 +234,7 @@ decompress_routine(void* args)
             xml_off += curr_len;
             buff_off += curr_len;
             xml_i++;
-            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec+1)
+            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec)
                 block = -1;
             else
                 block++;
