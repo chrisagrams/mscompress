@@ -607,25 +607,30 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     return r;
 }
 
-data_positions_t**
-new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, long* threads)
+data_positions_t***
+new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, int* divisions, long* threads)
 {
-    data_positions_t** r;
+    data_positions_t*** r;
 
-    int i = 0,
+    int i = 0, j = 0,
         curr_div = 0,
         curr_div_i = 0,
         curr_size = 0;
 
     *divisions = *threads;
 
-    r = alloc_ddp(*divisions, (int)ceil(dp->total_spec/(*divisions)));
+    r = (data_positions_t***)malloc(sizeof(data_positions_t**) * ddp_len);
+    
+    for(j = 0; j < ddp_len; j++)
+    {
+        r[j] = alloc_ddp(*divisions, (int)ceil(ddp[0]->total_spec/(*divisions)));
+    }
 
-    long encoded_sum = encodedLength_sum(dp);
+    long encoded_sum = encodedLength_sum(ddp[0]);
 
     long bs = encoded_sum/(*divisions);
 
-    int bound = dp->total_spec;
+    int bound = ddp[0]->total_spec;
 
     for(; i < bound; i++)
     {
@@ -637,10 +642,13 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
             if(curr_div > *divisions)
                 break;
         }
-        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
-        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
-        r[curr_div]->total_spec++;
-        curr_size += (dp->end_positions[i] - dp->start_positions[i]);
+        for(j = 0; j < ddp_len; j++)
+        {
+            r[j][curr_div]->start_positions[curr_div_i] = ddp[j]->start_positions[i];
+            r[j][curr_div]->end_positions[curr_div_i] = ddp[j]->end_positions[i];
+            r[j][curr_div]->total_spec++;
+        }
+        curr_size += (ddp[0]->end_positions[i] - ddp[0]->start_positions[i]);
         curr_div_i++;
     }
 
@@ -649,9 +657,12 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
     /* add the remainder to the last division */
     for(; i < bound; i++)
     {
-        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
-        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
-        r[curr_div]->total_spec++;
+        for(j = 0; j < ddp_len; j++)
+        {
+            r[j][curr_div]->start_positions[curr_div_i] = ddp[j]->start_positions[i];
+            r[j][curr_div]->end_positions[curr_div_i] = ddp[j]->end_positions[i];
+            r[j][curr_div]->total_spec++;
+        }
     }
 
     return r;
@@ -887,9 +898,11 @@ preprocess_mzml(char* input_map,
   if (*ddp == NULL)
       return -1;
 
-  *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
-  *int_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
-
+//   *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
+//   *int_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
+data_positions_t*** binary_divisions = new_get_binary_divisions(*ddp, 2, blocksize, divisions, n_threads);
+*mz_binary_divisions = binary_divisions[0];
+*int_binary_divisions = binary_divisions[1];
 //   long sum = encodedLength_sum(*dp);
 // 
 //   print("\tencodedLengths sum: %ld\n", sum);

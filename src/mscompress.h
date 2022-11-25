@@ -207,7 +207,7 @@ data_positions_t** find_binary_quick(char* input_map, data_format_t* df, long en
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
-data_positions_t** new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, long* threads);
+data_positions_t*** new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, int* divisions, long* threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
 Algo map_fun(int fun_num);

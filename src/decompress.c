@@ -214,7 +214,7 @@ decompress_routine(void* args)
 
     long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
 
-    char* buff = malloc(len);
+    char* buff = malloc(len*2);
     db_args->ret = buff;
 
     int64_t curr_len = 0;
@@ -241,6 +241,7 @@ decompress_routine(void* args)
             break;
         case 1: // mz
             curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
+            if(mz_i == db_args->mz_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
@@ -261,6 +262,7 @@ decompress_routine(void* args)
             break;
         case 3:
             curr_len = db_args->int_binary_divisions[db_args->division]->end_positions[int_i] - db_args->int_binary_divisions[db_args->division]->start_positions[int_i];
+            if(int_i == db_args->int_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_int_binary;
             a_args->src_len = curr_len;
@@ -277,41 +279,6 @@ decompress_routine(void* args)
 
     db_args->ret_len = buff_off;
 
-    // data_positions_t* dp = db_args->dp;
-
-    // int64_t len = dp->file_end;
-    // int64_t curr_len = dp->end_positions[0] - dp->start_positions[0];
-
-    // char* buff = malloc(len);
-
-    // db_args->ret = buff;
-
-    // memcpy(buff, decmp_xml, curr_len);
-    // buff_off += curr_len;
-    // xml_off += curr_len;
-
-    // int i = 1;
-
-    // int64_t bound = db_args->xml_blk->original_size;
-
-    // while(xml_off < bound)
-    // {
-    //     /* encode binary and copy over to buffer */
-    //     db_args->df->encode_source_compression_fun(((char**)&decmp_binary), buff + buff_off, &binary_len);
-    //     buff_off += binary_len;
-
-    //     /* copy over xml to buffer */
-    //     curr_len = dp->end_positions[i] - dp->start_positions[i];
-    //     memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
-    //     buff_off += curr_len;
-    //     xml_off += curr_len;
-
-    //     i++;
-    // }
-
-    // db_args->ret_len = buff_off;
-
-    // print("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
     return;
 }
 
