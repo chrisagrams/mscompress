@@ -274,8 +274,8 @@ main(int argc, char* argv[])
       df = get_header_df(input_map);
 
       df->encode_source_compression_fun = set_encode_fun(df->source_compression);
-      df->target_mz_fun = &algo_encode_zlib;
-      df->target_int_fun = &algo_encode_zlib;
+      df->target_mz_fun = &algo_encode_lossless;
+      df->target_int_fun = &algo_encode_lossless;
 
 
       // // binary_encoding = df->source_compression;

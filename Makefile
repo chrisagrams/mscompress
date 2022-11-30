@@ -1,7 +1,7 @@
 CC = gcc
 
 CFLAGS += -O3 -Wall -Wextra -pedantic -msse4.2
-DEBUG_CFLAGS += -g
+DEBUG_CFLAGS += -g 
 
 OBJS = \
 	vendor/yxml/yxml.o \
@@ -16,6 +16,7 @@ OBJS = \
 	vendor/base64/lib/lib.o \
 	vendor/base64/lib/codec_choose.o \
 	vendor/base64/lib/tables/tables.o \
+	src/algo.o \
 	src/queue.o \
 	src/sys.o \
 	src/preprocess.o \

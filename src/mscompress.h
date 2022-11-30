@@ -281,6 +281,8 @@ typedef struct
     size_t src_len;
     char* dest;
     size_t* dest_len;
+    encode_fun_ptr enc_fun;
+    decode_fun_ptr dec_fun;
 } algo_args;
 
 ZSTD_DCtx* alloc_dctx();
@@ -296,9 +298,12 @@ void decompress_parallel(char* input_map,
                     data_format_t* df,
                     footer_t* msz_footer,
                     int divisions, int threads, int fd);
-void algo_encode_no_comp (void* args);
-void algo_encode_zlib (void* args);
 
+
+
+
+/* algo.c */
+void algo_encode_lossless (void* args);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
