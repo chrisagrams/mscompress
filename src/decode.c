@@ -24,7 +24,7 @@ base64_alloc(size_t size)
 {
     char* r;
 
-    r = (char*)malloc(sizeof(char) * size);
+    r = malloc(sizeof(char) * size);
     
     if(!r)
     {

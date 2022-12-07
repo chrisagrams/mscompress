@@ -192,7 +192,7 @@ get_header_df(void* input_map)
 {
   data_format_t* r;
   
-  r = (data_format_t*)malloc(sizeof(data_format_t));
+  r = malloc(sizeof(data_format_t));
   
   memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
   
@@ -335,7 +335,7 @@ change_extension(char* input, char* extension)
   char* x;
   char* r;
 
-  r = (char*)malloc(sizeof(char) * strlen(input));
+  r = malloc(sizeof(char) * strlen(input));
 
   strcpy(r, input);
   x = strrchr(r, '.');

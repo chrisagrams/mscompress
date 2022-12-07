@@ -36,7 +36,7 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 {
     // char* b64_out_buff;
 
-    // b64_out_buff = (char*)malloc(sizeof(char)*src_len*2);
+    // b64_out_buff = malloc(sizeof(char)*src_len*2);
 
     base64_encode(zblk->buff, src_len, dest, out_len, 0);
 

@@ -13,7 +13,7 @@ alloc_cmp_buff()
 {
     cmp_blk_queue_t* r;
 
-    r = (cmp_blk_queue_t*)malloc(sizeof(cmp_blk_queue_t));
+    r = malloc(sizeof(cmp_blk_queue_t));
     r->populated = 0;
     r->head = NULL;
     r->tail = NULL;
@@ -117,7 +117,7 @@ alloc_block_len(size_t original_size, size_t compressed_size)
 {
     block_len_t* r;
 
-    r = (block_len_t*)malloc(sizeof(block_len_t));
+    r = malloc(sizeof(block_len_t));
 
     r->original_size = original_size;
     r->compressed_size = compressed_size;
@@ -140,7 +140,7 @@ alloc_block_len_queue()
 {
     block_len_queue_t* r;
 
-    r = (block_len_queue_t*)malloc(sizeof(block_len_queue_t));
+    r = malloc(sizeof(block_len_queue_t));
 
     r->head = NULL;
     r->tail = NULL;

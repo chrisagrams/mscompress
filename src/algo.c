@@ -55,7 +55,7 @@ algo_encode_cast32 (void* args)
     float* arr = (float*)((void*)a_args->src + sizeof(u_int16_t));
 
     // Allocate buffer
-    double* res = (double*)malloc(sizeof(double) * len);
+    double* res = malloc(sizeof(double) * len);
 
     // Cast all
     for (size_t i = 0; i < len; i++)

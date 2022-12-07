@@ -71,7 +71,7 @@ alloc_decompress_args(char* input_map,
 {
     decompress_args_t* r;
     
-    r = (decompress_args_t*)malloc(sizeof(decompress_args_t));
+    r = malloc(sizeof(decompress_args_t));
 
     r->input_map = input_map;
     r->df = df;
@@ -173,7 +173,7 @@ decompress_routine(void* args)
 
     int64_t curr_len = 0;
 
-    algo_args* a_args = (algo_args*)malloc(sizeof(algo_args));
+    algo_args* a_args = malloc(sizeof(algo_args));
     size_t algo_output_len = 0;
     a_args->dest_len = &algo_output_len;
     a_args->enc_fun = db_args->df->encode_source_compression_fun;

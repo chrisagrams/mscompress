@@ -28,7 +28,7 @@
 yxml_t*
 alloc_yxml()
 {
-    yxml_t* xml = (yxml_t*)malloc(sizeof(yxml_t) + BUFSIZE);
+    yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
 
     if(!xml)
     {
@@ -43,7 +43,7 @@ alloc_yxml()
 data_format_t*
 alloc_df()
 {
-    data_format_t* df = (data_format_t*)malloc(sizeof(data_format_t));
+    data_format_t* df = malloc(sizeof(data_format_t));
 
     if(!df)
     {
@@ -83,7 +83,7 @@ populate_df_target(data_format_t* df, int target_xml_format, int target_mz_forma
 data_positions_t*
 alloc_dp(int total_spec)
 {
-    data_positions_t* dp = (data_positions_t*)malloc(sizeof(data_positions_t));
+    data_positions_t* dp = malloc(sizeof(data_positions_t));
 
     if(!dp)
     {
@@ -93,8 +93,8 @@ alloc_dp(int total_spec)
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
-    dp->start_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
-    dp->end_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+    dp->start_positions = malloc(sizeof(off_t)*total_spec*2);
+    dp->end_positions = malloc(sizeof(off_t)*total_spec*2);
 
     if(!dp->start_positions || !dp->end_positions)
     {
@@ -140,7 +140,7 @@ alloc_ddp(int len, int total_spec)
     
     int i;
 
-    r = (data_positions_t**)malloc(len*sizeof(data_positions_t*));
+    r = malloc(len*sizeof(data_positions_t*));
 
     if(!r)
     {
@@ -443,7 +443,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     mz_dp = alloc_dp(df->source_total_spec);
     int_dp = alloc_dp(df->source_total_spec);
 
-    ddp = (data_positions_t**)malloc(sizeof(data_positions_t*) * 3);
+    ddp = malloc(sizeof(data_positions_t*) * 3);
     ddp[0] = mz_dp;
     ddp[1] = int_dp;
     ddp[2] = xml_dp;
@@ -619,7 +619,7 @@ new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, i
 
     *divisions = *threads;
 
-    r = (data_positions_t***)malloc(sizeof(data_positions_t**) * ddp_len);
+    r = malloc(sizeof(data_positions_t**) * ddp_len);
     
     for(j = 0; j < ddp_len; j++)
     {
@@ -689,7 +689,7 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
         fprintf(stderr, "err: r is null\n");
         exit(-1);
     }
-    
+
     for(; i <= bound; i++)
     {
         if(curr_div_i > div_bound)
@@ -840,14 +840,14 @@ read_ddp(void* input_map, long position)
 
     position += sizeof(int);
 
-    r = (data_positions_t**)malloc(sizeof(data_positions_t*) * divisions);
+    r = malloc(sizeof(data_positions_t*) * divisions);
 
     for(; i < divisions; i++)
     {
         num_spec = *(int*)(input_map+position);
         position += sizeof(int);
 
-        r[i] = (data_positions_t*)malloc(sizeof(data_positions_t));
+        r[i] = malloc(sizeof(data_positions_t));
 
         r[i]->total_spec = num_spec;
 
@@ -865,7 +865,7 @@ read_ddp(void* input_map, long position)
 // {
 //     data_positions_t* r;
 
-//     r = (data_positions_t*)malloc(sizeof(data_positions_t));
+//     r = malloc(sizeof(data_positions_t));
 
 //     r->start_positions = (off_t*)(input_map + dp_position);
 //     r->end_positions = (off_t*)(input_map + dp_position + (sizeof(off_t)*num_spectra*2));

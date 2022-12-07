@@ -108,8 +108,8 @@ alloc_data_block(size_t max_size)
  */
 {
     data_block_t* r;
-    r = (data_block_t*)malloc(sizeof(data_block_t));
-    r->mem = (char*)malloc(sizeof(char)*max_size);
+    r = malloc(sizeof(data_block_t));
+    r->mem = malloc(sizeof(char)*max_size);
     r->size = 0;
     r->max_size = max_size;
     return r;
@@ -148,7 +148,7 @@ alloc_cmp_block(char* mem, size_t size, size_t original_size)
  */
 {
     cmp_block_t* r;
-    r = (cmp_block_t*)malloc(sizeof(cmp_block_t));
+    r = malloc(sizeof(cmp_block_t));
     r->mem = mem;
     r->size = size;
     r->original_size = original_size;
@@ -204,7 +204,7 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
 
     compress_args_t* r;
 
-    r = (compress_args_t*)malloc(sizeof(compress_args_t));
+    r = malloc(sizeof(compress_args_t));
 
     r->input_map = input_map;
     r->dp = dp;
