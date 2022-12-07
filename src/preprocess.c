@@ -683,7 +683,13 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
 
     r = alloc_ddp(divisions, div_bound + divisions); // allocate extra room for remainders
 
-
+    // check if r is null
+    if(r == NULL)
+    {
+        fprintf(stderr, "err: r is null\n");
+        exit(-1);
+    }
+    
     for(; i <= bound; i++)
     {
         if(curr_div_i > div_bound)

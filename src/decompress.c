@@ -121,23 +121,31 @@ get_lowest(int i_0, int i_1, int i_2)
 void
 decompress_routine(void* args)
 {
-    int tid;
+    // Get thread ID
+    int tid = get_thread_id();
 
-    ZSTD_DCtx* dctx;
+    // Allocate a decompression context
+    ZSTD_DCtx* dctx = alloc_dctx();
 
-    decompress_args_t* db_args;
+    if(dctx == NULL)
+    {
+        fprintf(stderr, "Failed to allocate decompression context.\n");
+        exit(-1);
+    }
 
-    void *decmp_xml, *decmp_mz_binary, *decmp_int_binary;
+    decompress_args_t* db_args = (decompress_args_t*)args;
 
-    tid = get_thread_id();
+    if(db_args == NULL)
+    {
+        fprintf(stderr, "Decompression arguments are null.\n");
+        exit(-1);
+    }
 
-    dctx = alloc_dctx();
-
-    db_args = (decompress_args_t*)args;
-
-    decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk);
-    decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk);
-    decmp_int_binary = decmp_block(dctx, db_args->input_map, db_args->footer_int_bin_off, db_args->int_binary_blk);
+    // Decompress each block of data
+    void
+        *decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_int_binary = decmp_block(dctx, db_args->input_map, db_args->footer_int_bin_off, db_args->int_binary_blk);
 
     size_t binary_len = 0;
 
@@ -145,15 +153,18 @@ decompress_routine(void* args)
             xml_off = 0, mz_off = 0, int_off = 0;
     int64_t xml_i = 0, mz_i = 0, int_i = 0;        
 
-    //determine starting block (xml, mz, int)
-
-    int block = -1; // xml = 0/2, mz = 1, int = 3, error = -1
-
+    // Determine starting block (xml, mz, int)
     off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
           mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
           int_start = db_args->int_binary_divisions[db_args->division]->start_positions[0];
 
-    block = get_lowest(xml_start, mz_start, int_start);
+    int block = get_lowest(xml_start, mz_start, int_start); // xml = 0/2, mz = 1, int = 3, error = -1
+
+    if(block == -1)
+    {
+        fprintf(stderr, "Error determining starting block.\n");
+        exit(-1);
+    }
 
     long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
 
