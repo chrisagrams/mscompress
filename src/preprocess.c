@@ -451,9 +451,13 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     xml_dp->start_positions[xml_curr] = 0;
 
     while (ptr)
-    {
+    {   
         if(mz_curr + int_curr == bound)
             break;
+        
+        if(xml_curr >= bound || mz_curr >= df->source_total_spec || int_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
+            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
+            
         ptr = strstr(ptr, "scan=") + 5;
 
         if(ptr == NULL)
@@ -485,12 +489,16 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
 
         ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
 
         
         ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
         mz_dp->end_positions[mz_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
@@ -500,11 +508,15 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
 
         ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
         int_dp->start_positions[int_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = int_dp->start_positions[int_curr];
 
         
         ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
         int_dp->end_positions[int_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = int_dp->end_positions[int_curr];
         
@@ -514,6 +526,8 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     
     }
 
+    if(xml_curr != bound || mz_curr != df->source_total_spec || int_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
+        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
 
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
@@ -524,6 +538,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     mz_dp->file_end = int_dp->file_end = xml_dp->file_end = end;
 
+    // Sanity check
     validate_positions(mz_dp->start_positions, mz_dp->total_spec);
     validate_positions(mz_dp->end_positions, mz_dp->total_spec);
     validate_positions(int_dp->start_positions, int_dp->total_spec);
@@ -625,7 +640,17 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
 data_positions_t***
 new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, int* divisions, long* threads)
 {
-    data_positions_t*** r;
+    if(ddp == NULL)
+        error("new_get_binary_divisions: NULL pointer passed in.\n");
+    if(ddp_len < 1)
+        error("new_get_binary_divisions: ddp_len < 1.\n");
+    if(*threads < 1)
+        error("new_get_binary_divisions: threads < 1.\n");
+
+    data_positions_t*** r = malloc(sizeof(data_positions_t**) * ddp_len);
+
+    if(r == NULL)
+        error("new_get_binary_divisions: malloc failed.\n");
 
     int i = 0, j = 0,
         curr_div = 0,
@@ -633,22 +658,24 @@ new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, i
         curr_size = 0;
 
     *divisions = *threads;
-
-    r = malloc(sizeof(data_positions_t**) * ddp_len);
     
     for(j = 0; j < ddp_len; j++)
-    {
         r[j] = alloc_ddp(*divisions, (int)ceil(ddp[0]->total_spec/(*divisions)));
-    }
 
     long encoded_sum = encodedLength_sum(ddp[0]);
+    if(encoded_sum <= 0)
+        error("new_get_binary_divisions: encoded_sum <= 0.\n");
 
     long bs = encoded_sum/(*divisions);
 
     int bound = ddp[0]->total_spec;
+    if(bound <= 0)
+        error("new_get_binary_divisions: bound <= 0.\n");
 
     for(; i < bound; i++)
     {
+        if(curr_div_i >= r[0][curr_div]->total_spec)
+            error("new_get_binary_divisions: curr_div_i >= r[0][curr_div]->total_spec.\n");
         if(curr_size >= bs)
         {
             curr_div++;
