@@ -319,11 +319,23 @@ decompress_parallel(char* input_map,
         }
 
         for(i = divisions_used; i < divisions_used + threads; i++)
-            pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
+        {
+            int ret = pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
+            if(ret != 0)
+            {
+                perror("pthread_create");
+                exit(-1);
+            }
+        }
 
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
-            pthread_join(ptid[i], NULL);
+            int ret = pthread_join(ptid[i], NULL);
+            if(ret != 0)
+            {
+                perror("pthread_join");
+                exit(-1);
+            }
 
             start = clock();
             write_to_file(fd, args[i]->ret, args[i]->ret_len);
