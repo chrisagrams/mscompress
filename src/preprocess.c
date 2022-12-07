@@ -30,11 +30,8 @@ alloc_yxml()
 {
     yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
 
-    if(!xml)
-    {
-        fprintf(stderr, "malloc failure alloc_yxml().\n");
-        exit(-1);
-    }
+    if(xml == NULL)
+        error("malloc failure in alloc_yxml().\n");
 
     yxml_init(xml, xml+1, BUFSIZE);
     return xml;
@@ -45,12 +42,8 @@ alloc_df()
 {
     data_format_t* df = malloc(sizeof(data_format_t));
 
-    if(!df)
-    {
-        fprintf(stderr, "malloc failure in alloc_df().\n");
-        exit(-1);
-    }
-
+    if(df == NULL)
+        error("alloc_df: malloc failure.\n");
     df->populated = 0;
     return df;
 }
@@ -61,10 +54,7 @@ dealloc_df(data_format_t* df)
     if(df)
         free(df);
     else
-    {
-        fprintf(stderr, "delloc_df received null.\n");
-        exit(-1);
-    }
+        error("dealloc_df: df is NULL.\n");
 }
 
 
@@ -83,24 +73,25 @@ populate_df_target(data_format_t* df, int target_xml_format, int target_mz_forma
 data_positions_t*
 alloc_dp(int total_spec)
 {
+    if(total_spec < 1)
+        warning("alloc_dp: total_spec is less than 1!\n");
+    if(total_spec > 1000000) // Realistically, this should never happen
+        warning("alloc_dp: total_spec is greater than 1,000,000!\n");
+    if(total_spec < 0)
+        error("alloc_dp: total_spec is less than 0!\n");
+
     data_positions_t* dp = malloc(sizeof(data_positions_t));
 
-    if(!dp)
-    {
-        fprintf(stderr, "malloc failure in alloc_dp().\n");
-        exit(-1);
-    }
+    if(dp == NULL)
+        error("alloc_dp: malloc failure.\n");
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
     dp->start_positions = malloc(sizeof(off_t)*total_spec*2);
     dp->end_positions = malloc(sizeof(off_t)*total_spec*2);
 
-    if(!dp->start_positions || !dp->end_positions)
-    {
-        fprintf(stderr, "inner malloc failure in alloc_dp().\n");
-        exit(-1);
-    }
+    if(dp->start_positions == NULL || dp->end_positions == NULL)
+        error("alloc_dp: malloc failure.\n");
 
     return dp;
 }
@@ -113,40 +104,35 @@ dealloc_dp(data_positions_t* dp)
         if(dp->start_positions)
             free(dp->start_positions);
         else
-        {
-            fprintf(stderr, "dp->start_positions is null.\n");
-            exit(-1);
-        }
+            error("dealloc_dp: dp->start_positions is null.\n");
         if(dp->end_positions)
             free(dp->end_positions);
         else
-        {
-            fprintf(stderr, "dp->end_positions is null.\n");
-            exit(-1);
-        }
+            error("dealloc_dp: dp->end_positions is null.\n");
         free(dp);
     }
     else
-    {
-        fprintf(stderr, "dealloc_dp() received null pointer.\n");
-        exit(-1);
-    }
+        error("dealloc_dp: dp is null.\n");
 }
 
 data_positions_t**
 alloc_ddp(int len, int total_spec)
 {
+    if(len < 1)
+        error("alloc_ddp: len is less than 1.\n");
+    if(total_spec < 1)
+        error("alloc_ddp: total_spec is less than 1.\n");
+    if(total_spec > 1000000) // Realistically, this should never happen
+        warning("alloc_ddp: total_spec is greater than 1,000,000!\n");
+
     data_positions_t** r;
     
     int i;
 
     r = malloc(len*sizeof(data_positions_t*));
 
-    if(!r)
-    {
-        fprintf(stderr, "malloc failure in alloc_ddp().\n");
-        exit(-1);
-    }
+    if(r == NULL)
+        error("alloc_ddp: malloc failure.\n");
 
     i = 0;
 
@@ -165,10 +151,7 @@ free_ddp(data_positions_t** ddp, int divisions)
     int i;
 
     if (divisions < 1)
-    {
-        fprintf(stderr, "invalid divisions in free_dp().\n");
-        exit(-1);
-    }
+        error("free_ddp: divisions is less than 1.\n");
 
     if(ddp)
     {
@@ -179,31 +162,12 @@ free_ddp(data_positions_t** ddp, int divisions)
         free(ddp);
     }
     else
-    {
-        fprintf(stderr, "free_dp() received null pointer.\n");
-        exit(-1);
-    }
+        error("free_ddp: ddp is null.\n");
 
 }
 
 /* === End of allocation and deallocation helper functions === */
  
-char* fun1(void* args)
-{
-    return "Hello world";
-}
- 
-Algo map_fun(int fun_num)
-{
-    switch(fun_num)
-    {
-        case _ZSTD_compression_:
-            return &fun1;
-        default:
-            fprintf(stderr, "Target format not implemented in this version of mscompress.\n");
-            exit(-1);
-    }
-}
 
 /* === Start of XML traversal functions === */
 
@@ -435,6 +399,11 @@ find_binary(char* input_map, data_format_t* df)
 data_positions_t**
 find_binary_quick(char* input_map, data_format_t* df, long end)
 {
+    if(input_map == NULL || df == NULL)
+        error("find_binary_quick: NULL pointer passed in.\n");
+    if(end < 0)
+        error("find_binary_quick: end position is negative.\n");
+
     data_positions_t** ddp;
 
     data_positions_t *mz_dp, *int_dp, *xml_dp;
@@ -443,7 +412,13 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     mz_dp = alloc_dp(df->source_total_spec);
     int_dp = alloc_dp(df->source_total_spec);
 
+    if(xml_dp == NULL || mz_dp == NULL || int_dp == NULL)
+        error("find_binary_quick: failed to allocate memory.\n");
+
     ddp = malloc(sizeof(data_positions_t*) * 3);
+    if(ddp == NULL)
+        error("find_binary_quick: failed to allocate memory.\n");
+
     ddp[0] = mz_dp;
     ddp[1] = int_dp;
     ddp[2] = xml_dp;
@@ -527,6 +502,9 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 long
 encodedLength_sum(data_positions_t* dp)
 {
+    if(dp == NULL)
+        error("encodedLength_sum: NULL pointer passed in.\n");
+    
     int i = 0;
     long res = 0;
 

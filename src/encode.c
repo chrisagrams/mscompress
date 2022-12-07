@@ -112,7 +112,7 @@ set_encode_fun(int compression_method)
         case _no_comp_:
             return encode_no_comp_fun;
         default:
-            fprintf(stderr,"Unknown source compression method.\n");
-            exit(-1);
+            error("Invalid compression method.");
+            return NULL;
     }
 }

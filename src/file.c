@@ -70,17 +70,14 @@ ssize_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
-      exit(1);
+      error("write_to_file: invalid file descriptor.\n");
     
     ssize_t rv;
 
     rv = write(fd, buff, n);
 
     if (rv < 0)
-    {
-        fprintf(stderr, "Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
-        exit(1);
-    }
+      error("Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
 
     return rv;
 }
@@ -89,18 +86,14 @@ ssize_t
 read_from_file(int fd, void* buff, size_t n)
 {
     if(fd < 0)
-      exit(1);
-    
+      error("read_from_file: invalid file descriptor.\n");
 
     ssize_t rv;
 
     rv = read(fd, buff, n);
 
     if (rv < 0)
-    {
-        fprintf(stderr, "Error in read.\n");
-        exit(1);
-    }
+      error("Error in reading %ld bytes from file descritor %d.", n, fd);
 
     return rv;
     
@@ -321,7 +314,7 @@ determine_filetype(int fd)
     return DECOMPRESS;
   }  
   else
-    fprintf(stderr, "Invalid input file.\n");
+    error("Invalid input file.\n");
   return -1;
 
 }
@@ -338,10 +331,17 @@ change_extension(char* input, char* extension)
  * @return Malloc'd char array with new path string.
  */
 {
+  if(input == NULL)
+    error("change_extension: input is NULL.\n");
+  if(extension == NULL)
+    error("change_extension: extension is NULL.\n");
+
   char* x;
   char* r;
 
   r = malloc(sizeof(char) * strlen(input));
+  if(r == NULL)
+    error("change_extension: malloc failed.\n");
 
   strcpy(r, input);
   x = strrchr(r, '.');
@@ -389,16 +389,11 @@ prepare_fds(char* input_path,
   if(input_path)
     input_fd = open(input_path, O_RDONLY);
   else
-  {
-    fprintf(stderr, "No input file specified.");
-    exit(1);
-  }
-
+    error("No input file specified.\n");
+  
   if(input_fd < 0)
-  {
-    fprintf(stderr, "Error in opening input file descriptor. (%s)\n", strerror(errno));
-    exit(1);
-  }
+    error("Error in opening input file descriptor. (%s)\n", strerror(errno));
+
 
   if(debug_output)
   {
@@ -409,7 +404,7 @@ prepare_fds(char* input_path,
   type = determine_filetype(input_fd);
 
   if(type != COMPRESS && type != DECOMPRESS)
-    exit(1);
+    error("Cannot determine file type.\n");
 
   fds[0] = input_fd;
   *input_map = get_mapping(input_fd);
@@ -419,10 +414,7 @@ prepare_fds(char* input_path,
   {
     output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
     if(output_fd < 0)
-    {
-      fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
-      exit(1);
-    }
+      error("Error in opening output file descriptor. (%s)\n", strerror(errno));
     fds[1] = output_fd;
     return type;
   }
@@ -436,10 +428,7 @@ prepare_fds(char* input_path,
   output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
 
   if(output_fd < 0)
-  {
-    fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
-    exit(1);
-  }
+    error("Error in opening output file descriptor. (%s)\n", strerror(errno));
 
   fds[1] = output_fd;
 

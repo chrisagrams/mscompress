@@ -6,7 +6,7 @@
 #include <pthread.h>
 #include <assert.h>
 
-ZSTD_DCtx*
+ZSTD_DCtx *
 alloc_dctx()
 /**
  * @brief Creates a ZSTD decompression context and handles errors.
@@ -15,26 +15,18 @@ alloc_dctx()
  * 
  */
 {
-    ZSTD_DCtx* dctx;
-    dctx = ZSTD_createDCtx();
-    if(!dctx) 
-    {
-        fprintf(stderr, "ZSTD Context failed.\n");
-        exit(-1);
-    }
+    ZSTD_DCtx* dctx = ZSTD_createDCtx();
+    if(dctx == NULL) 
+        error("alloc_dctx: ZSTD Context failed.\n");
     return dctx;
-
 }
 
-void*
+void *
 alloc_ztsd_dbuff(size_t buff_len)
 {
     void* r = malloc(buff_len);
-    if(!r)
-    {
-        fprintf(stderr, "malloc() error");
-        exit(1);
-    }
+    if(r == NULL)
+        error("alloc_ztsd_dbuff: malloc() error.\n");
     return r;
 }
 
@@ -49,16 +41,13 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
     decmp_len = ZSTD_decompressDCtx(dctx, out_buff, org_len, src_buff, src_len);
 
     if (decmp_len != org_len)
-    {
-        fprintf(stderr, "ZSTD_decompressDCtx() error: %s\n", ZSTD_getErrorName(decmp_len));
-        exit(-1);
-    }
+        error("zstd_decompress: ZSTD_decompressDCtx() error: %s\n", ZSTD_getErrorName(decmp_len));
 
     return out_buff;
 
 }
 
-void*
+void *
 decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 {
     return zstd_decompress(dctx, input_map+offset, blk->compressed_size, blk->original_size);
@@ -82,10 +71,7 @@ alloc_decompress_args(char* input_map,
     
     r = malloc(sizeof(decompress_args_t));
     if(r == NULL)
-    {
-        fprintf(stderr, "malloc() error\n");
-        exit(-1);
-    }
+        error("alloc_decompress_args: malloc() error.\n");
 
     r->input_map = input_map;
     r->df = df;
@@ -142,18 +128,12 @@ decompress_routine(void* args)
     ZSTD_DCtx* dctx = alloc_dctx();
 
     if(dctx == NULL)
-    {
-        fprintf(stderr, "Failed to allocate decompression context.\n");
-        exit(-1);
-    }
+        error("decompress_routine: ZSTD Context failed.\n");
 
     decompress_args_t* db_args = (decompress_args_t*)args;
 
     if(db_args == NULL)
-    {
-        fprintf(stderr, "Decompression arguments are null.\n");
-        exit(-1);
-    }
+        error("decompress_routine: Decompression arguments are null.\n");
 
     // Decompress each block of data
     void
@@ -175,24 +155,15 @@ decompress_routine(void* args)
     int block = get_lowest(xml_start, mz_start, int_start); // xml = 0/2, mz = 1, int = 3, error = -1
 
     if(block == -1)
-    {
-        fprintf(stderr, "Error determining starting block.\n");
-        exit(-1);
-    }
+        error("decompress_routine: Error determining starting block.\n");
 
     long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
     if(len <= 0)
-    {
-        fprintf(stderr, "Error determining decompression buffer size.\n");
-        exit(-1);
-    }
+        error("decompress_routine: Error determining decompression buffer size.\n");
 
-    char* buff = malloc(len*2);
+    char* buff = malloc(len*2); // *2 to be safe
     if(buff == NULL)
-    {
-        fprintf(stderr, "Failed to allocate buffer for decompression.\n");
-        exit(-1);
-    }
+        error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
     db_args->ret = buff;
 
@@ -200,10 +171,7 @@ decompress_routine(void* args)
 
     algo_args* a_args = malloc(sizeof(algo_args));
     if(a_args == NULL)
-    {
-        fprintf(stderr, "Failed to allocate algo_args.\n");
-        exit(-1);
-    }
+        error("decompress_routine: Failed to allocate algo_args.\n");
 
     size_t algo_output_len = 0;
     a_args->dest_len = &algo_output_len;

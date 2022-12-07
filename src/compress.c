@@ -110,26 +110,17 @@ alloc_data_block(size_t max_size)
     data_block_t* r;
 
     if(max_size <= 0)
-    {
-        fprintf(stderr, "alloc_data_block: invalid max_size for data block.\n");
-        exit(-1);
-    }
+        error("alloc_data_block: invalid max_size for data block.\n");
 
     r = malloc(sizeof(data_block_t));
 
     if(r == NULL)
-    {
-        fprintf(stderr, "alloc_data_block: Failed to allocate data block.\n");
-        exit(1);
-    }
+        error("alloc_data_block: Failed to allocate data block.\n");
 
     r->mem = malloc(sizeof(char) * max_size);
 
     if(r->mem == NULL)
-    {
-        fprintf(stderr, "alloc_data_block: Failed to allocate data block memory.\n");
-        exit(1);
-    }
+        error("alloc_data_block: Failed to allocate data block memory.\n");
 
     r->size = 0;
     r->max_size = max_size;
@@ -170,24 +161,15 @@ alloc_cmp_block(char* mem, size_t size, size_t original_size)
  */
 {
     if(mem == NULL)
-    {
-        fprintf(stderr, "alloc_cmp_block: invalid mem for cmp block.\n");
-        exit(-1);
-    }
+        error("alloc_cmp_block: invalid mem for cmp block.\n");
 
     if(size <= 0 || original_size <= 0)
-    {
-        fprintf(stderr, "alloc_cmp_block: invalid size for cmp block.\n");
-        exit(-1);
-    }
-
+        error("alloc_cmp_block: invalid size for cmp block.\n");
+    
     cmp_block_t* r = malloc(sizeof(cmp_block_t));
 
     if(r == NULL)
-    {
-        fprintf(stderr, "alloc_cmp_block: Failed to allocate cmp block.\n");
-        exit(1);
-    }
+        error("alloc_cmp_block: Failed to allocate cmp block.\n");
 
     r->mem = mem;
     r->size = size;
@@ -201,20 +183,13 @@ dealloc_cmp_block(cmp_block_t* blk)
     if(blk)
     {
         if (blk->mem)
-        {
             free(blk->mem);
-        }
-        else {
-            fprintf(stderr, "dealloc_cmp_block: blk's mem is NULL\n");
-            exit(-1);
-        }
+        else
+            error("dealloc_cmp_block: blk's mem is NULL\n");
         free(blk);
     }
     else
-    {
-        fprintf(stderr, "dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
-        exit(-1);
-    }
+        error("dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
     return;
 }
 
@@ -237,16 +212,10 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
     if(buff_len + data_block->size > data_block->max_size) return 0;        // Not enough space in data block
 
     if(data_block->mem+data_block->size == NULL || mem == NULL)             // Check for NULL pointers
-    {
-        fprintf(stderr, "append_mem: NULL pointer passed to append_mem.\n");
-        exit(-1);
-    }
+        error("append_mem: NULL pointer passed to append_mem.\n");
 
     if(memcpy(data_block->mem+data_block->size, mem, buff_len) == NULL)     // Copy memory
-    {
-        fprintf(stderr, "append_mem: Failed to append memory.\n");
-        exit(-1);
-    }
+        error("append_mem: Failed to append memory.\n");
 
     data_block->size += buff_len;                                           // Update size of data block
 
@@ -269,10 +238,7 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
 
     r = malloc(sizeof(compress_args_t));
     if(r == NULL)
-    {
-        fprintf(stderr, "alloc_compress_args: Failed to allocate compress_args_t.\n");
-        exit(-1);
-    }
+        error("alloc_compress_args: Failed to allocate compress_args_t.\n");
 
     r->input_map = input_map;
     r->dp = dp;
@@ -337,10 +303,8 @@ cmp_routine(ZSTD_CCtx* czstd,
     cmp_block_t* cmp_block;
     size_t cmp_len = 0;
 
-    if(len > cmp_blk_size) {
-        fprintf(stderr, "err: cmp_blk_size too small (%ld > %ld)\n", len, cmp_blk_size);
-        exit(1);
-    }
+    if(len > cmp_blk_size)
+        error("cmp_routine: len > cmp_blk_size. This should not happen.\n");
 
     if(!append_mem(*curr_block, input, len))
     {
@@ -398,10 +362,8 @@ cmp_flush(ZSTD_CCtx* czstd,
     size_t cmp_len = 0;
 
 
-    if((*curr_block)->size > cmp_blk_size) {
-        fprintf(stderr, "err: cmp_blk_size too small (%ld > %ld)\n", (*curr_block)->size, cmp_blk_size);
-        exit(1);
-    }
+    if((*curr_block)->size > cmp_blk_size) 
+        error("cmp_flush: curr_block->size > cmp_blk_size. This should not happen.\n");
 
     cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
@@ -431,10 +393,7 @@ write_cmp_blk(cmp_block_t* blk, int fd)
     rv = write_to_file(fd, blk->mem, blk->size);
     
     if(rv != blk->size)
-    {
-        fprintf(stderr, "Did not write all bytes to disk.\n");
-        exit(1);
-    }
+       error("write_cmp_blk: Did not write all bytes to disk.\n");
 }
 
 void
@@ -510,9 +469,12 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
  */
 {
     size_t binary_len = 0;
-    char* binary_buff; 
+    char* binary_buff = NULL; 
     
-    binary_buff = df->decode_source_compression_fun(input, 0, len, &binary_len);
+    df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
+
+    if(binary_buff == NULL)
+        error("cmp_binary_routine: binary_buff is NULL\n");
 
     cmp_routine(czstd,
                 cmp_buff,
@@ -543,10 +505,7 @@ compress_routine(void* args)
     compress_args_t* cb_args = (compress_args_t*)args;
 
     if(cb_args == NULL)
-    {
-        fprintf(stderr, "Invalid compress_args_t\n");
-        exit(-1);
-    }
+        error("compress_routine: Invalid compress_args_t\n");
 
     cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
     data_block_t* curr_block = alloc_data_block(cb_args->cmp_blk_size);
@@ -564,10 +523,7 @@ compress_routine(void* args)
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
         if(len < 0)
-        {
-            fprintf(stderr, "Invalid data position. Start: %ld End: %ld\n");
-            exit(-1);
-        }
+            error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
         
         if(cb_args->df)
             cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 

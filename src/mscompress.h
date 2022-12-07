@@ -46,7 +46,7 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state);
 typedef void (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
 
-typedef char* (*decode_fun)(char*, int, int, size_t*);
+typedef void (*decode_fun)(char*, size_t, char**, size_t*);
 typedef decode_fun (*decode_fun_ptr)();
 
 typedef void(*encode_fun)(char**, char*, size_t*);
@@ -223,6 +223,8 @@ int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* 
 int get_cpu_count();
 int get_thread_id();
 int print(const char* format, ...);
+int error(const char* format, ...);
+int warning(const char* format, ...);
 
 
 /* decode.c */
