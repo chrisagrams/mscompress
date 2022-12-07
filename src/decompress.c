@@ -19,8 +19,8 @@ alloc_dctx()
     dctx = ZSTD_createDCtx();
     if(!dctx) 
     {
-        perror("ZSTD Context failed.");
-        exit(1);
+        fprintf(stderr, "ZSTD Context failed.\n");
+        exit(-1);
     }
     return dctx;
 
@@ -29,7 +29,13 @@ alloc_dctx()
 void*
 alloc_ztsd_dbuff(size_t buff_len)
 {
-    return malloc(buff_len);
+    void* r = malloc(buff_len);
+    if(!r)
+    {
+        fprintf(stderr, "malloc() error");
+        exit(1);
+    }
+    return r;
 }
 
 void *
@@ -38,12 +44,15 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
     void* out_buff;
     size_t decmp_len = 0;
 
-    out_buff = alloc_ztsd_dbuff(org_len);
+    out_buff = alloc_ztsd_dbuff(org_len); // will return buff, exit on error
 
     decmp_len = ZSTD_decompressDCtx(dctx, out_buff, org_len, src_buff, src_len);
 
     if (decmp_len != org_len)
-        return NULL;
+    {
+        fprintf(stderr, "ZSTD_decompressDCtx() error: %s\n", ZSTD_getErrorName(decmp_len));
+        exit(-1);
+    }
 
     return out_buff;
 
@@ -72,6 +81,11 @@ alloc_decompress_args(char* input_map,
     decompress_args_t* r;
     
     r = malloc(sizeof(decompress_args_t));
+    if(r == NULL)
+    {
+        fprintf(stderr, "malloc() error\n");
+        exit(-1);
+    }
 
     r->input_map = input_map;
     r->df = df;
@@ -151,7 +165,7 @@ decompress_routine(void* args)
 
     int64_t buff_off = 0,
             xml_off = 0, mz_off = 0, int_off = 0;
-    int64_t xml_i = 0, mz_i = 0, int_i = 0;        
+    int64_t xml_i = 0,   mz_i = 0,   int_i = 0;        
 
     // Determine starting block (xml, mz, int)
     off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
@@ -167,13 +181,30 @@ decompress_routine(void* args)
     }
 
     long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
+    if(len <= 0)
+    {
+        fprintf(stderr, "Error determining decompression buffer size.\n");
+        exit(-1);
+    }
 
     char* buff = malloc(len*2);
+    if(buff == NULL)
+    {
+        fprintf(stderr, "Failed to allocate buffer for decompression.\n");
+        exit(-1);
+    }
+
     db_args->ret = buff;
 
     int64_t curr_len = 0;
 
     algo_args* a_args = malloc(sizeof(algo_args));
+    if(a_args == NULL)
+    {
+        fprintf(stderr, "Failed to allocate algo_args.\n");
+        exit(-1);
+    }
+
     size_t algo_output_len = 0;
     a_args->dest_len = &algo_output_len;
     a_args->enc_fun = db_args->df->encode_source_compression_fun;
