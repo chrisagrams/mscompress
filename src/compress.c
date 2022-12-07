@@ -108,10 +108,32 @@ alloc_data_block(size_t max_size)
  */
 {
     data_block_t* r;
+
+    if(max_size <= 0)
+    {
+        fprintf(stderr, "alloc_data_block: invalid max_size for data block.\n");
+        exit(-1);
+    }
+
     r = malloc(sizeof(data_block_t));
-    r->mem = malloc(sizeof(char)*max_size);
+
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_data_block: Failed to allocate data block.\n");
+        exit(1);
+    }
+
+    r->mem = malloc(sizeof(char) * max_size);
+
+    if(r->mem == NULL)
+    {
+        fprintf(stderr, "alloc_data_block: Failed to allocate data block memory.\n");
+        exit(1);
+    }
+
     r->size = 0;
     r->max_size = max_size;
+
     return r;
 }
 
@@ -147,8 +169,26 @@ alloc_cmp_block(char* mem, size_t size, size_t original_size)
  * 
  */
 {
-    cmp_block_t* r;
-    r = malloc(sizeof(cmp_block_t));
+    if(mem == NULL)
+    {
+        fprintf(stderr, "alloc_cmp_block: invalid mem for cmp block.\n");
+        exit(-1);
+    }
+
+    if(size <= 0 || original_size <= 0)
+    {
+        fprintf(stderr, "alloc_cmp_block: invalid size for cmp block.\n");
+        exit(-1);
+    }
+
+    cmp_block_t* r = malloc(sizeof(cmp_block_t));
+
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_cmp_block: Failed to allocate cmp block.\n");
+        exit(1);
+    }
+
     r->mem = mem;
     r->size = size;
     r->original_size = original_size;
@@ -160,8 +200,20 @@ dealloc_cmp_block(cmp_block_t* blk)
 {
     if(blk)
     {
-        if (blk->mem) free(blk->mem);
+        if (blk->mem)
+        {
+            free(blk->mem);
+        }
+        else {
+            fprintf(stderr, "dealloc_cmp_block: blk's mem is NULL\n");
+            exit(-1);
+        }
         free(blk);
+    }
+    else
+    {
+        fprintf(stderr, "dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
+        exit(-1);
     }
     return;
 }
@@ -182,10 +234,21 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
  * 
  */
 {
-    if(buff_len+data_block->size > data_block->max_size) return 0;
+    if(buff_len + data_block->size > data_block->max_size) return 0;        // Not enough space in data block
 
-    memcpy(data_block->mem+data_block->size, mem, buff_len);
-    data_block->size += buff_len;
+    if(data_block->mem+data_block->size == NULL || mem == NULL)             // Check for NULL pointers
+    {
+        fprintf(stderr, "append_mem: NULL pointer passed to append_mem.\n");
+        exit(-1);
+    }
+
+    if(memcpy(data_block->mem+data_block->size, mem, buff_len) == NULL)     // Copy memory
+    {
+        fprintf(stderr, "append_mem: Failed to append memory.\n");
+        exit(-1);
+    }
+
+    data_block->size += buff_len;                                           // Update size of data block
 
     return 1;
 }
@@ -205,6 +268,11 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
     compress_args_t* r;
 
     r = malloc(sizeof(compress_args_t));
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_compress_args: Failed to allocate compress_args_t.\n");
+        exit(-1);
+    }
 
     r->input_map = input_map;
     r->dp = dp;
@@ -468,34 +536,38 @@ compress_routine(void* args)
  */
 
 {
-    int tid;
+    int tid = get_thread_id();
 
-    ZSTD_CCtx* czstd;
+    ZSTD_CCtx* czstd = alloc_cctx();
 
-    compress_args_t* cb_args;
-    cmp_blk_queue_t* cmp_buff;
-    data_block_t* curr_block;
+    compress_args_t* cb_args = (compress_args_t*)args;
+
+    if(cb_args == NULL)
+    {
+        fprintf(stderr, "Invalid compress_args_t\n");
+        exit(-1);
+    }
+
+    cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
+    data_block_t* curr_block = alloc_data_block(cb_args->cmp_blk_size);
+
 
     size_t len = 0;
-
     size_t tot_size = 0;
     size_t tot_cmp = 0;
 
     int i = 0;
 
-    tid = get_thread_id();
-
-    cb_args = (compress_args_t*)args;
-
-    czstd = alloc_cctx();
-
-    cmp_buff = alloc_cmp_buff();
-
-    curr_block = alloc_data_block(cb_args->cmp_blk_size);
-
+    
     for(; i < cb_args->dp->total_spec; i++)
     {
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
+
+        if(len < 0)
+        {
+            fprintf(stderr, "Invalid data position. Start: %ld End: %ld\n");
+            exit(-1);
+        }
         
         if(cb_args->df)
             cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 
@@ -559,11 +631,23 @@ compress_parallel(char* input_map,
             args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
 
         for(i = divisions_used; i < divisions_used + threads; i++)
-            pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
+        {
+            int ret = pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
+            if(ret != 0)
+            {
+                perror("pthread_create");
+                exit(-1);
+            }   
+        }
 
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
-            pthread_join(ptid[i], NULL);
+            int ret = pthread_join(ptid[i], NULL);
+            if(ret != 0)
+            {
+                perror("pthread_join");
+                exit(-1);
+            }
             cmp_dump(args[i]->ret, blk_len_queue, fd);
             dealloc_compress_args(args[i]);
         }

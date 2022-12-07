@@ -116,7 +116,13 @@ get_offset(int fd)
  * @return Numeric offset within file descriptor.
  */
 {
-    return lseek(fd, 0, SEEK_CUR);
+  off_t ret = lseek(fd, 0, SEEK_CUR);
+  if (ret == -1)
+  {
+    perror("lseek");
+    exit(-1);
+  }
+  return ret;
 }
 
 void

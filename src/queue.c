@@ -14,6 +14,11 @@ alloc_cmp_buff()
     cmp_blk_queue_t* r;
 
     r = malloc(sizeof(cmp_blk_queue_t));
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_cmp_buff: malloc failed\n");
+        exit(-1);
+    }
     r->populated = 0;
     r->head = NULL;
     r->tail = NULL;
@@ -141,6 +146,12 @@ alloc_block_len_queue()
     block_len_queue_t* r;
 
     r = malloc(sizeof(block_len_queue_t));
+    
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_block_len_queue: malloc failed\n");
+        exit(-1);
+    }
 
     r->head = NULL;
     r->tail = NULL;
