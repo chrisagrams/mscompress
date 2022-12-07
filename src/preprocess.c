@@ -65,9 +65,9 @@ populate_df_target(data_format_t* df, int target_xml_format, int target_mz_forma
     df->target_mz_format = target_mz_format;
     df->target_int_format = target_int_format;
 
-    df->target_xml_fun = map_fun(target_xml_format);
-    df->target_mz_fun = map_fun(target_mz_format);
-    df->target_int_fun = map_fun(target_int_format);
+    // df->target_xml_fun = map_fun(target_xml_format);
+    // df->target_mz_fun = map_fun(target_mz_format);
+    // df->target_int_fun = map_fun(target_int_format);
 }
 
 data_positions_t*
@@ -395,6 +395,19 @@ find_binary(char* input_map, data_format_t* df)
 
 }
 
+void
+validate_positions(off_t* arr, int len)
+{
+    int i;
+    for(i = 0; i < len; i++)
+    {
+        if(arr[i] < 0)
+            error("validate_positions: negative position detected.\n");
+        if(i+1 < len && arr[i] > arr[i+1])
+            error("validate_positions: position %d is greater than %d\n", i, i+1);
+    }
+}
+
 
 data_positions_t**
 find_binary_quick(char* input_map, data_format_t* df, long end)
@@ -442,13 +455,30 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
         if(mz_curr + int_curr == bound)
             break;
         ptr = strstr(ptr, "scan=") + 5;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+
         e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+
         curr_scan = strtol(ptr, &e, 10);
+
+        if(curr_scan == 0)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
 
         ptr = e;
 
         ptr = strstr(ptr, "\"ms level\"") + 18;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
         e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
         curr_ms_level = strtol(ptr, &e, 10);
 
         ptr = e;
@@ -493,6 +523,13 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     int_dp->total_spec = df->source_total_spec;
 
     mz_dp->file_end = int_dp->file_end = xml_dp->file_end = end;
+
+    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
+    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
+    validate_positions(int_dp->start_positions, int_dp->total_spec);
+    validate_positions(int_dp->end_positions, int_dp->total_spec);
+    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
+    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
 
     return ddp;
 }
