@@ -28,6 +28,13 @@
 
 void
 algo_encode_lossless (void* args)
+/**
+ * @brief Lossless encoding function.
+ * 
+ * @param args Pointer to algo_args struct.
+ * 
+ * @return void
+ */
 {
     // Parse args
     algo_args* a_args = (algo_args*)args;
@@ -46,6 +53,13 @@ algo_encode_lossless (void* args)
 
 void
 algo_encode_cast32 (void* args)
+/**
+ * @brief Casts 32-bit float array to 64-bit double array.
+ * 
+ * @param args Pointer to algo_args struct.
+ * 
+ * @return void
+ */
 {
     // Parse args
     algo_args* a_args = (algo_args*)args;
