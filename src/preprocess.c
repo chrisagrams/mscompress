@@ -674,8 +674,8 @@ new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, i
 
     for(; i < bound; i++)
     {
-        if(curr_div_i >= r[0][curr_div]->total_spec)
-            error("new_get_binary_divisions: curr_div_i >= r[0][curr_div]->total_spec.\n");
+        // if(curr_div_i >= r[0][curr_div]->total_spec)
+        //     error("new_get_binary_divisions: curr_div_i >= r[0][curr_div]->total_spec.\n");
         if(curr_size >= bs)
         {
             curr_div++;

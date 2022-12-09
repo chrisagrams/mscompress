@@ -198,8 +198,9 @@ decompress_routine(void* args)
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
+            a_args->src_format = db_args->df->source_mz_fmt;
             db_args->df->target_mz_fun((void*)a_args);
-            buff_off += curr_len;
+            buff_off += *a_args->dest_len;
             mz_i++;
             block++;
             break;
@@ -220,8 +221,9 @@ decompress_routine(void* args)
             a_args->src = (char**)&decmp_int_binary;
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
+            a_args->src_format = db_args->df->source_int_fmt;
             db_args->df->target_int_fun((void*)a_args);
-            buff_off += curr_len;
+            buff_off += *a_args->dest_len;
             int_i++;
             block = 0;
             break;

@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "vendor/zlib/zlib.h"
+#include <assert.h>
 
 
 void
@@ -46,8 +47,10 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 }
 
 void
-encode_zlib_fun(char** src, char* dest, size_t* out_len)
+encode_zlib_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 {
+    assert(0); // this is broken now, need to fix
+
     Bytef* zlib_encoded;
 
     size_t zlib_len = 0;
@@ -77,7 +80,7 @@ encode_zlib_fun(char** src, char* dest, size_t* out_len)
 }
 
 void
-encode_no_comp_fun(char** src, char* dest, size_t* out_len)
+encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 {
     Bytef* zlib_encoded;
 
@@ -87,19 +90,19 @@ encode_no_comp_fun(char** src, char* dest, size_t* out_len)
 
     zlib_block_t* cmp_output;
  
-    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input = zlib_alloc(0);
     decmp_input->mem = *src;
     decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-    cmp_output = zlib_alloc(0);
+    // cmp_output = zlib_alloc(0);
 
-    void* decmp_header = zlib_pop_header(decmp_input);
+    // void* decmp_header = zlib_pop_header(decmp_input);
 
-    uint16_t org_len = *(uint16_t*)decmp_header;
+    // uint16_t org_len = *(uint16_t*)decmp_header;
 
-    encode_base64(decmp_input, dest, org_len, out_len);
+    encode_base64(decmp_input, dest, src_len, out_len);
 
-    *src += (ZLIB_SIZE_OFFSET + org_len);
+    *src += (ZLIB_SIZE_OFFSET + src_len);
 }
 
 encode_fun_ptr

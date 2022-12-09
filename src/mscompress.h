@@ -34,9 +34,10 @@ extern int verbose;
 
 struct arguments
 {
-  char *args[3];            /* ARG1 and ARG2 */
+  char *args[4];            /* ARG1 and ARG2 */
   int verbose;              /* The -v flag */
   int threads;
+  char* lossy;
   long blocksize;
   int checksum; 
 };
@@ -277,16 +278,6 @@ typedef struct
 
 } decompress_args_t;
 
-typedef struct
-{
-    char** src;
-    size_t src_len;
-    char* dest;
-    size_t* dest_len;
-    encode_fun_ptr enc_fun;
-    decode_fun_ptr dec_fun;
-} algo_args;
-
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
@@ -302,10 +293,23 @@ void decompress_parallel(char* input_map,
                     int divisions, int threads, int fd);
 
 
-
-
 /* algo.c */
+typedef struct
+{
+    char** src;
+    size_t src_len;
+    char** dest;
+    size_t* dest_len;
+    int src_format;
+    encode_fun_ptr enc_fun;
+    decode_fun_ptr dec_fun;
+} algo_args;
+void algo_decode_lossless (void* args);
 void algo_encode_lossless (void* args);
+void algo_decode_log_2_transform (void* args);
+void algo_encode_log_2_transform (void* args);
+Algo_ptr set_compress_algo(char* arg);
+Algo_ptr set_decompress_algo(char* arg);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

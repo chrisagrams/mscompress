@@ -471,7 +471,20 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     size_t binary_len = 0;
     char* binary_buff = NULL; 
     
-    df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
+    // df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
+
+    algo_args* a_args = malloc(sizeof(algo_args));
+    if(a_args == NULL)
+        error("cmp_binary_routine: Failed to allocate algo_args.\n");
+
+    a_args->src = &input;
+    a_args->src_len = len;    
+    a_args->dest = &binary_buff;
+    a_args->dest_len = &binary_len;
+    a_args->src_format = df->source_mz_fmt; //TODO: This is a hack. Need to fix.
+    a_args->dec_fun = df->decode_source_compression_fun;
+
+    df->target_mz_fun((void*)a_args); //TODO: This is a hack. Need to fix.
 
     if(binary_buff == NULL)
         error("cmp_binary_routine: binary_buff is NULL\n");

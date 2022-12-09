@@ -25,6 +25,7 @@ static char doc[] = MESSAGE "\n" "MSCompress is used to compress mass spec raw d
 static struct argp_option options[] = { 
     { "verbose", 'v', 0, OPTION_ARG_OPTIONAL, "Run in verbose mode."},
     { "threads", 't', "num", OPTION_ARG_OPTIONAL, "Set amount of threads to use. (default: auto)"},
+    { "lossy", 'l', "type", OPTION_ARG_OPTIONAL, "Enable lossy compression (cast, log). (disabled by default)"},
     { "blocksize", 'b', "size", OPTION_ARG_OPTIONAL, "Set maximum blocksize (xKB, xMB, xGB). (default: 10MB)"},
     { "checksum", 'c', 0, OPTION_ARG_OPTIONAL, "Enable checksum generation. (disabled by default)"},
     { 0 } 
@@ -68,6 +69,9 @@ parse_opt (int key, char *arg, struct argp_state *state)
       if(arguments->threads <= 0)
         argp_error(state, "Number of threads cannot be less than 1.");
       break;
+    case 'l':
+      arguments->lossy = arg;
+      break;  
     case 'b':
       blksize = parse_blocksize(arg);
       if(blksize == -1)
@@ -183,8 +187,12 @@ main(int argc, char* argv[])
     args.args[0] = NULL;
     args.args[1] = NULL;
     args.args[2] = NULL;
+    args.args[3] = NULL;
     
     argp_parse (&argp, argc, argv, 0, 0, &args);
+
+    if(args.lossy == NULL)
+      args.lossy = "lossless";
 
     blocksize = args.blocksize;
 
@@ -232,6 +240,9 @@ main(int argc, char* argv[])
       df->target_int_format = _ZSTD_compression_;
       
       df->decode_source_compression_fun = set_decode_fun(df->source_compression);
+      // df->target_mz_fun = algo_decode_log_2_transform;
+      df->target_mz_fun= set_compress_algo(args.lossy);
+      df->target_int_fun = set_compress_algo(args.lossy);
 
       // #if DEBUG == 1
       //   dprintf(fds[2], "=== Begin binary divisions ===\n");
@@ -274,9 +285,8 @@ main(int argc, char* argv[])
       df = get_header_df(input_map);
 
       df->encode_source_compression_fun = set_encode_fun(df->source_compression);
-      df->target_mz_fun = &algo_encode_lossless;
-      df->target_int_fun = &algo_encode_lossless;
-
+      df->target_mz_fun = set_decompress_algo(args.lossy);
+      df->target_int_fun = set_decompress_algo(args.lossy);
 
       // // binary_encoding = df->source_compression;
 
