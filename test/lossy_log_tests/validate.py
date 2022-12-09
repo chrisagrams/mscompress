@@ -39,9 +39,10 @@ def unpack_all(l):
             for b in unpack_floats(zlib.decompress(l[i+1])):
                 intensity.append(b)
         except zlib.error:
-            traceback.print_exc()
-            print("index: {}".format(i))
-            exit(-1)
+            for b in unpack_floats(l[i]):
+                mz.append(b)
+            for b in unpack_floats(l[i+1]):
+                intensity.append(b)
     return {'mz': mz, 'int': intensity}
 
 
