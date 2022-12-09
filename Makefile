@@ -1,7 +1,7 @@
 CC = gcc
 
-CFLAGS += -O3 -Wall -Wextra -pedantic -msse4.2
-DEBUG_CFLAGS += -g 
+CFLAGS += -O3 -Wall -Wextra -pedantic -msse4.2 -fomit-frame-pointer
+DEBUG_CFLAGS += -g
 
 OBJS = \
 	vendor/yxml/yxml.o \

@@ -35,6 +35,18 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
  * 
  */
 {
+    if(zblk == NULL || zblk->buff == NULL)
+        error("encode_base64: zblk is NULL");
+
+    if(dest == NULL)
+        error("encode_base64: dest is NULL");
+
+    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
+        error("encode_base64: src_len is invalid");
+    
+    if (out_len == NULL)
+        error("encode_base64: out_len is NULL");
+
     // char* b64_out_buff;
 
     // b64_out_buff = malloc(sizeof(char)*src_len*2);
@@ -43,13 +55,59 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 
 
     // zlib_dealloc(zblk);
-    // free(zblk);
+    free(zblk);
 
     // return b64_out_buff;
 }
 
 void
-encode_zlib_fun(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_len)
+{
+    // assert(0); // this is broken now, need to fix
+    if(src == NULL || *src == NULL)
+        error("encode_zlib_fun: src is NULL");
+
+    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
+        error("encode_zlib_fun: src_len is invalid");
+
+    if (dest == NULL)
+        error("encode_zlib_fun: dest is NULL");
+
+    if (out_len == NULL)
+        error("encode_zlib_fun: out_len is NULL");
+
+    Bytef* zlib_encoded;
+
+    size_t zlib_len = 0;
+    
+    zlib_block_t* decmp_input;
+
+    zlib_block_t* cmp_output;
+ 
+    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input->mem = *src;
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+
+    cmp_output = zlib_alloc(0);
+
+    // void* decmp_header = zlib_pop_header(decmp_input);
+
+    // uint16_t org_len = *(uint16_t*)decmp_header;
+
+    zlib_len = (size_t)zlib_compress(((Bytef*)*src), cmp_output, src_len);
+    // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, src_len);
+
+
+    free(decmp_input);
+    // free(decmp_header);
+
+    encode_base64(cmp_output, dest, zlib_len, out_len);
+    
+    *src += (ZLIB_SIZE_OFFSET + src_len);
+}
+
+void
+encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len)
 {
     // assert(0); // this is broken now, need to fix
     if(src == NULL || *src == NULL)
@@ -101,13 +159,13 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 
     size_t zlib_len = 0;
     
-    zlib_block_t* decmp_input;
+    zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
 
     zlib_block_t* cmp_output;
  
-    decmp_input = zlib_alloc(0);
     decmp_input->mem = *src;
-    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+    decmp_input->offset = 0;
+    decmp_input->buff = decmp_input->mem;
 
     // cmp_output = zlib_alloc(0);
 
@@ -121,12 +179,17 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 }
 
 encode_fun_ptr
-set_encode_fun(int compression_method)
+set_encode_fun(int compression_method, char* lossy)
 {
+    if(lossy == NULL)
+        error("set_encode_fun: lossy is NULL");
     switch(compression_method)
     {
         case _zlib_:
-            return encode_zlib_fun;
+            if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+                return encode_zlib_fun_w_header;
+            else
+                return encode_zlib_fun_no_header;    
         case _no_comp_:
             return encode_no_comp_fun;
         default:

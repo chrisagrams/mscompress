@@ -109,7 +109,7 @@ algo_decode_log_2_transform (void* args)
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = len * sizeof(uint16_t);
+    *a_args->dest_len = (len+1) * sizeof(uint16_t);
 
     return;
 }
@@ -249,7 +249,7 @@ set_compress_algo(char* arg)
 {
     if(arg == NULL)
         error("set_compress_algo: arg is NULL");
-    if(strcmp(arg, "lossless") == 0 || *arg == '\0')
+    if(strcmp(arg, "lossless") == 0 || *arg == "" || *arg == '\0')
         return algo_decode_lossless;
     else if(strcmp(arg, "log") == 0)
         return algo_decode_log_2_transform;
@@ -271,7 +271,7 @@ set_decompress_algo(char* arg)
 {
     if(arg == NULL)
         error("set_decompress_algo: arg is NULL");
-    if(strcmp(arg, "lossless") == 0 || *arg == '\0')
+    if(strcmp(arg, "lossless") == 0 || *arg == '\0' || *arg == "")
         return algo_encode_lossless;
     else if(strcmp(arg, "log") == 0)
         return algo_encode_log_2_transform;

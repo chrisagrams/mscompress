@@ -65,14 +65,20 @@ parse_opt (int key, char *arg, struct argp_state *state)
       arguments->verbose = 1;
       break;
     case 't':
+      if(arg == NULL)
+        argp_error(state, "Invalid number of threads.");
       arguments->threads = atoi(arg);
       if(arguments->threads <= 0)
         argp_error(state, "Number of threads cannot be less than 1.");
       break;
     case 'l':
+      if(arg == NULL)
+        argp_error(state, "Invalid lossy compression type.");
       arguments->lossy = arg;
       break;  
     case 'b':
+      if(arg == NULL)
+        argp_error(state, "Invalid blocksize.");
       blksize = parse_blocksize(arg);
       if(blksize == -1)
         argp_error(state, "Unkown size suffix. (KB, MB, GB)");
@@ -184,10 +190,12 @@ main(int argc, char* argv[])
     args.verbose = 0;
     args.blocksize = 1e+10;
     args.threads = 0;
+    args.lossy = NULL;
     args.args[0] = NULL;
     args.args[1] = NULL;
     args.args[2] = NULL;
     args.args[3] = NULL;
+    
     
     argp_parse (&argp, argc, argv, 0, 0, &args);
 
@@ -284,7 +292,7 @@ main(int argc, char* argv[])
 
       df = get_header_df(input_map);
 
-      df->encode_source_compression_fun = set_encode_fun(df->source_compression);
+      df->encode_source_compression_fun = set_encode_fun(df->source_compression, args.lossy);
       df->target_mz_fun = set_decompress_algo(args.lossy);
       df->target_int_fun = set_decompress_algo(args.lossy);
 
