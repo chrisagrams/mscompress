@@ -136,7 +136,7 @@ algo_encode_lossless (void* args)
     /* Lossless, don't touch anything */
 
     // Encode using specified encoding format
-    a_args->enc_fun(a_args->src, a_args->dest, a_args->dest_len);
+    a_args->enc_fun(a_args->src, a_args->src_len, a_args->dest, a_args->dest_len);
 
     return;
 }
@@ -176,7 +176,7 @@ algo_encode_cast32 (void* args)
         res[i] = (double)arr[i];
 
     // Encode using specified encoding format
-    a_args->enc_fun(a_args->src, a_args->dest, a_args->dest_len);
+    a_args->enc_fun(a_args->src, len*sizeof(uint16_t), a_args->dest, a_args->dest_len);
 
     free(res);
 
@@ -249,7 +249,7 @@ set_compress_algo(char* arg)
 {
     if(arg == NULL)
         error("set_compress_algo: arg is NULL");
-    if(strcmp(arg, "lossless") == 0)
+    if(strcmp(arg, "lossless") == 0 || *arg == '\0')
         return algo_decode_lossless;
     else if(strcmp(arg, "log") == 0)
         return algo_decode_log_2_transform;
@@ -271,7 +271,7 @@ set_decompress_algo(char* arg)
 {
     if(arg == NULL)
         error("set_decompress_algo: arg is NULL");
-    if(strcmp(arg, "lossless") == 0)
+    if(strcmp(arg, "lossless") == 0 || *arg == '\0')
         return algo_encode_lossless;
     else if(strcmp(arg, "log") == 0)
         return algo_encode_log_2_transform;

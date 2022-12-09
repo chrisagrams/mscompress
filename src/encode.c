@@ -41,7 +41,9 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 
     base64_encode(zblk->buff, src_len, dest, out_len, 0);
 
-    free(zblk);
+
+    // zlib_dealloc(zblk);
+    // free(zblk);
 
     // return b64_out_buff;
 }
@@ -49,7 +51,18 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 void
 encode_zlib_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 {
-    assert(0); // this is broken now, need to fix
+    // assert(0); // this is broken now, need to fix
+    if(src == NULL || *src == NULL)
+        error("encode_zlib_fun: src is NULL");
+
+    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
+        error("encode_zlib_fun: src_len is invalid");
+
+    if (dest == NULL)
+        error("encode_zlib_fun: dest is NULL");
+
+    if (out_len == NULL)
+        error("encode_zlib_fun: out_len is NULL");
 
     Bytef* zlib_encoded;
 
@@ -70,6 +83,8 @@ encode_zlib_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     uint16_t org_len = *(uint16_t*)decmp_header;
 
     zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
+    // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, src_len);
+
 
     free(decmp_input);
     free(decmp_header);
