@@ -10,9 +10,25 @@ import numpy as np
 import traceback
 
 
-def get_binaries(path):
+def get_tree(path):
     mzml_file = open(path)
     tree = etree.parse(mzml_file)
+    return tree
+
+
+def get_encoding(tree):
+    root = tree.getroot()
+    nodes = tree.findall('//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
+                         namespaces=root.nsmap)
+    for node in nodes:
+        accession = node.attrib['accession']
+        if accession == 'MS:1000574':
+            return 'zlib'
+        elif accession == 'MS:1000576':
+            return 'nocomp'
+
+
+def get_binaries(tree):
     root = tree.getroot()
     binaries = []
     for binary in tree.findall(
@@ -24,33 +40,44 @@ def get_binaries(path):
 
 def unpack_floats(data):
     res = []
-    for i in range(0, int(len(data)/4), 4):
-        res.append(struct.unpack('f', data[i:i+4])[0])
+    for i in range(0, int(len(data) / 4), 4):
+        res.append(struct.unpack('f', data[i:i + 4])[0])
     return res
 
 
-def unpack_all(l):
+def unpack_all(l, encoding_type):
     mz = []
     intensity = []
+    fun = None
+
+    if encoding_type == 'zlib':
+        fun = zlib.decompress
+    elif encoding_type == 'nocomp':
+        def fun(arr): return arr
+    else:
+        print('invalid encoding_type')
+        exit(-1)
+
     for i in range(0, len(l), 2):
-        try:
-            for b in unpack_floats(zlib.decompress(l[i])):
-                mz.append(b)
-            for b in unpack_floats(zlib.decompress(l[i+1])):
-                intensity.append(b)
-        except zlib.error:
-            for b in unpack_floats(l[i]):
-                mz.append(b)
-            for b in unpack_floats(l[i+1]):
-                intensity.append(b)
+        for b in unpack_floats(fun(l[i])):
+            mz.append(b)
+        for b in unpack_floats(fun(l[i + 1])):
+            intensity.append(b)
+
     return {'mz': mz, 'int': intensity}
 
 
 if __name__ == "__main__":
     test = sys.argv[1]
     org = sys.argv[2]
-    test_binaries = unpack_all(get_binaries(test))
-    org_binaries = unpack_all(get_binaries(org))
+    mz_tolerance = float(sys.argv[3])
+    int_tolerance = float(sys.argv[4])
+
+    test_tree = get_tree(test)
+    org_tree = get_tree(org)
+
+    test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree))
+    org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree))
 
     # number of binaries should be the same
     if len(test_binaries) != len(org_binaries):
@@ -80,10 +107,16 @@ if __name__ == "__main__":
         print("inf values found.")
         exit(-1)
 
-    df['%mz_diff'] = abs(df['test_mz']-df['org_mz'])/df['org_mz']
-    df['%int_diff'] = abs(df['test_int']-df['org_int'])/df['org_mz']
+    df['%mz_diff'] = abs(df['test_mz'] - df['org_mz']) / df['org_mz']
+    df['%int_diff'] = abs(df['test_int'] - df['org_int']) / df['org_mz']
 
-    print(df['%mz_diff'].describe())
-    print(df['%int_diff'].describe())
+    mz_diff_max = df['%mz_diff'].describe()['max']
+    if mz_diff_max > mz_tolerance:
+        print('mz tolerance of {} surpassed. (mz max diff: {})'.format(mz_tolerance, mz_diff_max))
+        exit(-1)
+
+    int_diff_max = df['%int_diff'].describe()['max']
+    if int_diff_max > int_tolerance:
+        print('int tolerance of {} surpassed. (int max diff: {})'.format(int_tolerance, int_diff_max))
 
     exit(0)
