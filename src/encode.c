@@ -164,18 +164,18 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     zlib_block_t* cmp_output;
  
     decmp_input->mem = *src;
-    decmp_input->offset = 0;
-    decmp_input->buff = decmp_input->mem;
+    decmp_input->offset = ZLIB_SIZE_OFFSET;
+    decmp_input->buff = decmp_input->mem + ZLIB_SIZE_OFFSET;
 
     // cmp_output = zlib_alloc(0);
 
-    // void* decmp_header = zlib_pop_header(decmp_input);
+    void* decmp_header = zlib_pop_header(decmp_input);
 
-    // uint16_t org_len = *(uint16_t*)decmp_header;
+    uint16_t org_len = *(uint16_t*)decmp_header;
 
-    encode_base64(decmp_input, dest, src_len, out_len);
+    encode_base64(decmp_input, dest, org_len, out_len);
 
-    *src += (ZLIB_SIZE_OFFSET + src_len);
+    *src += (ZLIB_SIZE_OFFSET + org_len);
 }
 
 encode_fun_ptr
