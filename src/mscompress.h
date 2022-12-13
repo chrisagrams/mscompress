@@ -147,6 +147,7 @@ typedef struct
     size_t num_spectra;
     off_t file_end;
     int divisions;
+    int magic_tag;
 } footer_t;
 
 
@@ -229,7 +230,7 @@ int warning(const char* format, ...);
 
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method);
+decode_fun_ptr set_decode_fun(int compression_method, char* lossy);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
@@ -332,7 +333,7 @@ void zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);
-uInt  zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
+uInt zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
 uInt zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len);
 
 

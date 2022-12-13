@@ -194,7 +194,7 @@ get_header_df(void* input_map)
   r = malloc(sizeof(data_format_t));
   
   memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
-  
+
   r->populated = 2;
 
   return r;
@@ -210,6 +210,7 @@ write_footer(footer_t* footer, int fd)
  * @param fd Output file descriptor to write to. 
  */
 {
+    footer->magic_tag = MAGIC_TAG; // Set magic tag
     write_to_file(fd, (char*)footer, sizeof(footer_t));
 }
 
@@ -228,6 +229,9 @@ read_footer(void* input_map, long filesize)
     footer_t* footer;
 
     footer = (footer_t*)(&input_map[0] + filesize - sizeof(footer_t));
+
+    if (footer->magic_tag != MAGIC_TAG)
+        error("read_footer: invalid magic tag.\n");
 
     return footer;
 }

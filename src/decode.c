@@ -111,6 +111,42 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 }
 
 void
+decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len)
+{
+    if(src == NULL)
+        error("decode_zlib_fun_no_header: src is NULL.\n");
+
+    if(src_len <= 0)
+        error("decode_zlib_fun_no_header: src_len is <= 0.\n");
+
+    if(dest == NULL)
+        error("decode_zlib_fun_no_header: dest is NULL.\n");
+
+    if(out_len == NULL)
+        error("decode_zlib_fun_no_header: out_len is NULL.\n");
+
+    size_t b64_out_len = 0;
+
+    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    
+    decode_base64(src, b64_out_buff, src_len, &b64_out_len);
+    
+    if (b64_out_buff == NULL)
+        error("decode_zlib_fun_no_header: base64_decode returned with an error.\n");
+
+    zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
+
+    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+
+    free(b64_out_buff);
+    
+    *out_len = decmp_size;
+    
+    *dest = (char*)decmp_output->mem;
+
+    free(decmp_output);
+}
+void
 decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
@@ -149,7 +185,7 @@ decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 }
 
 decode_fun_ptr
-set_decode_fun(int compression_method)
+set_decode_fun(int compression_method, char* lossy)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.
  * 
@@ -159,10 +195,15 @@ set_decode_fun(int compression_method)
  *         Exits program on failure.
  */
 {
+    if(lossy == NULL)
+        error("set_decode_fun: lossy is NULL.\n");
     switch (compression_method)
     {
     case _zlib_:
-       return decode_zlib_fun;
+        if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+            return decode_zlib_fun;
+        else
+            return decode_zlib_fun_no_header;
     case _no_comp_:
         return decode_no_comp_fun;
     default:

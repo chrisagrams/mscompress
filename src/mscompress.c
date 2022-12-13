@@ -247,7 +247,7 @@ main(int argc, char* argv[])
       df->target_mz_format = _ZSTD_compression_;
       df->target_int_format = _ZSTD_compression_;
       
-      df->decode_source_compression_fun = set_decode_fun(df->source_compression);
+      df->decode_source_compression_fun = set_decode_fun(df->source_compression, args.lossy);
       // df->target_mz_fun = algo_decode_log_2_transform;
       df->target_mz_fun= set_compress_algo(args.lossy);
       df->target_int_fun = set_compress_algo(args.lossy);

@@ -263,6 +263,12 @@ dump_block_len_queue(block_len_queue_t* queue, int fd)
 block_len_queue_t*
 read_block_len_queue(void* input_map, int offset, int end)
 {
+    if(input_map == NULL)
+        error("read_block_len_queue: input_map is NULL");
+    if(offset < 0)
+        error("read_block_len_queue: offset is negative");
+    if(end < 0)
+        error("read_block_len_queue: end is negative");    
     block_len_queue_t* r;
     long diff;
     int factor;

@@ -84,7 +84,7 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 
     zlib_block_t* cmp_output;
  
-    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input = zlib_alloc(0);
     decmp_input->mem = *src;
     decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
@@ -103,7 +103,7 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 
     encode_base64(cmp_output, dest, zlib_len, out_len);
     
-    *src += (ZLIB_SIZE_OFFSET + src_len);
+    *src += src_len;
 }
 
 void
