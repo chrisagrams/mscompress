@@ -109,7 +109,6 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 void
 encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len)
 {
-    // assert(0); // this is broken now, need to fix
     if(src == NULL || *src == NULL)
         error("encode_zlib_fun: src is NULL");
 
@@ -160,14 +159,12 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     size_t zlib_len = 0;
     
     zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
-
-    zlib_block_t* cmp_output;
+    if(decmp_input == NULL)
+        error("encode_no_comp_fun: malloc failed");
  
     decmp_input->mem = *src;
     decmp_input->offset = ZLIB_SIZE_OFFSET;
     decmp_input->buff = decmp_input->mem + ZLIB_SIZE_OFFSET;
-
-    // cmp_output = zlib_alloc(0);
 
     void* decmp_header = zlib_pop_header(decmp_input);
 
