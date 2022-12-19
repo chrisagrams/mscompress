@@ -343,7 +343,7 @@ change_extension(char* input, char* extension)
   char* x;
   char* r;
 
-  r = malloc(sizeof(char) * strlen(input));
+  r = malloc(sizeof(char) * (strlen(input) + 1));
   if(r == NULL)
     error("change_extension: malloc failed.\n");
 

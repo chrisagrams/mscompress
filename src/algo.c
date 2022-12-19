@@ -32,6 +32,64 @@ algo_decode_lossless (void* args)
 }
 
 void
+algo_decode_cast32 (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    char* decoded = NULL;
+    size_t decoded_len = 0;
+
+    // Decode using specified encoding format
+    a_args->dec_fun(*a_args->src, a_args->src_len, &decoded, &decoded_len);
+
+    // Deternmine length of data based on data format
+    uint16_t len;
+    float* res;
+    
+    switch (a_args->src_format)
+    {
+        case _32f_: {
+            len = decoded_len/ sizeof(float);
+            res = malloc((len+1) * sizeof(float)); // Allocate space for result and leave room for header
+            if(res == NULL)
+                error("algo_decode_cast32: malloc failed");
+            float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+            for(int i = 1; i < len+1; i++)
+            {
+                res[i] = f[i-1];
+            }
+            break;
+        }
+        case _64d_: {
+            len = decoded_len/ sizeof(double);
+            res = malloc((len+1) * sizeof(float)); // Allocate space for result and leave room for header
+            if(res == NULL)
+                error("algo_decode_cast32: malloc failed");
+            float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+            for(int i = 1; i < len+1; i++)
+            {
+                res[i] = f[i-1];
+            }
+            break;
+        }
+        default : {
+            free(res);
+            error("algo_decode_log_2_transform: Unknown data format");
+        }
+    }
+
+    // Store length of array in first 4 bytes
+    res[0] = (float)len;
+
+    // Return result
+    *a_args->dest = res;
+    *a_args->dest_len = (len+1) * sizeof(float);
+
+    return;
+}
+
+void
 algo_decode_log_2_transform (void* args)
 /**
  * @brief Log2 transform decoding function.
@@ -97,6 +155,7 @@ algo_decode_log_2_transform (void* args)
             break;
         }
         default : {
+            free(res);
             error("algo_decode_log_2_transform: Unknown data format");
         }
     }
@@ -158,13 +217,15 @@ algo_encode_cast32 (void* args)
 
     // Cast 32-bit to 64-bit 
     
-    // Get array length
-    u_int16_t len = *(uint16_t*)a_args->src;
-    if (len <= 0)
-        error("algo_encode_cast32: len is <= 0");
 
     // Get source array 
-    float* arr = (float*)((void*)a_args->src + sizeof(u_int16_t));
+    float* arr = *a_args->src;
+    
+    // Get array length
+    u_int16_t len = (uint16_t)arr[0];
+
+    if (len <= 0)
+        error("algo_encode_cast32: len is <= 0");
 
     // Allocate buffer
     double* res = malloc(sizeof(double) * len);
@@ -172,8 +233,8 @@ algo_encode_cast32 (void* args)
         error("algo_encode_cast32: malloc failed");
 
     // Cast all
-    for (size_t i = 0; i < len; i++)
-        res[i] = (double)arr[i];
+    for (size_t i = 1; i < len+1; i++)
+        res[i-1] = (double)arr[i];
 
     // Encode using specified encoding format
     a_args->enc_fun(a_args->src, len*sizeof(uint16_t), a_args->dest, a_args->dest_len);
@@ -203,7 +264,8 @@ algo_encode_log_2_transform (void* args)
     {
         case _32f_ : { // 32-bit float
             // Allocate buffer
-            float* res = malloc(sizeof(float) * len);
+            size_t res_len = len * sizeof(float);
+            float* res = malloc(res_len);
             if(res == NULL)
                 error("algo_encode_log_2_transform: malloc failed");
 
@@ -212,7 +274,7 @@ algo_encode_log_2_transform (void* args)
                 res[i] = (float)exp2((double)arr[i] / 100);
 
             // Encode using specified encoding format
-            a_args->enc_fun((char**)(&res), len*sizeof(float), a_args->dest, a_args->dest_len);
+            a_args->enc_fun((char**)(&res), res_len, a_args->dest, a_args->dest_len);
             break;
         }
         case _64d_ : { // 64-bit double
@@ -254,7 +316,7 @@ set_compress_algo(char* arg)
     else if(strcmp(arg, "log") == 0)
         return algo_decode_log_2_transform;
     else if(strcmp(arg, "cast") == 0)
-        assert(0); // Not yet implemented
+        return algo_decode_cast32;
     else
         error("set_compress_algo: Unknown compression algorithm");
 }
@@ -276,7 +338,7 @@ set_decompress_algo(char* arg)
     else if(strcmp(arg, "log") == 0)
         return algo_encode_log_2_transform;
     else if(strcmp(arg, "cast") == 0)
-        assert(0); // Not yet implemented
+        return algo_encode_cast32;
     else
         error("set_decompress_algo: Unknown compression algorithm");        
 }

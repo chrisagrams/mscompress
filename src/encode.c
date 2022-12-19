@@ -162,17 +162,23 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     if(decmp_input == NULL)
         error("encode_no_comp_fun: malloc failed");
  
+    // decmp_input->mem = *src;
+    // decmp_input->offset = ZLIB_SIZE_OFFSET;
+    // decmp_input->buff = decmp_input->mem + ZLIB_SIZE_OFFSET;
+
+    // void* decmp_header = zlib_pop_header(decmp_input);
+
+    // uint16_t org_len = *(uint16_t*)decmp_header;
+
+    // encode_base64(decmp_input, dest, org_len, out_len);
+
     decmp_input->mem = *src;
-    decmp_input->offset = ZLIB_SIZE_OFFSET;
-    decmp_input->buff = decmp_input->mem + ZLIB_SIZE_OFFSET;
+    decmp_input->offset = 0;
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-    void* decmp_header = zlib_pop_header(decmp_input);
+    encode_base64(decmp_input, dest, src_len, out_len);
 
-    uint16_t org_len = *(uint16_t*)decmp_header;
-
-    encode_base64(decmp_input, dest, org_len, out_len);
-
-    *src += (ZLIB_SIZE_OFFSET + org_len);
+    *src += src_len;
 }
 
 encode_fun_ptr

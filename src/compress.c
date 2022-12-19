@@ -54,13 +54,22 @@ alloc_ztsd_cbuff(size_t src_len, size_t* buff_len)
  * 
  */
 {
+    if(src_len <= 0)
+        error("alloc_ztsd_cbuff: invalid src_len for compression buffer.\n");
+    if(buff_len == NULL)
+        error("alloc_ztsd_cbuff: buff_len is NULL.\n");
+
     size_t bound;
 
     bound = ZSTD_compressBound(src_len);
 
     *buff_len = bound;
 
-    return malloc(bound);
+    void* r = malloc(bound);
+    if(r == NULL)
+        error("alloc_ztsd_cbuff: malloc failed.\n");
+
+    return r;
 }
 
 
@@ -84,6 +93,17 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
  * @return A buffer with the compressed string on success, NULL on error.
  */
 {
+    if(cctx == NULL)
+        error("zstd_compress: cctx is NULL.\n");
+    if(src_buff == NULL)
+        error("zstd_compress: src_buff is NULL.\n");
+    if(src_len <= 0)
+        error("zstd_compress: invalid src_len for compression.\n");
+    if(out_len == NULL)
+        error("zstd_compress: out_len is NULL.\n");
+    if(compression_level < 1 || compression_level > 9)
+        error("zstd_compress: invalid compression_level.\n");
+        
     void* out_buff;
     size_t buff_len = 0;
 
@@ -92,7 +112,8 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
 
     *out_len = ZSTD_compressCCtx(cctx, out_buff, buff_len, src_buff, src_len, compression_level);
 
-    if (!*out_len) return NULL;
+    if (!*out_len)
+        error("zstd_compress: ZSTD_compressCCtx failed.\n");
 
     return out_buff;
 }
