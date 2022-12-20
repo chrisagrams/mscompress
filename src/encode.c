@@ -154,6 +154,18 @@ encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len
 void
 encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
 {
+    if(src == NULL || *src == NULL)
+        error("encode_zlib_fun: src is NULL");
+
+    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
+        error("encode_zlib_fun: src_len is invalid");
+
+    if (dest == NULL)
+        error("encode_zlib_fun: dest is NULL");
+
+    if (out_len == NULL)
+        error("encode_zlib_fun: out_len is NULL");
+
     Bytef* zlib_encoded;
 
     size_t zlib_len = 0;
@@ -162,23 +174,15 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     if(decmp_input == NULL)
         error("encode_no_comp_fun: malloc failed");
  
-    // decmp_input->mem = *src;
-    // decmp_input->offset = ZLIB_SIZE_OFFSET;
-    // decmp_input->buff = decmp_input->mem + ZLIB_SIZE_OFFSET;
-
-    // void* decmp_header = zlib_pop_header(decmp_input);
-
-    // uint16_t org_len = *(uint16_t*)decmp_header;
-
-    // encode_base64(decmp_input, dest, org_len, out_len);
-
     decmp_input->mem = *src;
-    decmp_input->offset = 0;
+    decmp_input->offset = ZLIB_SIZE_OFFSET;
     decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-    encode_base64(decmp_input, dest, src_len, out_len);
+    uint16_t org_len = *(uint16_t*)zlib_pop_header(decmp_input);
 
-    *src += src_len;
+    encode_base64(decmp_input, dest, org_len, out_len);
+
+    *src += org_len + ZLIB_SIZE_OFFSET;
 }
 
 encode_fun_ptr

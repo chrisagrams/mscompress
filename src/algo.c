@@ -225,22 +225,41 @@ algo_encode_cast32 (void* args)
     u_int16_t len = (uint16_t)arr[0];
 
     if (len <= 0)
-        error("algo_encode_cast32: len is <= 0");
+            error("algo_encode_cast32: len is <= 0");
 
-    // Allocate buffer
-    double* res = malloc(sizeof(double) * len);
-    if(res == NULL)
-        error("algo_encode_cast32: malloc failed");
 
-    // Cast all
-    for (size_t i = 1; i < len+1; i++)
-        res[i-1] = (double)arr[i];
+    switch(a_args->src_format)
+    {
+        case _32f_ : { // 32-bit float
+            a_args->enc_fun(a_args->src, len*sizeof(float), a_args->dest, a_args->dest_len);
+            break;
+        }
+        case _64d_ : { // 64-bit double
+            // Allocate buffer
+            void* res = malloc(sizeof(double) * len + ZLIB_SIZE_OFFSET);
+            if(res == NULL)
+                error("algo_encode_cast32: malloc failed");
 
-    // Encode using specified encoding format
-    a_args->enc_fun(a_args->src, len*sizeof(uint16_t), a_args->dest, a_args->dest_len);
+            double* res_arr = (double*)res;
 
-    free(res);
+            // Cast all
+            for (size_t i = 1; i < len+1; i++)
+                res_arr[i-1] = (double)arr[i];
 
+            // Add header
+            memcpy(res, &len, ZLIB_SIZE_OFFSET);
+
+            // Encode using specified encoding format
+            a_args->enc_fun(res, len*sizeof(double), a_args->dest, a_args->dest_len);
+
+            // Move src pointer
+            *a_args->src += len*sizeof(float) + ZLIB_BUFF_FACTOR;
+
+            // Free buffer
+            free(res);
+            break;
+        }
+    }
     return;
 }
 
@@ -265,34 +284,44 @@ algo_encode_log_2_transform (void* args)
         case _32f_ : { // 32-bit float
             // Allocate buffer
             size_t res_len = len * sizeof(float);
-            float* res = malloc(res_len);
+            void* res = malloc(res_len + ZLIB_SIZE_OFFSET);
             if(res == NULL)
                 error("algo_encode_log_2_transform: malloc failed");
-
+            float* res_arr = (float*)(res + ZLIB_SIZE_OFFSET);
             // Perform log2 transform
             for (size_t i = 0; i < len; i++)
-                res[i] = (float)exp2((double)arr[i] / 100);
+                res_arr[i] = (float)exp2((double)arr[i] / 100);
+
+            // Add header
+            memcpy(res, &res_len, ZLIB_SIZE_OFFSET);    
 
             // Encode using specified encoding format
             a_args->enc_fun((char**)(&res), res_len, a_args->dest, a_args->dest_len);
+
+            // Move to next array
+            *a_args->src += res_len + ZLIB_SIZE_OFFSET;
             break;
         }
         case _64d_ : { // 64-bit double
             // Allocate buffer
-            double* res = malloc(sizeof(double) * len);
+            size_t res_len = len * sizeof(double);
+            void* res = malloc(res_len + ZLIB_SIZE_OFFSET);
             if(res == NULL)
                 error("algo_encode_log_2_transform: malloc failed");
-
+            double* res_arr = (double*)(res + ZLIB_SIZE_OFFSET);
             // Perform log2 transform
             for (size_t i = 0; i < len; i++)
-                res[i] = (double)exp2((double)arr[i] / 100);
+                res_arr[i] = (double)exp2((double)arr[i] / 100);
+
+            // Add header
+            memcpy(res, &res_len, ZLIB_SIZE_OFFSET);    
 
             // Encode using specified encoding format
-            a_args->enc_fun((char**)(&res), len*sizeof(double), a_args->dest, a_args->dest_len);
+            a_args->enc_fun((char**)(&res), res_len, a_args->dest, a_args->dest_len);
+
+            // Move to next array
+            *a_args->src += res_len + ZLIB_SIZE_OFFSET;
             break;
-        }
-        default : {
-            error("algo_encode_log_2_transform: Unknown data format");
         }
     }
 
