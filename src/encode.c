@@ -152,7 +152,7 @@ encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len
 }
 
 void
-encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_no_comp_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len)
 {
     if(src == NULL || *src == NULL)
         error("encode_zlib_fun: src is NULL");
@@ -185,6 +185,41 @@ encode_no_comp_fun(char** src, size_t src_len, char* dest, size_t* out_len)
     *src += org_len + ZLIB_SIZE_OFFSET;
 }
 
+void
+encode_no_comp_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_len)
+{
+    if(src == NULL || *src == NULL)
+        error("encode_zlib_fun: src is NULL");
+
+    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
+        error("encode_zlib_fun: src_len is invalid");
+
+    if (dest == NULL)
+        error("encode_zlib_fun: dest is NULL");
+
+    if (out_len == NULL)
+        error("encode_zlib_fun: out_len is NULL");
+
+    Bytef* zlib_encoded;
+
+    size_t zlib_len = 0;
+    
+    zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
+    if(decmp_input == NULL)
+        error("encode_no_comp_fun: malloc failed");
+ 
+    decmp_input->mem = *src;
+    // decmp_input->offset = ZLIB_SIZE_OFFSET;
+    decmp_input->offset = 0;
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+
+    // uint16_t org_len = *(uint16_t*)zlib_pop_header(decmp_input);
+
+    encode_base64(decmp_input, dest, src_len, out_len);
+
+    // *src += org_len + ZLIB_SIZE_OFFSET;
+}
+
 encode_fun_ptr
 set_encode_fun(int compression_method, char* lossy)
 {
@@ -198,7 +233,10 @@ set_encode_fun(int compression_method, char* lossy)
             else
                 return encode_zlib_fun_no_header;    
         case _no_comp_:
-            return encode_no_comp_fun;
+            if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+                return encode_no_comp_fun_w_header;
+            else
+                return encode_no_comp_fun_no_header;
         default:
             error("Invalid compression method.");
             return NULL;
