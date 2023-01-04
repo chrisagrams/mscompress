@@ -70,17 +70,14 @@ ssize_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
-      exit(1);
+      error("write_to_file: invalid file descriptor.\n");
     
     ssize_t rv;
 
     rv = write(fd, buff, n);
 
     if (rv < 0)
-    {
-        fprintf(stderr, "Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
-        exit(1);
-    }
+      error("Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
 
     return rv;
 }
@@ -89,18 +86,14 @@ ssize_t
 read_from_file(int fd, void* buff, size_t n)
 {
     if(fd < 0)
-      exit(1);
-    
+      error("read_from_file: invalid file descriptor.\n");
 
     ssize_t rv;
 
     rv = read(fd, buff, n);
 
     if (rv < 0)
-    {
-        fprintf(stderr, "Error in read.\n");
-        exit(1);
-    }
+      error("Error in reading %ld bytes from file descritor %d.", n, fd);
 
     return rv;
     
@@ -116,7 +109,13 @@ get_offset(int fd)
  * @return Numeric offset within file descriptor.
  */
 {
-    return lseek(fd, 0, SEEK_CUR);
+  off_t ret = lseek(fd, 0, SEEK_CUR);
+  if (ret == -1)
+  {
+    perror("lseek");
+    exit(-1);
+  }
+  return ret;
 }
 
 void
@@ -192,10 +191,10 @@ get_header_df(void* input_map)
 {
   data_format_t* r;
   
-  r = (data_format_t*)malloc(sizeof(data_format_t));
+  r = malloc(sizeof(data_format_t));
   
   memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
-  
+
   r->populated = 2;
 
   return r;
@@ -211,6 +210,7 @@ write_footer(footer_t* footer, int fd)
  * @param fd Output file descriptor to write to. 
  */
 {
+    footer->magic_tag = MAGIC_TAG; // Set magic tag
     write_to_file(fd, (char*)footer, sizeof(footer_t));
 }
 
@@ -229,6 +229,9 @@ read_footer(void* input_map, long filesize)
     footer_t* footer;
 
     footer = (footer_t*)(&input_map[0] + filesize - sizeof(footer_t));
+
+    if (footer->magic_tag != MAGIC_TAG)
+        error("read_footer: invalid magic tag.\n");
 
     return footer;
 }
@@ -315,7 +318,7 @@ determine_filetype(int fd)
     return DECOMPRESS;
   }  
   else
-    fprintf(stderr, "Invalid input file.\n");
+    error("Invalid input file.\n");
   return -1;
 
 }
@@ -332,10 +335,17 @@ change_extension(char* input, char* extension)
  * @return Malloc'd char array with new path string.
  */
 {
+  if(input == NULL)
+    error("change_extension: input is NULL.\n");
+  if(extension == NULL)
+    error("change_extension: extension is NULL.\n");
+
   char* x;
   char* r;
 
-  r = (char*)malloc(sizeof(char) * strlen(input));
+  r = malloc(sizeof(char) * (strlen(input) + 1));
+  if(r == NULL)
+    error("change_extension: malloc failed.\n");
 
   strcpy(r, input);
   x = strrchr(r, '.');
@@ -383,16 +393,11 @@ prepare_fds(char* input_path,
   if(input_path)
     input_fd = open(input_path, O_RDONLY);
   else
-  {
-    fprintf(stderr, "No input file specified.");
-    exit(1);
-  }
-
+    error("No input file specified.\n");
+  
   if(input_fd < 0)
-  {
-    fprintf(stderr, "Error in opening input file descriptor. (%s)\n", strerror(errno));
-    exit(1);
-  }
+    error("Error in opening input file descriptor. (%s)\n", strerror(errno));
+
 
   if(debug_output)
   {
@@ -403,7 +408,7 @@ prepare_fds(char* input_path,
   type = determine_filetype(input_fd);
 
   if(type != COMPRESS && type != DECOMPRESS)
-    exit(1);
+    error("Cannot determine file type.\n");
 
   fds[0] = input_fd;
   *input_map = get_mapping(input_fd);
@@ -413,10 +418,7 @@ prepare_fds(char* input_path,
   {
     output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
     if(output_fd < 0)
-    {
-      fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
-      exit(1);
-    }
+      error("Error in opening output file descriptor. (%s)\n", strerror(errno));
     fds[1] = output_fd;
     return type;
   }
@@ -430,10 +432,7 @@ prepare_fds(char* input_path,
   output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
 
   if(output_fd < 0)
-  {
-    fprintf(stderr, "Error in opening output file descriptor. (%s)\n", strerror(errno));
-    exit(1);
-  }
+    error("Error in opening output file descriptor. (%s)\n", strerror(errno));
 
   fds[1] = output_fd;
 

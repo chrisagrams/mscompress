@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <assert.h>
 
-ZSTD_DCtx*
+ZSTD_DCtx *
 alloc_dctx()
 /**
  * @brief Creates a ZSTD decompression context and handles errors.
@@ -14,21 +15,19 @@ alloc_dctx()
  * 
  */
 {
-    ZSTD_DCtx* dctx;
-    dctx = ZSTD_createDCtx();
-    if(!dctx) 
-    {
-        perror("ZSTD Context failed.");
-        exit(1);
-    }
+    ZSTD_DCtx* dctx = ZSTD_createDCtx();
+    if(dctx == NULL) 
+        error("alloc_dctx: ZSTD Context failed.\n");
     return dctx;
-
 }
 
-void*
+void *
 alloc_ztsd_dbuff(size_t buff_len)
 {
-    return malloc(buff_len);
+    void* r = malloc(buff_len);
+    if(r == NULL)
+        error("alloc_ztsd_dbuff: malloc() error.\n");
+    return r;
 }
 
 void *
@@ -37,18 +36,18 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
     void* out_buff;
     size_t decmp_len = 0;
 
-    out_buff = alloc_ztsd_dbuff(org_len);
+    out_buff = alloc_ztsd_dbuff(org_len); // will return buff, exit on error
 
     decmp_len = ZSTD_decompressDCtx(dctx, out_buff, org_len, src_buff, src_len);
 
     if (decmp_len != org_len)
-        return NULL;
+        error("zstd_decompress: ZSTD_decompressDCtx() error: %s\n", ZSTD_getErrorName(decmp_len));
 
     return out_buff;
 
 }
 
-void*
+void *
 decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 {
     return zstd_decompress(dctx, input_map+offset, blk->compressed_size, blk->original_size);
@@ -63,13 +62,16 @@ alloc_decompress_args(char* input_map,
                       data_positions_t** mz_binary_divisions,
                       data_positions_t** int_binary_divisions,
                       data_positions_t** xml_divisions,
+                      int division,
                       off_t footer_xml_off,
                       off_t footer_mz_bin_off,
                       off_t footer_int_bin_off)
 {
     decompress_args_t* r;
     
-    r = (decompress_args_t*)malloc(sizeof(decompress_args_t));
+    r = malloc(sizeof(decompress_args_t));
+    if(r == NULL)
+        error("alloc_decompress_args: malloc() error.\n");
 
     r->input_map = input_map;
     r->df = df;
@@ -79,6 +81,7 @@ alloc_decompress_args(char* input_map,
     r->mz_binary_divisions = mz_binary_divisions;
     r->int_binary_divisions = int_binary_divisions;
     r->xml_divisions = xml_divisions;
+    r->division = division;
     r->footer_xml_off = footer_xml_off;
     r->footer_mz_bin_off = footer_mz_bin_off;
     r->footer_int_bin_off = footer_int_bin_off;
@@ -99,66 +102,138 @@ dealloc_decompress_args(decompress_args_t* args)
     }
 }
 
+int
+get_lowest(int i_0, int i_1, int i_2)
+{
+    int ret = -1;
+
+    if(i_0 < i_1 && i_0 < i_2) 
+        ret = 0;
+    else if (i_1 < i_0 && i_1 < i_2)
+        ret = 1;
+    else if (i_2 < i_0 && i_2 < i_1)
+        ret = 2;    
+
+    return ret;
+}
+
+
 void
 decompress_routine(void* args)
 {
-    int tid;
+    // Get thread ID
+    int tid = get_thread_id();
 
-    ZSTD_DCtx* dctx;
+    // Allocate a decompression context
+    ZSTD_DCtx* dctx = alloc_dctx();
 
-    decompress_args_t* db_args;
+    if(dctx == NULL)
+        error("decompress_routine: ZSTD Context failed.\n");
 
-    void *decmp_xml, *decmp_mz_binary, *decmp_int_binary;
+    decompress_args_t* db_args = (decompress_args_t*)args;
 
-    tid = get_thread_id();
+    if(db_args == NULL)
+        error("decompress_routine: Decompression arguments are null.\n");
 
-    dctx = alloc_dctx();
-
-    db_args = (decompress_args_t*)args;
-
-    decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk);
-    decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk);
-    decmp_int_binary = decmp_block(dctx, db_args->input_map, db_args->footer_int_bin_off, db_args->int_binary_blk);
+    // Decompress each block of data
+    void
+        *decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_int_binary = decmp_block(dctx, db_args->input_map, db_args->footer_int_bin_off, db_args->int_binary_blk);
 
     size_t binary_len = 0;
 
-    int64_t buff_off, xml_off = 0;
+    int64_t buff_off = 0,
+            xml_off = 0, mz_off = 0, int_off = 0;
+    int64_t xml_i = 0,   mz_i = 0,   int_i = 0;        
 
-    // data_positions_t* dp = db_args->dp;
+    // Determine starting block (xml, mz, int)
+    off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
+          mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
+          int_start = db_args->int_binary_divisions[db_args->division]->start_positions[0];
 
-    // int64_t len = dp->file_end;
-    // int64_t curr_len = dp->end_positions[0] - dp->start_positions[0];
+    int block = get_lowest(xml_start, mz_start, int_start); // xml = 0/2, mz = 1, int = 3, error = -1
 
-    // char* buff = malloc(len);
+    if(block == -1)
+        error("decompress_routine: Error determining starting block.\n");
 
-    // db_args->ret = buff;
+    long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
+    if(len <= 0)
+        error("decompress_routine: Error determining decompression buffer size.\n");
 
-    // memcpy(buff, decmp_xml, curr_len);
-    // buff_off += curr_len;
-    // xml_off += curr_len;
+    char* buff = malloc(len*3); // *3 to be safe
+    if(buff == NULL)
+        error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
-    // int i = 1;
+    db_args->ret = buff;
 
-    // int64_t bound = db_args->xml_blk->original_size;
+    int64_t curr_len = 0;
 
-    // while(xml_off < bound)
-    // {
-    //     /* encode binary and copy over to buffer */
-    //     db_args->df->encode_source_compression_fun(((char**)&decmp_binary), buff + buff_off, &binary_len);
-    //     buff_off += binary_len;
+    algo_args* a_args = malloc(sizeof(algo_args));
+    if(a_args == NULL)
+        error("decompress_routine: Failed to allocate algo_args.\n");
 
-    //     /* copy over xml to buffer */
-    //     curr_len = dp->end_positions[i] - dp->start_positions[i];
-    //     memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
-    //     buff_off += curr_len;
-    //     xml_off += curr_len;
+    size_t algo_output_len = 0;
+    a_args->dest_len = &algo_output_len;
+    a_args->enc_fun = db_args->df->encode_source_compression_fun;
 
-    //     i++;
-    // }
+    while(block != -1)
+    {
+        switch (block)
+        {
+        case 0: // xml
+            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec) {block = -1; break;}
+            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            assert(curr_len > 0 && curr_len < len);
+            memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
+            xml_off += curr_len;
+            buff_off += curr_len;
+            xml_i++;
+            block++;
+            break;
+        case 1: // mz
+            if(mz_i == db_args->mz_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
+            curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
+            assert(curr_len > 0 && curr_len < len);
+            a_args->src = (char**)&decmp_mz_binary;
+            a_args->src_len = curr_len;
+            a_args->dest = buff+buff_off;
+            a_args->src_format = db_args->df->source_mz_fmt;
+            db_args->df->target_mz_fun((void*)a_args);
+            buff_off += *a_args->dest_len;
+            mz_i++;
+            block++;
+            break;
+        case 2: // xml
+            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec) {block = -1; break;}
+            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            assert(curr_len > 0 && curr_len < len);
+            memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
+            xml_off += curr_len;
+            buff_off += curr_len;
+            xml_i++;
+            block++;
+            break;
+        case 3:
+            if(int_i == db_args->int_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
+            curr_len = db_args->int_binary_divisions[db_args->division]->end_positions[int_i] - db_args->int_binary_divisions[db_args->division]->start_positions[int_i];
+            assert(curr_len > 0 && curr_len < len);
+            a_args->src = (char**)&decmp_int_binary;
+            a_args->src_len = curr_len;
+            a_args->dest = buff+buff_off;
+            a_args->src_format = db_args->df->source_int_fmt;
+            db_args->df->target_int_fun((void*)a_args);
+            buff_off += *a_args->dest_len;
+            int_i++;
+            block = 0;
+            break;
+        case -1:
+            break;
+        }
+    }
 
-    // db_args->ret_len = buff_off;
+    db_args->ret_len = buff_off;
 
-    // print("\tThread %03d: Decompressed size: %ld bytes.\n", tid, buff_off);
     return;
 }
 
@@ -203,6 +278,7 @@ decompress_parallel(char* input_map,
                                             mz_binary_divisions,
                                             int_binary_divisions,
                                             xml_divisions,
+                                            i,
                                             footer_xml_off + msz_footer->xml_pos,
                                             footer_mz_bin_off + msz_footer->mz_binary_pos,
                                             footer_int_bin_off + msz_footer->int_binary_pos);
@@ -213,11 +289,23 @@ decompress_parallel(char* input_map,
         }
 
         for(i = divisions_used; i < divisions_used + threads; i++)
-            pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
+        {
+            int ret = pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
+            if(ret != 0)
+            {
+                perror("pthread_create");
+                exit(-1);
+            }
+        }
 
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
-            pthread_join(ptid[i], NULL);
+            int ret = pthread_join(ptid[i], NULL);
+            if(ret != 0)
+            {
+                perror("pthread_join");
+                exit(-1);
+            }
 
             start = clock();
             write_to_file(fd, args[i]->ret, args[i]->ret_len);

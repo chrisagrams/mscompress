@@ -2,4 +2,7 @@ mscompress
 mscompress.dSYM/
 *.o
 *.msz
+*.mzML
 vgcore.*
+.vscode/*
+.DS_Store

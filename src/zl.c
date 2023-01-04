@@ -10,13 +10,19 @@
 zlib_block_t*
 zlib_alloc(int offset)
 {
-    zlib_block_t* r;
+    if(offset < 0)
+        error("zlib_alloc: offset must be >= 0");
+    
+    zlib_block_t* r = malloc(sizeof(zlib_block_t));
 
-    r = (zlib_block_t*)malloc(sizeof(zlib_block_t));
+    if(r == NULL)
+        error("zlib_alloc: malloc error");
     r->len = ZLIB_BUFF_FACTOR;
     r->size = r->len + offset;
     r->offset = offset;
-    r->mem = (Bytef*)malloc(r->size);
+    r->mem = malloc(r->size);
+    if(r->mem == NULL)
+        error("zlib_alloc: malloc error");
     r->buff = r->mem + r->offset;
     
     return r;
@@ -70,7 +76,7 @@ alloc_z_stream()
 {
     z_stream* r;
 
-    r = (z_stream*)malloc(sizeof(z_stream));
+    r = malloc(sizeof(z_stream));
     r->zalloc = Z_NULL;
     r->zfree = Z_NULL;
     r->opaque = Z_NULL;

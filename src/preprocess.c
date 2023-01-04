@@ -28,13 +28,10 @@
 yxml_t*
 alloc_yxml()
 {
-    yxml_t* xml = (yxml_t*)malloc(sizeof(yxml_t) + BUFSIZE);
+    yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
 
-    if(!xml)
-    {
-        fprintf(stderr, "malloc failure alloc_yxml().\n");
-        exit(-1);
-    }
+    if(xml == NULL)
+        error("malloc failure in alloc_yxml().\n");
 
     yxml_init(xml, xml+1, BUFSIZE);
     return xml;
@@ -43,14 +40,10 @@ alloc_yxml()
 data_format_t*
 alloc_df()
 {
-    data_format_t* df = (data_format_t*)malloc(sizeof(data_format_t));
+    data_format_t* df = malloc(sizeof(data_format_t));
 
-    if(!df)
-    {
-        fprintf(stderr, "malloc failure in alloc_df().\n");
-        exit(-1);
-    }
-
+    if(df == NULL)
+        error("alloc_df: malloc failure.\n");
     df->populated = 0;
     return df;
 }
@@ -61,10 +54,7 @@ dealloc_df(data_format_t* df)
     if(df)
         free(df);
     else
-    {
-        fprintf(stderr, "delloc_df received null.\n");
-        exit(-1);
-    }
+        error("dealloc_df: df is NULL.\n");
 }
 
 
@@ -75,32 +65,33 @@ populate_df_target(data_format_t* df, int target_xml_format, int target_mz_forma
     df->target_mz_format = target_mz_format;
     df->target_int_format = target_int_format;
 
-    df->target_xml_fun = map_fun(target_xml_format);
-    df->target_mz_fun = map_fun(target_mz_format);
-    df->target_int_fun = map_fun(target_int_format);
+    // df->target_xml_fun = map_fun(target_xml_format);
+    // df->target_mz_fun = map_fun(target_mz_format);
+    // df->target_int_fun = map_fun(target_int_format);
 }
 
 data_positions_t*
 alloc_dp(int total_spec)
 {
-    data_positions_t* dp = (data_positions_t*)malloc(sizeof(data_positions_t));
+    if(total_spec < 1)
+        warning("alloc_dp: total_spec is less than 1!\n");
+    if(total_spec > 1000000) // Realistically, this should never happen
+        warning("alloc_dp: total_spec is greater than 1,000,000!\n");
+    if(total_spec < 0)
+        error("alloc_dp: total_spec is less than 0!\n");
 
-    if(!dp)
-    {
-        fprintf(stderr, "malloc failure in alloc_dp().\n");
-        exit(-1);
-    }
+    data_positions_t* dp = malloc(sizeof(data_positions_t));
+
+    if(dp == NULL)
+        error("alloc_dp: malloc failure.\n");
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
-    dp->start_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
-    dp->end_positions = (off_t*)malloc(sizeof(off_t)*total_spec*2);
+    dp->start_positions = malloc(sizeof(off_t)*total_spec*2);
+    dp->end_positions = malloc(sizeof(off_t)*total_spec*2);
 
-    if(!dp->start_positions || !dp->end_positions)
-    {
-        fprintf(stderr, "inner malloc failure in alloc_dp().\n");
-        exit(-1);
-    }
+    if(dp->start_positions == NULL || dp->end_positions == NULL)
+        error("alloc_dp: malloc failure.\n");
 
     return dp;
 }
@@ -113,40 +104,35 @@ dealloc_dp(data_positions_t* dp)
         if(dp->start_positions)
             free(dp->start_positions);
         else
-        {
-            fprintf(stderr, "dp->start_positions is null.\n");
-            exit(-1);
-        }
+            error("dealloc_dp: dp->start_positions is null.\n");
         if(dp->end_positions)
             free(dp->end_positions);
         else
-        {
-            fprintf(stderr, "dp->end_positions is null.\n");
-            exit(-1);
-        }
+            error("dealloc_dp: dp->end_positions is null.\n");
         free(dp);
     }
     else
-    {
-        fprintf(stderr, "dealloc_dp() received null pointer.\n");
-        exit(-1);
-    }
+        error("dealloc_dp: dp is null.\n");
 }
 
 data_positions_t**
 alloc_ddp(int len, int total_spec)
 {
+    if(len < 1)
+        error("alloc_ddp: len is less than 1.\n");
+    if(total_spec < 1)
+        error("alloc_ddp: total_spec is less than 1.\n");
+    if(total_spec > 1000000) // Realistically, this should never happen
+        warning("alloc_ddp: total_spec is greater than 1,000,000!\n");
+
     data_positions_t** r;
     
     int i;
 
-    r = (data_positions_t**)malloc(len*sizeof(data_positions_t*));
+    r = malloc(len*sizeof(data_positions_t*));
 
-    if(!r)
-    {
-        fprintf(stderr, "malloc failure in alloc_ddp().\n");
-        exit(-1);
-    }
+    if(r == NULL)
+        error("alloc_ddp: malloc failure.\n");
 
     i = 0;
 
@@ -165,10 +151,7 @@ free_ddp(data_positions_t** ddp, int divisions)
     int i;
 
     if (divisions < 1)
-    {
-        fprintf(stderr, "invalid divisions in free_dp().\n");
-        exit(-1);
-    }
+        error("free_ddp: divisions is less than 1.\n");
 
     if(ddp)
     {
@@ -179,31 +162,12 @@ free_ddp(data_positions_t** ddp, int divisions)
         free(ddp);
     }
     else
-    {
-        fprintf(stderr, "free_dp() received null pointer.\n");
-        exit(-1);
-    }
+        error("free_ddp: ddp is null.\n");
 
 }
 
 /* === End of allocation and deallocation helper functions === */
  
-char* fun1(void* args)
-{
-    return "Hello world";
-}
- 
-Algo map_fun(int fun_num)
-{
-    switch(fun_num)
-    {
-        case _ZSTD_compression_:
-            return &fun1;
-        default:
-            fprintf(stderr, "Target format not implemented in this version of mscompress.\n");
-            exit(-1);
-    }
-}
 
 /* === Start of XML traversal functions === */
 
@@ -431,10 +395,28 @@ find_binary(char* input_map, data_format_t* df)
 
 }
 
+void
+validate_positions(off_t* arr, int len)
+{
+    int i;
+    for(i = 0; i < len; i++)
+    {
+        if(arr[i] < 0)
+            error("validate_positions: negative position detected.\n");
+        if(i+1 < len && arr[i] > arr[i+1])
+            error("validate_positions: position %d is greater than %d\n", i, i+1);
+    }
+}
+
 
 data_positions_t**
 find_binary_quick(char* input_map, data_format_t* df, long end)
 {
+    if(input_map == NULL || df == NULL)
+        error("find_binary_quick: NULL pointer passed in.\n");
+    if(end < 0)
+        error("find_binary_quick: end position is negative.\n");
+
     data_positions_t** ddp;
 
     data_positions_t *mz_dp, *int_dp, *xml_dp;
@@ -443,7 +425,13 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     mz_dp = alloc_dp(df->source_total_spec);
     int_dp = alloc_dp(df->source_total_spec);
 
-    ddp = (data_positions_t**)malloc(sizeof(data_positions_t*) * 3);
+    if(xml_dp == NULL || mz_dp == NULL || int_dp == NULL)
+        error("find_binary_quick: failed to allocate memory.\n");
+
+    ddp = malloc(sizeof(data_positions_t*) * 3);
+    if(ddp == NULL)
+        error("find_binary_quick: failed to allocate memory.\n");
+
     ddp[0] = mz_dp;
     ddp[1] = int_dp;
     ddp[2] = xml_dp;
@@ -463,29 +451,54 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     xml_dp->start_positions[xml_curr] = 0;
 
     while (ptr)
-    {
+    {   
         if(mz_curr + int_curr == bound)
             break;
+        
+        if(xml_curr >= bound || mz_curr >= df->source_total_spec || int_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
+            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
+            
         ptr = strstr(ptr, "scan=") + 5;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+
         e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+
         curr_scan = strtol(ptr, &e, 10);
+
+        if(curr_scan == 0)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
 
         ptr = e;
 
         ptr = strstr(ptr, "\"ms level\"") + 18;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
         e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
         curr_ms_level = strtol(ptr, &e, 10);
 
         ptr = e;
 
 
         ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
 
         
         ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
         mz_dp->end_positions[mz_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
@@ -495,11 +508,15 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
 
         ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
         int_dp->start_positions[int_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = int_dp->start_positions[int_curr];
 
         
         ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
         int_dp->end_positions[int_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = int_dp->end_positions[int_curr];
         
@@ -509,6 +526,8 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     
     }
 
+    if(xml_curr != bound || mz_curr != df->source_total_spec || int_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
+        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
 
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
@@ -519,6 +538,14 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     mz_dp->file_end = int_dp->file_end = xml_dp->file_end = end;
 
+    // Sanity check
+    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
+    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
+    validate_positions(int_dp->start_positions, int_dp->total_spec);
+    validate_positions(int_dp->end_positions, int_dp->total_spec);
+    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
+    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
+
     return ddp;
 }
 
@@ -527,6 +554,9 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 long
 encodedLength_sum(data_positions_t* dp)
 {
+    if(dp == NULL)
+        error("encodedLength_sum: NULL pointer passed in.\n");
+    
     int i = 0;
     long res = 0;
 
@@ -607,28 +637,45 @@ get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int*
     return r;
 }
 
-data_positions_t**
-new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, long* threads)
+data_positions_t***
+new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, int* divisions, long* threads)
 {
-    data_positions_t** r;
+    if(ddp == NULL)
+        error("new_get_binary_divisions: NULL pointer passed in.\n");
+    if(ddp_len < 1)
+        error("new_get_binary_divisions: ddp_len < 1.\n");
+    if(*threads < 1)
+        error("new_get_binary_divisions: threads < 1.\n");
 
-    int i = 0,
+    data_positions_t*** r = malloc(sizeof(data_positions_t**) * ddp_len);
+
+    if(r == NULL)
+        error("new_get_binary_divisions: malloc failed.\n");
+
+    int i = 0, j = 0,
         curr_div = 0,
         curr_div_i = 0,
         curr_size = 0;
 
     *divisions = *threads;
+    
+    for(j = 0; j < ddp_len; j++)
+        r[j] = alloc_ddp(*divisions, (int)ceil(ddp[0]->total_spec/(*divisions)));
 
-    r = alloc_ddp(*divisions, (int)ceil(dp->total_spec/(*divisions)));
-
-    long encoded_sum = encodedLength_sum(dp);
+    long encoded_sum = encodedLength_sum(ddp[0]);
+    if(encoded_sum <= 0)
+        error("new_get_binary_divisions: encoded_sum <= 0.\n");
 
     long bs = encoded_sum/(*divisions);
 
-    int bound = dp->total_spec;
+    int bound = ddp[0]->total_spec;
+    if(bound <= 0)
+        error("new_get_binary_divisions: bound <= 0.\n");
 
     for(; i < bound; i++)
     {
+        // if(curr_div_i >= r[0][curr_div]->total_spec)
+        //     error("new_get_binary_divisions: curr_div_i >= r[0][curr_div]->total_spec.\n");
         if(curr_size >= bs)
         {
             curr_div++;
@@ -637,10 +684,13 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
             if(curr_div > *divisions)
                 break;
         }
-        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
-        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
-        r[curr_div]->total_spec++;
-        curr_size += (dp->end_positions[i] - dp->start_positions[i]);
+        for(j = 0; j < ddp_len; j++)
+        {
+            r[j][curr_div]->start_positions[curr_div_i] = ddp[j]->start_positions[i];
+            r[j][curr_div]->end_positions[curr_div_i] = ddp[j]->end_positions[i];
+            r[j][curr_div]->total_spec++;
+        }
+        curr_size += (ddp[0]->end_positions[i] - ddp[0]->start_positions[i]);
         curr_div_i++;
     }
 
@@ -649,9 +699,12 @@ new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, 
     /* add the remainder to the last division */
     for(; i < bound; i++)
     {
-        r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
-        r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
-        r[curr_div]->total_spec++;
+        for(j = 0; j < ddp_len; j++)
+        {
+            r[j][curr_div]->start_positions[curr_div_i] = ddp[j]->start_positions[i];
+            r[j][curr_div]->end_positions[curr_div_i] = ddp[j]->end_positions[i];
+            r[j][curr_div]->total_spec++;
+        }
     }
 
     return r;
@@ -672,10 +725,16 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
 
     r = alloc_ddp(divisions, div_bound + divisions); // allocate extra room for remainders
 
-
-    for(; i < bound; i++)
+    // check if r is null
+    if(r == NULL)
     {
-        if(curr_div_i >= div_bound)
+        fprintf(stderr, "err: r is null\n");
+        exit(-1);
+    }
+
+    for(; i <= bound; i++)
+    {
+        if(curr_div_i > div_bound)
         {
             r[curr_div]->file_end = dp->file_end;
             curr_div++;
@@ -694,7 +753,7 @@ new_get_xml_divisions(data_positions_t* dp, int divisions)
     curr_div--;
 
     // put remainder in last division
-    for(; i < bound; i++)
+    for(; i <= bound; i++)
     {
         r[curr_div]->start_positions[curr_div_i] = dp->start_positions[i];
         r[curr_div]->end_positions[curr_div_i] = dp->end_positions[i];
@@ -823,14 +882,14 @@ read_ddp(void* input_map, long position)
 
     position += sizeof(int);
 
-    r = (data_positions_t**)malloc(sizeof(data_positions_t*) * divisions);
+    r = malloc(sizeof(data_positions_t*) * divisions);
 
     for(; i < divisions; i++)
     {
         num_spec = *(int*)(input_map+position);
         position += sizeof(int);
 
-        r[i] = (data_positions_t*)malloc(sizeof(data_positions_t));
+        r[i] = malloc(sizeof(data_positions_t));
 
         r[i]->total_spec = num_spec;
 
@@ -848,7 +907,7 @@ read_ddp(void* input_map, long position)
 // {
 //     data_positions_t* r;
 
-//     r = (data_positions_t*)malloc(sizeof(data_positions_t));
+//     r = malloc(sizeof(data_positions_t));
 
 //     r->start_positions = (off_t*)(input_map + dp_position);
 //     r->end_positions = (off_t*)(input_map + dp_position + (sizeof(off_t)*num_spectra*2));
@@ -887,9 +946,11 @@ preprocess_mzml(char* input_map,
   if (*ddp == NULL)
       return -1;
 
-  *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
-  *int_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
-
+//   *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
+//   *int_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
+data_positions_t*** binary_divisions = new_get_binary_divisions(*ddp, 2, blocksize, divisions, n_threads);
+*mz_binary_divisions = binary_divisions[0];
+*int_binary_divisions = binary_divisions[1];
 //   long sum = encodedLength_sum(*dp);
 // 
 //   print("\tencodedLengths sum: %ld\n", sum);

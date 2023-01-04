@@ -13,7 +13,12 @@ alloc_cmp_buff()
 {
     cmp_blk_queue_t* r;
 
-    r = (cmp_blk_queue_t*)malloc(sizeof(cmp_blk_queue_t));
+    r = malloc(sizeof(cmp_blk_queue_t));
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_cmp_buff: malloc failed\n");
+        exit(-1);
+    }
     r->populated = 0;
     r->head = NULL;
     r->tail = NULL;
@@ -117,7 +122,7 @@ alloc_block_len(size_t original_size, size_t compressed_size)
 {
     block_len_t* r;
 
-    r = (block_len_t*)malloc(sizeof(block_len_t));
+    r = malloc(sizeof(block_len_t));
 
     r->original_size = original_size;
     r->compressed_size = compressed_size;
@@ -140,7 +145,13 @@ alloc_block_len_queue()
 {
     block_len_queue_t* r;
 
-    r = (block_len_queue_t*)malloc(sizeof(block_len_queue_t));
+    r = malloc(sizeof(block_len_queue_t));
+    
+    if(r == NULL)
+    {
+        fprintf(stderr, "alloc_block_len_queue: malloc failed\n");
+        exit(-1);
+    }
 
     r->head = NULL;
     r->tail = NULL;
@@ -252,6 +263,12 @@ dump_block_len_queue(block_len_queue_t* queue, int fd)
 block_len_queue_t*
 read_block_len_queue(void* input_map, int offset, int end)
 {
+    if(input_map == NULL)
+        error("read_block_len_queue: input_map is NULL");
+    if(offset < 0)
+        error("read_block_len_queue: offset is negative");
+    if(end < 0)
+        error("read_block_len_queue: end is negative");    
     block_len_queue_t* r;
     long diff;
     int factor;

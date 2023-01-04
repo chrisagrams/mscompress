@@ -34,19 +34,20 @@ extern int verbose;
 
 struct arguments
 {
-  char *args[3];            /* ARG1 and ARG2 */
+  char *args[4];            /* ARG1 and ARG2 */
   int verbose;              /* The -v flag */
   int threads;
+  char* lossy;
   long blocksize;
   int checksum; 
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state);
 
-typedef char* (*Algo)(void*);
+typedef void (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
 
-typedef char* (*decode_fun)(char*, int, int, size_t*);
+typedef void (*decode_fun)(char*, size_t, char**, size_t*);
 typedef decode_fun (*decode_fun_ptr)();
 
 typedef void(*encode_fun)(char**, char*, size_t*);
@@ -146,6 +147,7 @@ typedef struct
     size_t num_spectra;
     off_t file_end;
     int divisions;
+    int magic_tag;
 } footer_t;
 
 
@@ -207,7 +209,7 @@ data_positions_t** find_binary_quick(char* input_map, data_format_t* df, long en
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
-data_positions_t** new_get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, long* threads);
+data_positions_t*** new_get_binary_divisions(data_positions_t** ddp, int ddp_len, long* blocksize, int* divisions, long* threads);
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
 Algo map_fun(int fun_num);
@@ -223,14 +225,17 @@ int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* 
 int get_cpu_count();
 int get_thread_id();
 int print(const char* format, ...);
+int error(const char* format, ...);
+int warning(const char* format, ...);
 
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method);
+decode_fun_ptr set_decode_fun(int compression_method, char* lossy);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-encode_fun_ptr set_encode_fun(int compression_method);
+encode_fun_ptr set_encode_fun(int compression_method, char* lossy);
+void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* compress.c */
@@ -263,6 +268,7 @@ typedef struct
     data_positions_t** mz_binary_divisions;
     data_positions_t** int_binary_divisions;
     data_positions_t** xml_divisions;
+    int division;
     off_t footer_xml_off;
     off_t footer_mz_bin_off;
     off_t footer_int_bin_off;
@@ -287,6 +293,25 @@ void decompress_parallel(char* input_map,
                     footer_t* msz_footer,
                     int divisions, int threads, int fd);
 
+
+/* algo.c */
+typedef struct
+{
+    char** src;
+    size_t src_len;
+    char** dest;
+    size_t* dest_len;
+    int src_format;
+    encode_fun_ptr enc_fun;
+    decode_fun_ptr dec_fun;
+} algo_args;
+void algo_decode_lossless (void* args);
+void algo_encode_lossless (void* args);
+void algo_decode_log_2_transform (void* args);
+void algo_encode_log_2_transform (void* args);
+Algo_ptr set_compress_algo(char* arg);
+Algo_ptr set_decompress_algo(char* arg);
+
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
 void dealloc_cmp_buff(cmp_blk_queue_t* queue);
@@ -308,7 +333,7 @@ void zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);
-uInt  zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
+uInt zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
 uInt zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len);
 
 

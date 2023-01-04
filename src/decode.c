@@ -24,13 +24,10 @@ base64_alloc(size_t size)
 {
     char* r;
 
-    r = (char*)malloc(sizeof(char) * size);
+    r = malloc(sizeof(char) * size);
     
-    if(!r)
-    {
-        fprintf(stderr, "malloc failure in base64_alloc.\n");
-        exit(-1);
-    }
+    if(r == NULL)
+        error("base64_alloc: failed to allocate memory.\n");
     
     return r;
 }
@@ -50,19 +47,14 @@ decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
  * @return Decoded string.
  */
 {
-    int b64_ret;
-
-    b64_ret = base64_decode(src, src_len, dest, out_len, 0);
+    int b64_ret = base64_decode(src, src_len, dest, out_len, 0);
 
     if(b64_ret == 0) 
-    {
-        fprintf(stderr, "base64_decode returned with an error.\n");
-        exit(-1);
-    }
+        error("decode_base64: base64_decode returned with an error. (%d)\n", b64_ret);
 }
 
-char*
-decode_zlib_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+void
+decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 /**
  * @brief Decodes an mzML binary block with "zlib" encoding.
  *        Decodes base64 string, zlib decodes the string, and appends resulting binary
@@ -82,25 +74,30 @@ decode_zlib_fun(char* input_map, int start_position, int end_position, size_t* o
  *         and resulting decoded binary buffer.
  */
 {
+    if(src == NULL)
+        error("decode_zlib_fun: src is NULL.\n");
+
+    if(src_len <= 0)
+        error("decode_zlib_fun: src_len is <= 0.\n");
+
+    if(dest == NULL)
+        error("decode_zlib_fun: dest is NULL.\n");
+
+    if(out_len == NULL)
+        error("decode_zlib_fun: out_len is NULL.\n");
+
     size_t b64_out_len = 0;
 
-    char* b64_out_buff;
-    zlib_block_t* decmp_output;
-
-    uint16_t decmp_size;
-
-    size_t len = end_position - start_position;
-
-    b64_out_buff = base64_alloc(sizeof(char) * len);
-
-    decode_base64(input_map + start_position, b64_out_buff, len, &b64_out_len);
+    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
     
-    if (!b64_out_buff)
-        return NULL;
+    decode_base64(src, b64_out_buff, src_len, &b64_out_len);
+    
+    if (b64_out_buff == NULL)
+        error("decode_zlib_fun: base64_decode returned with an error.\n");
 
-    decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
+    zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
@@ -108,15 +105,49 @@ decode_zlib_fun(char* input_map, int start_position, int end_position, size_t* o
     
     *out_len = decmp_size + ZLIB_SIZE_OFFSET;
     
-    Bytef* r = decmp_output->mem;
+    *dest = (char*)decmp_output->mem;
 
     free(decmp_output);
-
-    return r;
 }
 
-char*
-decode_no_comp_fun(char* input_map, int start_position, int end_position, size_t* out_len)
+void
+decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len)
+{
+    if(src == NULL)
+        error("decode_zlib_fun_no_header: src is NULL.\n");
+
+    if(src_len <= 0)
+        error("decode_zlib_fun_no_header: src_len is <= 0.\n");
+
+    if(dest == NULL)
+        error("decode_zlib_fun_no_header: dest is NULL.\n");
+
+    if(out_len == NULL)
+        error("decode_zlib_fun_no_header: out_len is NULL.\n");
+
+    size_t b64_out_len = 0;
+
+    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    
+    decode_base64(src, b64_out_buff, src_len, &b64_out_len);
+    
+    if (b64_out_buff == NULL)
+        error("decode_zlib_fun_no_header: base64_decode returned with an error.\n");
+
+    zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
+
+    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+
+    free(b64_out_buff);
+    
+    *out_len = decmp_size;
+    
+    *dest = (char*)decmp_output->mem;
+
+    free(decmp_output);
+}
+void
+decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 
@@ -140,23 +171,21 @@ decode_no_comp_fun(char* input_map, int start_position, int end_position, size_t
 
     size_t header;
 
-    size_t len = end_position - start_position;
+    b64_out_buff = base64_alloc(sizeof(char) * src_len + ZLIB_SIZE_OFFSET);
 
-    b64_out_buff = base64_alloc(sizeof(char) * len + ZLIB_SIZE_OFFSET);
-
-    decode_base64(input_map + start_position, b64_out_buff + ZLIB_SIZE_OFFSET, len, out_len);
+    decode_base64(src, b64_out_buff + ZLIB_SIZE_OFFSET, src_len, out_len);
 
     header = (uint16_t)(*out_len);
 
     memcpy(b64_out_buff, &header, ZLIB_SIZE_OFFSET);
 
     *out_len += ZLIB_SIZE_OFFSET;
-
-    return b64_out_buff;
+    
+    *dest = b64_out_buff;
 }
 
 decode_fun_ptr
-set_decode_fun(int compression_method)
+set_decode_fun(int compression_method, char* lossy)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.
  * 
@@ -166,14 +195,19 @@ set_decode_fun(int compression_method)
  *         Exits program on failure.
  */
 {
+    if(lossy == NULL)
+        error("set_decode_fun: lossy is NULL.\n");
     switch (compression_method)
     {
     case _zlib_:
-       return decode_zlib_fun;
+        if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+            return decode_zlib_fun;
+        else
+            return decode_zlib_fun_no_header;
     case _no_comp_:
         return decode_no_comp_fun;
     default:
-        fprintf(stderr, "Unknown source compression method.\n");
-        exit(-1);
+        error("set_decode_fun: Unknown source compression method.\n");
+        return NULL; 
     }
 }
