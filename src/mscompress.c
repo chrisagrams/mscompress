@@ -13,7 +13,6 @@
 
 #include "vendor/base64/include/libbase64.h"
 
-
 #include <stdbool.h>
 #include "vendor/yxml/yxml.h"
 
@@ -247,17 +246,19 @@ main(int argc, char* argv[])
       df->target_xml_format = _ZSTD_compression_;
       df->target_mz_format = _ZSTD_compression_;
       df->target_int_format = _ZSTD_compression_;
-      
-      // Set decoding function based on source compression format.
-      df->decode_source_compression_fun = set_decode_fun(df->source_compression, args.lossy);
 
       // Parse arguments for compression algorithms and set formats accordingly.
+      
       // Store format integer in footer.
       footer->mz_fmt = get_algo_type(args.lossy);
       footer->int_fmt = get_algo_type(args.lossy);
+      
       // Set target compression functions.
-      df->target_mz_fun= set_compress_algo(args.lossy);
-      df->target_int_fun = set_compress_algo(args.lossy);
+      df->target_mz_fun= set_compress_algo(footer->mz_fmt);
+      df->target_int_fun = set_compress_algo(footer->int_fmt);
+      
+      // Set decoding function based on source compression format.
+      df->decode_source_compression_fun = set_decode_fun(df->source_compression, footer->mz_fmt);
 
       //Write df header to file.
       write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
@@ -280,16 +281,15 @@ main(int argc, char* argv[])
     {
       print("\tDetected .msz file, reading header and footer...\n");
 
+      if(args.lossy != NULL)
+        print("Lossy arg passed while decompressing, ignoring...\n");
+
       block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *int_binary_block_lens;
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
 
       df = get_header_df(input_map);
-
-      df->encode_source_compression_fun = set_encode_fun(df->source_compression, args.lossy);
-      df->target_mz_fun = set_decompress_algo(args.lossy);
-      df->target_int_fun = set_decompress_algo(args.lossy);
 
       get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
 
@@ -303,6 +303,10 @@ main(int argc, char* argv[])
                    &divisions);
 
       print("\nDecompression and encoding...\n");
+
+      df->encode_source_compression_fun = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
+      df->target_mz_fun = set_decompress_algo(msz_footer->mz_fmt);
+      df->target_int_fun = set_decompress_algo(msz_footer->int_fmt);
 
       decompress_parallel(input_map,
                           xml_block_lens,

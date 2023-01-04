@@ -47,6 +47,7 @@
 #define _cast_64_to_32_    4700002
 #define _log2_transform_   4700003
 
+#define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 
 #define COMPRESS 1
 #define DECOMPRESS 2
@@ -231,11 +232,11 @@ int warning(const char* format, ...);
 
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method, char* lossy);
+decode_fun_ptr set_decode_fun(int compression_method, int algo);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-encode_fun_ptr set_encode_fun(int compression_method, char* lossy);
+encode_fun_ptr set_encode_fun(int compression_method, int algo);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
