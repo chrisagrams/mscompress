@@ -77,9 +77,12 @@ ifdef OPENMP
   CFLAGS += -fopenmp
 endif
 
+ifneq ("$(wildcard $(./vendor/zlib/libz.a))", "")
+cd ./vendor/zlib && ./configure && make static
+endif
+
 mscompress: $(OBJS)
 	@echo $(LIBS)
-	cd ./vendor/zlib && ./configure && make static
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) ./vendor/zlib/libz.a
 
 ifeq ($(OS),Windows_NT)
@@ -93,7 +96,6 @@ endif
 debug: CFLAGS = $(DEBUG_CFLAGS)
 
 debug: $(OBJS)
-	cd ./vendor/zlib && ./configure && make static
 	$(CC) $(CFLAGS) -o mscompress $^ $(LIBS) ./vendor/zlib/libz.a
 
 vendor/base64/lib/config.h:

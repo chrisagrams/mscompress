@@ -340,45 +340,40 @@ algo_encode_log_2_transform (void* args)
 }
 
 Algo_ptr
-set_compress_algo(char* arg)
-/**
- * @brief Sets compression algorithm based on input string.
- * 
- * @param arg String containing compression algorithm name.
- * 
- * @return Algo_ptr Pointer to compression algorithm function.
- */
+set_compress_algo(int algo)
 {
-    if(arg == NULL)
-        error("set_compress_algo: arg is NULL");
-    if(strcmp(arg, "lossless") == 0 || *arg == "" || *arg == '\0')
-        return algo_decode_lossless;
-    else if(strcmp(arg, "log") == 0)
-        return algo_decode_log_2_transform;
-    else if(strcmp(arg, "cast") == 0)
-        return algo_decode_cast32;
-    else
-        error("set_compress_algo: Unknown compression algorithm");
+    switch(algo)
+    {
+        case _lossless_ :       return algo_decode_lossless;
+        case _log2_transform_ : return algo_decode_log_2_transform;
+        case _cast_64_to_32_:   return algo_decode_cast32;
+        default:                error("set_compress_algo: Unknown compression algorithm");
+    }
 }
 
 Algo_ptr
-set_decompress_algo(char* arg)
-/**
- * @brief Sets decompression algorithm based on input string.
- * 
- * @param arg String containing decompression algorithm name.
- * 
- * @return Algo_ptr Pointer to decompression algorithm function.
- */
+set_decompress_algo(int algo)
+{   
+    switch(algo)
+    {
+        case _lossless_ :       return algo_encode_lossless;
+        case _log2_transform_ : return algo_encode_log_2_transform;
+        case _cast_64_to_32_:   return algo_encode_cast32;
+        default:                error("set_decompress_algo: Unknown compression algorithm");
+    }
+}
+
+int
+get_algo_type(char* arg)
 {
     if(arg == NULL)
-        error("set_decompress_algo: arg is NULL");
+        error("get_algo_type: arg is NULL");
     if(strcmp(arg, "lossless") == 0 || *arg == '\0' || *arg == "")
-        return algo_encode_lossless;
+        return _lossless_;
     else if(strcmp(arg, "log") == 0)
-        return algo_encode_log_2_transform;
+        return _log2_transform_;
     else if(strcmp(arg, "cast") == 0)
-        return algo_encode_cast32;
+        return _cast_64_to_32_;
     else
-        error("set_decompress_algo: Unknown compression algorithm");        
+        error("get_algo_type: Unknown compression algorithm");
 }
