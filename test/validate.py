@@ -27,6 +27,17 @@ def get_encoding(tree):
         elif accession == 'MS:1000576':
             return 'nocomp'
 
+def get_datatype(tree):
+    root = tree.getroot()
+    nodes = tree.findall('//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
+                         namespaces=root.nsmap)
+    for node in nodes:
+        accession = node.attrib['accession']
+        if accession == 'MS:1000523':
+            return 8 # 64 bit (double)
+        elif accession == 'MS:1000521':
+            return 4 # 32 bit (float)
+
 
 def get_binaries(tree):
     root = tree.getroot()
@@ -38,14 +49,29 @@ def get_binaries(tree):
     return binaries
 
 
-def unpack_floats(data):
+def unpack_floats(data, sizeof_):
     res = []
-    for i in range(0, int(len(data) / 4), 4):
-        res.append(struct.unpack('f', data[i:i + 4])[0])
+    fun = None
+
+    def f(i):
+        res.append(struct.unpack('f', i)[0])
+    def d(i):
+        res.append(struct.unpack('<d', i)[0])
+
+    if sizeof_ == 8:
+        fun = d
+    elif sizeof_ == 4:
+        fun = f
+    else:
+        print('invalid encoding size')
+        exit(-1)
+
+    for i in range(0, int(len(data) / sizeof_), sizeof_):
+        fun(data[i:i + sizeof_])
     return res
 
 
-def unpack_all(l, encoding_type):
+def unpack_all(l, encoding_type, sizeof_):
     mz = []
     intensity = []
     fun = None
@@ -59,9 +85,9 @@ def unpack_all(l, encoding_type):
         exit(-1)
 
     for i in range(0, len(l), 2):
-        for b in unpack_floats(fun(l[i])):
+        for b in unpack_floats(fun(l[i]), sizeof_):
             mz.append(b)
-        for b in unpack_floats(fun(l[i + 1])):
+        for b in unpack_floats(fun(l[i + 1]), sizeof_):
             intensity.append(b)
 
     return {'mz': mz, 'int': intensity}
@@ -76,8 +102,8 @@ if __name__ == "__main__":
     test_tree = get_tree(test)
     org_tree = get_tree(org)
 
-    test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree))
-    org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree))
+    test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree), get_datatype(test_tree))
+    org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree), get_datatype(org_tree))
 
     # number of binaries should be the same
     if len(test_binaries) != len(org_binaries):
