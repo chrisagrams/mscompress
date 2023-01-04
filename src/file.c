@@ -202,7 +202,7 @@ get_header_df(void* input_map)
 }
 
 void
-write_footer(footer_t footer, int fd)
+write_footer(footer_t* footer, int fd)
 /**
  * @brief Writes a footer_t struct to file descritor.
  * 
@@ -211,10 +211,7 @@ write_footer(footer_t footer, int fd)
  * @param fd Output file descriptor to write to. 
  */
 {
-    char buff[sizeof(footer_t)];
-    footer_t* buff_cast = (footer_t*)(&buff[0]);
-    *buff_cast = footer;
-    write_to_file(fd, buff, sizeof(footer_t));
+    write_to_file(fd, (char*)footer, sizeof(footer_t));
 }
 
 footer_t*
