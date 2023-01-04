@@ -19,11 +19,17 @@ alloc_cctx()
 {
     ZSTD_CCtx* cctx;
     cctx = ZSTD_createCCtx();
+    
+    #ifdef ERROR_CHECK
+        if(!cctx) 
     if(!cctx) 
-    {
-        perror("ZSTD Context failed.");
-        exit(1);
-    }
+        if(!cctx) 
+        {
+            perror("ZSTD Context failed.");
+            exit(1);
+        }
+    #endif
+
     return cctx;
 }
 
@@ -54,10 +60,12 @@ alloc_ztsd_cbuff(size_t src_len, size_t* buff_len)
  * 
  */
 {
-    if(src_len <= 0)
-        error("alloc_ztsd_cbuff: invalid src_len for compression buffer.\n");
-    if(buff_len == NULL)
-        error("alloc_ztsd_cbuff: buff_len is NULL.\n");
+    #ifdef ERROR_CHECK
+        if(src_len <= 0)
+            error("alloc_ztsd_cbuff: invalid src_len for compression buffer.\n");
+        if(buff_len == NULL)
+            error("alloc_ztsd_cbuff: buff_len is NULL.\n");
+    #endif
 
     size_t bound;
 
@@ -66,8 +74,11 @@ alloc_ztsd_cbuff(size_t src_len, size_t* buff_len)
     *buff_len = bound;
 
     void* r = malloc(bound);
-    if(r == NULL)
-        error("alloc_ztsd_cbuff: malloc failed.\n");
+
+    #ifdef ERROR_CHECK
+        if(r == NULL)
+            error("alloc_ztsd_cbuff: malloc failed.\n");
+    #endif
 
     return r;
 }
@@ -93,27 +104,30 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
  * @return A buffer with the compressed string on success, NULL on error.
  */
 {
-    if(cctx == NULL)
-        error("zstd_compress: cctx is NULL.\n");
-    if(src_buff == NULL)
-        error("zstd_compress: src_buff is NULL.\n");
-    if(src_len <= 0)
-        error("zstd_compress: invalid src_len for compression.\n");
-    if(out_len == NULL)
-        error("zstd_compress: out_len is NULL.\n");
-    if(compression_level < 1 || compression_level > 9)
-        error("zstd_compress: invalid compression_level.\n");
-        
+    #ifdef ERROR_CHECK
+        if(cctx == NULL)
+            error("zstd_compress: cctx is NULL.\n");
+        if(src_buff == NULL)
+            error("zstd_compress: src_buff is NULL.\n");
+        if(src_len <= 0)
+            error("zstd_compress: invalid src_len for compression.\n");
+        if(out_len == NULL)
+            error("zstd_compress: out_len is NULL.\n");
+        if(compression_level < 1 || compression_level > 9)
+            error("zstd_compress: invalid compression_level.\n");
+    #endif
+
     void* out_buff;
     size_t buff_len = 0;
-
 
     out_buff = alloc_ztsd_cbuff(src_len, &buff_len);
 
     *out_len = ZSTD_compressCCtx(cctx, out_buff, buff_len, src_buff, src_len, compression_level);
 
-    if (!*out_len)
-        error("zstd_compress: ZSTD_compressCCtx failed.\n");
+    #ifdef ERROR_CHECK
+        if (!*out_len)
+            error("zstd_compress: ZSTD_compressCCtx failed.\n");
+    #endif
 
     return out_buff;
 }
@@ -128,20 +142,24 @@ alloc_data_block(size_t max_size)
  * @return A populated data_block_t struct with capacity max_size and max_size field set.
  */
 {
-    data_block_t* r;
+    #ifdef ERROR_CHECK
+        if(max_size <= 0)
+            error("alloc_data_block: invalid max_size for data block.\n");
+    #endif
+    
+    data_block_t* r = malloc(sizeof(data_block_t));
 
-    if(max_size <= 0)
-        error("alloc_data_block: invalid max_size for data block.\n");
-
-    r = malloc(sizeof(data_block_t));
-
-    if(r == NULL)
-        error("alloc_data_block: Failed to allocate data block.\n");
+    #ifdef ERROR_CHECK
+        if(r == NULL)
+            error("alloc_data_block: Failed to allocate data block.\n");
+    #endif
 
     r->mem = malloc(sizeof(char) * max_size);
 
+    #ifdef ERROR_CHECK
     if(r->mem == NULL)
         error("alloc_data_block: Failed to allocate data block memory.\n");
+    #endif
 
     r->size = 0;
     r->max_size = max_size;
@@ -181,16 +199,20 @@ alloc_cmp_block(char* mem, size_t size, size_t original_size)
  * 
  */
 {
-    if(mem == NULL)
-        error("alloc_cmp_block: invalid mem for cmp block.\n");
+    #ifdef ERROR_CHECK
+        if(mem == NULL)
+            error("alloc_cmp_block: invalid mem for cmp block.\n");
 
-    if(size <= 0 || original_size <= 0)
-        error("alloc_cmp_block: invalid size for cmp block.\n");
-    
+        if(size <= 0 || original_size <= 0)
+            error("alloc_cmp_block: invalid size for cmp block.\n");
+    #endif
+
     cmp_block_t* r = malloc(sizeof(cmp_block_t));
 
-    if(r == NULL)
-        error("alloc_cmp_block: Failed to allocate cmp block.\n");
+    #ifdef ERROR_CHECK
+        if(r == NULL)
+            error("alloc_cmp_block: Failed to allocate cmp block.\n");
+    #endif
 
     r->mem = mem;
     r->size = size;
@@ -258,8 +280,11 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
     compress_args_t* r;
 
     r = malloc(sizeof(compress_args_t));
-    if(r == NULL)
-        error("alloc_compress_args: Failed to allocate compress_args_t.\n");
+
+    #ifdef ERROR_CHECK
+        if(r == NULL)
+            error("alloc_compress_args: Failed to allocate compress_args_t.\n");
+    #endif
 
     r->input_map = input_map;
     r->dp = dp;
@@ -324,8 +349,10 @@ cmp_routine(ZSTD_CCtx* czstd,
     cmp_block_t* cmp_block;
     size_t cmp_len = 0;
 
-    if(len > cmp_blk_size)
-        error("cmp_routine: len > cmp_blk_size. This should not happen.\n");
+    #ifdef ERROR_CHECK
+        if(len > cmp_blk_size)
+            error("cmp_routine: len > cmp_blk_size. This should not happen.\n");
+    #endif
 
     if(!append_mem(*curr_block, input, len))
     {
@@ -382,10 +409,13 @@ cmp_flush(ZSTD_CCtx* czstd,
     cmp_block_t* cmp_block;
     size_t cmp_len = 0;
 
-
-    if((*curr_block)->size > cmp_blk_size) 
-        error("cmp_flush: curr_block->size > cmp_blk_size. This should not happen.\n");
-
+    #ifdef ERROR_CHECK
+        if(!(*curr_block))
+            error("cmp_flush: curr_block is NULL. This should not happen.\n");
+        if((*curr_block)->size > cmp_blk_size) 
+            error("cmp_flush: curr_block->size > cmp_blk_size. This should not happen.\n");
+    #endif
+    
     cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
     cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
