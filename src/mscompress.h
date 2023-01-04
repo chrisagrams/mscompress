@@ -30,6 +30,28 @@
 
 #define DEBUG 0
 
+#define _32i_ 1000519
+#define _16e_ 1000520
+#define _32f_ 1000521
+#define _64i_ 1000522
+#define _64d_ 1000523
+
+#define _zlib_ 1000574
+#define _no_comp_ 1000576
+
+#define _intensity_ 1000515
+#define _mass_ 1000514
+
+#define _lossless_         4700000
+#define _ZSTD_compression_ 4700001
+#define _cast_64_to_32_    4700002
+#define _log2_transform_   4700003
+
+#define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
+
+#define COMPRESS 1
+#define DECOMPRESS 2
+
 extern int verbose;
 
 struct arguments
@@ -148,6 +170,8 @@ typedef struct
     off_t file_end;
     int divisions;
     int magic_tag;
+    int mz_fmt;
+    int int_fmt;
 } footer_t;
 
 
@@ -160,28 +184,6 @@ typedef struct
     size_t offset;
 
 } zlib_block_t;
-
-
-#define _32i_ 1000519
-#define _16e_ 1000520
-#define _32f_ 1000521
-#define _64i_ 1000522
-#define _64d_ 1000523
-
-#define _zlib_ 1000574
-#define _no_comp_ 1000576
-
-#define _intensity_ 1000515
-#define _mass_ 1000514
-
-
-#define _ZSTD_compression_ 4700001
-#define _cast_64_to_32_    4700002
-#define _log2_transform_   4700003
-
-
-#define COMPRESS 1
-#define DECOMPRESS 2
 
 
 /* file.c */
@@ -230,11 +232,11 @@ int warning(const char* format, ...);
 
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method, char* lossy);
+decode_fun_ptr set_decode_fun(int compression_method, int algo);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-encode_fun_ptr set_encode_fun(int compression_method, char* lossy);
+encode_fun_ptr set_encode_fun(int compression_method, int algo);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
@@ -309,8 +311,9 @@ void algo_decode_lossless (void* args);
 void algo_encode_lossless (void* args);
 void algo_decode_log_2_transform (void* args);
 void algo_encode_log_2_transform (void* args);
-Algo_ptr set_compress_algo(char* arg);
-Algo_ptr set_decompress_algo(char* arg);
+Algo_ptr set_compress_algo(int algo);
+Algo_ptr set_decompress_algo(int algo);
+int get_algo_type(char* arg);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

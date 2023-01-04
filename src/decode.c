@@ -185,7 +185,7 @@ decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 }
 
 decode_fun_ptr
-set_decode_fun(int compression_method, char* lossy)
+set_decode_fun(int compression_method, int algo)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.
  * 
@@ -195,12 +195,12 @@ set_decode_fun(int compression_method, char* lossy)
  *         Exits program on failure.
  */
 {
-    if(lossy == NULL)
-        error("set_decode_fun: lossy is NULL.\n");
+    if(algo == 0)
+        error("set_decode_fun: lossy is 0.\n");
     switch (compression_method)
     {
     case _zlib_:
-        if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+        if(algo == _lossless_)
             return decode_zlib_fun;
         else
             return decode_zlib_fun_no_header;

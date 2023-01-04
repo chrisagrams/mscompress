@@ -221,19 +221,19 @@ encode_no_comp_fun_no_header(char** src, size_t src_len, char* dest, size_t* out
 }
 
 encode_fun_ptr
-set_encode_fun(int compression_method, char* lossy)
+set_encode_fun(int compression_method, int algo)
 {
-    if(lossy == NULL)
-        error("set_encode_fun: lossy is NULL");
+    if(algo == 0)
+        error("set_encode_fun: lossy is 0");
     switch(compression_method)
     {
         case _zlib_:
-            if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+            if(algo == _lossless_)
                 return encode_zlib_fun_w_header;
             else
                 return encode_zlib_fun_no_header;    
         case _no_comp_:
-            if(strcmp(lossy, "lossless") == 0 || *lossy == '0' || *lossy == "")
+            if(algo == _lossless_)
                 return encode_no_comp_fun_w_header;
             else
                 return encode_no_comp_fun_no_header;
