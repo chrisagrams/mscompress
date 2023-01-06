@@ -80,14 +80,14 @@ typedef struct
 
     /* source information (source mzML) */
     int source_mz_fmt;
-    int source_int_fmt;
+    int source_inten_fmt;
     int source_compression;
     int source_total_spec;
 
     /* target information */
     int target_xml_format;
     int target_mz_format;
-    int target_int_format;
+    int target_inten_format;
 
     /* runtime variables, not written to disk. */
     int populated;
@@ -95,7 +95,7 @@ typedef struct
     encode_fun_ptr encode_source_compression_fun;
     Algo_ptr target_xml_fun;
     Algo_ptr target_mz_fun;
-    Algo_ptr target_int_fun;
+    Algo_ptr target_inten_fun;
 
 
 } data_format_t;
@@ -105,10 +105,19 @@ typedef struct
 {
     off_t* start_positions;
     off_t* end_positions;
-    // off_t* positions_len;
     int total_spec;
-    size_t file_end;
+    size_t file_end; //TODO: remove this
 } data_positions_t;
+
+
+typedef struct
+{
+    data_positions_t* xml;
+    data_positions_t* mz;
+    data_positions_t* inten;
+    
+
+} division_t;
 
 
 typedef struct 
@@ -159,19 +168,19 @@ typedef struct
 {
     off_t xml_pos;          // msz file position of start of compressed XML data.
     off_t mz_binary_pos;    // msz file position of start of compressed m/z binary data.
-    off_t int_binary_pos;   // msz file position of start of compressed int binary data.
+    off_t inten_binary_pos;   // msz file position of start of compressed int binary data.
     off_t xml_blk_pos;
     off_t mz_binary_blk_pos;
-    off_t int_binary_blk_pos;
+    off_t inten_binary_blk_pos;
     off_t xml_ddp_pos;
     off_t mz_ddp_pos;
-    off_t int_ddp_pos;
+    off_t inten_ddp_pos;
     size_t num_spectra;
     off_t file_end;
     int divisions;
     int magic_tag;
     int mz_fmt;
-    int int_fmt;
+    int inten_fmt;
 } footer_t;
 
 
@@ -221,7 +230,7 @@ void dump_ddp(data_positions_t** ddp, int divisions, int fd);
 data_positions_t** read_ddp(void* input_map, long position);
 void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
-int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long* n_threads, data_positions_t*** ddp, data_format_t** df, data_positions_t*** mz_binary_divisions, data_positions_t*** int_binary_divisions, data_positions_t*** xml_divisions);
+int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long* n_threads, data_positions_t*** ddp, data_format_t** df, data_positions_t*** mz_binary_divisions, data_positions_t*** inten_binary_divisions, data_positions_t*** xml_divisions);
 
 /* sys.c */
 int get_cpu_count();
@@ -256,7 +265,7 @@ void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* ou
 void compress_routine(void* args);
 block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
-void compress_mzml(char* input_map, long blocksize, int divisions, int threads, footer_t* footer, data_positions_t** ddp, data_format_t* df, data_positions_t** mz_binary_divisions, data_positions_t** int_binary_divisions, data_positions_t** xml_divisions, int output_fd);
+void compress_mzml(char* input_map, long blocksize, int divisions, int threads, footer_t* footer, data_positions_t** ddp, data_format_t* df, data_positions_t** mz_binary_divisions, data_positions_t** inten_binary_divisions, data_positions_t** xml_divisions, int output_fd);
 
 /* decompress.c */
 typedef struct
@@ -266,14 +275,14 @@ typedef struct
     data_format_t* df;
     block_len_t* xml_blk;
     block_len_t* mz_binary_blk;
-    block_len_t* int_binary_blk;
+    block_len_t* inten_binary_blk;
     data_positions_t** mz_binary_divisions;
-    data_positions_t** int_binary_divisions;
+    data_positions_t** inten_binary_divisions;
     data_positions_t** xml_divisions;
     int division;
     off_t footer_xml_off;
     off_t footer_mz_bin_off;
-    off_t footer_int_bin_off;
+    off_t footer_inten_bin_off;
 
     char* ret;
     size_t ret_len;
@@ -287,9 +296,9 @@ void decompress_routine(void* args);
 void decompress_parallel(char* input_map,
                     block_len_queue_t* xml_block_lens,
                     block_len_queue_t* mz_binary_block_lens,
-                    block_len_queue_t* int_binary_block_lens,
+                    block_len_queue_t* inten_binary_block_lens,
                     data_positions_t** mz_binary_divisions,
-                    data_positions_t** int_binary_divisions,
+                    data_positions_t** inten_binary_divisions,
                     data_positions_t** xml_divisions,
                     data_format_t* df,
                     footer_t* msz_footer,

@@ -59,15 +59,15 @@ dealloc_df(data_format_t* df)
 
 
 void
-populate_df_target(data_format_t* df, int target_xml_format, int target_mz_format, int target_int_format)
+populate_df_target(data_format_t* df, int target_xml_format, int target_mz_format, int target_inten_format)
 {
     df->target_xml_format = target_xml_format;
     df->target_mz_format = target_mz_format;
-    df->target_int_format = target_int_format;
+    df->target_inten_format = target_inten_format;
 
     // df->target_xml_fun = map_fun(target_xml_format);
     // df->target_mz_fun = map_fun(target_mz_format);
-    // df->target_int_fun = map_fun(target_int_format);
+    // df->target_inten_fun = map_fun(target_inten_format);
 }
 
 data_positions_t*
@@ -207,7 +207,7 @@ map_to_df(int acc, int* current_type, data_format_t* df)
                 if(acc >= _32i_ && acc <= _64d_) {
                     if (*current_type == _intensity_) 
                     {
-                        df->source_int_fmt = acc;
+                        df->source_inten_fmt = acc;
                         df->populated++;
                     }
                     else if (*current_type == _mass_) 
@@ -419,13 +419,13 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     data_positions_t** ddp;
 
-    data_positions_t *mz_dp, *int_dp, *xml_dp;
+    data_positions_t *mz_dp, *inten_dp, *xml_dp;
 
     xml_dp = alloc_dp(df->source_total_spec * 2);
     mz_dp = alloc_dp(df->source_total_spec);
-    int_dp = alloc_dp(df->source_total_spec);
+    inten_dp = alloc_dp(df->source_total_spec);
 
-    if(xml_dp == NULL || mz_dp == NULL || int_dp == NULL)
+    if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
         error("find_binary_quick: failed to allocate memory.\n");
 
     ddp = malloc(sizeof(data_positions_t*) * 3);
@@ -433,12 +433,12 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
         error("find_binary_quick: failed to allocate memory.\n");
 
     ddp[0] = mz_dp;
-    ddp[1] = int_dp;
+    ddp[1] = inten_dp;
     ddp[2] = xml_dp;
 
     char* ptr = input_map;
 
-    int mz_curr = 0, int_curr = 0, xml_curr = 0;
+    int mz_curr = 0, inten_curr = 0, xml_curr = 0;
 
     int curr_scan = 0;
     int curr_ms_level = 0;
@@ -452,37 +452,37 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     while (ptr)
     {   
-        if(mz_curr + int_curr == bound)
+        if(mz_curr + inten_curr == bound)
             break;
         
-        if(xml_curr >= bound || mz_curr >= df->source_total_spec || int_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
-            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
+        if(xml_curr >= bound || mz_curr >= df->source_total_spec || inten_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
+            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
             
         ptr = strstr(ptr, "scan=") + 5;
 
         if(ptr == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
 
         e = strstr(ptr, "\"");
 
         if(e == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
 
         curr_scan = strtol(ptr, &e, 10);
 
         if(curr_scan == 0)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
 
         ptr = e;
 
         ptr = strstr(ptr, "\"ms level\"") + 18;
 
         if(ptr == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
         e = strstr(ptr, "\"");
 
         if(e == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
         curr_ms_level = strtol(ptr, &e, 10);
 
         ptr = e;
@@ -490,7 +490,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "<binary>") + 8;
         if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
@@ -498,7 +498,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
         
         ptr = strstr(ptr, "</binary>");
         if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
         mz_dp->end_positions[mz_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
@@ -509,40 +509,40 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "<binary>") + 8;
         if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + int_curr);
-        int_dp->start_positions[int_curr] = ptr - input_map;
-        xml_dp->end_positions[xml_curr++] = int_dp->start_positions[int_curr];
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        inten_dp->start_positions[inten_curr] = ptr - input_map;
+        xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
 
         
         ptr = strstr(ptr, "</binary>");
         if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + int_curr);
-        int_dp->end_positions[int_curr] = ptr - input_map;
-        xml_dp->start_positions[xml_curr] = int_dp->end_positions[int_curr];
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        inten_dp->end_positions[inten_curr] = ptr - input_map;
+        xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
         
         // scan_nums[curr] = curr_scan;
         // ms_levels[curr++] = curr_ms_level;
-        int_curr++;
+        inten_curr++;
     
     }
 
-    if(xml_curr != bound || mz_curr != df->source_total_spec || int_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
-        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, int_curr: %d\n", xml_curr, mz_curr, int_curr);
+    if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
+        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
 
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
     xml_dp->total_spec = xml_curr;
 
     mz_dp->total_spec = df->source_total_spec;
-    int_dp->total_spec = df->source_total_spec;
+    inten_dp->total_spec = df->source_total_spec;
 
-    mz_dp->file_end = int_dp->file_end = xml_dp->file_end = end;
+    mz_dp->file_end = inten_dp->file_end = xml_dp->file_end = end;
 
     // Sanity check
     validate_positions(mz_dp->start_positions, mz_dp->total_spec);
     validate_positions(mz_dp->end_positions, mz_dp->total_spec);
-    validate_positions(int_dp->start_positions, int_dp->total_spec);
-    validate_positions(int_dp->end_positions, int_dp->total_spec);
+    validate_positions(inten_dp->start_positions, inten_dp->total_spec);
+    validate_positions(inten_dp->end_positions, inten_dp->total_spec);
     validate_positions(xml_dp->start_positions, xml_dp->total_spec);
     validate_positions(xml_dp->end_positions, xml_dp->total_spec);
 
@@ -926,7 +926,7 @@ preprocess_mzml(char* input_map,
                 data_positions_t*** ddp,
                 data_format_t** df,
                 data_positions_t*** mz_binary_divisions,
-                data_positions_t*** int_binary_divisions,
+                data_positions_t*** inten_binary_divisions,
                 data_positions_t*** xml_divisions)
 {
   struct timeval start, stop;
@@ -947,10 +947,10 @@ preprocess_mzml(char* input_map,
       return -1;
 
 //   *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
-//   *int_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
+//   *inten_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
 data_positions_t*** binary_divisions = new_get_binary_divisions(*ddp, 2, blocksize, divisions, n_threads);
 *mz_binary_divisions = binary_divisions[0];
-*int_binary_divisions = binary_divisions[1];
+*inten_binary_divisions = binary_divisions[1];
 //   long sum = encodedLength_sum(*dp);
 // 
 //   print("\tencodedLengths sum: %ld\n", sum);

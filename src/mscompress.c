@@ -135,9 +135,9 @@ void
 parse_footer(footer_t** footer, void* input_map, long input_filesize,
             block_len_queue_t**xml_block_lens,
             block_len_queue_t** mz_binary_block_lens,
-            block_len_queue_t** int_binary_block_lens,
+            block_len_queue_t** inten_binary_block_lens,
             data_positions_t*** mz_binary_divisions,
-            data_positions_t*** int_binary_divisions,
+            data_positions_t*** inten_binary_divisions,
             data_positions_t*** xml_divisions,
             int* divisions)
 {
@@ -146,23 +146,23 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
 
       print("\tXML position: %ld\n", (*footer)->xml_pos);
       print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
-      print("\tint binary position: %ld\n", (*footer)->int_binary_pos);
+      print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
       print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
       print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-      print("\tint binary blocks position: %ld\n", (*footer)->int_binary_blk_pos);
+      print("\tint binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
       print("\txml_ddp_pos block position: %ld\n", (*footer)->xml_ddp_pos);
       print("\tmz_ddp_pos block position: %ld\n", (*footer)->mz_ddp_pos);
-      print("\tint_ddp_pos block position: %ld\n", (*footer)->int_ddp_pos);
+      print("\tinten_ddp_pos block position: %ld\n", (*footer)->inten_ddp_pos);
       print("\tEOF position: %ld\n", input_filesize);
       print("\tOriginal file end: %ld\n", (*footer)->file_end);
 
       *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
-      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->int_binary_blk_pos);
-      *int_binary_block_lens = read_block_len_queue(input_map, (*footer)->int_binary_blk_pos, (*footer)->xml_ddp_pos);
+      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
+      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->xml_ddp_pos);
 
       *xml_divisions = read_ddp(input_map, (*footer)->xml_ddp_pos);
       *mz_binary_divisions = read_ddp(input_map, (*footer)->mz_ddp_pos);
-      *int_binary_divisions = read_ddp(input_map, (*footer)->int_ddp_pos);
+      *inten_binary_divisions = read_ddp(input_map, (*footer)->inten_ddp_pos);
 
       *divisions = (*footer)->divisions;
 }
@@ -177,7 +177,7 @@ main(int argc, char* argv[])
     struct base64_state state;
     int divisions = 0;
 
-    data_positions_t **ddp, **mz_binary_divisions, **int_binary_divisions, **xml_divisions;
+    data_positions_t **ddp, **mz_binary_divisions, **inten_binary_divisions, **xml_divisions;
     data_format_t* df;
 
     int fds[3] = {-1, -1, -1};
@@ -239,23 +239,23 @@ main(int argc, char* argv[])
                        &ddp,
                        &df,
                        &mz_binary_divisions,
-                       &int_binary_divisions,
+                       &inten_binary_divisions,
                        &xml_divisions);
 
       // TODO: target format switch
       df->target_xml_format = _ZSTD_compression_;
       df->target_mz_format = _ZSTD_compression_;
-      df->target_int_format = _ZSTD_compression_;
+      df->target_inten_format = _ZSTD_compression_;
 
       // Parse arguments for compression algorithms and set formats accordingly.
       
       // Store format integer in footer.
       footer->mz_fmt = get_algo_type(args.lossy);
-      footer->int_fmt = get_algo_type(args.lossy);
+      footer->inten_fmt = get_algo_type(args.lossy);
       
       // Set target compression functions.
       df->target_mz_fun= set_compress_algo(footer->mz_fmt);
-      df->target_int_fun = set_compress_algo(footer->int_fmt);
+      df->target_inten_fun = set_compress_algo(footer->inten_fmt);
       
       // Set decoding function based on source compression format.
       df->decode_source_compression_fun = set_decode_fun(df->source_compression, footer->mz_fmt);
@@ -272,7 +272,7 @@ main(int argc, char* argv[])
                      ddp,
                      df,
                      mz_binary_divisions,
-                     int_binary_divisions,
+                     inten_binary_divisions,
                      xml_divisions,
                      fds[1]);
     }
@@ -284,7 +284,7 @@ main(int argc, char* argv[])
       if(args.lossy != NULL)
         print("Lossy arg passed while decompressing, ignoring...\n");
 
-      block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *int_binary_block_lens;
+      block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
@@ -296,9 +296,9 @@ main(int argc, char* argv[])
       parse_footer(&msz_footer, input_map, input_filesize,
                    &xml_block_lens, 
                    &mz_binary_block_lens,
-                   &int_binary_block_lens,
+                   &inten_binary_block_lens,
                    &mz_binary_divisions,
-                   &int_binary_divisions,
+                   &inten_binary_divisions,
                    &xml_divisions,
                    &divisions);
 
@@ -306,14 +306,14 @@ main(int argc, char* argv[])
 
       df->encode_source_compression_fun = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
       df->target_mz_fun = set_decompress_algo(msz_footer->mz_fmt);
-      df->target_int_fun = set_decompress_algo(msz_footer->int_fmt);
+      df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt);
 
       decompress_parallel(input_map,
                           xml_block_lens,
                           mz_binary_block_lens,
-                          int_binary_block_lens,
+                          inten_binary_block_lens,
                           mz_binary_divisions,
-                          int_binary_divisions,
+                          inten_binary_divisions,
                           xml_divisions,
                           df, msz_footer, divisions, n_threads, fds[1]);
 
@@ -322,7 +322,7 @@ main(int argc, char* argv[])
 
     // free_ddp(xml_divisions, divisions);
     // free_ddp(mz_binary_divisions, divisions);
-    // free_ddp(int_binary_divisions, divisions);
+    // free_ddp(inten_binary_divisions, divisions);
 
     dealloc_df(df);
 

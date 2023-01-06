@@ -58,14 +58,14 @@ alloc_decompress_args(char* input_map,
                       data_format_t* df,
                       block_len_t* xml_blk,
                       block_len_t* mz_binary_blk,
-                      block_len_t* int_binary_blk,
+                      block_len_t* inten_binary_blk,
                       data_positions_t** mz_binary_divisions,
-                      data_positions_t** int_binary_divisions,
+                      data_positions_t** inten_binary_divisions,
                       data_positions_t** xml_divisions,
                       int division,
                       off_t footer_xml_off,
                       off_t footer_mz_bin_off,
-                      off_t footer_int_bin_off)
+                      off_t footer_inten_bin_off)
 {
     decompress_args_t* r;
     
@@ -77,14 +77,14 @@ alloc_decompress_args(char* input_map,
     r->df = df;
     r->xml_blk = xml_blk;
     r->mz_binary_blk = mz_binary_blk;
-    r->int_binary_blk = int_binary_blk;
+    r->inten_binary_blk = inten_binary_blk;
     r->mz_binary_divisions = mz_binary_divisions;
-    r->int_binary_divisions = int_binary_divisions;
+    r->inten_binary_divisions = inten_binary_divisions;
     r->xml_divisions = xml_divisions;
     r->division = division;
     r->footer_xml_off = footer_xml_off;
     r->footer_mz_bin_off = footer_mz_bin_off;
-    r->footer_int_bin_off = footer_int_bin_off;
+    r->footer_inten_bin_off = footer_inten_bin_off;
 
     r->ret = NULL;
     r->ret_len = 0;
@@ -139,25 +139,25 @@ decompress_routine(void* args)
     void
         *decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
         *decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
-        *decmp_int_binary = decmp_block(dctx, db_args->input_map, db_args->footer_int_bin_off, db_args->int_binary_blk);
+        *decmp_inten_binary = decmp_block(dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
     size_t binary_len = 0;
 
     int64_t buff_off = 0,
-            xml_off = 0, mz_off = 0, int_off = 0;
-    int64_t xml_i = 0,   mz_i = 0,   int_i = 0;        
+            xml_off = 0, mz_off = 0, inten_off = 0;
+    int64_t xml_i = 0,   mz_i = 0,   inten_i = 0;        
 
     // Determine starting block (xml, mz, int)
     off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
           mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
-          int_start = db_args->int_binary_divisions[db_args->division]->start_positions[0];
+          inten_start = db_args->inten_binary_divisions[db_args->division]->start_positions[0];
 
-    int block = get_lowest(xml_start, mz_start, int_start); // xml = 0/2, mz = 1, int = 3, error = -1
+    int block = get_lowest(xml_start, mz_start, inten_start); // xml = 0/2, mz = 1, int = 3, error = -1
 
     if(block == -1)
         error("decompress_routine: Error determining starting block.\n");
 
-    long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->int_binary_blk->original_size;
+    long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->inten_binary_blk->original_size;
     if(len <= 0)
         error("decompress_routine: Error determining decompression buffer size.\n");
 
@@ -214,17 +214,17 @@ decompress_routine(void* args)
             xml_i++;
             block++;
             break;
-        case 3:
-            if(int_i == db_args->int_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
-            curr_len = db_args->int_binary_divisions[db_args->division]->end_positions[int_i] - db_args->int_binary_divisions[db_args->division]->start_positions[int_i];
+        case 3: // int
+            if(inten_i == db_args->inten_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
+            curr_len = db_args->inten_binary_divisions[db_args->division]->end_positions[inten_i] - db_args->inten_binary_divisions[db_args->division]->start_positions[inten_i];
             assert(curr_len > 0 && curr_len < len);
-            a_args->src = (char**)&decmp_int_binary;
+            a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
-            a_args->src_format = db_args->df->source_int_fmt;
-            db_args->df->target_int_fun((void*)a_args);
+            a_args->src_format = db_args->df->source_inten_fmt;
+            db_args->df->target_inten_fun((void*)a_args);
             buff_off += *a_args->dest_len;
-            int_i++;
+            inten_i++;
             block = 0;
             break;
         case -1:
@@ -241,9 +241,9 @@ void
 decompress_parallel(char* input_map,
                     block_len_queue_t* xml_block_lens,
                     block_len_queue_t* mz_binary_block_lens,
-                    block_len_queue_t* int_binary_block_lens,
+                    block_len_queue_t* inten_binary_block_lens,
                     data_positions_t** mz_binary_divisions,
-                    data_positions_t** int_binary_divisions,
+                    data_positions_t** inten_binary_divisions,
                     data_positions_t** xml_divisions,
                     data_format_t* df,
                     footer_t* msz_footer,
@@ -252,9 +252,9 @@ decompress_parallel(char* input_map,
     decompress_args_t* args[divisions];
     pthread_t ptid[divisions];
 
-    block_len_t *xml_blk, *mz_binary_blk, *int_binary_blk;
+    block_len_t *xml_blk, *mz_binary_blk, *inten_binary_blk;
 
-    off_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_int_bin_off = 0; // offset within corresponding data_block.
+    off_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_inten_bin_off = 0; // offset within corresponding data_block.
 
     int i;
 
@@ -268,24 +268,24 @@ decompress_parallel(char* input_map,
         {
             xml_blk = pop_block_len(xml_block_lens);
             mz_binary_blk = pop_block_len(mz_binary_block_lens);
-            int_binary_blk = pop_block_len(int_binary_block_lens);
+            inten_binary_blk = pop_block_len(inten_binary_block_lens);
 
             args[i] = alloc_decompress_args(input_map,
                                             df,
                                             xml_blk,
                                             mz_binary_blk,
-                                            int_binary_blk,
+                                            inten_binary_blk,
                                             mz_binary_divisions,
-                                            int_binary_divisions,
+                                            inten_binary_divisions,
                                             xml_divisions,
                                             i,
                                             footer_xml_off + msz_footer->xml_pos,
                                             footer_mz_bin_off + msz_footer->mz_binary_pos,
-                                            footer_int_bin_off + msz_footer->int_binary_pos);
+                                            footer_inten_bin_off + msz_footer->inten_binary_pos);
 
             footer_xml_off += xml_blk->compressed_size;
             footer_mz_bin_off += mz_binary_blk->compressed_size;
-            footer_int_bin_off += int_binary_blk->compressed_size;
+            footer_inten_bin_off += inten_binary_blk->compressed_size;
         }
 
         for(i = divisions_used; i < divisions_used + threads; i++)

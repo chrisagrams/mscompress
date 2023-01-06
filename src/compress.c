@@ -685,12 +685,12 @@ compress_mzml(char* input_map,
               data_positions_t** ddp,
               data_format_t* df,
               data_positions_t** mz_binary_divisions,
-              data_positions_t** int_binary_divisions,
+              data_positions_t** inten_binary_divisions,
               data_positions_t** xml_divisions,
               int output_fd)
 {
 
-    block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *int_binary_block_lens;
+    block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
 
     struct timeval start, stop;
 
@@ -707,8 +707,8 @@ compress_mzml(char* input_map,
     mz_binary_block_lens = compress_parallel((char*)input_map, mz_binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress m/z binary */
 
     print("\t===int binary===\n");
-    footer->int_binary_pos = get_offset(output_fd);
-    int_binary_block_lens = compress_parallel((char*)input_map, int_binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress int binary */
+    footer->inten_binary_pos = get_offset(output_fd);
+    inten_binary_block_lens = compress_parallel((char*)input_map, inten_binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress int binary */
 
     // Dump block_len_queue to msz file.
     footer->xml_blk_pos = get_offset(output_fd);
@@ -717,8 +717,8 @@ compress_mzml(char* input_map,
     footer->mz_binary_blk_pos = get_offset(output_fd);
     dump_block_len_queue(mz_binary_block_lens, output_fd);
 
-    footer->int_binary_blk_pos = get_offset(output_fd);
-    dump_block_len_queue(int_binary_block_lens, output_fd);
+    footer->inten_binary_blk_pos = get_offset(output_fd);
+    dump_block_len_queue(inten_binary_block_lens, output_fd);
 
     footer->xml_ddp_pos = get_offset(output_fd);
     dump_ddp(xml_divisions, divisions, output_fd);
@@ -726,8 +726,8 @@ compress_mzml(char* input_map,
     footer->mz_ddp_pos = get_offset(output_fd);
     dump_ddp(mz_binary_divisions, divisions, output_fd);
 
-    footer->int_ddp_pos = get_offset(output_fd);
-    dump_ddp(int_binary_divisions, divisions, output_fd);
+    footer->inten_ddp_pos = get_offset(output_fd);
+    dump_ddp(inten_binary_divisions, divisions, output_fd);
 
     // footer->num_spectra = dp->total_spec;
 
