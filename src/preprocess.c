@@ -73,17 +73,25 @@ populate_df_target(data_format_t* df, int target_xml_format, int target_mz_forma
 data_positions_t*
 alloc_dp(int total_spec)
 {
-    if(total_spec < 1)
-        warning("alloc_dp: total_spec is less than 1!\n");
+    if(total_spec < 0)
+        error("alloc_dp: total_spec is less than 0!\n");
     if(total_spec > 1000000) // Realistically, this should never happen
         warning("alloc_dp: total_spec is greater than 1,000,000!\n");
     if(total_spec < 0)
-        error("alloc_dp: total_spec is less than 0!\n");
+        error("alloc_dp: total_spec is less than 0!\n");  
 
     data_positions_t* dp = malloc(sizeof(data_positions_t));
 
     if(dp == NULL)
         error("alloc_dp: malloc failure.\n");
+
+    if(total_spec == 0)
+    {
+        dp->total_spec = 0;
+        dp->file_end = 0;
+        dp->start_positions = NULL;
+        dp->end_positions = NULL;
+    }
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
@@ -913,6 +921,7 @@ read_division(void* input_map, long* position)
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
     r->size = *((size_t*)(input_map + *position));
+    *position += sizeof(size_t);
 
     return r;
 }
@@ -977,13 +986,119 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     r = malloc(sizeof(divisions_t));
     if(r == NULL) return NULL;
 
-    r->divisions = malloc(sizeof(division_t*) * n_threads);
+    r->divisions = malloc(sizeof(division_t*) * n_threads +1);
     if(r->divisions == NULL) return NULL;
 
     // r->n_divisions = n_threads;
-    r->n_divisions = 1; // TODO: fix this
+    r->n_divisions = n_threads + 1; // n_divisions + 1 for the last division containing only remaining XML.
 
-    r->divisions[0] = div; // TODO: fix this
+    //  Determine roughly how many spectra each division will contain
+    long n_spec_per_div = div->mz->total_spec / n_threads;
+
+    // Determine how many spectra will be left over
+    long n_spec_leftover = div->mz->total_spec % n_threads;
+
+    int spec_i = 0;
+    int xml_i = 0;
+    for(int i = 0; i < n_threads - 1; i++)
+    {
+        r->divisions[i] = malloc(sizeof(division_t));
+        if(r->divisions[i] == NULL) return NULL;
+
+        r->divisions[i]->xml = alloc_dp(n_spec_per_div*2);
+        r->divisions[i]->xml->total_spec = 0;
+
+        r->divisions[i]->mz = alloc_dp(n_spec_per_div);
+        r->divisions[i]->mz->total_spec = 0;
+
+        r->divisions[i]->inten = alloc_dp(n_spec_per_div);
+        r->divisions[i]->inten->total_spec = 0;
+
+
+        for(int j = 0; j < n_spec_per_div; j++)
+        {
+            // Copy MZ
+            r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
+            r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
+            r->divisions[i]->mz->total_spec++;
+            r->divisions[i]->size += div->mz->end_positions[spec_i] - div->mz->start_positions[spec_i];
+
+            // Copy Inten
+            r->divisions[i]->inten->start_positions[j] = div->inten->start_positions[spec_i];
+            r->divisions[i]->inten->end_positions[j] = div->inten->end_positions[spec_i];
+            r->divisions[i]->inten->total_spec++;
+            r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
+
+            spec_i++;
+        }
+
+        for(int j = 0; j < n_spec_per_div * 2; j++)
+        {
+            // Copy XML
+            r->divisions[i]->xml->start_positions[j] = div->xml->start_positions[xml_i];
+            r->divisions[i]->xml->end_positions[j] = div->xml->end_positions[xml_i];
+            r->divisions[i]->xml->total_spec++;
+            r->divisions[i]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+            xml_i++;
+        }
+    }
+
+    // End case: take the remaining spectra and put them in the last division
+    // TODO: factor this out into a function
+    int i = n_threads - 1;
+    n_spec_per_div += n_spec_leftover;
+
+    r->divisions[i] = malloc(sizeof(division_t));
+    if(r->divisions[i] == NULL) return NULL;
+
+    r->divisions[i]->xml = alloc_dp(n_spec_per_div*2);
+    r->divisions[i]->xml->total_spec = 0;
+
+    r->divisions[i]->mz = alloc_dp(n_spec_per_div);
+    r->divisions[i]->mz->total_spec = 0;
+
+    r->divisions[i]->inten = alloc_dp(n_spec_per_div);
+    r->divisions[i]->inten->total_spec = 0;
+
+
+    for(int j = 0; j < n_spec_per_div; j++)
+    {
+        // Copy MZ
+        r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
+        r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
+        r->divisions[i]->mz->total_spec++;
+        r->divisions[i]->size += div->mz->end_positions[spec_i] - div->mz->start_positions[spec_i];
+
+        // Copy Inten
+        r->divisions[i]->inten->start_positions[j] = div->inten->start_positions[spec_i];
+        r->divisions[i]->inten->end_positions[j] = div->inten->end_positions[spec_i];
+        r->divisions[i]->inten->total_spec++;
+        r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
+
+        spec_i++;
+    }
+
+    for(int j = 0; j < n_spec_per_div * 2; j++)
+    {
+        // Copy XML
+        r->divisions[i]->xml->start_positions[j] = div->xml->start_positions[xml_i];
+        r->divisions[i]->xml->end_positions[j] = div->xml->end_positions[xml_i];
+        r->divisions[i]->xml->total_spec++;
+        r->divisions[i]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+        xml_i++;
+    }
+
+    // End case: remaining XML
+    r->divisions[n_threads] = malloc(sizeof(division_t));
+    if(r->divisions[n_threads] == NULL) return NULL;
+
+    r->divisions[n_threads]->xml = alloc_dp(1);
+    r->divisions[n_threads]->xml->start_positions[0] = div->xml->start_positions[xml_i];
+    r->divisions[n_threads]->xml->end_positions[0] = div->xml->end_positions[xml_i];
+    r->divisions[n_threads]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+
+    r->divisions[n_threads]->mz = alloc_dp(0);
+    r->divisions[n_threads]->inten = alloc_dp(0);
 
     return r;
 }

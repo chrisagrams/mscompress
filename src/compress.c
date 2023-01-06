@@ -465,6 +465,8 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
     cmp_block_t* front;
     clock_t start, stop;
 
+    if(cmp_buff == NULL) return; // Nothing to do.
+
     while(cmp_buff->populated > 0)
     {
         front = pop_cmp_block(cmp_buff);
@@ -571,6 +573,8 @@ compress_routine(void* args)
     if(cb_args == NULL)
         error("compress_routine: Invalid compress_args_t\n");
 
+    if(cb_args->dp->total_spec == 0) return; // No data to compress.
+
     cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
     data_block_t* curr_block = alloc_data_block(cb_args->cmp_blk_size);
 
@@ -643,12 +647,15 @@ compress_parallel(char* input_map,
     blk_len_queue = alloc_block_len_queue();
 
     int divisions_used = 0;
+    int divisions_left = divisions;
 
-    while(divisions_used < divisions)
+    for(i = divisions_used; i < divisions; i++)
+        args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
+
+    while(divisions_left > 0)
     {
-        
-        for(i = divisions_used; i < divisions_used + threads; i++)
-            args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
+        if(divisions_left < threads)
+            threads = divisions_left;
 
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
@@ -672,6 +679,7 @@ compress_parallel(char* input_map,
             dealloc_compress_args(args[i]);
         }
         divisions_used += threads;
+        divisions_left -= threads;
     }
     return blk_len_queue;
 }

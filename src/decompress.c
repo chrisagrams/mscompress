@@ -50,6 +50,8 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 void *
 decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 {
+    if(blk == NULL) // Empty block, return null.
+        return NULL; 
     return zstd_decompress(dctx, input_map+offset, blk->compressed_size, blk->original_size);
 }
 
@@ -176,7 +178,7 @@ decompress_routine(void* args)
             if(xml_i == curr_dp->total_spec) {
                 block = -1; break;}
             curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
-            assert(curr_len > 0 && curr_len < len);
+            assert(curr_len > 0 && curr_len <= len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -255,32 +257,35 @@ decompress_parallel(char* input_map,
     int i;
 
     int divisions_used = 0;
+    int divisions_left = divisions->n_divisions;
 
     clock_t start, stop;
-    
-    while(divisions_used < divisions->n_divisions)
+
+    for(i = 0; i < divisions->n_divisions; i++)
     {
-        for(i = divisions_used; i < divisions_used + threads; i++)
-        {
-            xml_blk = pop_block_len(xml_block_lens);
-            mz_binary_blk = pop_block_len(mz_binary_block_lens);
-            inten_binary_blk = pop_block_len(inten_binary_block_lens);
+        xml_blk = pop_block_len(xml_block_lens);
+        mz_binary_blk = pop_block_len(mz_binary_block_lens);
+        inten_binary_blk = pop_block_len(inten_binary_block_lens);
 
-            args[i] = alloc_decompress_args(input_map,
-                                            df,
-                                            xml_blk,
-                                            mz_binary_blk,
-                                            inten_binary_blk,
-                                            divisions->divisions[i],
-                                            footer_xml_off + msz_footer->xml_pos,
-                                            footer_mz_bin_off + msz_footer->mz_binary_pos,
-                                            footer_inten_bin_off + msz_footer->inten_binary_pos);
+        args[i] = alloc_decompress_args(input_map,
+                                        df,
+                                        xml_blk,
+                                        mz_binary_blk,
+                                        inten_binary_blk,
+                                        divisions->divisions[i],
+                                        footer_xml_off + msz_footer->xml_pos,
+                                        footer_mz_bin_off + msz_footer->mz_binary_pos,
+                                        footer_inten_bin_off + msz_footer->inten_binary_pos);
 
-            footer_xml_off += xml_blk->compressed_size;
-            footer_mz_bin_off += mz_binary_blk->compressed_size;
-            footer_inten_bin_off += inten_binary_blk->compressed_size;
-        }
-
+        if(xml_blk != NULL) footer_xml_off += xml_blk->compressed_size;
+        if(mz_binary_blk != NULL) footer_mz_bin_off += mz_binary_blk->compressed_size;
+        if(inten_binary_blk != NULL) footer_inten_bin_off += inten_binary_blk->compressed_size;
+    }
+    
+    while(divisions_left > 0)
+    {
+        if(divisions_left < threads)
+            threads = divisions_left;
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
             int ret = pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
@@ -304,10 +309,12 @@ decompress_parallel(char* input_map,
             write_to_file(fd, args[i]->ret, args[i]->ret_len);
             stop = clock();
 
-            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, ((double)args[i]->ret_len/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, (float)args[i]->ret_len / (stop - start) * CLOCKS_PER_SEC / 1024 / 1024);
 
             dealloc_decompress_args(args[i]);
         }
+
+        divisions_left -= threads;
         divisions_used += threads;
     }
 }
