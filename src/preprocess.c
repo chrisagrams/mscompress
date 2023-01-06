@@ -174,6 +174,29 @@ free_ddp(data_positions_t** ddp, int divisions)
 
 }
 
+division_t*
+alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
+{
+    division_t* d = malloc(sizeof(division_t));
+
+    if(d == NULL)
+        error("alloc_division: malloc failure.\n");
+
+    d->xml = alloc_dp(n_xml);
+    d->mz = alloc_dp(n_mz);
+    d->inten = alloc_dp(n_inten);
+    d->size = 0;
+
+    if(d->xml == NULL || d->mz == NULL || d->inten == NULL)
+        error("alloc_division: malloc failure.\n");
+
+    d->xml->total_spec = 0;
+    d->mz->total_spec = 0;
+    d->inten->total_spec = 0;
+
+    return d;
+}
+
 /* === End of allocation and deallocation helper functions === */
  
 
@@ -986,7 +1009,7 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     r = malloc(sizeof(divisions_t));
     if(r == NULL) return NULL;
 
-    r->divisions = malloc(sizeof(division_t*) * n_threads +1);
+    r->divisions = malloc(sizeof(division_t*) * (n_threads + 1));
     if(r->divisions == NULL) return NULL;
 
     // r->n_divisions = n_threads;
@@ -1002,18 +1025,7 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     int xml_i = 0;
     for(int i = 0; i < n_threads - 1; i++)
     {
-        r->divisions[i] = malloc(sizeof(division_t));
-        if(r->divisions[i] == NULL) return NULL;
-
-        r->divisions[i]->xml = alloc_dp(n_spec_per_div*2);
-        r->divisions[i]->xml->total_spec = 0;
-
-        r->divisions[i]->mz = alloc_dp(n_spec_per_div);
-        r->divisions[i]->mz->total_spec = 0;
-
-        r->divisions[i]->inten = alloc_dp(n_spec_per_div);
-        r->divisions[i]->inten->total_spec = 0;
-
+        r->divisions[i] = alloc_division(n_spec_per_div*2, n_spec_per_div, n_spec_per_div);
 
         for(int j = 0; j < n_spec_per_div; j++)
         {
@@ -1048,18 +1060,7 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     int i = n_threads - 1;
     n_spec_per_div += n_spec_leftover;
 
-    r->divisions[i] = malloc(sizeof(division_t));
-    if(r->divisions[i] == NULL) return NULL;
-
-    r->divisions[i]->xml = alloc_dp(n_spec_per_div*2);
-    r->divisions[i]->xml->total_spec = 0;
-
-    r->divisions[i]->mz = alloc_dp(n_spec_per_div);
-    r->divisions[i]->mz->total_spec = 0;
-
-    r->divisions[i]->inten = alloc_dp(n_spec_per_div);
-    r->divisions[i]->inten->total_spec = 0;
-
+    r->divisions[i] = alloc_division(n_spec_per_div*2, n_spec_per_div, n_spec_per_div);
 
     for(int j = 0; j < n_spec_per_div; j++)
     {
@@ -1089,16 +1090,12 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     }
 
     // End case: remaining XML
-    r->divisions[n_threads] = malloc(sizeof(division_t));
-    if(r->divisions[n_threads] == NULL) return NULL;
+    r->divisions[n_threads] = alloc_division(1, 0, 0);
 
-    r->divisions[n_threads]->xml = alloc_dp(1);
     r->divisions[n_threads]->xml->start_positions[0] = div->xml->start_positions[xml_i];
     r->divisions[n_threads]->xml->end_positions[0] = div->xml->end_positions[xml_i];
+    r->divisions[n_threads]->xml->total_spec++;
     r->divisions[n_threads]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
-
-    r->divisions[n_threads]->mz = alloc_dp(0);
-    r->divisions[n_threads]->inten = alloc_dp(0);
 
     return r;
 }
