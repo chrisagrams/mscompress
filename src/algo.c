@@ -246,7 +246,7 @@ algo_encode_cast32 (void* args)
     // Cast 32-bit to 64-bit 
     
     // Get source array 
-    float* arr = *a_args->src;
+    float* arr = (float*)(*a_args->src);
     
     // Get array length
     u_int16_t len = (uint16_t)arr[0];

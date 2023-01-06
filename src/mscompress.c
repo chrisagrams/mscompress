@@ -137,7 +137,7 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
             block_len_queue_t**xml_block_lens,
             block_len_queue_t** mz_binary_block_lens,
             block_len_queue_t** inten_binary_block_lens,
-            division_t** divisions,
+            divisions_t** divisions,
             int* n_divisions)
 {
 

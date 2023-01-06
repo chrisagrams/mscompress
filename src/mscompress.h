@@ -340,7 +340,7 @@ void dealloc_block_len_queue(block_len_queue_t* queue);
 void append_block_len(block_len_queue_t* queue, size_t original_size, size_t compressed_size);
 block_len_t* pop_block_len(block_len_queue_t* queue);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
-block_len_queue_t* read_block_len_queue(void* input_map, int offset, int end);
+block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 
 /* zl.c */
 
