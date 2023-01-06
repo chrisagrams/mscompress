@@ -679,18 +679,17 @@ compress_parallel(char* input_map,
 void 
 compress_mzml(char* input_map,
               long blocksize,
-              int divisions,
               int threads,
               footer_t* footer,
-              data_positions_t** ddp,
               data_format_t* df,
-              data_positions_t** mz_binary_divisions,
-              data_positions_t** inten_binary_divisions,
-              data_positions_t** xml_divisions,
+              divisions_t* divisions,
               int output_fd)
 {
-
     block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
+
+    data_positions_t **xml_divisions = join_xml(divisions),
+                     **mz_divisions  = join_mz(divisions),
+                     **inten_divisions = join_inten(divisions); 
 
     struct timeval start, stop;
 
@@ -700,15 +699,15 @@ compress_mzml(char* input_map,
 
     print("\t===XML===\n");
     footer->xml_pos = get_offset(output_fd);
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions, threads, output_fd);  /* Compress XML */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions->n_divisions, threads, output_fd);  /* Compress XML */
 
     print("\t===m/z binary===\n");
     footer->mz_binary_pos = get_offset(output_fd);
-    mz_binary_block_lens = compress_parallel((char*)input_map, mz_binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress m/z binary */
+    mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, blocksize, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
 
     print("\t===int binary===\n");
     footer->inten_binary_pos = get_offset(output_fd);
-    inten_binary_block_lens = compress_parallel((char*)input_map, inten_binary_divisions, df, blocksize, divisions, threads, output_fd); /* Compress int binary */
+    inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, blocksize, divisions->n_divisions, threads, output_fd); /* Compress int binary */
 
     // Dump block_len_queue to msz file.
     footer->xml_blk_pos = get_offset(output_fd);
@@ -720,22 +719,14 @@ compress_mzml(char* input_map,
     footer->inten_binary_blk_pos = get_offset(output_fd);
     dump_block_len_queue(inten_binary_block_lens, output_fd);
 
-    footer->xml_ddp_pos = get_offset(output_fd);
-    dump_ddp(xml_divisions, divisions, output_fd);
+    // footer->xml_ddp_pos = get_offset(output_fd);
+    // dump_ddp(xml_divisions, divisions->n_divisions, output_fd);
 
-    footer->mz_ddp_pos = get_offset(output_fd);
-    dump_ddp(mz_binary_divisions, divisions, output_fd);
+    // footer->mz_ddp_pos = get_offset(output_fd);
+    // dump_ddp(mz_divisions, divisions->n_divisions, output_fd);
 
-    footer->inten_ddp_pos = get_offset(output_fd);
-    dump_ddp(inten_binary_divisions, divisions, output_fd);
-
-    // footer->num_spectra = dp->total_spec;
-
-    // footer->file_end = dp->file_end;
-
-    footer->divisions = divisions;
-
-    write_footer(footer, output_fd);
+    // footer->inten_ddp_pos = get_offset(output_fd);
+    // dump_ddp(inten_divisions, divisions->n_divisions, output_fd);
 
     gettimeofday(&stop, NULL);
 

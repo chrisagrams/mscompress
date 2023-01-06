@@ -116,8 +116,17 @@ typedef struct
     data_positions_t* mz;
     data_positions_t* inten;
     
+    size_t size;
 
 } division_t;
+
+
+typedef struct
+{
+    division_t** divisions;
+    int n_divisions;
+
+} divisions_t;
 
 
 typedef struct 
@@ -172,12 +181,10 @@ typedef struct
     off_t xml_blk_pos;
     off_t mz_binary_blk_pos;
     off_t inten_binary_blk_pos;
-    off_t xml_ddp_pos;
-    off_t mz_ddp_pos;
-    off_t inten_ddp_pos;
+    off_t divisions_t_pos;
     size_t num_spectra;
-    off_t file_end;
-    int divisions;
+    off_t original_filesize;
+    int n_divisions;
     int magic_tag;
     int mz_fmt;
     int inten_fmt;
@@ -215,8 +222,6 @@ int is_msz(int fd);
 
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);
-data_positions_t*find_binary(char* input_map, data_format_t* df);
-data_positions_t** find_binary_quick(char* input_map, data_format_t* df, long end);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
@@ -224,14 +229,18 @@ data_positions_t*** new_get_binary_divisions(data_positions_t** ddp, int ddp_len
 data_positions_t** get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int divisions);
 void free_ddp(data_positions_t** ddp, int divisions);
 Algo map_fun(int fun_num);
-// void dump_dp(data_positions_t* dp, int fd);
+// void write_dp(data_positions_t* dp, int fd);
 // data_positions_t* read_dp(void* input_map, long dp_position, size_t num_spectra, long eof);
 void dump_ddp(data_positions_t** ddp, int divisions, int fd);
 data_positions_t** read_ddp(void* input_map, long position);
 void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
-int preprocess_mzml(char* input_map, long input_filesize, int* divisions, long* blocksize, long* n_threads, data_positions_t*** ddp, data_format_t** df, data_positions_t*** mz_binary_divisions, data_positions_t*** inten_binary_divisions, data_positions_t*** xml_divisions);
-
+void write_divisions(divisions_t* divisions, int fd);
+divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+data_positions_t** join_xml(divisions_t* divisions);
+data_positions_t** join_mz(divisions_t* divisions);
+data_positions_t** join_inten(divisions_t* divisions);
+int preprocess_mzml(char* input_map, long input_filesize, long* blocksize, long n_threads, data_format_t** df, divisions_t** divisions);
 /* sys.c */
 int get_cpu_count();
 int get_thread_id();
@@ -265,7 +274,7 @@ void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* ou
 void compress_routine(void* args);
 block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
-void compress_mzml(char* input_map, long blocksize, int divisions, int threads, footer_t* footer, data_positions_t** ddp, data_format_t* df, data_positions_t** mz_binary_divisions, data_positions_t** inten_binary_divisions, data_positions_t** xml_divisions, int output_fd);
+void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
 
 /* decompress.c */
 typedef struct
@@ -276,10 +285,7 @@ typedef struct
     block_len_t* xml_blk;
     block_len_t* mz_binary_blk;
     block_len_t* inten_binary_blk;
-    data_positions_t** mz_binary_divisions;
-    data_positions_t** inten_binary_divisions;
-    data_positions_t** xml_divisions;
-    int division;
+    division_t* division;
     off_t footer_xml_off;
     off_t footer_mz_bin_off;
     off_t footer_inten_bin_off;
@@ -297,12 +303,10 @@ void decompress_parallel(char* input_map,
                     block_len_queue_t* xml_block_lens,
                     block_len_queue_t* mz_binary_block_lens,
                     block_len_queue_t* inten_binary_block_lens,
-                    data_positions_t** mz_binary_divisions,
-                    data_positions_t** inten_binary_divisions,
-                    data_positions_t** xml_divisions,
+                    divisions_t* divisions,
                     data_format_t* df,
                     footer_t* msz_footer,
-                    int divisions, int threads, int fd);
+                    int threads, int fd);
 
 
 /* algo.c */

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <zstd.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "vendor/base64/include/libbase64.h"
 
@@ -136,10 +137,8 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
             block_len_queue_t**xml_block_lens,
             block_len_queue_t** mz_binary_block_lens,
             block_len_queue_t** inten_binary_block_lens,
-            data_positions_t*** mz_binary_divisions,
-            data_positions_t*** inten_binary_divisions,
-            data_positions_t*** xml_divisions,
-            int* divisions)
+            division_t** divisions,
+            int* n_divisions)
 {
 
       *footer = read_footer(input_map, input_filesize);
@@ -149,22 +148,18 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
       print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
       print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
       print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-      print("\tint binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
-      print("\txml_ddp_pos block position: %ld\n", (*footer)->xml_ddp_pos);
-      print("\tmz_ddp_pos block position: %ld\n", (*footer)->mz_ddp_pos);
-      print("\tinten_ddp_pos block position: %ld\n", (*footer)->inten_ddp_pos);
+      print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
+      print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
       print("\tEOF position: %ld\n", input_filesize);
-      print("\tOriginal file end: %ld\n", (*footer)->file_end);
+      print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
 
       *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
       *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
-      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->xml_ddp_pos);
+      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
 
-      *xml_divisions = read_ddp(input_map, (*footer)->xml_ddp_pos);
-      *mz_binary_divisions = read_ddp(input_map, (*footer)->mz_ddp_pos);
-      *inten_binary_divisions = read_ddp(input_map, (*footer)->inten_ddp_pos);
+      *n_divisions = (*footer)->n_divisions;
 
-      *divisions = (*footer)->divisions;
+      *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
 }
 
 int 
@@ -175,9 +170,10 @@ main(int argc, char* argv[])
     struct timeval abs_start, abs_stop;
     long blocksize = 0;
     struct base64_state state;
-    int divisions = 0;
 
-    data_positions_t **ddp, **mz_binary_divisions, **inten_binary_divisions, **xml_divisions;
+    data_positions_t **ddp, **mz_binary_divisions, **inten_binary_divisions, **xml_divisions; // TODO: remove
+
+    divisions_t* divisions;
     data_format_t* df;
 
     int fds[3] = {-1, -1, -1};
@@ -231,16 +227,16 @@ main(int argc, char* argv[])
       print("\tDetected .mzML file, starting compression...\n");
 
       // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
+
       preprocess_mzml((char*)input_map,
-                       input_filesize,
-                       &divisions,
-                       &blocksize,
-                       &n_threads,
-                       &ddp,
-                       &df,
-                       &mz_binary_divisions,
-                       &inten_binary_divisions,
-                       &xml_divisions);
+                      input_filesize,
+                      &blocksize,
+                      n_threads,
+                      &df,
+                      &divisions);
+      
+      footer->original_filesize = input_filesize;
+      footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
 
       // TODO: target format switch
       df->target_xml_format = _ZSTD_compression_;
@@ -265,16 +261,20 @@ main(int argc, char* argv[])
 
       //Start compress routine.
       compress_mzml((char*)input_map,
-                     blocksize,
-                     divisions,
-                     n_threads,
-                     footer,
-                     ddp,
-                     df,
-                     mz_binary_divisions,
-                     inten_binary_divisions,
-                     xml_divisions,
-                     fds[1]);
+                    blocksize,
+                    n_threads,
+                    footer,
+                    df,
+                    divisions,
+                    fds[1]);
+
+
+      // Write divisions to file.
+      footer->divisions_t_pos = get_offset(fds[1]);
+      write_divisions(divisions, fds[1]);
+
+      // Write footer to file.
+      write_footer(footer, fds[1]);
     }
 
     else if (operation == DECOMPRESS)
@@ -288,6 +288,7 @@ main(int argc, char* argv[])
       footer_t* msz_footer;
       char* xml_compression_type;
       char* binary_compression_type;
+      int n_divisions = 0;
 
       df = get_header_df(input_map);
 
@@ -297,10 +298,11 @@ main(int argc, char* argv[])
                    &xml_block_lens, 
                    &mz_binary_block_lens,
                    &inten_binary_block_lens,
-                   &mz_binary_divisions,
-                   &inten_binary_divisions,
-                   &xml_divisions,
-                   &divisions);
+                   &divisions,
+                   &n_divisions);
+
+      if(n_divisions == 0)
+        error("No divisions found in file, aborting...\n");
 
       print("\nDecompression and encoding...\n");
 
@@ -312,10 +314,8 @@ main(int argc, char* argv[])
                           xml_block_lens,
                           mz_binary_block_lens,
                           inten_binary_block_lens,
-                          mz_binary_divisions,
-                          inten_binary_divisions,
-                          xml_divisions,
-                          df, msz_footer, divisions, n_threads, fds[1]);
+                          divisions,
+                          df, msz_footer, n_threads, fds[1]);
 
     }
     print("\nCleaning up...\n");

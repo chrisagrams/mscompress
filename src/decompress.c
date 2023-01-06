@@ -59,10 +59,7 @@ alloc_decompress_args(char* input_map,
                       block_len_t* xml_blk,
                       block_len_t* mz_binary_blk,
                       block_len_t* inten_binary_blk,
-                      data_positions_t** mz_binary_divisions,
-                      data_positions_t** inten_binary_divisions,
-                      data_positions_t** xml_divisions,
-                      int division,
+                      division_t* division,
                       off_t footer_xml_off,
                       off_t footer_mz_bin_off,
                       off_t footer_inten_bin_off)
@@ -78,9 +75,6 @@ alloc_decompress_args(char* input_map,
     r->xml_blk = xml_blk;
     r->mz_binary_blk = mz_binary_blk;
     r->inten_binary_blk = inten_binary_blk;
-    r->mz_binary_divisions = mz_binary_divisions;
-    r->inten_binary_divisions = inten_binary_divisions;
-    r->xml_divisions = xml_divisions;
     r->division = division;
     r->footer_xml_off = footer_xml_off;
     r->footer_mz_bin_off = footer_mz_bin_off;
@@ -131,6 +125,7 @@ decompress_routine(void* args)
         error("decompress_routine: ZSTD Context failed.\n");
 
     decompress_args_t* db_args = (decompress_args_t*)args;
+    division_t* division = db_args->division;
 
     if(db_args == NULL)
         error("decompress_routine: Decompression arguments are null.\n");
@@ -147,21 +142,14 @@ decompress_routine(void* args)
             xml_off = 0, mz_off = 0, inten_off = 0;
     int64_t xml_i = 0,   mz_i = 0,   inten_i = 0;        
 
-    // Determine starting block (xml, mz, int)
-    off_t xml_start = db_args->xml_divisions[db_args->division]->start_positions[0],
-          mz_start  = db_args->mz_binary_divisions[db_args->division]->start_positions[0],
-          inten_start = db_args->inten_binary_divisions[db_args->division]->start_positions[0];
+    int block = 0;
 
-    int block = get_lowest(xml_start, mz_start, inten_start); // xml = 0/2, mz = 1, int = 3, error = -1
+    long len = division->size;
 
-    if(block == -1)
-        error("decompress_routine: Error determining starting block.\n");
-
-    long len = db_args->xml_blk->original_size + db_args->mz_binary_blk->original_size + db_args->inten_binary_blk->original_size;
     if(len <= 0)
         error("decompress_routine: Error determining decompression buffer size.\n");
 
-    char* buff = malloc(len*3); // *3 to be safe
+    char* buff = malloc(len*2); // *2 to be safe TODO: fix this
     if(buff == NULL)
         error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
@@ -177,13 +165,17 @@ decompress_routine(void* args)
     a_args->dest_len = &algo_output_len;
     a_args->enc_fun = db_args->df->encode_source_compression_fun;
 
+    data_positions_t* curr_dp;
+
     while(block != -1)
     {
         switch (block)
         {
         case 0: // xml
-            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec) {block = -1; break;}
-            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            curr_dp = division->xml;
+            if(xml_i == curr_dp->total_spec) {
+                block = -1; break;}
+            curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
             assert(curr_len > 0 && curr_len < len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -192,8 +184,10 @@ decompress_routine(void* args)
             block++;
             break;
         case 1: // mz
-            if(mz_i == db_args->mz_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
-            curr_len = db_args->mz_binary_divisions[db_args->division]->end_positions[mz_i] - db_args->mz_binary_divisions[db_args->division]->start_positions[mz_i];
+            curr_dp = division->mz;
+            if(mz_i == curr_dp->total_spec) {
+                block = 0; break;}
+            curr_len = curr_dp->end_positions[mz_i] - curr_dp->start_positions[mz_i];
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
@@ -205,8 +199,10 @@ decompress_routine(void* args)
             block++;
             break;
         case 2: // xml
-            if(xml_i == db_args->xml_divisions[db_args->division]->total_spec) {block = -1; break;}
-            curr_len = db_args->xml_divisions[db_args->division]->end_positions[xml_i] - db_args->xml_divisions[db_args->division]->start_positions[xml_i];
+            curr_dp = division->xml;
+            if(xml_i == curr_dp->total_spec) {
+                block = -1; break;}
+            curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
             assert(curr_len > 0 && curr_len < len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -215,8 +211,10 @@ decompress_routine(void* args)
             block++;
             break;
         case 3: // int
-            if(inten_i == db_args->inten_binary_divisions[db_args->division]->total_spec) {block = -1; break;}
-            curr_len = db_args->inten_binary_divisions[db_args->division]->end_positions[inten_i] - db_args->inten_binary_divisions[db_args->division]->start_positions[inten_i];
+            curr_dp = division->inten;
+            if(inten_i == curr_dp->total_spec) {
+                block = 0; break;}
+            curr_len = curr_dp->end_positions[inten_i] - curr_dp->start_positions[inten_i];
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
@@ -242,15 +240,13 @@ decompress_parallel(char* input_map,
                     block_len_queue_t* xml_block_lens,
                     block_len_queue_t* mz_binary_block_lens,
                     block_len_queue_t* inten_binary_block_lens,
-                    data_positions_t** mz_binary_divisions,
-                    data_positions_t** inten_binary_divisions,
-                    data_positions_t** xml_divisions,
+                    divisions_t* divisions,
                     data_format_t* df,
                     footer_t* msz_footer,
-                    int divisions, int threads, int fd)
+                    int threads, int fd)
 {
-    decompress_args_t* args[divisions];
-    pthread_t ptid[divisions];
+    decompress_args_t* args[divisions->n_divisions];
+    pthread_t ptid[divisions->n_divisions];
 
     block_len_t *xml_blk, *mz_binary_blk, *inten_binary_blk;
 
@@ -262,7 +258,7 @@ decompress_parallel(char* input_map,
 
     clock_t start, stop;
     
-    while(divisions_used < divisions)
+    while(divisions_used < divisions->n_divisions)
     {
         for(i = divisions_used; i < divisions_used + threads; i++)
         {
@@ -275,10 +271,7 @@ decompress_parallel(char* input_map,
                                             xml_blk,
                                             mz_binary_blk,
                                             inten_binary_blk,
-                                            mz_binary_divisions,
-                                            inten_binary_divisions,
-                                            xml_divisions,
-                                            i,
+                                            divisions->divisions[i],
                                             footer_xml_off + msz_footer->xml_pos,
                                             footer_mz_bin_off + msz_footer->mz_binary_pos,
                                             footer_inten_bin_off + msz_footer->inten_binary_pos);

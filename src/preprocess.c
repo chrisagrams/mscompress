@@ -409,15 +409,13 @@ validate_positions(off_t* arr, int len)
 }
 
 
-data_positions_t**
+division_t*
 find_binary_quick(char* input_map, data_format_t* df, long end)
 {
     if(input_map == NULL || df == NULL)
         error("find_binary_quick: NULL pointer passed in.\n");
     if(end < 0)
         error("find_binary_quick: end position is negative.\n");
-
-    data_positions_t** ddp;
 
     data_positions_t *mz_dp, *inten_dp, *xml_dp;
 
@@ -427,14 +425,6 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
         error("find_binary_quick: failed to allocate memory.\n");
-
-    ddp = malloc(sizeof(data_positions_t*) * 3);
-    if(ddp == NULL)
-        error("find_binary_quick: failed to allocate memory.\n");
-
-    ddp[0] = mz_dp;
-    ddp[1] = inten_dp;
-    ddp[2] = xml_dp;
 
     char* ptr = input_map;
 
@@ -531,6 +521,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
+    xml_curr++;
     xml_dp->total_spec = xml_curr;
 
     mz_dp->total_spec = df->source_total_spec;
@@ -546,7 +537,18 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     validate_positions(xml_dp->start_positions, xml_dp->total_spec);
     validate_positions(xml_dp->end_positions, xml_dp->total_spec);
 
-    return ddp;
+    // Create division_t 
+
+    division_t* div = (division_t*)malloc(sizeof(division_t));
+    if(div == NULL)
+        error("find_binary_quick: failed to allocate division_t.\n");
+
+    div->xml = xml_dp;
+    div->mz = mz_dp;
+    div->inten = inten_dp;
+    div->size = end; // Size is the end of the file
+
+    return div;    
 }
 
 
@@ -829,138 +831,193 @@ get_xml_divisions(data_positions_t* dp, data_positions_t** binary_divisions, int
     return r;
 }
 
-// void
-// dump_dp(data_positions_t* dp, int fd)
-// {
-//     char* buff;
-
-//     buff = (char*)dp->start_positions;
-//     write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
-//     buff = (char*)dp->end_positions;
-//     write_to_file(fd, buff, sizeof(off_t)*dp->total_spec*2);
-
-//     return;
-// }
-
 void
-dump_ddp(data_positions_t** ddp, int divisions, int fd)
+write_dp(data_positions_t* dp, int fd)
 {
-    char *num_buff, *buff;
-    int i = 0;
+    char* buff, *num_buff;
 
-    // write number of divisions
+
+    // Write total_spec (spectrum count)
     num_buff = malloc(sizeof(int));
-    memcpy(num_buff, (char*)&divisions, sizeof(int));
+    *((int*)num_buff) = dp->total_spec;
     write_to_file(fd, num_buff, sizeof(int));
 
-    for(; i < divisions; i++)
-    {
-        // write spec count
-        memcpy(num_buff, (char*)&ddp[i]->total_spec, sizeof(int));
-        write_to_file(fd, num_buff, sizeof(int));
+    // Write start positions
+    buff = (char*)dp->start_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
 
-        // write start_positions
-        buff = (char*)ddp[i]->start_positions;
-        write_to_file(fd, buff, sizeof(off_t)*ddp[i]->total_spec);
+    // Write end positions
+    buff = (char*)dp->end_positions;
+    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
 
-        // write end positions
-        buff = (char*)ddp[i]->end_positions;
-        write_to_file(fd, buff, sizeof(off_t)*ddp[i]->total_spec);
-    }
-    
-    free(num_buff);
+    return;
 }
 
-data_positions_t**
-read_ddp(void* input_map, long position)
+data_positions_t*
+read_dp(void* input_map, long* position)
 {
-    data_positions_t** r;
+    data_positions_t* r = malloc(sizeof(data_positions_t));
+    if(r == NULL) return NULL;
 
-    int divisions = *(int*)(input_map+position),
-        i = 0,
-        num_spec = 0;
+    // Read total_spec
+    r->total_spec = *((int*)(input_map + *position));
+    *position += sizeof(int);
 
-    position += sizeof(int);
+    // Read start positions
+    r->start_positions = (off_t*)(input_map + *position);
+    *position += sizeof(off_t)*r->total_spec;
 
-    r = malloc(sizeof(data_positions_t*) * divisions);
-
-    for(; i < divisions; i++)
-    {
-        num_spec = *(int*)(input_map+position);
-        position += sizeof(int);
-
-        r[i] = malloc(sizeof(data_positions_t));
-
-        r[i]->total_spec = num_spec;
-
-        r[i]->start_positions = (off_t*)(input_map+position);
-        position += sizeof(off_t)*num_spec;
-        r[i]->end_positions = (off_t*)(input_map+position);
-        position += sizeof(off_t)*num_spec;
-    }
+    // Read end positions
+    r->end_positions = (off_t*)(input_map + *position);
+    *position += sizeof(off_t)*r->total_spec;
 
     return r;
 }
 
-// data_positions_t*
-// read_dp(void* input_map, long dp_position, size_t num_spectra, long eof)
-// {
-//     data_positions_t* r;
+void
+write_division(division_t* div, int fd)
+{
+    char* buff, *num_buff;
 
-//     r = malloc(sizeof(data_positions_t));
+    // Write data_positions_t
+    write_dp(div->xml, fd);
+    write_dp(div->mz, fd);
+    write_dp(div->inten, fd);
 
-//     r->start_positions = (off_t*)(input_map + dp_position);
-//     r->end_positions = (off_t*)(input_map + dp_position + (sizeof(off_t)*num_spectra*2));
-//     r->total_spec = num_spectra;
-//     r->file_end = eof;
+    // Write size of division
+    num_buff = malloc(sizeof(size_t));
+    *((size_t*)num_buff) = div->size;
+    write_to_file(fd, num_buff, sizeof(size_t));
 
-//     return r;
-// }
+    return;
+}
+
+void
+write_divisions(divisions_t* divisions, int fd)
+{
+    for(int i = 0; i < divisions->n_divisions; i++)
+        write_division(divisions->divisions[i], fd);
+
+    return;    
+}
+
+division_t*
+read_division(void* input_map, long* position)
+{
+    division_t* r;
+
+    r = malloc(sizeof(division_t));
+    if(r == NULL) return NULL;
+
+    r->xml = read_dp(input_map, position);
+    r->mz = read_dp(input_map, position);
+    r->inten = read_dp(input_map, position);
+    r->size = *((size_t*)(input_map + *position));
+
+    return r;
+}
+
+divisions_t*
+read_divisions(void* input_map, long position, int n_divisions)
+{
+    divisions_t* r;
+
+    r = malloc(sizeof(divisions_t));
+    if(r == NULL) return NULL;
+    r->divisions = malloc(sizeof(division_t*) * n_divisions);
+    if(r->divisions == NULL) return NULL;
+
+    for(int i = 0; i < n_divisions; i++)
+        r->divisions[i] = read_division(input_map, &position);
+
+    r->n_divisions = n_divisions;
+
+    return r;
+}
+
+
+data_positions_t**
+join_xml(divisions_t* divisions)
+{
+    data_positions_t** r;
+    r = malloc(sizeof(data_positions_t*) * divisions->n_divisions);
+    if(r == NULL) return NULL;
+    for(int i = 0; i < divisions->n_divisions; i++)
+        r[i] = divisions->divisions[i]->xml;
+    return r;    
+}
+
+data_positions_t**
+join_mz(divisions_t* divisions)
+{
+    data_positions_t** r;
+    r = malloc(sizeof(data_positions_t*) * divisions->n_divisions);
+    if(r == NULL) return NULL;
+    for(int i = 0; i < divisions->n_divisions; i++)
+        r[i] = divisions->divisions[i]->mz;
+    return r;    
+}
+
+data_positions_t**
+join_inten(divisions_t* divisions)
+{
+    data_positions_t** r;
+    r = malloc(sizeof(data_positions_t*) * divisions->n_divisions);
+    if(r == NULL) return NULL;
+    for(int i = 0; i < divisions->n_divisions; i++)
+        r[i] = divisions->divisions[i]->inten;
+    return r;    
+}
+
+division_t**
+create_divisions(division_t* div, long blocksize, long n_threads)
+{
+    divisions_t* r;
+
+    r = malloc(sizeof(divisions_t));
+    if(r == NULL) return NULL;
+
+    r->divisions = malloc(sizeof(division_t*) * n_threads);
+    if(r->divisions == NULL) return NULL;
+
+    // r->n_divisions = n_threads;
+    r->n_divisions = 1; // TODO: fix this
+
+    r->divisions[0] = div; // TODO: fix this
+
+    return r;
+}
 
 int
 preprocess_mzml(char* input_map,
-                long input_filesize,
-                int* divisions,
+                long  input_filesize,
                 long* blocksize,
-                long* n_threads,
-                data_positions_t*** ddp,
+                long n_threads,
                 data_format_t** df,
-                data_positions_t*** mz_binary_divisions,
-                data_positions_t*** inten_binary_divisions,
-                data_positions_t*** xml_divisions)
+                divisions_t** divisions)
 {
-  struct timeval start, stop;
+    struct timeval start, stop;
 
-  gettimeofday(&start, NULL);
+    gettimeofday(&start, NULL);
 
-  print("\nPreprocessing...\n");
+    print("\nPreprocessing...\n");
 
-  *df = pattern_detect((char*)input_map);
+    *df = pattern_detect((char*)input_map);
 
-  if (*df == NULL)
-      return -1;
+    if (*df == NULL)
+        return -1;
 
-//   *dp = find_binary((char*)input_map, *df);
-  *ddp = find_binary_quick((char*)input_map, *df, input_filesize);
+    division_t* div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
 
-  if (*ddp == NULL)
-      return -1;
+    if (div == NULL)
+        return -1;
 
-//   *mz_binary_divisions = new_get_binary_divisions((*ddp)[0], blocksize, divisions, n_threads);
-//   *inten_binary_divisions = new_get_binary_divisions((*ddp)[1], blocksize, divisions, n_threads);
-data_positions_t*** binary_divisions = new_get_binary_divisions(*ddp, 2, blocksize, divisions, n_threads);
-*mz_binary_divisions = binary_divisions[0];
-*inten_binary_divisions = binary_divisions[1];
-//   long sum = encodedLength_sum(*dp);
-// 
-//   print("\tencodedLengths sum: %ld\n", sum);
+    *divisions = create_divisions(div, *blocksize, n_threads); // For now, create_divisions only returns one division
 
-//   *xml_divisions = get_xml_divisions(*dp, *binary_divisions, *divisions);
+    if (*divisions == NULL)
+        return -1;
+    gettimeofday(&stop, NULL);
 
-  *xml_divisions = new_get_xml_divisions((*ddp)[2], *divisions);
-
-  gettimeofday(&stop, NULL);
-
-  print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
+    print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
 
 }
