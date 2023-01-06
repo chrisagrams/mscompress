@@ -719,15 +719,6 @@ compress_mzml(char* input_map,
     footer->inten_binary_blk_pos = get_offset(output_fd);
     dump_block_len_queue(inten_binary_block_lens, output_fd);
 
-    // footer->xml_ddp_pos = get_offset(output_fd);
-    // dump_ddp(xml_divisions, divisions->n_divisions, output_fd);
-
-    // footer->mz_ddp_pos = get_offset(output_fd);
-    // dump_ddp(mz_divisions, divisions->n_divisions, output_fd);
-
-    // footer->inten_ddp_pos = get_offset(output_fd);
-    // dump_ddp(inten_divisions, divisions->n_divisions, output_fd);
-
     gettimeofday(&stop, NULL);
 
     print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
