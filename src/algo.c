@@ -30,7 +30,7 @@ algo_decode_lossless (void* args)
     #endif
 
     //Decode using specified encoding format
-    a_args->dec_fun(*a_args->src, a_args->src_len, a_args->dest, a_args->dest_len);
+    a_args->dec_fun(*a_args->src, a_args->src_len, a_args->dest, a_args->dest_len, a_args->tmp);
 
     /* Lossless, don't touch anything */
 

@@ -54,7 +54,7 @@ decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 }
 
 void
-decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "zlib" encoding.
  *        Decodes base64 string, zlib decodes the string, and appends resulting binary
@@ -69,6 +69,8 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
  * @param end_position Position of last byte of </binary> block.
  * 
  * @param out_len Contains resulting buffer size on return.
+ * 
+ * @param tmp Pointer to data_block_t struct used for temporary storage.
  * 
  * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing length of decoded binary
  *         and resulting decoded binary buffer.
@@ -86,9 +88,17 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
     if(out_len == NULL)
         error("decode_zlib_fun: out_len is NULL.\n");
 
+    if(tmp == NULL)
+        error("decode_zlib_fun: tmp is NULL.\n");
+
     size_t b64_out_len = 0;
 
-    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    // char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+
+    if(tmp->max_size < src_len)
+        realloc_data_block(tmp, src_len);
+    
+    char* b64_out_buff = tmp->mem;
     
     decode_base64(src, b64_out_buff, src_len, &b64_out_len);
     
@@ -101,7 +111,7 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
-    free(b64_out_buff);
+    // free(b64_out_buff);
     
     *out_len = decmp_size + ZLIB_SIZE_OFFSET;
     

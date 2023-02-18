@@ -459,6 +459,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 
 void
 cmp_binary_routine(ZSTD_CCtx* czstd,
+                   algo_args* a_args,
                    cmp_blk_queue_t* cmp_buff,
                    data_block_t** curr_block,
                    data_format_t* df,
@@ -477,7 +478,6 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     
     // df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
 
-    algo_args* a_args = malloc(sizeof(algo_args));
     if(a_args == NULL)
         error("cmp_binary_routine: Failed to allocate algo_args.\n");
 
@@ -520,6 +520,9 @@ compress_routine(void* args)
     ZSTD_CCtx* czstd = alloc_cctx();
 
     compress_args_t* cb_args = (compress_args_t*)args;
+    algo_args* a_args = malloc(sizeof(algo_args));
+    a_args->tmp = alloc_data_block(REALLOC_FACTOR); // Allocate a temporary data_block to intermediately store data.
+
 
     if(cb_args == NULL)
         error("compress_routine: Invalid compress_args_t\n");
@@ -545,7 +548,7 @@ compress_routine(void* args)
             error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
         
         if(cb_args->df)
-            cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 
+            cmp_binary_routine(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
                         cb_args->input_map + cb_args->dp->start_positions[i],
                         len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
         else
@@ -561,6 +564,7 @@ compress_routine(void* args)
 
     /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);
+    dealloc_data_block(a_args->tmp);
 
     cb_args->ret = cmp_buff;
 }
