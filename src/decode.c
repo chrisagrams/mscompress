@@ -121,7 +121,7 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_bl
 }
 
 void
-decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 {
     if(src == NULL)
         error("decode_zlib_fun_no_header: src is NULL.\n");
@@ -137,7 +137,10 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     size_t b64_out_len = 0;
 
-    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    if(tmp->max_size < src_len)
+        realloc_data_block(tmp, src_len);
+    
+    char* b64_out_buff = tmp->mem;
     
     decode_base64(src, b64_out_buff, src_len, &b64_out_len);
     
@@ -148,7 +151,7 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
 
-    free(b64_out_buff);
+    // free(b64_out_buff);
     
     *out_len = decmp_size;
     
@@ -157,7 +160,7 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
     free(decmp_output);
 }
 void
-decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 

@@ -327,6 +327,7 @@ typedef struct
     int src_format;
     encode_fun_ptr enc_fun;
     decode_fun_ptr dec_fun;
+    data_block_t* tmp;
 } algo_args;
 void algo_decode_lossless (void* args);
 void algo_encode_lossless (void* args);
