@@ -222,6 +222,12 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output, char**
 int is_mzml(int fd);
 int is_msz(int fd);
 
+
+/* mem.c */
+data_block_t* alloc_data_block(size_t max_size);
+data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
+void dealloc_data_block(data_block_t* db);
+
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
