@@ -518,10 +518,10 @@ compress_parallel(char* input_map,
  */
 {
     block_len_queue_t* blk_len_queue;
-    compress_args_t* args[divisions];
-    pthread_t ptid[divisions];
+    compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
+    pthread_t* ptid = malloc(sizeof(pthread_t) * divisions);
     
-    int i;
+    int i = 0;
 
     blk_len_queue = alloc_block_len_queue();
 
