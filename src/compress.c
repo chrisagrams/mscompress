@@ -167,6 +167,28 @@ alloc_data_block(size_t max_size)
     return r;
 }
 
+data_block_t*
+realloc_data_block(data_block_t* db, size_t new_size)
+{
+    #ifdef ERROR_CHECK
+        if(db == NULL)
+            error("realloc_data_block: db is NULL.\n");
+        if(new_size <= 0)
+            error("realloc_data_block: invalid new_size for data block.\n");
+    #endif
+
+    db->mem = realloc(db->mem, sizeof(char) * new_size);
+
+    #ifdef ERROR_CHECK
+        if(db->mem == NULL)
+            error("realloc_data_block: Failed to reallocate data block memory.\n");
+    #endif
+
+    db->max_size = new_size;
+
+    return db;
+}
+
 
 void
 dealloc_data_block(data_block_t* db)
@@ -252,7 +274,8 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
  * 
  */
 {
-    if(buff_len + data_block->size > data_block->max_size) return 0;        // Not enough space in data block
+    if(buff_len + data_block->size > data_block->max_size)                  // Not enough space in data block
+        realloc_data_block(data_block, data_block->max_size + REALLOC_FACTOR); // Grow data block by REALLOC_FACTOR     
 
     if(data_block->mem+data_block->size == NULL || mem == NULL)             // Check for NULL pointers
         error("append_mem: NULL pointer passed to append_mem.\n");
@@ -576,7 +599,7 @@ compress_routine(void* args)
     if(cb_args->dp->total_spec == 0) return; // No data to compress.
 
     cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
-    data_block_t* curr_block = alloc_data_block(cb_args->cmp_blk_size);
+    data_block_t* curr_block = alloc_data_block(REALLOC_FACTOR); // Alloc to 10mb 
 
 
     size_t len = 0;

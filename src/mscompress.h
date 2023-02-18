@@ -16,6 +16,8 @@
 // #define ZLIB_BUFF_FACTOR 4096
 #define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
+#define REALLOC_FACTOR 1e+7 // 10 MB
+
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
 

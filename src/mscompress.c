@@ -183,7 +183,8 @@ main(int argc, char* argv[])
     int operation = -1;
 
     args.verbose = 0;
-    args.blocksize = 1e+10;
+    // args.blocksize = 1e+10;
+    args.blocksize = 1e+8;
     args.threads = 0;
     args.lossy = NULL;
     args.args[0] = NULL;
