@@ -16,7 +16,7 @@
 // #define ZLIB_BUFF_FACTOR 4096
 #define ZLIB_SIZE_OFFSET sizeof(uint16_t)
 
-#define REALLOC_FACTOR 1e+7 // 10 MB
+#define REALLOC_FACTOR 1.1
 
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
@@ -144,6 +144,8 @@ typedef struct
     char* mem;
     size_t size;
     size_t original_size;
+    size_t max_size;
+
     struct cmp_block_t* next;
 } cmp_block_t;
 
@@ -227,6 +229,8 @@ int is_msz(int fd);
 data_block_t* alloc_data_block(size_t max_size);
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
 void dealloc_data_block(data_block_t* db);
+cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
+void dealloc_cmp_block(cmp_block_t* blk);
 
 /* preproccess.c */
 data_format_t* pattern_detect(char* input_map);
@@ -273,6 +277,7 @@ typedef struct
     data_positions_t* dp;
     data_format_t* df;
     size_t cmp_blk_size;
+    long blocksize;
 
     cmp_blk_queue_t* ret;
 } compress_args_t;
@@ -280,7 +285,7 @@ typedef struct
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
-block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, int divisions, int threads, int fd);
+block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, long blocksize, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
 

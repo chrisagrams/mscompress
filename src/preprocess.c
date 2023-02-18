@@ -881,6 +881,8 @@ write_dp(data_positions_t* dp, int fd)
     buff = (char*)dp->end_positions;
     write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
 
+    free(num_buff);
+
     return;
 }
 
@@ -919,6 +921,7 @@ write_division(division_t* div, int fd)
     num_buff = malloc(sizeof(size_t));
     *((size_t*)num_buff) = div->size;
     write_to_file(fd, num_buff, sizeof(size_t));
+    free(num_buff);
 
     return;
 }
@@ -1002,28 +1005,28 @@ join_inten(divisions_t* divisions)
 }
 
 division_t**
-create_divisions(division_t* div, long blocksize, long n_threads)
+create_divisions(division_t* div, long n_divisions)
 {
     divisions_t* r;
 
     r = malloc(sizeof(divisions_t));
     if(r == NULL) return NULL;
 
-    r->divisions = malloc(sizeof(division_t*) * (n_threads + 1));
+    r->divisions = malloc(sizeof(division_t*) * (n_divisions + 1));
     if(r->divisions == NULL) return NULL;
 
     // r->n_divisions = n_threads;
-    r->n_divisions = n_threads + 1; // n_divisions + 1 for the last division containing only remaining XML.
+    r->n_divisions = n_divisions + 1; // n_divisions + 1 for the last division containing only remaining XML.
 
     //  Determine roughly how many spectra each division will contain
-    long n_spec_per_div = div->mz->total_spec / n_threads;
+    long n_spec_per_div = div->mz->total_spec / n_divisions;
 
     // Determine how many spectra will be left over
-    long n_spec_leftover = div->mz->total_spec % n_threads;
+    long n_spec_leftover = div->mz->total_spec % n_divisions;
 
     int spec_i = 0;
     int xml_i = 0;
-    for(int i = 0; i < n_threads - 1; i++)
+    for(int i = 0; i < n_divisions - 1; i++)
     {
         r->divisions[i] = alloc_division(n_spec_per_div*2, n_spec_per_div, n_spec_per_div);
 
@@ -1057,7 +1060,7 @@ create_divisions(division_t* div, long blocksize, long n_threads)
 
     // End case: take the remaining spectra and put them in the last division
     // TODO: factor this out into a function
-    int i = n_threads - 1;
+    int i = n_divisions - 1;
     n_spec_per_div += n_spec_leftover;
 
     r->divisions[i] = alloc_division(n_spec_per_div*2, n_spec_per_div, n_spec_per_div);
@@ -1090,14 +1093,39 @@ create_divisions(division_t* div, long blocksize, long n_threads)
     }
 
     // End case: remaining XML
-    r->divisions[n_threads] = alloc_division(1, 0, 0);
+    r->divisions[n_divisions] = alloc_division(1, 0, 0);
 
-    r->divisions[n_threads]->xml->start_positions[0] = div->xml->start_positions[xml_i];
-    r->divisions[n_threads]->xml->end_positions[0] = div->xml->end_positions[xml_i];
-    r->divisions[n_threads]->xml->total_spec++;
-    r->divisions[n_threads]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+    r->divisions[n_divisions]->xml->start_positions[0] = div->xml->start_positions[xml_i];
+    r->divisions[n_divisions]->xml->end_positions[0] = div->xml->end_positions[xml_i];
+    r->divisions[n_divisions]->xml->total_spec++;
+    r->divisions[n_divisions]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
 
     return r;
+}
+
+long
+determine_n_divisions(long filesize, long blocksize)
+{
+    long n_divisions = filesize / blocksize;
+
+    if (n_divisions == 0)
+        n_divisions = 1;
+
+    return n_divisions;
+}
+
+long
+get_division_size_max(divisions_t* divisions)
+{
+    long max = 0;
+
+    for(int i = 0; i < divisions->n_divisions; i++)
+    {
+        if (divisions->divisions[i]->size > max)
+            max = divisions->divisions[i]->size;
+    }
+
+    return max;
 }
 
 int
@@ -1124,12 +1152,23 @@ preprocess_mzml(char* input_map,
     if (div == NULL)
         return -1;
 
-    *divisions = create_divisions(div, *blocksize, n_threads); // For now, create_divisions only returns one division
+    long n_divisions = determine_n_divisions(input_filesize, *blocksize);
+
+    // *divisions = create_divisions(div, ((n_divisions) >= (n_threads) ? (n_divisions) : (n_threads))); // Create divisions. Either n_divisions or n_threads, whichever is greater
+
+    if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
+        *divisions = create_divisions(div, n_divisions);
+    else
+    {
+        *divisions = create_divisions(div, n_threads);
+        *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
+    }
 
     if (*divisions == NULL)
         return -1;
     gettimeofday(&stop, NULL);
 
-    print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));  
+    print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6)); 
+    print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, n_threads);
 
 }

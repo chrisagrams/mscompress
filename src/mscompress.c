@@ -44,11 +44,11 @@ parse_blocksize(char* arg)
   
   memcpy(prefix, arg+len-2, 2);
 
-  if(strcmp(prefix, "KB") || strcmp(prefix, "kb"))
+  if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
     res = num*1e+3;
-  else if(strcmp(prefix, "MB") || strcmp(prefix, "mb"))
+  else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
     res = num*1e+6;
-  else if(strcmp(prefix, "GB") || strcmp(prefix, "gb"))
+  else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
     res = num*1e+9;
 
   return res;
@@ -276,6 +276,8 @@ main(int argc, char* argv[])
 
       // Write footer to file.
       write_footer(footer, fds[1]);
+
+      free(footer);
     }
 
     else if (operation == DECOMPRESS)
