@@ -10,14 +10,14 @@
  * 
  */
 
-#include "mscompress.h"
-#include "vendor/base64/include/libbase64.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include "vendor/zlib/zlib.h"
-#include <assert.h>
+#include "vendor/base64/include/libbase64.h"
+#include "mscompress.h"
 
 
 void

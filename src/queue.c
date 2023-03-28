@@ -1,5 +1,5 @@
-#include "mscompress.h"
 #include <stdlib.h>
+#include "mscompress.h"
 
 cmp_blk_queue_t*
 alloc_cmp_buff()

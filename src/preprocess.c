@@ -9,17 +9,18 @@
  * 
  */
 
-#include "mscompress.h"
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <argp.h>
-#include <stdbool.h>
 #include <sys/time.h>
+
 #include "vendor/yxml/yxml.h"
 #include "vendor/base64/lib/config.h"
 #include "vendor/base64/include/libbase64.h"
+#include "mscompress.h"
 
 #define parse_acc_to_int(attrbuff) atoi(attrbuff+3)     /* Convert an accession to an integer by removing 'MS:' substring and calling atoi() */
 
