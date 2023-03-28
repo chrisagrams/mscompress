@@ -1,4 +1,5 @@
 #include "mscompress.h"
+#include <stdlib.h>
 
 data_block_t*
 alloc_data_block(size_t max_size)
