@@ -47,7 +47,7 @@ algo_decode_cast32 (void* args)
     size_t decoded_len = 0;
 
     // Decode using specified encoding format
-    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len);
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
 
     // Deternmine length of data based on data format
     uint16_t len;
@@ -122,7 +122,7 @@ algo_decode_log_2_transform (void* args)
     size_t decoded_len = 0;
 
     //Decode using specified encoding format
-    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len);
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
 
     // Deternmine length of data based on data format
     uint16_t len;
