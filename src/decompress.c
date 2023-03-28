@@ -160,6 +160,9 @@ decompress_routine(void* args)
     int64_t curr_len = 0;
 
     algo_args* a_args = malloc(sizeof(algo_args));
+
+    a_args->z = alloc_z_stream();
+
     if(a_args == NULL)
         error("decompress_routine: Failed to allocate algo_args.\n");
 
@@ -233,6 +236,8 @@ decompress_routine(void* args)
     }
 
     db_args->ret_len = buff_off;
+
+    dealloc_z_stream(a_args->z);
 
     return;
 }

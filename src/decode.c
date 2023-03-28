@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <zlib.h>
 #include "vendor/zlib/zlib.h"
 
 
@@ -54,7 +55,7 @@ decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 }
 
 void
-decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
+decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "zlib" encoding.
  *        Decodes base64 string, zlib decodes the string, and appends resulting binary
@@ -91,6 +92,9 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_bl
     if(tmp == NULL)
         error("decode_zlib_fun: tmp is NULL.\n");
 
+    if(z == NULL)
+        error("decode_zlib_fun: z is NULL.\n");
+
     size_t b64_out_len = 0;
 
     // char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
@@ -107,7 +111,7 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_bl
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
@@ -121,7 +125,7 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_bl
 }
 
 void
-decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
+decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 {
     if(src == NULL)
         error("decode_zlib_fun_no_header: src is NULL.\n");
@@ -134,6 +138,9 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     if(out_len == NULL)
         error("decode_zlib_fun_no_header: out_len is NULL.\n");
+
+    if(z == NULL)
+        error("decode_zlib_fun: z is NULL.\n");
 
     size_t b64_out_len = 0;
 
@@ -149,7 +156,7 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     // free(b64_out_buff);
     
@@ -159,8 +166,9 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     free(decmp_output);
 }
+
 void
-decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
+decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 

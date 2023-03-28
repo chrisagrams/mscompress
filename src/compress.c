@@ -6,6 +6,7 @@
 #include "vendor/zlib/zlib.h"
 #include <sys/time.h>
 #include <pthread.h>
+#include <assert.h>
 
 
 ZSTD_CCtx*
@@ -446,7 +447,7 @@ compress_routine(void* args)
     compress_args_t* cb_args = (compress_args_t*)args;
     algo_args* a_args = malloc(sizeof(algo_args));
     a_args->tmp = alloc_data_block(cb_args->blocksize); // Allocate a temporary data_block to intermediately store data.
-
+    a_args->z = alloc_z_stream(); // Allocate a z_stream to intermediately store data.
 
     if(cb_args == NULL)
         error("compress_routine: Invalid compress_args_t\n");
@@ -489,6 +490,7 @@ compress_routine(void* args)
     /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);
     dealloc_data_block(a_args->tmp);
+    dealloc_z_stream(a_args->z);
 
     cb_args->ret = cmp_buff;
 }

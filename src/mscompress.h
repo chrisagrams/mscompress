@@ -333,6 +333,7 @@ typedef struct
     encode_fun_ptr enc_fun;
     decode_fun_ptr dec_fun;
     data_block_t* tmp;
+    z_stream* z;
 } algo_args;
 void algo_decode_lossless (void* args);
 void algo_encode_lossless (void* args);
@@ -359,12 +360,14 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 /* zl.c */
 
 zlib_block_t* zlib_alloc(int offset);
+z_stream* alloc_z_stream();
+void dealloc_z_stream(z_stream* z);
 void zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);
-uInt zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len);
-uInt zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len);
+uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input_len);
+uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input_len);
 
 
 /* debug.c */

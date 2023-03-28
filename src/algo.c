@@ -30,7 +30,7 @@ algo_decode_lossless (void* args)
     #endif
 
     //Decode using specified encoding format
-    a_args->dec_fun(*a_args->src, a_args->src_len, a_args->dest, a_args->dest_len, a_args->tmp);
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, a_args->dest, a_args->dest_len, a_args->tmp);
 
     /* Lossless, don't touch anything */
 
@@ -47,7 +47,7 @@ algo_decode_cast32 (void* args)
     size_t decoded_len = 0;
 
     // Decode using specified encoding format
-    a_args->dec_fun(*a_args->src, a_args->src_len, &decoded, &decoded_len);
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len);
 
     // Deternmine length of data based on data format
     uint16_t len;
@@ -122,7 +122,7 @@ algo_decode_log_2_transform (void* args)
     size_t decoded_len = 0;
 
     //Decode using specified encoding format
-    a_args->dec_fun(*a_args->src, a_args->src_len, &decoded, &decoded_len);
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len);
 
     // Deternmine length of data based on data format
     uint16_t len;
@@ -220,7 +220,7 @@ algo_encode_lossless (void* args)
     /* Lossless, don't touch anything */
 
     // Encode using specified encoding format
-    a_args->enc_fun(a_args->src, a_args->src_len, a_args->dest, a_args->dest_len);
+    a_args->enc_fun(a_args->z, a_args->src, a_args->src_len, a_args->dest, a_args->dest_len);
 
     return;
 }
@@ -265,7 +265,7 @@ algo_encode_cast32 (void* args)
             char* ptr = *a_args->src + sizeof(float);
 
             // Encode using specified encoding format
-            a_args->enc_fun(&ptr, len * sizeof(float), a_args->dest, a_args->dest_len);
+            a_args->enc_fun(a_args->z, &ptr, len * sizeof(float), a_args->dest, a_args->dest_len);
 
             // Move src pointer
             *a_args->src += (len + 1) * sizeof(float);
@@ -288,7 +288,7 @@ algo_encode_cast32 (void* args)
                 res_arr[i-1] = (double)arr[i];
             
             // Encode using specified encoding format
-            a_args->enc_fun(&res, len*sizeof(double), a_args->dest, a_args->dest_len);
+            a_args->enc_fun(a_args->z, &res, len*sizeof(double), a_args->dest, a_args->dest_len);
 
             // Move src pointer
             *a_args->src += (len+1)*sizeof(float);
@@ -352,7 +352,7 @@ algo_encode_log_2_transform (void* args)
             }
 
             // Encode using specified encoding format
-            a_args->enc_fun((char**)(&res), res_len, a_args->dest, a_args->dest_len);
+            a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
             // Move to next array
             *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;
@@ -370,7 +370,7 @@ algo_encode_log_2_transform (void* args)
                 res[i] = (double)exp2((double)arr[i] / 100);
                 
             // Encode using specified encoding format
-            a_args->enc_fun((char**)(&res), res_len, a_args->dest, a_args->dest_len);
+            a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
             // Move to next array
             *a_args->src += (len*sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;

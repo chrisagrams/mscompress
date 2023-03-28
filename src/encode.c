@@ -61,7 +61,7 @@ encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len)
 }
 
 void
-encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len, char* dest, size_t* out_len)
 {
     // assert(0); // this is broken now, need to fix
     if(src == NULL || *src == NULL)
@@ -75,6 +75,9 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 
     if (out_len == NULL)
         error("encode_zlib_fun: out_len is NULL");
+
+    if (z == NULL)
+        error("encode_zlib_fun: z is NULL");
 
     Bytef* zlib_encoded;
 
@@ -94,7 +97,7 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 
     // uint16_t org_len = *(uint16_t*)decmp_header;
 
-    zlib_len = (size_t)zlib_compress(((Bytef*)*src), cmp_output, src_len);
+    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src), cmp_output, src_len);
     // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, src_len);
 
 
@@ -107,7 +110,7 @@ encode_zlib_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_le
 }
 
 void
-encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len, char* dest, size_t* out_len)
 {
     if(src == NULL || *src == NULL)
         error("encode_zlib_fun: src is NULL");
@@ -120,6 +123,9 @@ encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len
 
     if (out_len == NULL)
         error("encode_zlib_fun: out_len is NULL");
+
+    if (z == NULL)
+        error("encode_zlib_fun: z is NULL");
 
     Bytef* zlib_encoded;
 
@@ -139,7 +145,7 @@ encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len
 
     uint16_t org_len = *(uint16_t*)decmp_header;
 
-    zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
+    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
     // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, src_len);
 
 
@@ -152,7 +158,7 @@ encode_zlib_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len
 }
 
 void
-encode_no_comp_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len, char* dest, size_t* out_len)
 {
     if(src == NULL || *src == NULL)
         error("encode_zlib_fun: src is NULL");
@@ -186,7 +192,7 @@ encode_no_comp_fun_w_header(char** src, size_t src_len, char* dest, size_t* out_
 }
 
 void
-encode_no_comp_fun_no_header(char** src, size_t src_len, char* dest, size_t* out_len)
+encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len, char* dest, size_t* out_len)
 {
     if(src == NULL || *src == NULL)
         error("encode_zlib_fun: src is NULL");
