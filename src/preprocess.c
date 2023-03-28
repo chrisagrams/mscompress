@@ -1154,13 +1154,11 @@ preprocess_mzml(char* input_map,
 
     long n_divisions = determine_n_divisions(input_filesize, *blocksize);
 
-    if(n_divisions > div->mz->total_spec)
+    if(n_divisions > div->mz->total_spec) // If we have more divisions than spectra, we need to decrease the number of divisions
     {
         print("Warning: n_divisions (%ld) > total_spec (%ld). Setting n_divisions to total_spec)\n", n_divisions, div->mz->total_spec);
         n_divisions = div->mz->total_spec;
     }
-
-    // *divisions = create_divisions(div, ((n_divisions) >= (n_threads) ? (n_divisions) : (n_threads))); // Create divisions. Either n_divisions or n_threads, whichever is greater
 
     if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
         *divisions = create_divisions(div, n_divisions);
