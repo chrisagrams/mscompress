@@ -1,10 +1,12 @@
-#include "mscompress.h"
-#include <zstd.h>
+#include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
-#include <assert.h>
+#include <sys/time.h>
+#include "vendor/zlib/zlib.h"
+#include <zstd.h>
+#include "mscompress.h"
 
 ZSTD_DCtx *
 alloc_dctx()

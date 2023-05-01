@@ -1,18 +1,20 @@
 #ifdef __linux__
-    #include <sys/sysinfo.h>
-    #include <sys/types.h>
-    #include <sys/syscall.h>
-    #include <unistd.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #elif __APPLE__
-    #include <sys/sysctl.h>
-    #include <pthread.h>
+#include <sys/sysctl.h>
+#include <pthread.h>
 #elif _WIN32
-    #include <sysinfoapi.h>
+#include <sysinfoapi.h>
 #endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+
 #include "mscompress.h"
 
 

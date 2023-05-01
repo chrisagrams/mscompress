@@ -10,14 +10,14 @@
  * 
  */
 
-#include "mscompress.h"
-#include "vendor/base64/include/libbase64.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <zlib.h>
 #include "vendor/zlib/zlib.h"
+#include "mscompress.h"
+#include "vendor/base64/include/libbase64.h"
 
 
 char*
@@ -127,6 +127,25 @@ decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out
 void
 decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 {
+/**
+ * @brief Decodes a zlib compressed buffer without header and stores the output in a new buffer.
+ * 
+ * This function takes a zlib compressed buffer without header, decodes it, and stores the output in a newly 
+ * allocated buffer. The input buffer must be a base64 encoded string, which will be decoded before decompression.
+ * 
+ * @param z Pointer to a zlib stream object.
+ * @param src Pointer to the source buffer containing the compressed data.
+ * @param src_len Length of the source buffer in bytes.
+ * @param dest Pointer to the destination buffer where the decompressed data will be stored.
+ * @param out_len Pointer to a variable where the size of the decompressed data will be stored.
+ * @param tmp Pointer to a data_block_t object used as a temporary buffer.
+ * 
+ * @return None.
+ *
+ * @note The caller is responsible for freeing the destination buffer after use.
+ * @note The temporary buffer will be reallocated if its size is smaller than the size of the source buffer.
+ * @note This function will terminate the program with an error message if any of the input parameters are NULL or invalid.
+ */
     if(src == NULL)
         error("decode_zlib_fun_no_header: src is NULL.\n");
 
