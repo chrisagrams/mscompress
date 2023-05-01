@@ -363,8 +363,11 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
     }
 }
 
+typedef void (*cmp_routine_func)(ZSTD_CCtx*, algo_args*, cmp_blk_queue_t*, data_block_t**, data_format_t*, char*, size_t, size_t*, size_t*);
+
 void
 cmp_xml_routine(ZSTD_CCtx* czstd,
+                algo_args* a_args,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
@@ -464,6 +467,13 @@ compress_routine(void* args)
 
     int i = 0;
 
+    cmp_routine_func cmp_routine = NULL;
+    
+    if(cb_args->df)
+        cmp_routine = &cmp_binary_routine;
+    else
+        cmp_routine = &cmp_xml_routine;
+
     
     for(; i < cb_args->dp->total_spec; i++)
     {
@@ -472,15 +482,9 @@ compress_routine(void* args)
         if(len < 0)
             error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
         
-        if(cb_args->df)
-            cmp_binary_routine(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
-                        cb_args->input_map + cb_args->dp->start_positions[i],
-                        len, &tot_size, &tot_cmp);
-        else
-            cmp_xml_routine(czstd, cmp_buff, &curr_block,
-                        cb_args->input_map + cb_args->dp->start_positions[i],           
-                        len, &tot_size, &tot_cmp);
-
+        cmp_routine(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
+                    cb_args->input_map + cb_args->dp->start_positions[i],
+                    len, &tot_size, &tot_cmp);
     }
 
     cmp_flush(czstd, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
@@ -593,13 +597,13 @@ compress_mzml(char* input_map,
 
     print("\t===m/z binary===\n");
     footer->mz_binary_pos = get_offset(output_fd);
-    df->target_mz_fun = set_compress_algo(footer->mz_fmt);
+    df->target_mz_fun = set_compress_algo(footer->mz_fmt, df->source_mz_fmt); //TODO, rename target_mz_fun
     mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, blocksize, blocksize/3, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
     free(mz_divisions);
 
     print("\t===int binary===\n");
     footer->inten_binary_pos = get_offset(output_fd);
-    df->target_mz_fun = set_compress_algo(footer->inten_fmt);
+    df->target_mz_fun = set_compress_algo(footer->inten_fmt, df->source_mz_fmt);//TODO, rename target_mz_fun
     inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, blocksize, blocksize/3, divisions->n_divisions, threads, output_fd); /* Compress int binary */
     free(inten_divisions);
 
