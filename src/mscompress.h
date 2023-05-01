@@ -336,12 +336,9 @@ typedef struct
     data_block_t* tmp;
     z_stream* z;
 } algo_args;
-void algo_decode_lossless (void* args);
-void algo_encode_lossless (void* args);
-void algo_decode_log_2_transform (void* args);
-void algo_encode_log_2_transform (void* args);
-Algo_ptr set_compress_algo(int algo);
-Algo_ptr set_decompress_algo(int algo);
+
+Algo_ptr set_compress_algo(int algo, int accession);
+Algo_ptr set_decompress_algo(int algo, int accession);
 int get_algo_type(char* arg);
 
 /* queue.c */

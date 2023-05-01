@@ -177,7 +177,6 @@ main(int argc, char* argv[])
       print("\tDetected .mzML file, starting compression...\n");
 
       // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
-
       preprocess_mzml((char*)input_map,
                       input_filesize,
                       &blocksize,
@@ -200,8 +199,8 @@ main(int argc, char* argv[])
       footer->inten_fmt = get_algo_type(arguments.int_lossy);
       
       // Set target compression functions.
-      df->target_mz_fun= set_compress_algo(footer->mz_fmt);
-      df->target_inten_fun = set_compress_algo(footer->inten_fmt);
+      df->target_mz_fun= set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
+      df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
       
       // Set decoding function based on source compression format.
       df->decode_source_compression_fun = set_decode_fun(df->source_compression, footer->mz_fmt);
@@ -258,10 +257,12 @@ main(int argc, char* argv[])
 
       print("\nDecompression and encoding...\n");
 
+      // Set target encoding and decompression functions.
       df->encode_source_compression_fun = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
-      df->target_mz_fun = set_decompress_algo(msz_footer->mz_fmt);
-      df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt);
+      df->target_mz_fun = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
+      df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
 
+      //Start decompress routine.
       decompress_parallel(input_map,
                           xml_block_lens,
                           mz_binary_block_lens,
