@@ -28,8 +28,8 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "Options:\n");
   fprintf(stream, "  -v, --verbose          Run in verbose mode.\n");
   fprintf(stream, "  -t, --threads num      Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type    Enable mz lossy compression (cast, log). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type   Enable int lossy compression (cast, log). (disabled by default)\n");
+  fprintf(stream, "  -z, --mz-lossy type    Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type   Enable int lossy compression (cast, log, delta). (disabled by default)\n");
   fprintf(stream, "  -b, --blocksize size   Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum         Enable checksum generation. (disabled by default)\n");
   fprintf(stream, "  -h, --help             Show this help message.\n");

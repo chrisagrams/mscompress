@@ -49,6 +49,7 @@
 #define _ZSTD_compression_ 4700001
 #define _cast_64_to_32_    4700002
 #define _log2_transform_   4700003
+#define _delta_transform_  4700004
 
 #define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 
