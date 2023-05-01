@@ -593,11 +593,13 @@ compress_mzml(char* input_map,
 
     print("\t===m/z binary===\n");
     footer->mz_binary_pos = get_offset(output_fd);
+    df->target_mz_fun = set_compress_algo(footer->mz_fmt);
     mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, blocksize, blocksize/3, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
     free(mz_divisions);
 
     print("\t===int binary===\n");
     footer->inten_binary_pos = get_offset(output_fd);
+    df->target_mz_fun = set_compress_algo(footer->inten_fmt);
     inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, blocksize, blocksize/3, divisions->n_divisions, threads, output_fd); /* Compress int binary */
     free(inten_divisions);
 
