@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <argp.h>
 #include <sys/time.h>
 
 #include "vendor/yxml/yxml.h"
@@ -1176,4 +1175,34 @@ preprocess_mzml(char* input_map,
     print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6)); 
     print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, n_threads);
 
+}
+
+void
+parse_footer(footer_t** footer, void* input_map, long input_filesize,
+            block_len_queue_t**xml_block_lens,
+            block_len_queue_t** mz_binary_block_lens,
+            block_len_queue_t** inten_binary_block_lens,
+            divisions_t** divisions,
+            int* n_divisions)
+{
+
+      *footer = read_footer(input_map, input_filesize);
+
+      print("\tXML position: %ld\n", (*footer)->xml_pos);
+      print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
+      print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
+      print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
+      print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
+      print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
+      print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
+      print("\tEOF position: %ld\n", input_filesize);
+      print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
+
+      *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
+      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
+      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
+
+      *n_divisions = (*footer)->n_divisions;
+
+      *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
 }

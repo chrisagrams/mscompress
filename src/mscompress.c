@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <argp.h>
 #include <zstd.h>
 
 #include "vendor/base64/include/libbase64.h"
@@ -18,107 +17,104 @@
 
 int verbose = 0;
 
-const char *argp_program_version = VERSION " " STATUS;
-const char *argp_program_bug_address = ADDRESS;
-static char doc[] = MESSAGE "\n" "MSCompress is used to compress mass spec raw data with high efficiency.";
-static struct argp_option options[] = { 
-    { "verbose", 'v', 0, OPTION_ARG_OPTIONAL, "Run in verbose mode."},
-    { "threads", 't', "num", OPTION_ARG_OPTIONAL, "Set amount of threads to use. (default: auto)"},
-    { "lossy", 'l', "type", OPTION_ARG_OPTIONAL, "Enable lossy compression (cast, log). (disabled by default)"},
-    { "blocksize", 'b', "size", OPTION_ARG_OPTIONAL, "Set maximum blocksize (xKB, xMB, xGB). (default: 10MB)"},
-    { "checksum", 'c', 0, OPTION_ARG_OPTIONAL, "Enable checksum generation. (disabled by default)"},
-    { 0 } 
-};
+static const char* program_name = NULL;
 
-long
-parse_blocksize(char* arg)
-{
-  int num;
-  int len;
-  char prefix[2];
-  long res = -1;
-
-  len = strlen(arg);
-  num = atoi(arg);
-  
-  memcpy(prefix, arg+len-2, 2);
-
-  if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
-    res = num*1e+3;
-  else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
-    res = num*1e+6;
-  else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
-    res = num*1e+9;
-
-  return res;
+static void
+print_usage(FILE* stream, int exit_code) {
+  fprintf(stream, "Usage: %s [OPTION...] input_file [output_file]\n", program_name);
+  fprintf(stream, "Compresses mass spec raw data with high efficiency.\n\n");
+  fprintf(stream, "MSCompress version %s %s\n", VERSION, STATUS);
+  fprintf(stream, "Supports msz versions %s-%s\n", MIN_SUPPORT, MAX_SUPPORT);
+  fprintf(stream, "Options:\n");
+  fprintf(stream, "  -v, --verbose          Run in verbose mode.\n");
+  fprintf(stream, "  -t, --threads num      Set amount of threads to use. (default: auto)\n");
+  fprintf(stream, "  -z, --mz-lossy type    Enable mz lossy compression (cast, log). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type   Enable int lossy compression (cast, log). (disabled by default)\n");
+  fprintf(stream, "  -b, --blocksize size   Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
+  fprintf(stream, "  -c, --checksum         Enable checksum generation. (disabled by default)\n");
+  fprintf(stream, "  -h, --help             Show this help message.\n");
+  fprintf(stream, "  -V, --version          Show version information.\n\n");
+  fprintf(stream, "Arguments:\n");
+  fprintf(stream, "  input_file             Input file path.\n");
+  fprintf(stream, "  output_file            Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
+  exit(exit_code);
 }
 
-static error_t
-parse_opt (int key, char *arg, struct argp_state *state)
-{
-  struct arguments *arguments = state->input;
-  long blksize;
-  switch (key)
-    {
-    case 'v':
+
+static void 
+parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
+  int i;
+  arguments->verbose = 0;
+  arguments->threads = 0;
+  arguments->mz_lossy = NULL;
+  arguments->int_lossy = NULL;
+  arguments->blocksize = 1e+8;
+  arguments->input_file = NULL;
+  arguments->output_file = NULL;
+
+  program_name = argv[0];
+
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
       arguments->verbose = 1;
-      break;
-    case 't':
-      if(arg == NULL)
-        argp_error(state, "Invalid number of threads.");
-      arguments->threads = atoi(arg);
-      if(arguments->threads <= 0)
-        argp_error(state, "Number of threads cannot be less than 1.");
-      break;
-    case 'l':
-      if(arg == NULL)
-        argp_error(state, "Invalid lossy compression type.");
-      arguments->lossy = arg;
-      break;  
-    case 'b':
-      if(arg == NULL)
-        argp_error(state, "Invalid blocksize.");
-      blksize = parse_blocksize(arg);
-      if(blksize == -1)
-        argp_error(state, "Unkown size suffix. (KB, MB, GB)");
+    } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--threads") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Invalid number of threads.");
+        print_usage(stderr, 1);
+      }
+      arguments->threads = atoi(argv[++i]);
+      if (arguments->threads <= 0) {
+        fprintf(stderr, "%s\n", "Number of threads cannot be less than 1.");
+        print_usage(stderr, 1);
+      }
+    } else if (strcmp(argv[i], "-z") == 0 || strcmp(argv[i], "--mz-lossy") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Invalid mz lossy compression type.");
+        print_usage(stderr, 1);
+      }
+      arguments->mz_lossy = argv[++i];
+    } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
+        print_usage(stderr, 1);
+      }
+      arguments->int_lossy = argv[++i];
+    } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Invalid blocksize.");
+        print_usage(stderr, 1);
+      }
+      long blksize = parse_blocksize(argv[++i]);
+      if (blksize == -1) {
+        fprintf(stderr, "%s\n", "Unkown size suffix. (KB, MB, GB)");
+        print_usage(stderr, 1);
+      }
       arguments->blocksize = blksize;
-      break;
-    case ARGP_KEY_ARG:
-      if (state->arg_num >= 3)
-      {
-        argp_usage(state);
-      }
-      arguments->args[state->arg_num] = arg;
-      break;
-    case ARGP_KEY_END:
-      if (state->arg_num < 1)
-      {
-        argp_usage (state);
-      }
-      break;
-    default:
-      return ARGP_ERR_UNKNOWN;
+    } else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
+      // enable checksum generation (not implemented)
+    } else if (arguments->input_file == NULL) {
+      arguments->input_file = argv[i];
+    } else if (arguments->output_file == NULL) {
+      arguments->output_file = argv[i];
+    } else {
+      fprintf(stderr, "%s\n", "Too many arguments.");
+      print_usage(stderr, 1);
     }
-  return 0;
-}
+  }
 
-static char args_doc[] = "input_file (optional)output_file";
+  if (arguments->input_file == NULL) {
+    fprintf(stderr, "%s\n", "Missing input file.");
+    print_usage(stderr, 1);
+  }
 
-static struct argp argp = {options, parse_opt, args_doc, doc};
+  if (arguments->output_file == NULL)
+    arguments->output_file = change_extension(arguments->input_file, ".msz");
 
-
-void prepare_threads(struct arguments args, long* n_threads)
-{
-    long cpu_count;
-
-    cpu_count = get_cpu_count();
-
-    if(args.threads == 0)
-      *n_threads = cpu_count;
-    else
-      *n_threads = args.threads;
-    
-    print("\tUsing %d threads.\n", *n_threads);
+  if(arguments->mz_lossy == NULL)
+      arguments->mz_lossy = "lossless";
+  
+  if(arguments->int_lossy == NULL)
+      arguments->mz_lossy = "lossless";
 }
 
 void
@@ -131,40 +127,10 @@ get_compression_scheme(void* input_map, char** xml_compression_type, char** bina
   print("\tBinary compression scheme: %.*s\n", 0, *binary_compression_type);
 }
 
-void
-parse_footer(footer_t** footer, void* input_map, long input_filesize,
-            block_len_queue_t**xml_block_lens,
-            block_len_queue_t** mz_binary_block_lens,
-            block_len_queue_t** inten_binary_block_lens,
-            divisions_t** divisions,
-            int* n_divisions)
-{
-
-      *footer = read_footer(input_map, input_filesize);
-
-      print("\tXML position: %ld\n", (*footer)->xml_pos);
-      print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
-      print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
-      print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-      print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-      print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
-      print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
-      print("\tEOF position: %ld\n", input_filesize);
-      print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
-
-      *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
-      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
-      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
-
-      *n_divisions = (*footer)->n_divisions;
-
-      *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
-}
-
 int 
 main(int argc, char* argv[]) 
 {
-    struct arguments args;
+    struct Arguments arguments;
 
     struct timeval abs_start, abs_stop;
     long blocksize = 0;
@@ -180,26 +146,10 @@ main(int argc, char* argv[])
     size_t input_filesize = 0;
     long n_threads = 0;
     int operation = -1;
-
-    args.verbose = 0;
-    // args.blocksize = 1e+10;
-    args.blocksize = 1e+8;
-    args.threads = 0;
-    args.lossy = NULL;
-    args.args[0] = NULL;
-    args.args[1] = NULL;
-    args.args[2] = NULL;
-    args.args[3] = NULL;
     
-    
-    argp_parse (&argp, argc, argv, 0, 0, &args);
+    parse_arguments(argc, argv, &arguments);
 
-    if(args.lossy == NULL)
-      args.lossy = "lossless";
-
-    blocksize = args.blocksize;
-
-    verbose = args.verbose;    
+    verbose = arguments.verbose;    
 
     gettimeofday(&abs_start, NULL);
 
@@ -207,17 +157,17 @@ main(int argc, char* argv[])
 
     print("\nPreparing...\n");
 
-    prepare_threads(args, &n_threads);
+    prepare_threads(arguments.threads, &n_threads);
 
     // Open file descriptors and mmap.
-    operation = prepare_fds(args.args[0], &args.args[1], args.args[2], &input_map, &input_filesize, &fds);
+    operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
     // Initialize b64 encoder.
     base64_stream_encode_init(&state, 0);
 
-    print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", args.args[0], input_filesize);
+    print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", arguments.input_file, input_filesize);
 
-    print("\tOutput file: %s\n", args.args[1]);
+    print("\tOutput file: %s\n", arguments.output_file);
 
     if(operation == COMPRESS)
     {
@@ -246,8 +196,8 @@ main(int argc, char* argv[])
       // Parse arguments for compression algorithms and set formats accordingly.
       
       // Store format integer in footer.
-      footer->mz_fmt = get_algo_type(args.lossy);
-      footer->inten_fmt = get_algo_type(args.lossy);
+      footer->mz_fmt = get_algo_type(arguments.mz_lossy);
+      footer->inten_fmt = get_algo_type(arguments.int_lossy);
       
       // Set target compression functions.
       df->target_mz_fun= set_compress_algo(footer->mz_fmt);
@@ -283,7 +233,7 @@ main(int argc, char* argv[])
     {
       print("\tDetected .msz file, reading header and footer...\n");
 
-      if(args.lossy != NULL)
+      if(arguments.mz_lossy != NULL || arguments.int_lossy)
         print("Lossy arg passed while decompressing, ignoring...\n");
 
       block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;

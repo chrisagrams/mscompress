@@ -1,10 +1,11 @@
-#include <argp.h>
 #include <zstd.h>
 #include "vendor/zlib/zlib.h"
 #include <sys/types.h>
 
-#define VERSION "MSCompress 0.0.1"
+#define VERSION "0.0.1"
 #define STATUS "Dev"
+#define MIN_SUPPORT "0.1"
+#define MAX_SUPPORT "0.1"
 #define ADDRESS "chrisagrams@gmail.com"
 
 #define FORMAT_VERSION_MAJOR 1
@@ -56,17 +57,15 @@
 
 extern int verbose;
 
-struct arguments
-{
-  char *args[4];            /* ARG1 and ARG2 */
-  int verbose;              /* The -v flag */
-  int threads;
-  char* lossy;
-  long blocksize;
-  int checksum; 
+struct Arguments {
+    int verbose;
+    int threads;
+    char* mz_lossy;
+    char* int_lossy;
+    long blocksize;
+    char* input_file;
+    char* output_file;
 };
-
-static error_t parse_opt (int key, char *arg, struct argp_state *state);
 
 typedef void (*Algo)(void*);
 typedef Algo (*Algo_ptr)();
@@ -232,7 +231,7 @@ void dealloc_data_block(data_block_t* db);
 cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
 void dealloc_cmp_block(cmp_block_t* blk);
 
-/* preproccess.c */
+/* preprocess.c */
 data_format_t* pattern_detect(char* input_map);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
@@ -253,13 +252,15 @@ data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize, long n_threads, data_format_t** df, divisions_t** divisions);
+void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
+
 /* sys.c */
-int get_cpu_count();
+void prepare_threads(long args_threads, long* n_threads);
 int get_thread_id();
 int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
-
+long parse_blocksize(char* arg);
 
 /* decode.c */
 decode_fun_ptr set_decode_fun(int compression_method, int algo);
