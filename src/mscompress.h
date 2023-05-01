@@ -322,24 +322,10 @@ void decompress_parallel(char* input_map,
                     int threads, int fd);
 
 
-/* algo.c */#include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
-#include <argp.h>
-#include <zstd.h>
-
-#include "vendor/base64/include/libbase64.h"
-#include "vendor/yxml/yxml.h"
-#include "mscompress.h"
-
+/* algo.c */
+typedef struct
+{
+    char** src;
     size_t src_len;
     char** dest;
     size_t* dest_len;
