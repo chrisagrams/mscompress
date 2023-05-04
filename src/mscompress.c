@@ -114,7 +114,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->mz_lossy = "lossless";
   
   if(arguments->int_lossy == NULL)
-      arguments->mz_lossy = "lossless";
+      arguments->int_lossy = "lossless";
 }
 
 void
@@ -133,7 +133,6 @@ main(int argc, char* argv[])
     struct Arguments arguments;
 
     struct timeval abs_start, abs_stop;
-    long blocksize = 0;
     struct base64_state state;
 
     data_positions_t **ddp, **mz_binary_divisions, **inten_binary_divisions, **xml_divisions; // TODO: remove
@@ -179,7 +178,7 @@ main(int argc, char* argv[])
       // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
       preprocess_mzml((char*)input_map,
                       input_filesize,
-                      &blocksize,
+                      &(arguments.blocksize),
                       n_threads,
                       &df,
                       &divisions);
@@ -206,11 +205,11 @@ main(int argc, char* argv[])
       df->decode_source_compression_fun = set_decode_fun(df->source_compression, footer->mz_fmt);
 
       //Write df header to file.
-      write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+      write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
       //Start compress routine.
       compress_mzml((char*)input_map,
-                    blocksize,
+                    arguments.blocksize,
                     n_threads,
                     footer,
                     df,

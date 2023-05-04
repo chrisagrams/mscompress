@@ -1106,6 +1106,11 @@ create_divisions(division_t* div, long n_divisions)
 long
 determine_n_divisions(long filesize, long blocksize)
 {
+    if(blocksize == 0)
+        error("Blocksize cannot be 0.\n");
+    if(filesize == 0)
+        error("Filesize cannot be 0.\n");
+    
     long n_divisions = filesize / blocksize;
 
     if (n_divisions == 0)
