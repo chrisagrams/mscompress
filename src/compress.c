@@ -375,6 +375,7 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
                 algo_args* a_args,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
+                data_format_t* df,
                 char* input,
                 size_t len,
                 size_t* tot_size,
@@ -489,17 +490,9 @@ compress_routine(void* args)
         
         char* map = cb_args->input_map + cb_args->dp->start_positions[i];
 
-        // cmp_fun(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
-        //             map,
-        //             len, &tot_size, &tot_cmp);
-        if(cb_args->df)
-            cmp_binary_routine(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
-                        map,
-                        len, &tot_size, &tot_cmp);
-        else
-            cmp_xml_routine(czstd, a_args, cmp_buff, &curr_block, 
-                        map,
-                        len, &tot_size, &tot_cmp);
+        cmp_fun(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
+                    map,
+                    len, &tot_size, &tot_cmp);
     }
 
     cmp_flush(czstd, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
