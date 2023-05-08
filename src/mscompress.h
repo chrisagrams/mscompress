@@ -19,6 +19,12 @@
 
 #define REALLOC_FACTOR 1.1
 
+// #define DELTA_SCALE_FACTOR 6553.5
+// #define DELTA_SCALE_FACTOR 100
+// #define DELTA_SCALE_FACTOR 1000
+#define DELTA_SCALE_FACTOR 3276.75
+
+
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
 
@@ -44,6 +50,7 @@
 
 #define _intensity_ 1000515
 #define _mass_ 1000514
+#define _xml_ 1000513 //TODO: change this
 
 #define _lossless_         4700000
 #define _ZSTD_compression_ 4700001
@@ -93,8 +100,10 @@ typedef struct
 
     /* runtime variables, not written to disk. */
     int populated;
-    decode_fun_ptr decode_source_compression_fun;
-    encode_fun_ptr encode_source_compression_fun;
+    decode_fun_ptr decode_source_compression_mz_fun;
+    decode_fun_ptr  decode_source_compression_inten_fun;
+    encode_fun_ptr encode_source_compression_mz_fun;
+    encode_fun_ptr encode_source_compression_inten_fun;
     Algo_ptr target_xml_fun;
     Algo_ptr target_mz_fun;
     Algo_ptr target_inten_fun;
@@ -280,6 +289,7 @@ typedef struct
     data_format_t* df;
     size_t cmp_blk_size;
     long blocksize;
+    int mode;
 
     cmp_blk_queue_t* ret;
 } compress_args_t;
@@ -287,7 +297,7 @@ typedef struct
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
-block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, long blocksize, int divisions, int threads, int fd);
+block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, long blocksize, int mode, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
 

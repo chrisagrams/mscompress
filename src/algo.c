@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,7 +39,7 @@ algo_decode_lossless (void* args)
 }
 
 void
-algo_decode_cast32 (void* args)
+algo_decode_cast32_64d (void* args)
 {
     // Parse args
     algo_args* a_args = (algo_args*)args;
@@ -53,46 +54,22 @@ algo_decode_cast32 (void* args)
     uint16_t len;
     float* res;
     
-    switch (a_args->src_format)
+    #ifdef ERROR_CHECK
+        if(a_args->src_format != _64d_) // non-essential check, but useful for debugging
+            error("algo_decode_cast32_64d: Unknown data format");
+    #endif
+    len = decoded_len / sizeof(double);
+    res = malloc((len + 1) * sizeof(float)); // Allocate space for result and leave room for header
+    
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_decode_cast32: malloc failed");
+    #endif
+
+    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    for(int i = 1; i < len + 1; i++)
     {
-        case _32f_: 
-        {
-            len = decoded_len / sizeof(float);
-            res = malloc((len + 1) * sizeof(float)); // Allocate space for result and leave room for header
-
-            #ifdef ERROR_CHECK
-                if(res == NULL)
-                    error("algo_decode_cast32: malloc failed");
-            #endif
-
-            float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-            for(int i = 1; i < len + 1; i++)
-            {
-                res[i] = f[i-1];
-            }
-            break;
-        }
-        case _64d_: 
-        {
-            len = decoded_len / sizeof(double);
-            res = malloc((len + 1) * sizeof(float)); // Allocate space for result and leave room for header
-            
-            #ifdef ERROR_CHECK
-                if(res == NULL)
-                    error("algo_decode_cast32: malloc failed");
-            #endif
-
-            double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-            for(int i = 1; i < len + 1; i++)
-            {
-                res[i] = (float)f[i-1];
-            }
-            break;
-        }
-        default : {
-            free(res);
-            error("algo_decode_cast32: Unknown data format");
-        }
+        res[i] = (float)f[i-1];
     }
 
     // Store length of array in first 4 bytes
@@ -244,8 +221,10 @@ algo_decode_delta_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
+    size_t res_len = (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+
     // Perform delta transform
-    res = malloc((len + 1) * sizeof(uint16_t) + sizeof(float)); // Allocate space for result and leave room for header and first value
+    res = malloc(res_len); // Allocate space for result and leave room for header and first value
 
     #ifdef ERROR_CHECK
         if(res == NULL)
@@ -256,14 +235,16 @@ algo_decode_delta_transform_32f (void* args)
     uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
-    *(float*)&res[0] = f[0];
+    // *(float*)&res[0] = f[0];
+    memcpy(tmp, f, sizeof(float));
 
     // Perform delta transform
     for(int i = 1; i < len; i++)
     {
-        float diff = tmp[i] - tmp[i-1];
-        uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        res[i+1] = uint_diff;
+        float diff = f[i] - f[i-1];
+        // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
+        uint16_t uint_diff = (uint16_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        tmp[i+1] = uint_diff;
     }
 
     // Free decoded buffer
@@ -274,7 +255,7 @@ algo_decode_delta_transform_32f (void* args)
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = (len + 1) * sizeof(uint16_t) + sizeof(float);
+    *a_args->dest_len = res_len;
 
     return;
 }
@@ -310,7 +291,7 @@ algo_encode_lossless (void* args)
 }
 
 void
-algo_encode_cast32 (void* args)
+algo_encode_cast32_64d (void* args)
 /**
  * @brief Casts 32-bit float array to 64-bit double array.
  * 
@@ -491,10 +472,10 @@ algo_encode_delta_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(u_int16_t));
+    float start = *(float*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(u_int16_t) + sizeof(float));
+    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -513,7 +494,7 @@ algo_encode_delta_transform_32f (void* args)
     // Perform delta transform
     res[0] = start;
     for(size_t i = 1; i < len; i++)
-        res[i] = res[i-1] + (float)arr[i];
+        res[i] = res[i-1] + ((float)arr[i] / DELTA_SCALE_FACTOR);
     
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
@@ -542,7 +523,7 @@ set_compress_algo(int algo, int accession)
         {   
             switch(accession)
             {
-                case _64d_ :    return algo_decode_cast32;
+                case _64d_ :    return algo_decode_cast32_64d;
                 case _32f_ :    return algo_decode_lossless; // casting 32 to 32 is just lossless
             }
         } ;
@@ -580,7 +561,7 @@ set_decompress_algo(int algo, int accession)
         {
             switch(accession)
             {
-                case _64d_ :    return algo_encode_cast32;
+                case _64d_ :    return algo_encode_cast32_64d;
                 case _32f_ :    return algo_encode_lossless; // casting 32 to 32 is just lossless
             }
         } ;

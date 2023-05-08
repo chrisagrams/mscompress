@@ -170,7 +170,7 @@ decompress_routine(void* args)
 
     size_t algo_output_len = 0;
     a_args->dest_len = &algo_output_len;
-    a_args->enc_fun = db_args->df->encode_source_compression_fun;
+    
 
     data_positions_t* curr_dp;
 
@@ -200,6 +200,7 @@ decompress_routine(void* args)
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_mz_fmt;
+            a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             db_args->df->target_mz_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             mz_i++;
@@ -227,6 +228,7 @@ decompress_routine(void* args)
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_inten_fmt;
+            a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             db_args->df->target_inten_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             inten_i++;
