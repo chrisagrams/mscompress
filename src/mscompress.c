@@ -30,6 +30,7 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "  -t, --threads num      Set amount of threads to use. (default: auto)\n");
   fprintf(stream, "  -z, --mz-lossy type    Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
   fprintf(stream, "  -i, --int-lossy type   Enable int lossy compression (cast, log, delta). (disabled by default)\n");
+  fprintf(stream, "--mz-scale-factor factor Set mz scale factors for delta transform (default: 1000.0)\n");
   fprintf(stream, "  -b, --blocksize size   Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum         Enable checksum generation. (disabled by default)\n");
   fprintf(stream, "  -h, --help             Show this help message.\n");
@@ -51,7 +52,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->blocksize = 1e+8;
   arguments->input_file = NULL;
   arguments->output_file = NULL;
-
+  arguments->mz_scale_factor = 1000; // initialize scale factor to default value
   program_name = argv[0];
 
   for (i = 1; i < argc; i++) {
@@ -92,7 +93,22 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->blocksize = blksize;
     } else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
       // enable checksum generation (not implemented)
-    } else if (arguments->input_file == NULL) {
+    } else if (strcmp(argv[i], "--mz-scale-factor") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing scale factor for mz compression.");
+        print_usage(stderr, 1);
+      }
+      arguments->mz_scale_factor = atof(argv[++i]);
+    } 
+    // // delta transform for int compression is not implemented
+    // else if (strcmp(argv[i], "--int-scale-factor") == 0) {
+    //   if (i + 1 >= argc) {
+    //     fprintf(stderr, "%s\n", "Missing scale factor for int compression.");
+    //     print_usage(stderr, 1);
+    //   }
+    //   arguments->int_scale_factor = atof(argv[++i]);
+    //} 
+    else if (arguments->input_file == NULL) {
       arguments->input_file = argv[i];
     } else if (arguments->output_file == NULL) {
       arguments->output_file = argv[i];
