@@ -55,6 +55,10 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->mz_scale_factor = 1000; // initialize scale factor to default value
   program_name = argv[0];
 
+  if(argc <= 2) {
+    print_usage(stderr, 1);
+  }
+
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
       arguments->verbose = 1;
