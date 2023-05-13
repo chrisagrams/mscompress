@@ -1472,6 +1472,66 @@ get_division_size_max(divisions_t* divisions)
     return max;
 }
 
+int 
+is_monotonically_increasing(int* arr, int size)
+/*  
+    This function checks if the array is monotonically increasing.
+    The function returns 1 if the array is monotonically increasing, otherwise it returns 0.
+*/
+{
+
+    int i;
+    for (i = 0; i < size - 1; i++) {
+        if (arr[i] >= arr[i+1]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+long* 
+string_to_array(char* str, int* size) 
+/*
+    This function converts a string of numbers into an array of numbers.
+    The function returns the array and sets the size of the array.
+*/
+{
+    int i, j;
+    int len = strlen(str);
+    long* arr = malloc(len * sizeof(long));
+    *size = 0;
+
+    for (i = 0; i < len; i++) {
+        if (str[i] >= '0' && str[i] <= '9') {
+            long num = str[i] - '0';
+            for (j = i + 1; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
+                num = num * 10 + (str[j] - '0');
+            }
+            arr[*size] = num;
+            (*size)++;
+            i = j - 1;
+        }
+        else if (str[i] == '[') {
+            long start = 0;
+            for (j = i + 1; j < len && str[j] != '-'; j++) {
+                start = start * 10 + (str[j] - '0');
+            }
+            long end = 0;
+            for (j = j + 1; j < len && str[j] != ']'; j++) {
+                end = end * 10 + (str[j] - '0');
+            }
+            for (long num = start; num <= end; num++) {
+                arr[*size] = num;
+                (*size)++;
+            }
+            i = j;
+        }
+    }
+
+    return arr;
+}
+
+
 int
 preprocess_mzml(char* input_map,
                 long  input_filesize,
