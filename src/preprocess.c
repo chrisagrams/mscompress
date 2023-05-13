@@ -1537,6 +1537,8 @@ preprocess_mzml(char* input_map,
                 long  input_filesize,
                 long* blocksize,
                 long n_threads,
+                long* indicies,
+                long indicies_length, 
                 data_format_t** df,
                 divisions_t** divisions)
 {
@@ -1551,12 +1553,18 @@ preprocess_mzml(char* input_map,
     if (*df == NULL)
         return -1;
 
-    // division_t* div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
-    division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
-    // division_t* div = extract_one_spectra(tmp, 2);
-    long indicies[] = {1, 3, 5};
-    division_t* div = extract_n_spectra(tmp, indicies, 3);
-
+    division_t* div = NULL;
+    if(indicies_length == 0)
+    {
+        div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+    }
+    else if(indicies_length > 0)
+    {
+        division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        div = extract_n_spectra(tmp, indicies, indicies_length);
+    }
+    else
+        error("Invalid indicies_size: %ld\n", indicies_length);
 
     if (div == NULL)
         return -1;

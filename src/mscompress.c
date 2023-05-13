@@ -53,6 +53,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->input_file = NULL;
   arguments->output_file = NULL;
   arguments->mz_scale_factor = 1000; // initialize scale factor to default value
+  arguments->indices = NULL;
+  arguments->indices_length = 0;
   program_name = argv[0];
 
   if(argc <= 2) {
@@ -103,6 +105,13 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->mz_scale_factor = atof(argv[++i]);
+    }
+    else if (strcmp(argv[i], "--extract-indices") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing indices array for extraction.");
+        print_usage(stderr, 1);
+      }
+      arguments->indices = string_to_array(argv[++i], &arguments->indices_length);
     } 
     // // delta transform for int compression is not implemented
     // else if (strcmp(argv[i], "--int-scale-factor") == 0) {
@@ -200,6 +209,8 @@ main(int argc, char* argv[])
                       input_filesize,
                       &(arguments.blocksize),
                       n_threads,
+                      arguments.indices,
+                      arguments.indices_length,
                       &df,
                       &divisions);
       
