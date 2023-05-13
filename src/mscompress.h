@@ -77,6 +77,8 @@ struct Arguments {
     float int_scale_factor;
     long* indices;
     long indices_length;
+    long* scans;
+    long scans_length;
 };
 
 typedef void (*Algo)(void*);
@@ -131,8 +133,10 @@ typedef struct
     data_positions_t* xml;
     data_positions_t* mz;
     data_positions_t* inten;
-    
+
     size_t size;
+
+    long* scans;
 
 } division_t;
 
@@ -266,8 +270,9 @@ divisions_t* read_divisions(void* input_map, long position, int n_divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
-long* string_to_array(char* str, int* size);
-int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, long n_threads, long* indicies, long indicies_length,  data_format_t** df, divisions_t** divisions);
+long* string_to_array(char* str, long* size);
+void map_scan_to_index(struct Arguments* arguments, division_t* div);
+int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, long n_threads, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 
 /* sys.c */
