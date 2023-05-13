@@ -9,6 +9,7 @@
  * 
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -582,7 +583,338 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     return div;    
 }
 
+division_t*
+find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
+{
+    if(input_map == NULL || df == NULL)
+        error("find_binary_quick: NULL pointer passed in.\n");
+    if(end < 0)
+        error("find_binary_quick: end position is negative.\n");
 
+    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
+
+    spectra_dp = alloc_dp(df->source_total_spec);
+    xml_dp = alloc_dp(df->source_total_spec * 2);
+    mz_dp = alloc_dp(df->source_total_spec);
+    inten_dp = alloc_dp(df->source_total_spec);
+
+    if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
+        error("find_binary_quick: failed to allocate memory.\n");
+
+    char* ptr = input_map;
+
+    int spec_curr = 0, mz_curr = 0, inten_curr = 0, xml_curr = 0;
+
+    int curr_scan = 0;
+    int curr_ms_level = 0;
+
+    char* e;
+
+    int bound = df->source_total_spec * 2;
+
+    // xml base case
+    xml_dp->start_positions[xml_curr] = 0;
+
+    while (ptr)
+    {   
+        if(mz_curr + inten_curr == bound)
+            break;
+        
+        if(xml_curr >= bound || mz_curr >= df->source_total_spec || inten_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
+            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+            
+        ptr = strstr(ptr, "<spectrum ");
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find spectrum. index: %d\n", mz_curr + inten_curr);
+        
+        spectra_dp->start_positions[spec_curr] = ptr - input_map;
+
+        ptr = strstr(ptr, "scan=") + 5;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+
+        e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+
+        curr_scan = strtol(ptr, &e, 10);
+
+        if(curr_scan == 0)
+            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+
+        ptr = e;
+
+        ptr = strstr(ptr, "\"ms level\"") + 18;
+
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+        e = strstr(ptr, "\"");
+
+        if(e == NULL)
+            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+        curr_ms_level = strtol(ptr, &e, 10);
+
+        ptr = e;
+
+
+        ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        mz_dp->start_positions[mz_curr] = ptr - input_map;
+        xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
+
+
+        
+        ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        mz_dp->end_positions[mz_curr] = ptr - input_map;
+        xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
+
+        // scan_nums[curr] = curr_scan;
+        // ms_levels[curr++] = curr_ms_level;
+        mz_curr++;
+
+
+        ptr = strstr(ptr, "<binary>") + 8;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        inten_dp->start_positions[inten_curr] = ptr - input_map;
+        xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
+
+        
+        ptr = strstr(ptr, "</binary>");
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        inten_dp->end_positions[inten_curr] = ptr - input_map;
+        xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
+        
+        // scan_nums[curr] = curr_scan;
+        // ms_levels[curr++] = curr_ms_level;
+        inten_curr++;
+
+        ptr = strstr(ptr, "</spectrum>") + 11;
+        if(ptr == NULL)
+            error("find_binary_quick: failed to find end of spectrum. index: %d\n", mz_curr + inten_curr);
+        
+        spectra_dp->end_positions[spec_curr] = ptr - input_map;
+        spec_curr++;
+    
+    }
+
+    if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
+        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+
+    // xml base case
+    xml_dp->end_positions[xml_curr] = end;
+    xml_curr++;
+    xml_dp->total_spec = xml_curr;
+
+    mz_dp->total_spec = df->source_total_spec;
+    inten_dp->total_spec = df->source_total_spec;
+
+    mz_dp->file_end = inten_dp->file_end = xml_dp->file_end = end;
+
+    // Sanity check
+    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
+    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
+    validate_positions(inten_dp->start_positions, inten_dp->total_spec);
+    validate_positions(inten_dp->end_positions, inten_dp->total_spec);
+    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
+    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
+
+    // Create division_t 
+
+    division_t* div = (division_t*)malloc(sizeof(division_t));
+    if(div == NULL)
+        error("find_binary_quick: failed to allocate division_t.\n");
+
+    div->spectra = spectra_dp;
+    div->xml = xml_dp;
+    div->mz = mz_dp;
+    div->inten = inten_dp;
+    div->size = end; // Size is the end of the file
+
+    return div;    
+}
+
+division_t*
+extract_one_spectra(division_t* div, long index)
+{
+    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
+
+    division_t* new_div = (division_t*)malloc(sizeof(division_t));
+    if(new_div == NULL)
+        error("extract_one_spectra: failed to allocate division_t.\n");
+
+    xml_dp = alloc_dp(6);
+    mz_dp = alloc_dp(2);
+    inten_dp = alloc_dp(2);
+
+    //Copy over xml from start to first spectra
+
+    xml_dp->start_positions[0] = div->xml->start_positions[0];
+    xml_dp->end_positions[0] = div->spectra->start_positions[0];
+
+    new_div->size += xml_dp->end_positions[0] - xml_dp->start_positions[0];
+    // mz and inten of zero for position 0
+    mz_dp->start_positions[0] = 0;
+    mz_dp->end_positions[0] = 0;
+    inten_dp->start_positions[0] = 0;
+    inten_dp->end_positions[0] = 0;
+
+    xml_dp->start_positions[1] = 0;
+    xml_dp->end_positions[1] = 0;
+
+
+    //Copy over xml from index start till mz start
+    xml_dp->start_positions[2] = div->spectra->start_positions[index];
+    xml_dp->end_positions[2] = div->mz->start_positions[index];
+    new_div->size += xml_dp->end_positions[2] - xml_dp->start_positions[2];
+
+    //Copy over mz from index start till mz end
+    mz_dp->start_positions[1] = div->mz->start_positions[index];
+    mz_dp->end_positions[1] = div->mz->end_positions[index];
+    new_div->size += mz_dp->end_positions[1] - mz_dp->start_positions[1];
+
+    //Copy over xml from index start till int start
+    xml_dp->start_positions[3] = div->mz->end_positions[index];
+    xml_dp->end_positions[3] = div->inten->start_positions[index];
+    new_div->size += xml_dp->end_positions[3] - xml_dp->start_positions[3];
+
+    //Copy over int from index start till int end
+    inten_dp->start_positions[1] = div->inten->start_positions[index];
+    inten_dp->end_positions[1] = div->inten->end_positions[index];
+    new_div->size += inten_dp->end_positions[1] - inten_dp->start_positions[1];
+
+    //Copy over xml from inden end till next spectra
+    xml_dp->start_positions[4] = div->inten->end_positions[index];
+    xml_dp->end_positions[4] = div->spectra->start_positions[index+1];
+    new_div->size += xml_dp->end_positions[4] - xml_dp->start_positions[4];
+
+    //Copy over xml from last spectra till end
+    xml_dp->start_positions[5] = div->spectra->end_positions[div->mz->total_spec-1];
+    xml_dp->end_positions[5] = div->xml->end_positions[div->xml->total_spec-1];
+    new_div->size += xml_dp->end_positions[5] - xml_dp->start_positions[5];
+
+    new_div->spectra = div->spectra;
+    new_div->xml = xml_dp;
+    new_div->mz = mz_dp;
+    new_div->inten = inten_dp;
+
+    return new_div;
+}
+
+division_t*
+extract_n_spectra(division_t* div, long* indicies, long n)
+/*
+    Further pipeline expects the following structure:
+        1. xml
+        2. mz
+        3. xml
+        4. inten
+    Thus, we need padding of 0's for mz and inten between xml blocks.
+*/
+{
+    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
+
+    division_t* new_div = (division_t*)malloc(sizeof(division_t));
+    if(new_div == NULL)
+        error("extract_one_spectra: failed to allocate division_t.\n");
+
+    xml_dp = alloc_dp(((n*5)+3));
+    mz_dp = alloc_dp(n*2);
+    inten_dp = alloc_dp(n*2);
+
+    //base case
+    //Copy over xml from start to first spectra
+
+    xml_dp->start_positions[0] = div->xml->start_positions[0];
+    xml_dp->end_positions[0] = div->spectra->start_positions[0];
+
+    new_div->size += xml_dp->end_positions[0] - xml_dp->start_positions[0];
+    // mz and inten of zero for position 0
+    mz_dp->start_positions[0] = 0;
+    mz_dp->end_positions[0] = 0;
+    inten_dp->start_positions[0] = 0;
+    inten_dp->end_positions[0] = 0;
+
+    xml_dp->start_positions[1] = 0;
+    xml_dp->end_positions[1] = 0;
+
+    long xml_curr = 2;
+    long mz_curr = 1;
+    long inten_curr = 1;
+
+    for(long i = 0; i < n; i++)
+    {
+        long index = indicies[i];
+
+        //Copy over xml from index start till mz start
+        xml_dp->start_positions[xml_curr] = div->spectra->start_positions[index];
+        xml_dp->end_positions[xml_curr] = div->mz->start_positions[index];
+        new_div->size += xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
+
+        xml_curr++;
+
+        //Copy over mz from index start till mz end
+        mz_dp->start_positions[mz_curr] = div->mz->start_positions[index];
+        mz_dp->end_positions[mz_curr] = div->mz->end_positions[index];
+        new_div->size += mz_dp->end_positions[mz_curr] - mz_dp->start_positions[mz_curr];
+
+        mz_curr++;
+
+        //Copy over xml from index start till int start
+        xml_dp->start_positions[xml_curr] = div->mz->end_positions[index];
+        xml_dp->end_positions[xml_curr] = div->inten->start_positions[index];
+        new_div->size += xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
+
+        xml_curr++;
+
+        //Copy over int from index start till int end
+        inten_dp->start_positions[inten_curr] = div->inten->start_positions[index];
+        inten_dp->end_positions[inten_curr] = div->inten->end_positions[index];
+        new_div->size += inten_dp->end_positions[inten_curr] - inten_dp->start_positions[inten_curr];
+
+        inten_curr++;
+
+        //Copy over xml from inden end till next spectra
+        xml_dp->start_positions[xml_curr] = div->inten->end_positions[index];
+        xml_dp->end_positions[xml_curr] = div->spectra->start_positions[index+1];
+        new_div->size += xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
+        
+        xml_curr++;
+
+        // padding for mz and inten
+        mz_dp->start_positions[mz_curr] = 0;
+        mz_dp->end_positions[mz_curr] = 0;
+        mz_curr++;
+        xml_dp->start_positions[xml_curr] = 0;
+        xml_dp->end_positions[xml_curr] = 0;
+        xml_curr++;
+        inten_dp->start_positions[inten_curr] = 0;
+        inten_dp->end_positions[inten_curr] = 0;
+        inten_curr++;
+    }
+
+    //end case
+
+    //Copy over xml from last spectra till end
+    xml_dp->start_positions[xml_curr] = div->spectra->end_positions[div->mz->total_spec-1];
+    xml_dp->end_positions[xml_curr] = div->xml->end_positions[div->xml->total_spec-1];
+    new_div->size += xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
+    xml_curr++;
+
+    new_div->spectra = div->spectra;
+    new_div->xml = xml_dp;
+    new_div->mz = mz_dp;
+    new_div->inten = inten_dp;
+
+    return new_div;
+}
 
 long
 encodedLength_sum(data_positions_t* dp)
@@ -1093,12 +1425,19 @@ create_divisions(division_t* div, long n_divisions)
     }
 
     // End case: remaining XML
-    r->divisions[n_divisions] = alloc_division(1, 0, 0);
+    int remaining_xml = div->xml->total_spec - xml_i;
+    assert(remaining_xml >= 0);
+    if(remaining_xml == 0)
+        return r;
 
-    r->divisions[n_divisions]->xml->start_positions[0] = div->xml->start_positions[xml_i];
-    r->divisions[n_divisions]->xml->end_positions[0] = div->xml->end_positions[xml_i];
-    r->divisions[n_divisions]->xml->total_spec++;
-    r->divisions[n_divisions]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+    r->divisions[n_divisions] = alloc_division(remaining_xml, 0, 0);
+    for(int j = 0; j < remaining_xml; j++) {
+        r->divisions[n_divisions]->xml->start_positions[j] = div->xml->start_positions[xml_i];
+        r->divisions[n_divisions]->xml->end_positions[j] = div->xml->end_positions[xml_i];
+        r->divisions[n_divisions]->xml->total_spec++;
+        r->divisions[n_divisions]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
+        xml_i++;
+    }
 
     return r;
 }
@@ -1152,12 +1491,17 @@ preprocess_mzml(char* input_map,
     if (*df == NULL)
         return -1;
 
-    division_t* div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+    // division_t* div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+    division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+    // division_t* div = extract_one_spectra(tmp, 2);
+    long indicies[] = {1, 3, 5};
+    division_t* div = extract_n_spectra(tmp, indicies, 3);
+
 
     if (div == NULL)
         return -1;
 
-    long n_divisions = determine_n_divisions(input_filesize, *blocksize);
+    long n_divisions = determine_n_divisions(div->size, *blocksize);
 
     if(n_divisions > div->mz->total_spec) // If we have more divisions than spectra, we need to decrease the number of divisions
     {
@@ -1172,6 +1516,12 @@ preprocess_mzml(char* input_map,
         *divisions = create_divisions(div, n_threads);
         *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
     }
+
+    // //temporary
+    // *divisions = malloc(sizeof(divisions_t));
+    // (*divisions)->n_divisions = 1;
+    // (*divisions)->divisions = malloc(sizeof(division_t*));
+    // (*divisions)->divisions[0] = div;
 
     if (*divisions == NULL)
         return -1;

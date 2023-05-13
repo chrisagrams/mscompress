@@ -110,7 +110,7 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
             error("zstd_compress: cctx is NULL.\n");
         if(src_buff == NULL)
             error("zstd_compress: src_buff is NULL.\n");
-        if(src_len <= 0)
+        if(src_len < 0)
             error("zstd_compress: invalid src_len for compression.\n");
         if(out_len == NULL)
             error("zstd_compress: out_len is NULL.\n");
@@ -120,6 +120,12 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
 
     void* out_buff;
     size_t buff_len = 0;
+
+    if(src_len == 0)
+    {
+        *out_len = 0;
+        return NULL;
+    }
 
     out_buff = alloc_ztsd_cbuff(src_len, &buff_len);
 
@@ -497,6 +503,8 @@ compress_routine(void* args)
             error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
         
         char* map = cb_args->input_map + cb_args->dp->start_positions[i];
+
+        if(len == 0) continue; // Skip empty data blocks (e.g. empty spectra)
 
         cmp_fun(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
                     map,

@@ -183,6 +183,8 @@ decompress_routine(void* args)
             if(xml_i == curr_dp->total_spec) {
                 block = -1; break;}
             curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
+            if(curr_len == 0){
+                xml_i++; block++; break;}
             assert(curr_len > 0 && curr_len <= len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -195,6 +197,8 @@ decompress_routine(void* args)
             if(mz_i == curr_dp->total_spec) {
                 block = 0; break;}
             curr_len = curr_dp->end_positions[mz_i] - curr_dp->start_positions[mz_i];
+            if(curr_len == 0){
+                mz_i++; block++; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
@@ -211,6 +215,8 @@ decompress_routine(void* args)
             if(xml_i == curr_dp->total_spec) {
                 block = -1; break;}
             curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
+            if(curr_len == 0){
+                xml_i++; block++; break;}
             assert(curr_len > 0 && curr_len < len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -223,6 +229,8 @@ decompress_routine(void* args)
             if(inten_i == curr_dp->total_spec) {
                 block = 0; break;}
             curr_len = curr_dp->end_positions[inten_i] - curr_dp->start_positions[inten_i];
+            if(curr_len == 0){
+                inten_i++; block=0; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;

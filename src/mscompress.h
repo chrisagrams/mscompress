@@ -125,6 +125,7 @@ typedef struct
 
 typedef struct
 {
+    data_positions_t* spectra;
     data_positions_t* xml;
     data_positions_t* mz;
     data_positions_t* inten;
