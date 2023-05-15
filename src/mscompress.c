@@ -31,9 +31,9 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
   fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta). (disabled by default)\n");
   fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (default: 1000.0)\n");
-  fprintf(stream, "--extract-indices [range] Extract indices from mzML file. (disabled by default)\n");
-  fprintf(stream, "--extract-scans [range]   Extract scans from mzML file. (disabled by default)\n");
-  fprintf(stream, "--ms-level level          Extract specified ms level. (disabled by default)\n");
+  fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3]). (disabled by default)\n");
+  fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3]). (disabled by default)\n");
+  fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
   fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
   fprintf(stream, "  -h, --help              Show this help message.\n");
