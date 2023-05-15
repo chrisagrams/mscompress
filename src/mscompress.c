@@ -44,6 +44,15 @@ print_usage(FILE* stream, int exit_code) {
   exit(exit_code);
 }
 
+static void validate_algo_name(const char* name) {
+  if (strcmp(name, "cast") != 0 &&
+      strcmp(name, "log") != 0  &&
+      strcmp(name, "delta") != 0) 
+  {
+    fprintf(stderr, "Invalid lossy compression type: %s\n", name);
+    print_usage(stderr, 1);
+  }
+}
 
 static void 
 parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
@@ -87,12 +96,15 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->mz_lossy = argv[++i];
+      validate_algo_name(arguments->mz_lossy);
+
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
         print_usage(stderr, 1);
       }
       arguments->int_lossy = argv[++i];
+      validate_algo_name(arguments->int_lossy);
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
@@ -132,7 +144,17 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         fprintf(stderr, "%s\n", "Missing ms level for extraction.");
         print_usage(stderr, 1);
       }
-      arguments->ms_level = atoi(argv[++i]);
+      if(argv[++i] == 'n')
+        arguments->ms_level = -1; //still valid, set to "n"
+      else
+      {
+        arguments->ms_level = atoi(argv[i]);
+        if(!(arguments->ms_level == 1 || arguments->ms_level == 2))
+        {
+          fprintf(stderr, "%s\n", "Invalid ms level for extraction.");
+          print_usage(stderr, 1);
+        }
+      }
     } 
     // // delta transform for int compression is not implemented
     // else if (strcmp(argv[i], "--int-scale-factor") == 0) {

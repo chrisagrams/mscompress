@@ -497,6 +497,10 @@ compress_routine(void* args)
     
     for(; i < cb_args->dp->total_spec; i++)
     {
+        
+        if(cb_args->dp->end_positions[i] < cb_args->dp->start_positions[i])
+            error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
+
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
         if(len < 0)

@@ -10,6 +10,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h> // for isspace
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1482,14 +1483,14 @@ get_division_size_max(divisions_t* divisions)
 }
 
 int 
-is_monotonically_increasing(int* arr, int size)
+is_monotonically_increasing(long* arr, long size)
 /*  
     This function checks if the array is monotonically increasing.
     The function returns 1 if the array is monotonically increasing, otherwise it returns 0.
 */
 {
 
-    int i;
+    long i;
     for (i = 0; i < size - 1; i++) {
         if (arr[i] >= arr[i+1]) {
             return 0;
@@ -1498,6 +1499,27 @@ is_monotonically_increasing(int* arr, int size)
     return 1;
 }
 
+
+int 
+is_valid_input(char* str) 
+{
+    int len = strlen(str);
+    int i;
+
+    for (i = 0; i < len; i++) {
+        if (!(str[i] >= '0' && str[i] <= '9') && 
+            str[i] != '-' && 
+            str[i] != '[' && 
+            str[i] != ']' && 
+            !isspace((unsigned char) str[i])) {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
+
 long* 
 string_to_array(char* str, long* size) 
 /*
@@ -1505,6 +1527,9 @@ string_to_array(char* str, long* size)
     The function returns the array and sets the size of the array.
 */
 {
+    if(!is_valid_input(str))
+        error("Invalid input.\n");
+    
     int max = 1000000; //No more than 1,000,000 spectra
     int i, j;
     int len = strlen(str);
@@ -1517,7 +1542,7 @@ string_to_array(char* str, long* size)
             for (j = i + 1; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
                 num = num * 10 + (str[j] - '0');
             }
-            if(*size > max)
+            if(*size >= max)
                 error("Too many spectra specified.\n");
             arr[*size] = num;
             (*size)++;
@@ -1525,15 +1550,18 @@ string_to_array(char* str, long* size)
         }
         else if (str[i] == '[') {
             long start = 0;
-            for (j = i + 1; j < len && str[j] != '-'; j++) {
+            for (j = i + 1; j < len && str[j] != '-' && str[j] != ']'; j++) {
                 start = start * 10 + (str[j] - '0');
             }
-            long end = 0;
-            for (j = j + 1; j < len && str[j] != ']'; j++) {
-                end = end * 10 + (str[j] - '0');
+            long end = start; // Initialize end to start
+            if (str[j] == '-') { // if there is a range
+                end = 0;
+                for (j = j + 1; j < len && str[j] != ']'; j++) {
+                    end = end * 10 + (str[j] - '0');
+                }
             }
             for (long num = start; num <= end; num++) {
-                if(*size > max)
+                if(*size >= max)
                     error("Too many spectra specified.\n");
                 arr[*size] = num;
                 (*size)++;
@@ -1541,6 +1569,9 @@ string_to_array(char* str, long* size)
             i = j;
         }
     }
+    
+    if(!is_monotonically_increasing(arr, *size))
+        error("Scans must be monotonically increasing.\n");
 
     return arr;
 }
@@ -1568,6 +1599,9 @@ map_scan_to_index(struct Arguments* arguments, division_t* div)
             error("Scan %ld not found in file.\n", arguments->scans[i]);
     }
 
+    if(!is_monotonically_increasing(indicies, j))
+        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+
     arguments->indices = indicies;
     arguments->indices_length = j;
 }
@@ -1581,15 +1615,28 @@ map_ms_level_to_index(struct Arguments* arguments, division_t* div)
 
     for(long i = 0; i < div->spectra->total_spec; i++)
     {
-        if(div->ms_levels[i] == arguments->ms_level)
+        if(arguments->ms_level == -1)
+        {
+            if(div->ms_levels[i] > 2)
+            {
+                indicies[j] = i;
+                j++;
+            }
+        }
+        else if(div->ms_levels[i] == arguments->ms_level)
         {
             indicies[j] = i;
             j++;
         }
     }
 
+    if(!is_monotonically_increasing(indicies, j))
+        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+
     arguments->indices = indicies;
-    arguments->indices_length = j;
+    arguments->indices_length = j-1;
+
+    print("Found %ld spectra with ms level %ld.\n", j, arguments->ms_level);
 }
 
 
@@ -1626,7 +1673,7 @@ preprocess_mzml(char* input_map,
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
     }
-    else if(arguments->ms_level > 0)
+    else if(arguments->ms_level > 0 || arguments->ms_level == -1)
     {
         division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
         map_ms_level_to_index(arguments, tmp);
