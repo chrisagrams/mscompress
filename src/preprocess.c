@@ -599,6 +599,7 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     inten_dp = alloc_dp(df->source_total_spec);
 
     long* scans = (long*)malloc(sizeof(long) * df->source_total_spec);
+    long* ms_levels = (long*)malloc(sizeof(long) * df->source_total_spec);
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
         error("find_binary_quick: failed to allocate memory.\n");
@@ -660,6 +661,7 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
         if(e == NULL)
             error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
         curr_ms_level = strtol(ptr, &e, 10);
+        ms_levels[spec_curr] = curr_ms_level;
 
         ptr = e;
 
@@ -743,6 +745,7 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     div->size = end; // Size is the end of the file
 
     div->scans = scans;
+    div->ms_levels = ms_levels;
 
     return div;    
 }
@@ -1569,6 +1572,26 @@ map_scan_to_index(struct Arguments* arguments, division_t* div)
     arguments->indices_length = j;
 }
 
+void
+map_ms_level_to_index(struct Arguments* arguments, division_t* div)
+{
+    long* indicies = malloc(div->spectra->total_spec * sizeof(long));
+
+    long j = 0;
+
+    for(long i = 0; i < div->spectra->total_spec; i++)
+    {
+        if(div->ms_levels[i] == arguments->ms_level)
+        {
+            indicies[j] = i;
+            j++;
+        }
+    }
+
+    arguments->indices = indicies;
+    arguments->indices_length = j;
+}
+
 
 int
 preprocess_mzml(char* input_map,
@@ -1591,11 +1614,7 @@ preprocess_mzml(char* input_map,
         return -1;
 
     division_t* div = NULL;
-    if(arguments->indices_length == 0 && arguments->scans_length == 0)
-    {
-        div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
-    }
-    else if(arguments->indices_length > 0)
+    if(arguments->indices_length > 0)
     {
         division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
@@ -1606,6 +1625,16 @@ preprocess_mzml(char* input_map,
         map_scan_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
+    }
+    else if(arguments->ms_level > 0)
+    {
+        division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        map_ms_level_to_index(arguments, tmp);
+        div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+    }
+    else if(arguments->indices_length == 0 && arguments->scans_length == 0)
+    {
+        div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);

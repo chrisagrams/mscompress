@@ -57,6 +57,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->indices_length = 0;
   arguments->scans = NULL;
   arguments->scans_length = 0;
+  arguments->ms_level = 0;
+  
   program_name = argv[0];
 
   if(argc <= 2) {
@@ -121,6 +123,13 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->scans = string_to_array(argv[++i], &arguments->scans_length);
+    }
+    else if (strcmp(argv[i], "--ms-level") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing ms level for extraction.");
+        print_usage(stderr, 1);
+      }
+      arguments->ms_level = atoi(argv[++i]);
     } 
     // // delta transform for int compression is not implemented
     // else if (strcmp(argv[i], "--int-scale-factor") == 0) {

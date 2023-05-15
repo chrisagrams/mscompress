@@ -79,6 +79,7 @@ struct Arguments {
     long indices_length;
     long* scans;
     long scans_length;
+    long ms_level;
 };
 
 typedef void (*Algo)(void*);
@@ -137,6 +138,7 @@ typedef struct
     size_t size;
 
     long* scans;
+    long* ms_levels;
 
 } division_t;
 
