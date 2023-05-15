@@ -26,18 +26,21 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "MSCompress version %s %s\n", VERSION, STATUS);
   fprintf(stream, "Supports msz versions %s-%s\n", MIN_SUPPORT, MAX_SUPPORT);
   fprintf(stream, "Options:\n");
-  fprintf(stream, "  -v, --verbose          Run in verbose mode.\n");
-  fprintf(stream, "  -t, --threads num      Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type    Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type   Enable int lossy compression (cast, log, delta). (disabled by default)\n");
-  fprintf(stream, "--mz-scale-factor factor Set mz scale factors for delta transform (default: 1000.0)\n");
-  fprintf(stream, "  -b, --blocksize size   Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
-  fprintf(stream, "  -c, --checksum         Enable checksum generation. (disabled by default)\n");
-  fprintf(stream, "  -h, --help             Show this help message.\n");
-  fprintf(stream, "  -V, --version          Show version information.\n\n");
+  fprintf(stream, "  -v, --verbose           Run in verbose mode.\n");
+  fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
+  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta). (disabled by default)\n");
+  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (default: 1000.0)\n");
+  fprintf(stream, "--extract-indices [range] Extract indices from mzML file. (disabled by default)\n");
+  fprintf(stream, "--extract-scans [range]   Extract scans from mzML file. (disabled by default)\n");
+  fprintf(stream, "--ms-level level          Extract specified ms level. (disabled by default)\n");
+  fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
+  fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
+  fprintf(stream, "  -h, --help              Show this help message.\n");
+  fprintf(stream, "  -V, --version           Show version information.\n\n");
   fprintf(stream, "Arguments:\n");
-  fprintf(stream, "  input_file             Input file path.\n");
-  fprintf(stream, "  output_file            Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
+  fprintf(stream, "  input_file              Input file path.\n");
+  fprintf(stream, "  output_file             Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
   exit(exit_code);
 }
 
@@ -58,7 +61,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->scans = NULL;
   arguments->scans_length = 0;
   arguments->ms_level = 0;
-  
+
   program_name = argv[0];
 
   if(argc <= 2) {
