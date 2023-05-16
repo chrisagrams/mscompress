@@ -139,6 +139,17 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
     return out_buff;
 }
 
+void*
+no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level)
+/*
+    Same function signature as zstd_compress, but does not compress.
+*/
+{
+    *out_len = src_len;
+    void* out_buff = malloc(src_len);
+    memcpy(out_buff, src_buff, src_len);
+    return out_buff;
+}
 
 int
 append_mem(data_block_t* data_block, char* mem, size_t buff_len)
@@ -197,6 +208,8 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
     r->blocksize = blocksize;
     r->mode = mode;
 
+    r->comp_fun = zstd_compress; //TODO
+
     r->ret = NULL;
 
     return r;
@@ -213,7 +226,9 @@ dealloc_compress_args(compress_args_t* args)
 }
 
 void
-cmp_routine(ZSTD_CCtx* czstd,
+cmp_routine(    
+                compression_fun compression_fun,
+                ZSTD_CCtx* czstd,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
@@ -253,7 +268,7 @@ cmp_routine(ZSTD_CCtx* czstd,
 
     if(!append_mem((*curr_block), input, len))
     {
-        cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+        cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
         cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -275,7 +290,9 @@ cmp_routine(ZSTD_CCtx* czstd,
 
 
 void
-cmp_flush(ZSTD_CCtx* czstd,
+cmp_flush(    
+              compression_fun compression_fun,
+              ZSTD_CCtx* czstd,
               cmp_blk_queue_t* cmp_buff,
               data_block_t** curr_block,
               size_t* tot_size,
@@ -305,7 +322,7 @@ cmp_flush(ZSTD_CCtx* czstd,
             error("cmp_flush: curr_block is NULL. This should not happen.\n");
     #endif
     
-    cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+    cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
 
     cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -378,7 +395,9 @@ typedef cmp_routine_func (*cmp_routine_func_ptr)();
 
 
 void
-cmp_xml_routine(ZSTD_CCtx* czstd,
+cmp_xml_routine(
+                compression_fun compression_fun,
+                ZSTD_CCtx* czstd,
                 algo_args* a_args,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
@@ -391,7 +410,9 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
  * @brief cmp_routine wrapper for XML data.
  */
 {
-    cmp_routine(czstd,
+    cmp_routine(
+                compression_fun,
+                czstd,
                 cmp_buff,
                 curr_block,
                 input,
@@ -401,7 +422,9 @@ cmp_xml_routine(ZSTD_CCtx* czstd,
 }
 
 void
-cmp_binary_routine(ZSTD_CCtx* czstd,
+cmp_binary_routine(
+                   compression_fun compression_fun,
+                   ZSTD_CCtx* czstd,
                    algo_args* a_args,
                    cmp_blk_queue_t* cmp_buff,
                    data_block_t** curr_block,
@@ -434,7 +457,9 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     if(binary_buff == NULL)
         error("cmp_binary_routine: binary_buff is NULL\n");
 
-    cmp_routine(czstd,
+    cmp_routine(
+                compression_fun,
+                czstd,
                 cmp_buff,
                 curr_block,
                 binary_buff,
@@ -510,12 +535,12 @@ compress_routine(void* args)
 
         if(len == 0) continue; // Skip empty data blocks (e.g. empty spectra)
 
-        cmp_fun(czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
+        cmp_fun(cb_args->comp_fun, czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
                     map,
                     len, &tot_size, &tot_cmp);
     }
 
-    cmp_flush(czstd, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(cb_args->comp_fun, czstd, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     print("\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
@@ -648,4 +673,26 @@ compress_mzml(char* input_map,
     gettimeofday(&stop, NULL);
 
     print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
+}
+
+compression_fun
+set_compress_fun(int accession)
+{   
+    switch(accession)
+    {
+        case _ZSTD_compression_ :       return zstd_compress;
+        case _no_comp_ :                return no_compress;
+        default :                       error("Compression type not supported.");
+    }
+}
+
+int
+get_compress_type(char* arg)
+{
+    if(arg == NULL)
+        error("Compression type not specified.");
+    if(strcmp(arg, "zstd") == 0 || strcmp(arg, "ZSTD") == 0)
+        return _ZSTD_compression_;
+    if(strcmp(arg, "nocomp") == 0 || strcmp(arg, "none") == 0)
+        return _no_comp_;
 }

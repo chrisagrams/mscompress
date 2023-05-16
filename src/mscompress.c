@@ -196,8 +196,8 @@ get_compression_scheme(void* input_map, char** xml_compression_type, char** bina
 {      
   *xml_compression_type = "ZSTD";
   *binary_compression_type = "ZSTD";
-  print("\tXML compression scheme: %.*s\n", 0, *xml_compression_type);
-  print("\tBinary compression scheme: %.*s\n", 0, *binary_compression_type);
+  print("\tXML encoding scheme: %.*s\n", strlen(*xml_compression_type), *xml_compression_type);
+  print("\tBinary encoding scheme: %.*s\n", strlen(*xml_compression_type), *binary_compression_type);
 }
 
 int 
@@ -306,8 +306,8 @@ main(int argc, char* argv[])
     {
       print("\tDetected .msz file, reading header and footer...\n");
 
-      if(arguments.mz_lossy != NULL || arguments.int_lossy)
-        print("Lossy arg passed while decompressing, ignoring...\n");
+      // if(arguments.mz_lossy != NULL || arguments.int_lossy)
+      //   print("Lossy arg passed while decompressing, ignoring...\n");
 
       block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
       footer_t* msz_footer;

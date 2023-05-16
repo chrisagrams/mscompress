@@ -49,12 +49,28 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 
 }
 
+void*
+no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
+/*
+    Same function signature as zstd_decompress, but does not decompress.
+*/
+{
+    void* out_buff;
+    size_t decmp_len = 0;
+
+    out_buff = alloc_ztsd_dbuff(org_len); // will return buff, exit on error
+
+    memcpy(out_buff, src_buff, org_len);
+
+    return out_buff;
+}
+
 void *
-decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
+decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 {
     if(blk == NULL) // Empty block, return null.
         return NULL; 
-    return zstd_decompress(dctx, input_map+offset, blk->compressed_size, blk->original_size);
+    return decompress_fun(dctx, input_map+offset, blk->compressed_size, blk->original_size);
 }
 
 decompress_args_t*
@@ -136,9 +152,9 @@ decompress_routine(void* args)
 
     // Decompress each block of data
     void
-        *decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
-        *decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
-        *decmp_inten_binary = decmp_block(dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
+        *decmp_xml = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_inten_binary = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
     size_t binary_len = 0;
 

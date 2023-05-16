@@ -89,8 +89,14 @@ typedef Algo (*Algo_ptr)();
 typedef void (*decode_fun)(char*, size_t, char**, size_t*);
 typedef decode_fun (*decode_fun_ptr)();
 
-typedef void(*encode_fun)(char**, char*, size_t*);
+typedef void (*encode_fun)(char**, char*, size_t*);
 typedef encode_fun (*encode_fun_ptr)();
+
+typedef void* (*compression_fun)(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
+typedef compression_fun (*compression_fun_ptr)();
+
+typedef void* (*decompression_fun)(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t* out_len);
+typedef decompression_fun (*decompression_fun_ptr)();
 
 typedef struct
 {
@@ -306,6 +312,8 @@ typedef struct
     int mode;
 
     cmp_blk_queue_t* ret;
+    compression_fun comp_fun;
+    
 } compress_args_t;
     
 ZSTD_CCtx* alloc_cctx();
