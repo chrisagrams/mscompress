@@ -1511,6 +1511,7 @@ is_valid_input(char* str)
             str[i] != '-' && 
             str[i] != '[' && 
             str[i] != ']' && 
+            str[i] != ',' &&
             !isspace((unsigned char) str[i])) {
             return 0;
         }
@@ -1537,6 +1538,8 @@ string_to_array(char* str, long* size)
     *size = 0;
 
     for (i = 0; i < len; i++) {
+        if (str[i] == ' ') continue;  // Skip spaces
+
         if (str[i] >= '0' && str[i] <= '9') {
             long num = str[i] - '0';
             for (j = i + 1; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
@@ -1549,27 +1552,39 @@ string_to_array(char* str, long* size)
             i = j - 1;
         }
         else if (str[i] == '[') {
-            long start = 0;
-            for (j = i + 1; j < len && str[j] != '-' && str[j] != ']'; j++) {
-                start = start * 10 + (str[j] - '0');
-            }
-            long end = start; // Initialize end to start
-            if (str[j] == '-') { // if there is a range
-                end = 0;
-                for (j = j + 1; j < len && str[j] != ']'; j++) {
-                    end = end * 10 + (str[j] - '0');
+            i++;  // Move past the '['
+            while (i < len && str[i] != ']') {
+                if (str[i] == ' ') {  // Skip spaces
+                    i++;
+                    continue;
+                }
+
+                long start = 0;
+                for (j = i; j < len && str[j] != '-' && str[j] != ']' && str[j] != ',' && str[j] != ' '; j++) {
+                    start = start * 10 + (str[j] - '0');
+                }
+                long end = start; // Initialize end to start
+                if (str[j] == '-') { // if there is a range
+                    end = 0;
+                    for (j = j + 1; j < len && str[j] != ']' && str[j] != ',' && str[j] != ' '; j++) {
+                        end = end * 10 + (str[j] - '0');
+                    }
+                }
+                for (long num = start; num <= end; num++) {
+                    if(*size >= max)
+                        error("Too many spectra specified.\n");
+                    arr[*size] = num;
+                    (*size)++;
+                }
+                i = j;
+                while (str[i] == ' ' || str[i] == ',') {  // Skip spaces and commas
+                    i++;
                 }
             }
-            for (long num = start; num <= end; num++) {
-                if(*size >= max)
-                    error("Too many spectra specified.\n");
-                arr[*size] = num;
-                (*size)++;
-            }
-            i = j;
         }
     }
-    
+
+
     if(!is_monotonically_increasing(arr, *size))
         error("Scans must be monotonically increasing.\n");
 
