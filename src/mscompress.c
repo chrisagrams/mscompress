@@ -28,8 +28,8 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "Options:\n");
   fprintf(stream, "  -v, --verbose           Run in verbose mode.\n");
   fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta). (disabled by default)\n");
+  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
   fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (default: 1000.0)\n");
   fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
@@ -45,9 +45,10 @@ print_usage(FILE* stream, int exit_code) {
 }
 
 static void validate_algo_name(const char* name) {
-  if (strcmp(name, "cast") != 0 &&
-      strcmp(name, "log") != 0  &&
-      strcmp(name, "delta") != 0) 
+  if (strcmp(name, "cast")    != 0 &&
+      strcmp(name, "log")     != 0 &&
+      strcmp(name, "delta16") != 0 &&
+      strcmp(name, "delta32") != 0   )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
     print_usage(stderr, 1);

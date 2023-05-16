@@ -57,6 +57,7 @@
 #define _cast_64_to_32_     4700002
 #define _log2_transform_    4700003
 #define _delta16_transform_ 4700004
+#define _delta32_transform_ 4700005
 
 #define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 
