@@ -243,7 +243,7 @@ algo_decode_delta16_transform_32f (void* args)
     {
         float diff = f[i] - f[i-1];
         // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        uint16_t uint_diff = (uint16_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        uint16_t uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
         tmp[i+1] = uint_diff;
     }
 
@@ -308,7 +308,7 @@ algo_decode_delta16_transform_64d (void* args)
     for(int i = 1; i < len; i++)
     {
         diff = f[i] - f[i-1];
-        uint_diff = (uint16_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
         tmp[i-1] = uint_diff;
     }
 
@@ -370,7 +370,7 @@ algo_decode_delta32_transform_32f (void* args)
     {
         float diff = f[i] - f[i-1];
         // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        uint32_t uint_diff = (uint32_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        uint32_t uint_diff = (uint32_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
         tmp[i] = uint_diff;
     }
 
@@ -434,7 +434,7 @@ algo_decode_delta32_transform_64d (void* args)
     {
         float diff = f[i] - f[i-1];
         // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        uint32_t uint_diff = (uint32_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        uint32_t uint_diff = (uint32_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
         tmp[i-1] = uint_diff;
     }
 
@@ -684,7 +684,7 @@ algo_encode_delta16_transform_32f (void* args)
     // Perform delta transform
     res[0] = start;
     for(size_t i = 1; i < len; i++)
-        res[i] = res[i-1] + ((float)arr[i-1] / DELTA_SCALE_FACTOR);
+        res[i] = res[i-1] + ((float)arr[i-1] / a_args->scale_factor);
     
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
@@ -737,7 +737,7 @@ algo_encode_delta16_transform_64d (void* args)
     // Perform delta transform
     res[0] = start;
     for(size_t i = 1; i < len; i++)
-        res[i] = res[i-1] + ((double)arr[i-1] / DELTA_SCALE_FACTOR);
+        res[i] = res[i-1] + ((double)arr[i-1] / a_args->scale_factor);
     
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
@@ -790,7 +790,7 @@ algo_encode_delta32_transform_32f (void* args)
     // Perform delta transform
     res[0] = start;
     for(size_t i = 1; i < len; i++)
-        res[i] = res[i-1] + ((float)arr[i-1] / DELTA_SCALE_FACTOR);
+        res[i] = res[i-1] + ((float)arr[i-1] / a_args->scale_factor);
     
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
@@ -843,7 +843,7 @@ algo_encode_delta32_transform_64d (void* args)
     // Perform delta transform
     res[0] = start;
     for(size_t i = 1; i < len; i++)
-        res[i] = res[i-1] + ((double)arr[i-1] / DELTA_SCALE_FACTOR);
+        res[i] = res[i-1] + ((double)arr[i-1] / a_args->scale_factor);
     
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);

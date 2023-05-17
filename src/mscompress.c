@@ -134,7 +134,19 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         fprintf(stderr, "%s\n", "Missing scale factor for mz compression.");
         print_usage(stderr, 1);
       }
-      arguments->mz_scale_factor = atof(argv[++i]);
+      
+      const char* scale_factor_str = argv[++i];
+      int j = 0;
+      char scale_factor_buffer[20];
+
+      // Parse the argument until the first non-digit character
+      while (isdigit(scale_factor_str[j]) || scale_factor_str[j] == '.') {
+        scale_factor_buffer[j] = scale_factor_str[j];
+        j++;
+      }
+      scale_factor_buffer[j] = '\0'; // Null-terminate the parsed scale factor
+
+      arguments->mz_scale_factor = atof(scale_factor_buffer);
     }
     else if (strcmp(argv[i], "--extract-indices") == 0) {
       if (i + 1 >= argc) {
@@ -180,6 +192,10 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->target_mz_format = get_compress_type(argv[++i]);
+      if(arguments->target_mz_format == _delta16_transform_)
+        arguments->mz_scale_factor = 10.0; //TODO, deterimine best scale factor
+      else if(arguments->target_mz_format == _delta32_transform_)
+        arguments->mz_scale_factor = 1000.0; //TODO, determine best scale factor
     } 
     else if (strcmp(argv[i], "--target-inten-format") == 0) {
       if (i + 1 >= argc) {
@@ -320,6 +336,9 @@ main(int argc, char* argv[])
 
       // Set ZSTD compression level.
       df->zstd_compression_level = arguments.zstd_compression_level; 
+
+      // Set scale factor.
+      df->mz_scale_factor = arguments.mz_scale_factor;
 
       //Write df header to file.
       write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");

@@ -456,6 +456,7 @@ cmp_binary_routine(
 
     df->target_mz_fun((void*)a_args); //TODO: This is a hack. Need to fix.
 
+
     if(binary_buff == NULL)
         error("cmp_binary_routine: binary_buff is NULL\n");
 
@@ -515,9 +516,14 @@ compress_routine(void* args)
         cmp_fun = cmp_binary_routine;
 
     if(cb_args->mode == _mass_)
+    {
         a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
+        a_args->scale_factor = cb_args->df->mz_scale_factor;
+    }
     else if(cb_args->mode == _intensity_)
+    {
         a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
+    }
     else if(cb_args->mode == _xml_)
         a_args->dec_fun = NULL;
     else

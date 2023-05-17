@@ -139,9 +139,10 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *              | Target XML format         |   4  bytes |    156    |
  *              | Target m/z format         |   4  bytes |    160    |
  *              | Target intensity format   |   4  bytes |    164    |
- *              | Blocksize                 |   8  bytes |    168    |
- *              | MD5                       |  32  bytes |    176    |
- *              | Reserved                  |  304 bytes |    208    |
+ *              | mz scale factor           |   8  bytes |    168    |
+ *              | Blocksize                 |   8  bytes |    176    |
+ *              | MD5                       |  32  bytes |    184    |
+ *              | Reserved                  |  296 bytes |    216    |
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|

@@ -28,14 +28,14 @@
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
 
-#define MESSAGE_SIZE 128
-#define MESSAGE_OFFSET 12
+#define MESSAGE_SIZE         128
+#define MESSAGE_OFFSET       12
 #define DATA_FORMAT_T_OFFSET 140
-#define DATA_FORMAT_T_SIZE 28   /* ignores private members */
-#define BLOCKSIZE_OFFSET 168
-#define MD5_OFFSET 176
-#define MD5_SIZE 32
-#define HEADER_SIZE 512
+#define DATA_FORMAT_T_SIZE   36   /* ignores private members */
+#define BLOCKSIZE_OFFSET     176
+#define MD5_OFFSET           184
+#define MD5_SIZE             32
+#define HEADER_SIZE          512
 
 #define DEBUG 0
 
@@ -45,12 +45,12 @@
 #define _64i_ 1000522
 #define _64d_ 1000523
 
-#define _zlib_ 1000574
+#define _zlib_    1000574
 #define _no_comp_ 1000576
 
 #define _intensity_ 1000515
-#define _mass_ 1000514
-#define _xml_ 1000513 //TODO: change this
+#define _mass_      1000514
+#define _xml_       1000513 //TODO: change this
 
 #define _lossless_          4700000
 #define _ZSTD_compression_  4700001
@@ -117,6 +117,9 @@ typedef struct
     int target_xml_format;
     int target_mz_format;
     int target_inten_format;
+
+    /* algo parameters */
+    float mz_scale_factor; 
 
     /* runtime variables, not written to disk. */
     int populated;
@@ -383,6 +386,7 @@ typedef struct
     decode_fun_ptr dec_fun;
     data_block_t* tmp;
     z_stream* z;
+    float scale_factor;
 } algo_args;
 
 Algo_ptr set_compress_algo(int algo, int accession);

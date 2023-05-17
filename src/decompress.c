@@ -221,6 +221,7 @@ decompress_routine(void* args)
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
+            a_args->scale_factor = db_args->df->mz_scale_factor;
             db_args->df->target_mz_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             mz_i++;
