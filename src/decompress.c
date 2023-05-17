@@ -152,9 +152,9 @@ decompress_routine(void* args)
 
     // Decompress each block of data
     void
-        *decmp_xml = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
-        *decmp_mz_binary = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
-        *decmp_inten_binary = decmp_block(zstd_decompress, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
+        *decmp_xml = decmp_block(db_args->df->xml_decompression_fun, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = decmp_block(db_args->df->mz_decompression_fun, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_inten_binary = decmp_block(db_args->df->inten_decompression_fun, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
     size_t binary_len = 0;
 
@@ -349,5 +349,16 @@ decompress_parallel(char* input_map,
 
         divisions_left -= threads;
         divisions_used += threads;
+    }
+}
+
+decompression_fun
+set_decompress_fun(int accession)
+{   
+    switch(accession)
+    {
+        case _ZSTD_compression_ :       return zstd_decompress;
+        case _no_comp_ :                return no_decompress;
+        default :                       error("Compression type not supported.");
     }
 }

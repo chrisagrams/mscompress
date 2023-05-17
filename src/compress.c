@@ -181,7 +181,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 }
 
 compress_args_t*
-alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, size_t cmp_blk_size, long blocksize, int mode)
+alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, compression_fun comp_fun, size_t cmp_blk_size, long blocksize, int mode)
 {
 /**
  * @brief Allocates and initializes a compress_args_t struct to be passed to compress_routine.
@@ -204,11 +204,10 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
     r->input_map = input_map;
     r->dp = dp;
     r->df = df;
+    r->comp_fun = comp_fun;
     r->cmp_blk_size = cmp_blk_size;
     r->blocksize = blocksize;
     r->mode = mode;
-
-    r->comp_fun = zstd_compress; //TODO
 
     r->ret = NULL;
 
@@ -556,6 +555,7 @@ block_len_queue_t*
 compress_parallel(char* input_map,
                   data_positions_t** ddp,
                   data_format_t* df,
+                  compression_fun comp_fun,
                   size_t cmp_blk_size, long blocksize, int mode,
                   int divisions, int threads, int fd)
 /**
@@ -588,7 +588,7 @@ compress_parallel(char* input_map,
     int divisions_left = divisions;
 
     for(i = divisions_used; i < divisions; i++)
-        args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size, blocksize, mode);
+        args[i] = alloc_compress_args(input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
 
     while(divisions_left > 0)
     {
@@ -645,19 +645,19 @@ compress_mzml(char* input_map,
 
     print("\t===XML===\n");
     footer->xml_pos = get_offset(output_fd);
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, blocksize/3, _xml_, divisions->n_divisions, threads, output_fd);  /* Compress XML */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, df->xml_compression_fun, blocksize, blocksize/3, _xml_, divisions->n_divisions, threads, output_fd);  /* Compress XML */
     free(xml_divisions);
 
     print("\t===m/z binary===\n");
     footer->mz_binary_pos = get_offset(output_fd);
     df->target_mz_fun = set_compress_algo(footer->mz_fmt, df->source_mz_fmt); //TODO, rename target_mz_fun
-    mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, blocksize, blocksize/3, _mass_, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
+    mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize, blocksize/3, _mass_, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
     free(mz_divisions);
 
     print("\t===int binary===\n");
     footer->inten_binary_pos = get_offset(output_fd);
     df->target_mz_fun = set_compress_algo(footer->inten_fmt, df->source_mz_fmt);//TODO, rename target_mz_fun
-    inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, blocksize, blocksize/3, _intensity_, divisions->n_divisions, threads, output_fd); /* Compress int binary */
+    inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, df->inten_compression_fun, blocksize, blocksize/3, _intensity_, divisions->n_divisions, threads, output_fd); /* Compress int binary */
     free(inten_divisions);
 
     // Dump block_len_queue to msz file.

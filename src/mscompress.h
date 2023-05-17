@@ -81,6 +81,10 @@ struct Arguments {
     long* scans;
     long scans_length;
     long ms_level;
+
+    int target_xml_format;
+    int target_mz_format;
+    int target_inten_format;
 };
 
 typedef void (*Algo)(void*);
@@ -121,7 +125,12 @@ typedef struct
     Algo_ptr target_xml_fun;
     Algo_ptr target_mz_fun;
     Algo_ptr target_inten_fun;
-
+    compression_fun_ptr xml_compression_fun;
+    compression_fun_ptr mz_compression_fun;
+    compression_fun_ptr inten_compression_fun;
+    decompression_fun_ptr xml_decompression_fun;
+    decompression_fun_ptr mz_decompression_fun;
+    decompression_fun_ptr inten_decompression_fun;
 
 } data_format_t;
 
@@ -319,9 +328,9 @@ typedef struct
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
-block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp, data_format_t* df, size_t cmp_blk_size, long blocksize, int mode, int divisions, int threads, int fd);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
+compression_fun set_compress_fun(int accession);
 
 /* decompress.c */
 typedef struct
@@ -354,6 +363,7 @@ void decompress_parallel(char* input_map,
                     data_format_t* df,
                     footer_t* msz_footer,
                     int threads, int fd);
+decompression_fun set_decompress_fun(int accession);
 
 
 /* algo.c */

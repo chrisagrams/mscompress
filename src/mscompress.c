@@ -58,19 +58,23 @@ static void validate_algo_name(const char* name) {
 static void 
 parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   int i;
-  arguments->verbose = 0;
-  arguments->threads = 0;
-  arguments->mz_lossy = NULL;
-  arguments->int_lossy = NULL;
-  arguments->blocksize = 1e+8;
-  arguments->input_file = NULL;
-  arguments->output_file = NULL;
+  arguments->verbose         = 0;
+  arguments->threads         = 0;
+  arguments->mz_lossy        = NULL;
+  arguments->int_lossy       = NULL;
+  arguments->blocksize       = 1e+8;
+  arguments->input_file      = NULL;
+  arguments->output_file     = NULL;
   arguments->mz_scale_factor = 1000; // initialize scale factor to default value
-  arguments->indices = NULL;
-  arguments->indices_length = 0;
-  arguments->scans = NULL;
-  arguments->scans_length = 0;
-  arguments->ms_level = 0;
+  arguments->indices         = NULL;
+  arguments->indices_length  = 0;
+  arguments->scans           = NULL;
+  arguments->scans_length    = 0;
+  arguments->ms_level        = 0;
+
+  arguments->target_xml_format   = _ZSTD_compression_; // default
+  arguments->target_mz_format    = _ZSTD_compression_; // default
+  arguments->target_inten_format = _ZSTD_compression_; // default
 
   program_name = argv[0];
 
@@ -190,16 +194,6 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->int_lossy = "lossless";
 }
 
-void
-get_compression_scheme(void* input_map, char** xml_compression_type, char** binary_compression_type)
-//TODO
-{      
-  *xml_compression_type = "ZSTD";
-  *binary_compression_type = "ZSTD";
-  print("\tXML encoding scheme: %.*s\n", strlen(*xml_compression_type), *xml_compression_type);
-  print("\tBinary encoding scheme: %.*s\n", strlen(*xml_compression_type), *binary_compression_type);
-}
-
 int 
 main(int argc, char* argv[]) 
 {
@@ -260,23 +254,28 @@ main(int argc, char* argv[])
       footer->original_filesize = input_filesize;
       footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
 
-      // TODO: target format switch
-      df->target_xml_format = _ZSTD_compression_;
-      df->target_mz_format = _ZSTD_compression_;
-      df->target_inten_format = _ZSTD_compression_;
+      // Set target formats.
+      df->target_xml_format   = arguments.target_xml_format;
+      df->target_mz_format    = arguments.target_mz_format;
+      df->target_inten_format = arguments.target_inten_format;
+
+      // Set target compression functions.
+      df->xml_compression_fun   = set_compress_fun(df->target_xml_format);
+      df->mz_compression_fun    = set_compress_fun(df->target_mz_format);
+      df->inten_compression_fun = set_compress_fun(df->target_inten_format);
 
       // Parse arguments for compression algorithms and set formats accordingly.
       
       // Store format integer in footer.
-      footer->mz_fmt = get_algo_type(arguments.mz_lossy);
+      footer->mz_fmt    = get_algo_type(arguments.mz_lossy);
       footer->inten_fmt = get_algo_type(arguments.int_lossy);
       
       // Set target compression functions.
-      df->target_mz_fun= set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
+      df->target_mz_fun    = set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
       df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
       
       // Set decoding function based on source compression format.
-      df->decode_source_compression_mz_fun = set_decode_fun(df->source_compression, footer->mz_fmt);
+      df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt);
       df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt);
 
       //Write df header to file.
@@ -290,7 +289,6 @@ main(int argc, char* argv[])
                     df,
                     divisions,
                     fds[1]);
-
 
       // Write divisions to file.
       footer->divisions_t_pos = get_offset(fds[1]);
@@ -306,18 +304,11 @@ main(int argc, char* argv[])
     {
       print("\tDetected .msz file, reading header and footer...\n");
 
-      // if(arguments.mz_lossy != NULL || arguments.int_lossy)
-      //   print("Lossy arg passed while decompressing, ignoring...\n");
-
       block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
       footer_t* msz_footer;
-      char* xml_compression_type;
-      char* binary_compression_type;
       int n_divisions = 0;
 
       df = get_header_df(input_map);
-
-      get_compression_scheme(input_map, &xml_compression_type, &binary_compression_type);
 
       parse_footer(&msz_footer, input_map, input_filesize,
                    &xml_block_lens, 
@@ -332,10 +323,16 @@ main(int argc, char* argv[])
       print("\nDecompression and encoding...\n");
 
       // Set target encoding and decompression functions.
-      df->encode_source_compression_mz_fun = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
+      df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
       df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt);
-      df->target_mz_fun = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
+
+      df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
       df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
+
+      // Set target decompression functions.
+      df->xml_decompression_fun   = set_decompress_fun(df->target_xml_format);
+      df->mz_decompression_fun    = set_decompress_fun(df->target_mz_format);
+      df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
 
       //Start decompress routine.
       decompress_parallel(input_map,
