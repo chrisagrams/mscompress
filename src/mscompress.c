@@ -36,6 +36,7 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
   fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
   fprintf(stream, "--target-inten-format type Set target inten compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
@@ -78,6 +79,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   arguments->target_xml_format   = _ZSTD_compression_; // default
   arguments->target_mz_format    = _ZSTD_compression_; // default
   arguments->target_inten_format = _ZSTD_compression_; // default
+
+  arguments->zstd_compression_level = 3; // default
 
   program_name = argv[0];
 
@@ -184,7 +187,20 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->target_inten_format = get_compress_type(argv[++i]);
-    } 
+    }
+    else if (strcmp(argv[i], "--zstd-compression-level") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing compression level");
+        print_usage(stderr, 1);
+      }
+      int num = 0;
+      const char* str = argv[++i];
+      while (*str >= '0' && *str <= '9') {
+          num = num * 10 + (*str - '0');
+          str++;
+      }
+      arguments->zstd_compression_level = num;
+    }  
     // // delta transform for int compression is not implemented
     // else if (strcmp(argv[i], "--int-scale-factor") == 0) {
     //   if (i + 1 >= argc) {
@@ -301,6 +317,9 @@ main(int argc, char* argv[])
       // Set decoding function based on source compression format.
       df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt);
       df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt);
+
+      // Set ZSTD compression level.
+      df->zstd_compression_level = arguments.zstd_compression_level; 
 
       //Write df header to file.
       write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");

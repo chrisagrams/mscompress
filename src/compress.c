@@ -114,7 +114,7 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
             error("zstd_compress: invalid src_len for compression.\n");
         if(out_len == NULL)
             error("zstd_compress: out_len is NULL.\n");
-        if(compression_level < 1 || compression_level > 9)
+        if(compression_level < 1 || compression_level > 22)
             error("zstd_compress: invalid compression_level.\n");
     #endif
 
@@ -228,6 +228,7 @@ void
 cmp_routine(    
                 compression_fun compression_fun,
                 ZSTD_CCtx* czstd,
+                int compression_level,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
@@ -267,7 +268,7 @@ cmp_routine(
 
     if(!append_mem((*curr_block), input, len))
     {
-        cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+        cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, compression_level);
 
         cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -292,6 +293,7 @@ void
 cmp_flush(    
               compression_fun compression_fun,
               ZSTD_CCtx* czstd,
+              int compression_level,
               cmp_blk_queue_t* cmp_buff,
               data_block_t** curr_block,
               size_t* tot_size,
@@ -321,7 +323,7 @@ cmp_flush(
             error("cmp_flush: curr_block is NULL. This should not happen.\n");
     #endif
     
-    cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+    cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, compression_level);
 
     cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -412,6 +414,7 @@ cmp_xml_routine(
     cmp_routine(
                 compression_fun,
                 czstd,
+                df->zstd_compression_level,
                 cmp_buff,
                 curr_block,
                 input,
@@ -459,6 +462,7 @@ cmp_binary_routine(
     cmp_routine(
                 compression_fun,
                 czstd,
+                df->zstd_compression_level,
                 cmp_buff,
                 curr_block,
                 binary_buff,
@@ -505,10 +509,10 @@ compress_routine(void* args)
 
     cmp_routine_func_ptr cmp_fun = NULL;
     
-    if(cb_args->df)
-        cmp_fun = cmp_binary_routine;
-    else
+    if(cb_args->mode == _xml_)
         cmp_fun = cmp_xml_routine;
+    else
+        cmp_fun = cmp_binary_routine;
 
     if(cb_args->mode == _mass_)
         a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
@@ -539,7 +543,7 @@ compress_routine(void* args)
                     len, &tot_size, &tot_cmp);
     }
 
-    cmp_flush(cb_args->comp_fun, czstd, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(cb_args->comp_fun, czstd, cb_args->df->zstd_compression_level, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     print("\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
@@ -645,7 +649,7 @@ compress_mzml(char* input_map,
 
     print("\t===XML===\n");
     footer->xml_pos = get_offset(output_fd);
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, df->xml_compression_fun, blocksize, blocksize/3, _xml_, divisions->n_divisions, threads, output_fd);  /* Compress XML */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize, blocksize/3, _xml_, divisions->n_divisions, threads, output_fd);  /* Compress XML */
     free(xml_divisions);
 
     print("\t===m/z binary===\n");

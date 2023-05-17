@@ -85,6 +85,8 @@ struct Arguments {
     int target_xml_format;
     int target_mz_format;
     int target_inten_format;
+
+    int zstd_compression_level;
 };
 
 typedef void (*Algo)(void*);
@@ -131,6 +133,8 @@ typedef struct
     decompression_fun_ptr xml_decompression_fun;
     decompression_fun_ptr mz_decompression_fun;
     decompression_fun_ptr inten_decompression_fun;
+
+    int zstd_compression_level; // no need to write to file since ZSTD_DCtx doesn't need it.
 
 } data_format_t;
 
