@@ -338,7 +338,7 @@ algo_decode_delta32_transform_32f (void* args)
     a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
 
     // Deternmine length of data based on data format
-    uint32_t len;
+    uint16_t len;
     uint32_t* res;
 
     #ifdef ERROR_CHECK
@@ -351,7 +351,7 @@ algo_decode_delta32_transform_32f (void* args)
     size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
 
     // Perform delta transform
-    res = malloc(res_len); // Allocate space for result and leave room for header and first value
+    res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
 
     #ifdef ERROR_CHECK
         if(res == NULL)
@@ -359,7 +359,7 @@ algo_decode_delta32_transform_32f (void* args)
     #endif
 
     float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint32_t* tmp = (uint32_t*)(res) + 1; // Ignore header in first 4 bytes
+    uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
     // *(float*)&res[0] = f[0];
@@ -371,14 +371,76 @@ algo_decode_delta32_transform_32f (void* args)
         float diff = f[i] - f[i-1];
         // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
         uint32_t uint_diff = (uint32_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
-        tmp[i+1] = uint_diff;
+        tmp[i] = uint_diff;
     }
 
     // Free decoded buffer
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
+
+    // Return result
+    *a_args->dest = res;
+    *a_args->dest_len = res_len;
+
+    return;
+}
+
+void
+algo_decode_delta32_transform_64d (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    char* decoded = NULL;
+    size_t decoded_len = 0;
+
+    //Decode using specified encoding format
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
+
+    // Deternmine length of data based on data format
+    uint16_t len;
+    uint32_t* res;
+
+    #ifdef ERROR_CHECK
+        if(a_args->src_format != _64d_) // non-essential check, but useful for debugging
+            error("algo_decode_delta_transform_64d: Unknown data format");
+    #endif
+
+    len = decoded_len / sizeof(double);
+
+    size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+
+    // Perform delta transform
+    res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_decode_delta_transform: malloc failed");
+    #endif
+
+    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
+
+    //Store first value with full 32-bit precision
+    // *(float*)&res[0] = f[0];
+    memcpy(tmp, f, sizeof(double));
+
+    // Perform delta transform
+    for(int i = 1; i < len; i++)
+    {
+        float diff = f[i] - f[i-1];
+        // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
+        uint32_t uint_diff = (uint32_t)floor(diff * DELTA_SCALE_FACTOR); // scale by 2^16 / 10
+        tmp[i] = uint_diff;
+    }
+
+    // Free decoded buffer
+    free(decoded);
+
+    // Store length of array in first 4 bytes
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -696,7 +758,7 @@ algo_encode_delta32_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int32_t len = *(uint32_t*)(*a_args->src);
+    u_int16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -733,6 +795,59 @@ algo_encode_delta32_transform_32f (void* args)
 
     // Move to next array
     *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+
+    return;
+}
+
+void
+algo_encode_delta32_transform_64d (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    #ifdef ERROR_CHECK
+        if(a_args == NULL)
+            error("algo_encode_delta_transform: args is NULL");
+    #endif
+
+    // Get array length
+    u_int16_t len = *(uint16_t*)(*a_args->src);
+
+    #ifdef ERROR_CHECK
+        if (len <= 0)
+            error("algo_encode_delta_transform: len is <= 0");
+    #endif
+
+    // Get starting value
+    double start = *(double*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+
+    // Get source array
+    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(double));
+
+    #ifdef ERROR_CHECK
+        if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
+            error("algo_encode_delta_transform: Unknown data format");
+    #endif
+
+    // Allocate buffer
+    size_t res_len = len * sizeof(double);
+    double* res = malloc(res_len);
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_encode_delta_transform: malloc failed");
+    #endif
+
+    // Perform delta transform
+    res[0] = start;
+    for(size_t i = 1; i < len; i++)
+        res[i] = res[i-1] + ((double)arr[i] / DELTA_SCALE_FACTOR);
+    
+    // Encode using specified encoding format
+    a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
+
+    // Move to next array
+    *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
 
     return;
 }
@@ -775,8 +890,7 @@ set_compress_algo(int algo, int accession)
             switch(accession)
             {
                 case _32f_ :    return algo_decode_delta32_transform_32f;
-                // case _64d_ :    return algo_decode_delta32_transform_64d;
-                case _64d_ :    assert(0); // not implemented yet
+                case _64d_ :    return algo_decode_delta32_transform_64d;
             }
         } ;
         default:                error("set_compress_algo: Unknown compression algorithm");
@@ -818,8 +932,7 @@ set_decompress_algo(int algo, int accession)
             switch(accession)
             {
                 case _32f_ :    return algo_encode_delta32_transform_32f;
-                // case _64d_ :    return algo_encode_delta32_transform_64d;
-                case _64d_ :    assert(0); // not implemented yet
+                case _64d_ :    return algo_encode_delta32_transform_64d;
             }
         } ;
         default:                error("set_decompress_algo: Unknown compression algorithm");
