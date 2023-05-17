@@ -34,6 +34,9 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
+  fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--target-inten-format type Set target inten compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
   fprintf(stream, "  -h, --help              Show this help message.\n");
@@ -160,6 +163,27 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
           print_usage(stderr, 1);
         }
       }
+    }
+    else if (strcmp(argv[i], "--target-xml-format") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing target xml format.");
+        print_usage(stderr, 1);
+      }
+      arguments->target_xml_format = get_compress_type(argv[++i]);
+    } 
+    else if (strcmp(argv[i], "--target-mz-format") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing target mz format.");
+        print_usage(stderr, 1);
+      }
+      arguments->target_mz_format = get_compress_type(argv[++i]);
+    } 
+    else if (strcmp(argv[i], "--target-inten-format") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing target inten format.");
+        print_usage(stderr, 1);
+      }
+      arguments->target_inten_format = get_compress_type(argv[++i]);
     } 
     // // delta transform for int compression is not implemented
     // else if (strcmp(argv[i], "--int-scale-factor") == 0) {

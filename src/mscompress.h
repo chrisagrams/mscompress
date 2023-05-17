@@ -330,6 +330,7 @@ void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* ou
 void compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
+int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
 /* decompress.c */
