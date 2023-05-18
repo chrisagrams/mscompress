@@ -200,7 +200,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       if(arguments->target_mz_format == _delta16_transform_)
         arguments->mz_scale_factor = 127.998046875;
       else if(arguments->target_mz_format == _delta32_transform_)
-        arguments->mz_scale_factor = 1000.0; //TODO, determine best scale factor
+        arguments->mz_scale_factor = 262143.99993896484;
     } 
     else if (strcmp(argv[i], "--target-inten-format") == 0) {
       if (i + 1 >= argc) {

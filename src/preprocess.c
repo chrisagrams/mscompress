@@ -1723,7 +1723,13 @@ preprocess_mzml(char* input_map,
             n_divisions = div->mz->total_spec;
         }
 
-        if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
+        if(arguments->indices_length != 0 && n_threads > arguments->indices_length) // If we have more threads than selected specta, we need to decrease the number of divisions
+        {
+            print("Warning: n_threads (%ld) > indices_length (%ld). Setting n_divisions to indices_length)\n", n_threads, arguments->indices_length);
+            n_divisions = arguments->indices_length;
+            *divisions = create_divisions(div, n_divisions);
+        }
+        else if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
             *divisions = create_divisions(div, n_divisions);
         else
         {
