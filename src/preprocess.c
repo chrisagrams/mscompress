@@ -1704,30 +1704,37 @@ preprocess_mzml(char* input_map,
     if (div == NULL)
         return -1;
 
-    long n_divisions = determine_n_divisions(div->size, *blocksize);
-
-    if(n_divisions > div->mz->total_spec) // If we have more divisions than spectra, we need to decrease the number of divisions
+    if(n_threads == -1) // force divisions to be only 1
     {
-        print("Warning: n_divisions (%ld) > total_spec (%ld). Setting n_divisions to total_spec)\n", n_divisions, div->mz->total_spec);
-        n_divisions = div->mz->total_spec;
+        n_threads = 1;
+        *blocksize = div->size;
+        *divisions = (divisions_t*)malloc(sizeof(divisions_t));
+        (*divisions) -> divisions = (division_t**)malloc(sizeof(division_t*));
+        (*divisions) -> divisions[0] = div;
+        (*divisions) -> n_divisions = 1;
     }
-
-    if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
-        *divisions = create_divisions(div, n_divisions);
-    else
+    else 
     {
-        *divisions = create_divisions(div, n_threads);
-        *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
-    }
+        long n_divisions = determine_n_divisions(div->size, *blocksize);
 
-    // //temporary
-    // *divisions = malloc(sizeof(divisions_t));
-    // (*divisions)->n_divisions = 1;
-    // (*divisions)->divisions = malloc(sizeof(division_t*));
-    // (*divisions)->divisions[0] = div;
+        if(n_divisions > div->mz->total_spec) // If we have more divisions than spectra, we need to decrease the number of divisions
+        {
+            print("Warning: n_divisions (%ld) > total_spec (%ld). Setting n_divisions to total_spec)\n", n_divisions, div->mz->total_spec);
+            n_divisions = div->mz->total_spec;
+        }
+
+        if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
+            *divisions = create_divisions(div, n_divisions);
+        else
+        {
+            *divisions = create_divisions(div, n_threads);
+            *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
+        }
+    }
 
     if (*divisions == NULL)
         return -1;
+
     gettimeofday(&stop, NULL);
 
     print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6)); 

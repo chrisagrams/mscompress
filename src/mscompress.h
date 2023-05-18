@@ -63,12 +63,14 @@
 
 #define COMPRESS 1
 #define DECOMPRESS 2
+#define EXTRACT 3
 
 extern int verbose;
 
 struct Arguments {
     int verbose;
     int threads;
+    int extract_only;
     char* mz_lossy;
     char* int_lossy;
     long blocksize;
@@ -316,6 +318,9 @@ decode_fun_ptr set_decode_fun(int compression_method, int algo);
 encode_fun_ptr set_encode_fun(int compression_method, int algo);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
+
+/* extract.c */
+void extract_mzml(char* input_map, divisions_t* divisions, int output_fd);
 
 /* compress.c */
 typedef struct 

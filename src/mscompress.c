@@ -30,10 +30,11 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
   fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
   fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
-  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (default: 1000.0)\n");
+  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (delta16 default ~128, delta32 default 100)\n");
   fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
+  fprintf(stream, "--extract-only            Only output extracted mzML, no compression (disabled by default)\n");
   fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
@@ -64,6 +65,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   int i;
   arguments->verbose         = 0;
   arguments->threads         = 0;
+  arguments->extract_only    = 0;
   arguments->mz_lossy        = NULL;
   arguments->int_lossy       = NULL;
   arguments->blocksize       = 1e+8;
@@ -179,6 +181,9 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         }
       }
     }
+    else if (strcmp(argv[i], "--extract-only") == 0) {
+      arguments->extract_only = 1;
+    }
     else if (strcmp(argv[i], "--target-xml-format") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing target xml format.");
@@ -193,7 +198,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       }
       arguments->target_mz_format = get_compress_type(argv[++i]);
       if(arguments->target_mz_format == _delta16_transform_)
-        arguments->mz_scale_factor = 10.0; //TODO, deterimine best scale factor
+        arguments->mz_scale_factor = 127.998046875;
       else if(arguments->target_mz_format == _delta32_transform_)
         arguments->mz_scale_factor = 1000.0; //TODO, determine best scale factor
     } 
@@ -284,6 +289,8 @@ main(int argc, char* argv[])
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
+    operation = EXTRACT; // TODO: remove
+
     // Initialize b64 encoder.
     base64_stream_encode_init(&state, 0);
 
@@ -291,119 +298,137 @@ main(int argc, char* argv[])
 
     print("\tOutput file: %s\n", arguments.output_file);
 
-    if(operation == COMPRESS)
+    switch(operation)
     {
-      // Initialize footer to all 0's to not write garbage to file.
-      footer_t* footer = calloc(1, sizeof(footer_t));   
+      case COMPRESS:
+      {
+        // Initialize footer to all 0's to not write garbage to file.
+        footer_t* footer = calloc(1, sizeof(footer_t));   
 
-      print("\tDetected .mzML file, starting compression...\n");
+        print("\tDetected .mzML file, starting compression...\n");
 
-      // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
-      preprocess_mzml((char*)input_map,
-                      input_filesize,
-                      &(arguments.blocksize),
+        // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
+        preprocess_mzml((char*)input_map,
+                        input_filesize,
+                        &(arguments.blocksize),
+                        n_threads,
+                        &arguments,
+                        &df,
+                        &divisions);
+        
+        footer->original_filesize = input_filesize;
+        footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
+
+        // Set target formats.
+        df->target_xml_format   = arguments.target_xml_format;
+        df->target_mz_format    = arguments.target_mz_format;
+        df->target_inten_format = arguments.target_inten_format;
+
+        // Set target compression functions.
+        df->xml_compression_fun   = set_compress_fun(df->target_xml_format);
+        df->mz_compression_fun    = set_compress_fun(df->target_mz_format);
+        df->inten_compression_fun = set_compress_fun(df->target_inten_format);
+
+        // Parse arguments for compression algorithms and set formats accordingly.
+        
+        // Store format integer in footer.
+        footer->mz_fmt    = get_algo_type(arguments.mz_lossy);
+        footer->inten_fmt = get_algo_type(arguments.int_lossy);
+        
+        // Set target compression functions.
+        df->target_mz_fun    = set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
+        df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
+        
+        // Set decoding function based on source compression format.
+        df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt);
+        df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt);
+
+        // Set ZSTD compression level.
+        df->zstd_compression_level = arguments.zstd_compression_level; 
+
+        // Set scale factor.
+        df->mz_scale_factor = arguments.mz_scale_factor;
+
+        //Write df header to file.
+        write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
+        //Start compress routine.
+        compress_mzml((char*)input_map,
+                      arguments.blocksize,
                       n_threads,
-                      &arguments,
-                      &df,
-                      &divisions);
-      
-      footer->original_filesize = input_filesize;
-      footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
+                      footer,
+                      df,
+                      divisions,
+                      fds[1]);
 
-      // Set target formats.
-      df->target_xml_format   = arguments.target_xml_format;
-      df->target_mz_format    = arguments.target_mz_format;
-      df->target_inten_format = arguments.target_inten_format;
+        // Write divisions to file.
+        footer->divisions_t_pos = get_offset(fds[1]);
+        write_divisions(divisions, fds[1]);
 
-      // Set target compression functions.
-      df->xml_compression_fun   = set_compress_fun(df->target_xml_format);
-      df->mz_compression_fun    = set_compress_fun(df->target_mz_format);
-      df->inten_compression_fun = set_compress_fun(df->target_inten_format);
+        // Write footer to file.
+        write_footer(footer, fds[1]);
 
-      // Parse arguments for compression algorithms and set formats accordingly.
-      
-      // Store format integer in footer.
-      footer->mz_fmt    = get_algo_type(arguments.mz_lossy);
-      footer->inten_fmt = get_algo_type(arguments.int_lossy);
-      
-      // Set target compression functions.
-      df->target_mz_fun    = set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
-      df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
-      
-      // Set decoding function based on source compression format.
-      df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt);
-      df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt);
+        free(footer);
+        break;
+      }
+      case DECOMPRESS:
+      {
+        print("\tDetected .msz file, reading header and footer...\n");
 
-      // Set ZSTD compression level.
-      df->zstd_compression_level = arguments.zstd_compression_level; 
+        block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
+        footer_t* msz_footer;
+        int n_divisions = 0;
 
-      // Set scale factor.
-      df->mz_scale_factor = arguments.mz_scale_factor;
+        df = get_header_df(input_map);
 
-      //Write df header to file.
-      write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        parse_footer(&msz_footer, input_map, input_filesize,
+                    &xml_block_lens, 
+                    &mz_binary_block_lens,
+                    &inten_binary_block_lens,
+                    &divisions,
+                    &n_divisions);
 
-      //Start compress routine.
-      compress_mzml((char*)input_map,
-                    arguments.blocksize,
-                    n_threads,
-                    footer,
-                    df,
-                    divisions,
-                    fds[1]);
+        if(n_divisions == 0)
+          error("No divisions found in file, aborting...\n");
 
-      // Write divisions to file.
-      footer->divisions_t_pos = get_offset(fds[1]);
-      write_divisions(divisions, fds[1]);
+        print("\nDecompression and encoding...\n");
 
-      // Write footer to file.
-      write_footer(footer, fds[1]);
+        // Set target encoding and decompression functions.
+        df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
+        df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt);
 
-      free(footer);
-    }
+        df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
+        df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
 
-    else if (operation == DECOMPRESS)
-    {
-      print("\tDetected .msz file, reading header and footer...\n");
+        // Set target decompression functions.
+        df->xml_decompression_fun   = set_decompress_fun(df->target_xml_format);
+        df->mz_decompression_fun    = set_decompress_fun(df->target_mz_format);
+        df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
 
-      block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
-      footer_t* msz_footer;
-      int n_divisions = 0;
+        //Start decompress routine.
+        decompress_parallel(input_map,
+                            xml_block_lens,
+                            mz_binary_block_lens,
+                            inten_binary_block_lens,
+                            divisions,
+                            df, msz_footer, n_threads, fds[1]);
 
-      df = get_header_df(input_map);
+        break;
+      };
+      case EXTRACT:
+      {
+          print("\nExtracting ...\n");
 
-      parse_footer(&msz_footer, input_map, input_filesize,
-                   &xml_block_lens, 
-                   &mz_binary_block_lens,
-                   &inten_binary_block_lens,
-                   &divisions,
-                   &n_divisions);
-
-      if(n_divisions == 0)
-        error("No divisions found in file, aborting...\n");
-
-      print("\nDecompression and encoding...\n");
-
-      // Set target encoding and decompression functions.
-      df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
-      df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt);
-
-      df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
-      df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
-
-      // Set target decompression functions.
-      df->xml_decompression_fun   = set_decompress_fun(df->target_xml_format);
-      df->mz_decompression_fun    = set_decompress_fun(df->target_mz_format);
-      df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
-
-      //Start decompress routine.
-      decompress_parallel(input_map,
-                          xml_block_lens,
-                          mz_binary_block_lens,
-                          inten_binary_block_lens,
-                          divisions,
-                          df, msz_footer, n_threads, fds[1]);
-
+          preprocess_mzml((char*)input_map,
+                input_filesize,
+                &(arguments.blocksize),
+                -1, //force single threaded
+                &arguments,
+                &df,
+                &divisions);
+          
+          extract_mzml((char*)input_map, divisions, fds[1]);
+      };
     }
     print("\nCleaning up...\n");
 
