@@ -289,7 +289,8 @@ main(int argc, char* argv[])
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
-    operation = EXTRACT; // TODO: remove
+    if(arguments.extract_only)
+      operation = EXTRACT;
 
     // Initialize b64 encoder.
     base64_stream_encode_init(&state, 0);
