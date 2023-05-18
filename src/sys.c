@@ -1,29 +1,24 @@
 #ifdef __linux__
-    #include <sys/sysinfo.h>
-    #include <sys/types.h>
-    #include <sys/syscall.h>
-    #include <unistd.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #elif __APPLE__
-    #include <sys/sysctl.h>
-    #include <pthread.h>
+#include <sys/sysctl.h>
+#include <pthread.h>
 #elif _WIN32
-    #include <sysinfoapi.h>
+#include <sysinfoapi.h>
 #endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+
 #include "mscompress.h"
 
-
-int
-get_cpu_count()
-/**
- * @brief A wrapper function to get the number of processor cores on a platform. 
- * Prints to stdout the number of processors detected.
- * 
- * @return Number of configured (available) processors.
- */
+void
+prepare_threads(long args_threads, long* n_threads)
 {
     int np;
 
@@ -53,7 +48,12 @@ get_cpu_count()
 
     print("\t%d usable processors detected.\n", np);
 
-    return np;
+    if(args_threads == 0)
+      *n_threads = np;
+    else
+      *n_threads = args_threads;
+    
+    print("\tUsing %d threads.\n", *n_threads);
 }
 
 int
@@ -111,4 +111,27 @@ warning(const char* format, ...)
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
+}
+
+long
+parse_blocksize(char* arg)
+{
+  int num;
+  int len;
+  char prefix[2];
+  long res = -1;
+
+  len = strlen(arg);
+  num = atoi(arg);
+  
+  memcpy(prefix, arg+len-2, 2);
+
+  if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
+    res = num*1e+3;
+  else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
+    res = num*1e+6;
+  else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
+    res = num*1e+9;
+
+  return res;
 }

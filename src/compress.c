@@ -1,11 +1,12 @@
-#include "mscompress.h"
-#include <zstd.h>
+#include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "vendor/zlib/zlib.h"
 #include <sys/time.h>
-#include <pthread.h>
+#include "vendor/zlib/zlib.h"
+#include <zstd.h>
+#include "mscompress.h"
 
 
 ZSTD_CCtx*
@@ -109,16 +110,22 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
             error("zstd_compress: cctx is NULL.\n");
         if(src_buff == NULL)
             error("zstd_compress: src_buff is NULL.\n");
-        if(src_len <= 0)
+        if(src_len < 0)
             error("zstd_compress: invalid src_len for compression.\n");
         if(out_len == NULL)
             error("zstd_compress: out_len is NULL.\n");
-        if(compression_level < 1 || compression_level > 9)
+        if(compression_level < 1 || compression_level > 22)
             error("zstd_compress: invalid compression_level.\n");
     #endif
 
     void* out_buff;
     size_t buff_len = 0;
+
+    if(src_len == 0)
+    {
+        *out_len = 0;
+        return NULL;
+    }
 
     out_buff = alloc_ztsd_cbuff(src_len, &buff_len);
 
@@ -132,110 +139,17 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
     return out_buff;
 }
 
-data_block_t*
-alloc_data_block(size_t max_size)
-/**
- * @brief Allocates a data_block_t struct.
- * 
- * @param max_size The maximum size the data block can store (cmp_blk_size)
- * 
- * @return A populated data_block_t struct with capacity max_size and max_size field set.
- */
+void*
+no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level)
+/*
+    Same function signature as zstd_compress, but does not compress.
+*/
 {
-    #ifdef ERROR_CHECK
-        if(max_size <= 0)
-            error("alloc_data_block: invalid max_size for data block.\n");
-    #endif
-    
-    data_block_t* r = malloc(sizeof(data_block_t));
-
-    #ifdef ERROR_CHECK
-        if(r == NULL)
-            error("alloc_data_block: Failed to allocate data block.\n");
-    #endif
-
-    r->mem = malloc(sizeof(char) * max_size);
-
-    #ifdef ERROR_CHECK
-    if(r->mem == NULL)
-        error("alloc_data_block: Failed to allocate data block memory.\n");
-    #endif
-
-    r->size = 0;
-    r->max_size = max_size;
-
-    return r;
+    *out_len = src_len;
+    void* out_buff = malloc(src_len);
+    memcpy(out_buff, src_buff, src_len);
+    return out_buff;
 }
-
-
-void
-dealloc_data_block(data_block_t* db)
-/**
- * @brief Deallocates a data_block_struct and its members.
- * 
- * @param db An allocated data_block_struct.
- * 
- */
-{
-    if (db)
-    {
-        if (db->mem) free(db->mem);
-        free(db);
-    }
-    return;
-}
-
-
-cmp_block_t*
-alloc_cmp_block(char* mem, size_t size, size_t original_size)
-/**
- * @brief Allocates and populates a cmp_block_t struct to store a compressed block.
- * 
- * @param mem Contents of compressed block.
- * 
- * @param size Length of the compressed block.
- * 
- * @returns A populated cmp_block_t struct with contents of compressed block.
- * 
- */
-{
-    #ifdef ERROR_CHECK
-        if(mem == NULL)
-            error("alloc_cmp_block: invalid mem for cmp block.\n");
-
-        if(size <= 0 || original_size <= 0)
-            error("alloc_cmp_block: invalid size for cmp block.\n");
-    #endif
-
-    cmp_block_t* r = malloc(sizeof(cmp_block_t));
-
-    #ifdef ERROR_CHECK
-        if(r == NULL)
-            error("alloc_cmp_block: Failed to allocate cmp block.\n");
-    #endif
-
-    r->mem = mem;
-    r->size = size;
-    r->original_size = original_size;
-    return r;
-}
-
-void
-dealloc_cmp_block(cmp_block_t* blk)
-{
-    if(blk)
-    {
-        if (blk->mem)
-            free(blk->mem);
-        else
-            error("dealloc_cmp_block: blk's mem is NULL\n");
-        free(blk);
-    }
-    else
-        error("dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
-    return;
-}
-
 
 int
 append_mem(data_block_t* data_block, char* mem, size_t buff_len)
@@ -252,12 +166,13 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
  * 
  */
 {
-    if(buff_len + data_block->size > data_block->max_size) return 0;        // Not enough space in data block
+    while(buff_len + data_block->size >= data_block->max_size)                  // Not enough space in data block
+        realloc_data_block(data_block, data_block->max_size * REALLOC_FACTOR); // Grow data block by REALLOC_FACTOR     
 
-    if(data_block->mem+data_block->size == NULL || mem == NULL)             // Check for NULL pointers
+    if(data_block->mem + data_block->size == NULL || mem == NULL)             // Check for NULL pointers
         error("append_mem: NULL pointer passed to append_mem.\n");
 
-    if(memcpy(data_block->mem+data_block->size, mem, buff_len) == NULL)     // Copy memory
+    if(memcpy(data_block->mem + data_block->size, mem, buff_len) == NULL)     // Copy memory
         error("append_mem: Failed to append memory.\n");
 
     data_block->size += buff_len;                                           // Update size of data block
@@ -266,7 +181,7 @@ append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 }
 
 compress_args_t*
-alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, size_t cmp_blk_size)
+alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, compression_fun comp_fun, size_t cmp_blk_size, long blocksize, int mode)
 {
 /**
  * @brief Allocates and initializes a compress_args_t struct to be passed to compress_routine.
@@ -289,7 +204,10 @@ alloc_compress_args(char* input_map, data_positions_t* dp, data_format_t* df, si
     r->input_map = input_map;
     r->dp = dp;
     r->df = df;
+    r->comp_fun = comp_fun;
     r->cmp_blk_size = cmp_blk_size;
+    r->blocksize = blocksize;
+    r->mode = mode;
 
     r->ret = NULL;
 
@@ -307,12 +225,14 @@ dealloc_compress_args(compress_args_t* args)
 }
 
 void
-cmp_routine(ZSTD_CCtx* czstd,
+cmp_routine(    
+                compression_fun compression_fun,
+                ZSTD_CCtx* czstd,
+                int compression_level,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
                 char* input,
                 size_t len,
-                size_t cmp_blk_size,
                 size_t* tot_size,
                 size_t* tot_cmp)
 /**
@@ -332,13 +252,6 @@ cmp_routine(ZSTD_CCtx* czstd,
  * 
  * @param len The length of the desired substring to compress within the .mzML document.
  * 
- * @param cmp_blk_size The size of a data block before it is compressed. 
- *                     NOTE: If this value is set too small, the program will exit with error code 1.
- *                           The current routine does not handle a substring that is too big for a 
- *                           data block. This should not be an issue with reasonable a reasonable
- *                           block size (>10 MB). This gives the user the flexbility to test 
- *                           performance with different block sizes.
- * 
  * @param tot_size A pass-by-reference variable to bookkeep total number of XML bytes processed.
  * 
  * @param tot_cmp A pass-by-reference variable to bookkeep total compressed size of XML.
@@ -348,15 +261,14 @@ cmp_routine(ZSTD_CCtx* czstd,
     void* cmp;
     cmp_block_t* cmp_block;
     size_t cmp_len = 0;
+    size_t prev_size = 0;
 
-    #ifdef ERROR_CHECK
-        if(len > cmp_blk_size)
-            error("cmp_routine: len > cmp_blk_size. This should not happen.\n");
-    #endif
+    data_block_t* tmp_block = *curr_block;
 
-    if(!append_mem(*curr_block, input, len))
+
+    if(!append_mem((*curr_block), input, len))
     {
-        cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+        cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, compression_level);
 
         cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -366,9 +278,11 @@ cmp_routine(ZSTD_CCtx* czstd,
 
         append_cmp_block(cmp_buff, cmp_block);
 
+        prev_size = (*curr_block)->size;
+
         dealloc_data_block(*curr_block);
 
-        *curr_block = alloc_data_block(cmp_blk_size);
+        *curr_block = alloc_data_block(prev_size);
 
         append_mem(*curr_block, input, len);
     }
@@ -376,10 +290,12 @@ cmp_routine(ZSTD_CCtx* czstd,
 
 
 void
-cmp_flush(ZSTD_CCtx* czstd,
+cmp_flush(    
+              compression_fun compression_fun,
+              ZSTD_CCtx* czstd,
+              int compression_level,
               cmp_blk_queue_t* cmp_buff,
               data_block_t** curr_block,
-              size_t cmp_blk_size,
               size_t* tot_size,
               size_t* tot_cmp)
 /**
@@ -393,13 +309,6 @@ cmp_flush(ZSTD_CCtx* czstd,
  * 
  * @param curr_block Current data block to append to and/or compress.
  * 
- * @param cmp_blk_size The size of a data block before it is compressed. 
- *                     NOTE: If this value is set too small, the program will exit with error code 1.
- *                           The current routine does not handle a substring that is too big for a 
- *                           data block. This should not be an issue with reasonable a reasonable
- *                           block size (>10 MB). This gives the user the flexbility to test 
- *                           performance with different block sizes.
- * 
  * @param tot_size A pass-by-reference variable to bookkeep total number of XML bytes processed.
  * 
  * @param tot_cmp A pass-by-reference variable to bookkeep total compressed size of XML.
@@ -412,11 +321,9 @@ cmp_flush(ZSTD_CCtx* czstd,
     #ifdef ERROR_CHECK
         if(!(*curr_block))
             error("cmp_flush: curr_block is NULL. This should not happen.\n");
-        if((*curr_block)->size > cmp_blk_size) 
-            error("cmp_flush: curr_block->size > cmp_blk_size. This should not happen.\n");
     #endif
     
-    cmp = zstd_compress(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, 1);
+    cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size, &cmp_len, compression_level);
 
     cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
@@ -483,37 +390,49 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
     }
 }
 
+
+typedef void (*cmp_routine_func)(ZSTD_CCtx*, algo_args*, cmp_blk_queue_t*, data_block_t**, data_format_t*, char*, size_t, size_t*, size_t*);
+typedef cmp_routine_func (*cmp_routine_func_ptr)();
+
+
 void
-cmp_xml_routine(ZSTD_CCtx* czstd,
+cmp_xml_routine(
+                compression_fun compression_fun,
+                ZSTD_CCtx* czstd,
+                algo_args* a_args,
                 cmp_blk_queue_t* cmp_buff,
                 data_block_t** curr_block,
+                data_format_t* df,
                 char* input,
                 size_t len,
-                size_t cmp_blk_size,
                 size_t* tot_size,
                 size_t* tot_cmp)
 /**
  * @brief cmp_routine wrapper for XML data.
  */
 {
-    cmp_routine(czstd,
+    cmp_routine(
+                compression_fun,
+                czstd,
+                df->zstd_compression_level,
                 cmp_buff,
                 curr_block,
                 input,
                 len,
-                cmp_blk_size,
                 tot_size,
                 tot_cmp);
 }
 
 void
-cmp_binary_routine(ZSTD_CCtx* czstd,
+cmp_binary_routine(
+                   compression_fun compression_fun,
+                   ZSTD_CCtx* czstd,
+                   algo_args* a_args,
                    cmp_blk_queue_t* cmp_buff,
                    data_block_t** curr_block,
                    data_format_t* df,
                    char* input,
                    size_t len,
-                   size_t cmp_blk_size,
                    size_t* tot_size,
                    size_t* tot_cmp)
 /**
@@ -526,7 +445,6 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     
     // df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
 
-    algo_args* a_args = malloc(sizeof(algo_args));
     if(a_args == NULL)
         error("cmp_binary_routine: Failed to allocate algo_args.\n");
 
@@ -535,19 +453,21 @@ cmp_binary_routine(ZSTD_CCtx* czstd,
     a_args->dest = &binary_buff;
     a_args->dest_len = &binary_len;
     a_args->src_format = df->source_mz_fmt; //TODO: This is a hack. Need to fix.
-    a_args->dec_fun = df->decode_source_compression_fun;
 
     df->target_mz_fun((void*)a_args); //TODO: This is a hack. Need to fix.
+
 
     if(binary_buff == NULL)
         error("cmp_binary_routine: binary_buff is NULL\n");
 
-    cmp_routine(czstd,
+    cmp_routine(
+                compression_fun,
+                czstd,
+                df->zstd_compression_level,
                 cmp_buff,
                 curr_block,
                 binary_buff,
                 binary_len,
-                cmp_blk_size,
                 tot_size, tot_cmp);
                 
     free(binary_buff);
@@ -569,6 +489,9 @@ compress_routine(void* args)
     ZSTD_CCtx* czstd = alloc_cctx();
 
     compress_args_t* cb_args = (compress_args_t*)args;
+    algo_args* a_args = malloc(sizeof(algo_args));
+    a_args->tmp = alloc_data_block(cb_args->blocksize); // Allocate a temporary data_block to intermediately store data.
+    a_args->z = alloc_z_stream(); // Allocate a z_stream to intermediately store data.
 
     if(cb_args == NULL)
         error("compress_routine: Invalid compress_args_t\n");
@@ -576,7 +499,7 @@ compress_routine(void* args)
     if(cb_args->dp->total_spec == 0) return; // No data to compress.
 
     cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
-    data_block_t* curr_block = alloc_data_block(cb_args->cmp_blk_size);
+    data_block_t* curr_block = alloc_data_block(cb_args->blocksize); // Allocate a data_block to store data.
 
 
     size_t len = 0;
@@ -585,31 +508,55 @@ compress_routine(void* args)
 
     int i = 0;
 
+    cmp_routine_func_ptr cmp_fun = NULL;
+    
+    if(cb_args->mode == _xml_)
+        cmp_fun = cmp_xml_routine;
+    else
+        cmp_fun = cmp_binary_routine;
+
+    if(cb_args->mode == _mass_)
+    {
+        a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
+        a_args->scale_factor = cb_args->df->mz_scale_factor;
+    }
+    else if(cb_args->mode == _intensity_)
+    {
+        a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
+    }
+    else if(cb_args->mode == _xml_)
+        a_args->dec_fun = NULL;
+    else
+        error("compress_routine: Invalid mode. Mode: %d\n", cb_args->mode);
     
     for(; i < cb_args->dp->total_spec; i++)
     {
+        
+        if(cb_args->dp->end_positions[i] < cb_args->dp->start_positions[i])
+            error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
+
         len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
         if(len < 0)
             error("compress_routine: Invalid data position. Start: %ld End: %ld\n", cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
         
-        if(cb_args->df)
-            cmp_binary_routine(czstd, cmp_buff, &curr_block, cb_args->df, 
-                        cb_args->input_map + cb_args->dp->start_positions[i],
-                        len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
-        else
-            cmp_xml_routine(czstd, cmp_buff, &curr_block,
-                        cb_args->input_map + cb_args->dp->start_positions[i],           
-                        len, cb_args->cmp_blk_size, &tot_size, &tot_cmp);
+        char* map = cb_args->input_map + cb_args->dp->start_positions[i];
 
+        if(len == 0) continue; // Skip empty data blocks (e.g. empty spectra)
+
+        cmp_fun(cb_args->comp_fun, czstd, a_args, cmp_buff, &curr_block, cb_args->df, 
+                    map,
+                    len, &tot_size, &tot_cmp);
     }
 
-    cmp_flush(czstd, cmp_buff, &curr_block, cb_args->cmp_blk_size, &tot_size, &tot_cmp); /* Flush remainder datablocks */
+    cmp_flush(cb_args->comp_fun, czstd, cb_args->df->zstd_compression_level, cmp_buff, &curr_block, &tot_size, &tot_cmp); /* Flush remainder datablocks */
 
     print("\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. (%1.2f%%)\n", tid, tot_size, tot_cmp, (double)tot_size/tot_cmp);
 
     /* Cleanup (curr_block already freed by cmp_flush) */
     dealloc_cctx(czstd);
+    dealloc_data_block(a_args->tmp);
+    dealloc_z_stream(a_args->z);
 
     cb_args->ret = cmp_buff;
 }
@@ -618,7 +565,8 @@ block_len_queue_t*
 compress_parallel(char* input_map,
                   data_positions_t** ddp,
                   data_format_t* df,
-                  size_t cmp_blk_size,
+                  compression_fun comp_fun,
+                  size_t cmp_blk_size, long blocksize, int mode,
                   int divisions, int threads, int fd)
 /**
  * @brief Creates and executes compression threads using compress_routine.
@@ -639,10 +587,10 @@ compress_parallel(char* input_map,
  */
 {
     block_len_queue_t* blk_len_queue;
-    compress_args_t* args[divisions];
-    pthread_t ptid[divisions];
+    compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
+    pthread_t* ptid = malloc(sizeof(pthread_t) * divisions);
     
-    int i;
+    int i = 0;
 
     blk_len_queue = alloc_block_len_queue();
 
@@ -650,7 +598,7 @@ compress_parallel(char* input_map,
     int divisions_left = divisions;
 
     for(i = divisions_used; i < divisions; i++)
-        args[i] = alloc_compress_args(input_map, ddp[i], df, cmp_blk_size);
+        args[i] = alloc_compress_args(input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
 
     while(divisions_left > 0)
     {
@@ -707,15 +655,20 @@ compress_mzml(char* input_map,
 
     print("\t===XML===\n");
     footer->xml_pos = get_offset(output_fd);
-    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, NULL, blocksize, divisions->n_divisions, threads, output_fd);  /* Compress XML */
+    xml_block_lens = compress_parallel((char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize, blocksize/3, _xml_, divisions->n_divisions, threads, output_fd);  /* Compress XML */
+    free(xml_divisions);
 
     print("\t===m/z binary===\n");
     footer->mz_binary_pos = get_offset(output_fd);
-    mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, blocksize, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
+    df->target_mz_fun = set_compress_algo(footer->mz_fmt, df->source_mz_fmt); //TODO, rename target_mz_fun
+    mz_binary_block_lens = compress_parallel((char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize, blocksize/3, _mass_, divisions->n_divisions, threads, output_fd); /* Compress m/z binary */
+    free(mz_divisions);
 
     print("\t===int binary===\n");
     footer->inten_binary_pos = get_offset(output_fd);
-    inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, blocksize, divisions->n_divisions, threads, output_fd); /* Compress int binary */
+    df->target_mz_fun = set_compress_algo(footer->inten_fmt, df->source_mz_fmt);//TODO, rename target_mz_fun
+    inten_binary_block_lens = compress_parallel((char*)input_map, inten_divisions, df, df->inten_compression_fun, blocksize, blocksize/3, _intensity_, divisions->n_divisions, threads, output_fd); /* Compress int binary */
+    free(inten_divisions);
 
     // Dump block_len_queue to msz file.
     footer->xml_blk_pos = get_offset(output_fd);
@@ -730,4 +683,26 @@ compress_mzml(char* input_map,
     gettimeofday(&stop, NULL);
 
     print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
+}
+
+compression_fun
+set_compress_fun(int accession)
+{   
+    switch(accession)
+    {
+        case _ZSTD_compression_ :       return zstd_compress;
+        case _no_comp_ :                return no_compress;
+        default :                       error("Compression type not supported.");
+    }
+}
+
+int
+get_compress_type(char* arg)
+{
+    if(arg == NULL)
+        error("Compression type not specified.");
+    if(strcmp(arg, "zstd") == 0 || strcmp(arg, "ZSTD") == 0)
+        return _ZSTD_compression_;
+    if(strcmp(arg, "nocomp") == 0 || strcmp(arg, "none") == 0)
+        return _no_comp_;
 }

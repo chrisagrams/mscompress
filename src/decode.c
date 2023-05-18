@@ -10,13 +10,13 @@
  * 
  */
 
-#include "mscompress.h"
-#include "vendor/base64/include/libbase64.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include "vendor/zlib/zlib.h"
+#include "mscompress.h"
+#include "vendor/base64/include/libbase64.h"
 
 
 char*
@@ -54,7 +54,7 @@ decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 }
 
 void
-decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "zlib" encoding.
  *        Decodes base64 string, zlib decodes the string, and appends resulting binary
@@ -69,6 +69,8 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
  * @param end_position Position of last byte of </binary> block.
  * 
  * @param out_len Contains resulting buffer size on return.
+ * 
+ * @param tmp Pointer to data_block_t struct used for temporary storage.
  * 
  * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing length of decoded binary
  *         and resulting decoded binary buffer.
@@ -86,9 +88,20 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
     if(out_len == NULL)
         error("decode_zlib_fun: out_len is NULL.\n");
 
+    if(tmp == NULL)
+        error("decode_zlib_fun: tmp is NULL.\n");
+
+    if(z == NULL)
+        error("decode_zlib_fun: z is NULL.\n");
+
     size_t b64_out_len = 0;
 
-    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    // char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+
+    if(tmp->max_size < src_len)
+        realloc_data_block(tmp, src_len);
+    
+    char* b64_out_buff = tmp->mem;
     
     decode_base64(src, b64_out_buff, src_len, &b64_out_len);
     
@@ -97,11 +110,11 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
-    free(b64_out_buff);
+    // free(b64_out_buff);
     
     *out_len = decmp_size + ZLIB_SIZE_OFFSET;
     
@@ -111,8 +124,27 @@ decode_zlib_fun(char* src, size_t src_len, char** dest, size_t* out_len)
 }
 
 void
-decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 {
+/**
+ * @brief Decodes a zlib compressed buffer without header and stores the output in a new buffer.
+ * 
+ * This function takes a zlib compressed buffer without header, decodes it, and stores the output in a newly 
+ * allocated buffer. The input buffer must be a base64 encoded string, which will be decoded before decompression.
+ * 
+ * @param z Pointer to a zlib stream object.
+ * @param src Pointer to the source buffer containing the compressed data.
+ * @param src_len Length of the source buffer in bytes.
+ * @param dest Pointer to the destination buffer where the decompressed data will be stored.
+ * @param out_len Pointer to a variable where the size of the decompressed data will be stored.
+ * @param tmp Pointer to a data_block_t object used as a temporary buffer.
+ * 
+ * @return None.
+ *
+ * @note The caller is responsible for freeing the destination buffer after use.
+ * @note The temporary buffer will be reallocated if its size is smaller than the size of the source buffer.
+ * @note This function will terminate the program with an error message if any of the input parameters are NULL or invalid.
+ */
     if(src == NULL)
         error("decode_zlib_fun_no_header: src is NULL.\n");
 
@@ -125,9 +157,15 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
     if(out_len == NULL)
         error("decode_zlib_fun_no_header: out_len is NULL.\n");
 
+    if(z == NULL)
+        error("decode_zlib_fun: z is NULL.\n");
+
     size_t b64_out_len = 0;
 
-    char* b64_out_buff = base64_alloc(sizeof(char) * src_len);
+    if(tmp->max_size < src_len)
+        realloc_data_block(tmp, src_len);
+    
+    char* b64_out_buff = tmp->mem;
     
     decode_base64(src, b64_out_buff, src_len, &b64_out_len);
     
@@ -136,9 +174,9 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(b64_out_buff, decmp_output, b64_out_len);
+    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
-    free(b64_out_buff);
+    // free(b64_out_buff);
     
     *out_len = decmp_size;
     
@@ -146,8 +184,9 @@ decode_zlib_fun_no_header(char* src, size_t src_len, char** dest, size_t* out_le
 
     free(decmp_output);
 }
+
 void
-decode_no_comp_fun(char* src, size_t src_len, char** dest, size_t* out_len)
+decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 

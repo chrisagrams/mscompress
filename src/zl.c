@@ -74,47 +74,51 @@ zlib_pop_header(zlib_block_t* blk)
 z_stream*
 alloc_z_stream()
 {
-    z_stream* r;
+    z_stream* z;
 
-    r = malloc(sizeof(z_stream));
-    r->zalloc = Z_NULL;
-    r->zfree = Z_NULL;
-    r->opaque = Z_NULL;
+    z = calloc(1, sizeof(z_stream));
 
-    return r;
+    if (deflateInit(z, Z_DEFAULT_COMPRESSION) != Z_OK)
+        error("alloc_z_stream: deflateInit error\n");
+
+    return z;
 }
 
 void
-dealloc_z_stream(z_stream* stream)
+dealloc_z_stream(z_stream* z)
 {
-    if(stream)
-        free(stream);
+    if(z)
+    {
+        deflateEnd(z);
+        free(z);
+    }
 }
 
 uInt 
-zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len)
+zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input_len)
 {
     uInt r;
 
     uInt output_len = output->len;
     
-    z_stream* d = alloc_z_stream();
+    if(z == NULL)
+        error("zlib_compress: z_stream is NULL");
     
-    d->avail_in = input_len;
-    d->next_in = input;
-    d->avail_out = output_len;
-    d->next_out = output->buff;
-
-    deflateInit(d, Z_DEFAULT_COMPRESSION);
+    
+    z->avail_in = input_len;
+    z->next_in = input;
+    z->avail_out = output_len;
+    z->next_out = output->buff;
+    z->total_out = 0;
 
     int ret;
 
     do 
     {
-        d->avail_out = output_len-d->total_out;
-        d->next_out = output->buff+d->total_out;
+        z->avail_out = output_len-z->total_out;
+        z->next_out = output->buff+z->total_out;
 
-        ret = deflate(d, Z_FINISH);
+        ret = deflate(z, Z_FINISH);
 
         if(ret != Z_OK)
             break;
@@ -122,42 +126,43 @@ zlib_compress(Bytef* input, zlib_block_t* output, uInt input_len)
         output_len += ZLIB_BUFF_FACTOR;
         zlib_realloc(output, output_len);
 
-    } while(d->avail_out == 0);
+    } while(z->avail_out == 0);
 
-    r = d->total_out;
+    r = z->total_out;
     
-    deflateEnd(d); 
-    dealloc_z_stream(d);
+    deflateReset(z); // reset the z_stream
 
-    zlib_realloc(output, r); // shrink the 256k buffer down to only what is in use
+    zlib_realloc(output, r); // shrink the buffer down to only what is in use
 
     return r;
 } 
 
 uInt 
-zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len)
+zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input_len)
 {
     uInt r;
 
     uInt output_len = output->len;
 
-    z_stream* i = alloc_z_stream();
+    if(z == NULL)
+        error("zlib_decompress: z_stream is NULL");
 
-    i->avail_in = input_len;
-    i->next_in = input;
-    i->avail_out = output_len;
-    i->next_out = output->buff;
+    z->avail_in = input_len;
+    z->next_in = input;
+    z->avail_out = output_len;
+    z->next_out = output->buff;
+    z->total_out = 0;
 
-    inflateInit(i);
+    inflateInit(z);
 
     int ret;
 
     do
     {
-        i->avail_out = output_len-i->total_out;
-        i->next_out = output->buff+i->total_out;
+        z->avail_out = output_len-z->total_out;
+        z->next_out = output->buff+z->total_out;
 
-        ret = inflate(i, Z_NO_FLUSH);
+        ret = inflate(z, Z_NO_FLUSH);
         
         if(ret != Z_OK)
             break;
@@ -165,14 +170,13 @@ zlib_decompress(Bytef* input, zlib_block_t* output, uInt input_len)
         output_len += ZLIB_BUFF_FACTOR;
         zlib_realloc(output, output_len);
 
-    } while (i->avail_out == 0);
+    } while (z->avail_out == 0);
 
-    r = i->total_out;
+    r = z->total_out;
 
-    inflateEnd(i);
-    dealloc_z_stream(i);
+    inflateReset(z);
 
-    zlib_realloc(output, r); // shrink the 256k buffer down to only what is in use
+    zlib_realloc(output, r); // shrink the buffer down to only what is in use
 
     return r;
 }

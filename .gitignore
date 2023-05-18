@@ -6,3 +6,4 @@ mscompress.dSYM/
 vgcore.*
 .vscode/*
 .DS_Store
+heaptrack*

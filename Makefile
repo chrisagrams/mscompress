@@ -22,11 +22,13 @@ OBJS = \
 	src/preprocess.o \
 	src/file.o \
 	src/encode.o \
+	src/extract.o \
 	src/decode.o \
 	src/compress.o \
 	src/decompress.o \
 	src/zl.o \
 	src/debug.o \
+	src/mem.o \
 	src/mscompress.o
 
 LIBS				:=

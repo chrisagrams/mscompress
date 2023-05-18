@@ -1,10 +1,12 @@
-#include "mscompress.h"
-#include <zstd.h>
+#include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
-#include <assert.h>
+#include <sys/time.h>
+#include "vendor/zlib/zlib.h"
+#include <zstd.h>
+#include "mscompress.h"
 
 ZSTD_DCtx *
 alloc_dctx()
@@ -47,12 +49,28 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 
 }
 
+void*
+no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
+/*
+    Same function signature as zstd_decompress, but does not decompress.
+*/
+{
+    void* out_buff;
+    size_t decmp_len = 0;
+
+    out_buff = alloc_ztsd_dbuff(org_len); // will return buff, exit on error
+
+    memcpy(out_buff, src_buff, org_len);
+
+    return out_buff;
+}
+
 void *
-decmp_block(ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
+decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 {
     if(blk == NULL) // Empty block, return null.
         return NULL; 
-    return zstd_decompress(dctx, input_map+offset, blk->compressed_size, blk->original_size);
+    return decompress_fun(dctx, input_map+offset, blk->compressed_size, blk->original_size);
 }
 
 decompress_args_t*
@@ -134,9 +152,9 @@ decompress_routine(void* args)
 
     // Decompress each block of data
     void
-        *decmp_xml = decmp_block(dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
-        *decmp_mz_binary = decmp_block(dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
-        *decmp_inten_binary = decmp_block(dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
+        *decmp_xml = decmp_block(db_args->df->xml_decompression_fun, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = decmp_block(db_args->df->mz_decompression_fun, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_inten_binary = decmp_block(db_args->df->inten_decompression_fun, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
     size_t binary_len = 0;
 
@@ -151,7 +169,7 @@ decompress_routine(void* args)
     if(len <= 0)
         error("decompress_routine: Error determining decompression buffer size.\n");
 
-    char* buff = malloc(len); // *2 to be safe TODO: fix this
+    char* buff = malloc(len*2); // *2 to be safe TODO: fix this
     if(buff == NULL)
         error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
@@ -160,12 +178,15 @@ decompress_routine(void* args)
     int64_t curr_len = 0;
 
     algo_args* a_args = malloc(sizeof(algo_args));
+
+    a_args->z = alloc_z_stream();
+
     if(a_args == NULL)
         error("decompress_routine: Failed to allocate algo_args.\n");
 
     size_t algo_output_len = 0;
     a_args->dest_len = &algo_output_len;
-    a_args->enc_fun = db_args->df->encode_source_compression_fun;
+    
 
     data_positions_t* curr_dp;
 
@@ -178,6 +199,8 @@ decompress_routine(void* args)
             if(xml_i == curr_dp->total_spec) {
                 block = -1; break;}
             curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
+            if(curr_len == 0){
+                xml_i++; block++; break;}
             assert(curr_len > 0 && curr_len <= len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -190,11 +213,15 @@ decompress_routine(void* args)
             if(mz_i == curr_dp->total_spec) {
                 block = 0; break;}
             curr_len = curr_dp->end_positions[mz_i] - curr_dp->start_positions[mz_i];
+            if(curr_len == 0){
+                mz_i++; block++; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_mz_fmt;
+            a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
+            a_args->scale_factor = db_args->df->mz_scale_factor;
             db_args->df->target_mz_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             mz_i++;
@@ -205,6 +232,8 @@ decompress_routine(void* args)
             if(xml_i == curr_dp->total_spec) {
                 block = -1; break;}
             curr_len = curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
+            if(curr_len == 0){
+                xml_i++; block++; break;}
             assert(curr_len > 0 && curr_len < len);
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
@@ -217,11 +246,14 @@ decompress_routine(void* args)
             if(inten_i == curr_dp->total_spec) {
                 block = 0; break;}
             curr_len = curr_dp->end_positions[inten_i] - curr_dp->start_positions[inten_i];
+            if(curr_len == 0){
+                inten_i++; block=0; break;}
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_inten_fmt;
+            a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             db_args->df->target_inten_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             inten_i++;
@@ -233,6 +265,8 @@ decompress_routine(void* args)
     }
 
     db_args->ret_len = buff_off;
+
+    dealloc_z_stream(a_args->z);
 
     return;
 }
@@ -316,5 +350,16 @@ decompress_parallel(char* input_map,
 
         divisions_left -= threads;
         divisions_used += threads;
+    }
+}
+
+decompression_fun
+set_decompress_fun(int accession)
+{   
+    switch(accession)
+    {
+        case _ZSTD_compression_ :       return zstd_decompress;
+        case _no_comp_ :                return no_decompress;
+        default :                       error("Compression type not supported.");
     }
 }
