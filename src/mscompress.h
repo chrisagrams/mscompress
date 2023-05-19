@@ -1,6 +1,6 @@
 #include <zstd.h>
-#include "vendor/zlib/zlib.h"
 #include <sys/types.h>
+#include "vendor/zlib/zlib.h"
 
 #define VERSION "0.0.1"
 #define STATUS "Dev"
@@ -12,18 +12,12 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
-#define ZLIB_BUFF_FACTOR 1024000
-// #define ZLIB_BUFF_FACTOR 512000
-// #define ZLIB_BUFF_FACTOR 4096
-#define ZLIB_SIZE_OFFSET sizeof(uint16_t)
+#define ZLIB_BUFF_FACTOR 1024000 //initial size of zlib buffer
 
-#define REALLOC_FACTOR 1.1
+#define ZLIB_TYPE uint32_t // type and size of header used for encode/decode
+#define ZLIB_SIZE_OFFSET sizeof(ZLIB_TYPE)
 
-// #define DELTA_SCALE_FACTOR 6553.5   
-#define DELTA_SCALE_FACTOR 100
-// #define DELTA_SCALE_FACTOR 1000
-// #define DELTA_SCALE_FACTOR 3276.75
-// #define DELTA_SCALE_FACTOR 1310.70
+#define REALLOC_FACTOR 1.1 // realloc factor for zlib buffer
 
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
@@ -108,7 +102,6 @@ typedef decompression_fun (*decompression_fun_ptr)();
 
 typedef struct
 {
-
     /* source information (source mzML) */
     int source_mz_fmt;
     int source_inten_fmt;

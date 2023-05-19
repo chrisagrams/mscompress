@@ -143,7 +143,7 @@ encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len, char* dest, si
 
     void* decmp_header = zlib_pop_header(decmp_input);
 
-    uint16_t org_len = *(uint16_t*)decmp_header;
+    ZLIB_TYPE org_len = *(ZLIB_TYPE*)decmp_header;
 
     zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, org_len);
     // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET, cmp_output, src_len);
@@ -184,7 +184,7 @@ encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len, char* dest,
     decmp_input->offset = ZLIB_SIZE_OFFSET;
     decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-    uint16_t org_len = *(uint16_t*)zlib_pop_header(decmp_input);
+    ZLIB_TYPE org_len = *(ZLIB_TYPE*)zlib_pop_header(decmp_input);
 
     encode_base64(decmp_input, dest, org_len, out_len);
 
