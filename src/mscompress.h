@@ -304,11 +304,11 @@ int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method, int algo);
+decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-encode_fun_ptr set_encode_fun(int compression_method, int algo);
+encode_fun_ptr set_encode_fun(int compression_method, int algo, int accession);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 

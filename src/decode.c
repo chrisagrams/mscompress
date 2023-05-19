@@ -224,7 +224,7 @@ decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* 
 }
 
 decode_fun_ptr
-set_decode_fun(int compression_method, int algo)
+set_decode_fun(int compression_method, int algo, int accession)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.
  * 
@@ -239,7 +239,7 @@ set_decode_fun(int compression_method, int algo)
     switch (compression_method)
     {
     case _zlib_:
-        if(algo == _lossless_)
+        if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
             return decode_zlib_fun;
         else
             return decode_zlib_fun_no_header;

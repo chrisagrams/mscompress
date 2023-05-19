@@ -341,8 +341,8 @@ main(int argc, char* argv[])
         df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
         
         // Set decoding function based on source compression format.
-        df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt);
-        df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt);
+        df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt, df->source_mz_fmt);
+        df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt, df->source_inten_fmt);
 
         // Set ZSTD compression level.
         df->zstd_compression_level = arguments.zstd_compression_level; 
@@ -395,8 +395,8 @@ main(int argc, char* argv[])
         print("\nDecompression and encoding...\n");
 
         // Set target encoding and decompression functions.
-        df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt);
-        df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt);
+        df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
+        df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt, df->source_mz_fmt);
 
         df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
         df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);

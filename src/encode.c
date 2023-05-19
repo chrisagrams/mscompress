@@ -227,19 +227,19 @@ encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len, char* dest
 }
 
 encode_fun_ptr
-set_encode_fun(int compression_method, int algo)
+set_encode_fun(int compression_method, int algo, int accession)
 {
     if(algo == 0)
         error("set_encode_fun: lossy is 0");
     switch(compression_method)
     {
         case _zlib_:
-            if(algo == _lossless_)
+            if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
                 return encode_zlib_fun_w_header;
             else
                 return encode_zlib_fun_no_header;    
         case _no_comp_:
-            if(algo == _lossless_)
+            if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
                 return encode_no_comp_fun_w_header;
             else
                 return encode_no_comp_fun_no_header;

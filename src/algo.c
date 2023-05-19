@@ -136,10 +136,10 @@ algo_decode_log_2_transform_32f (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
-    *a_args->dest = res;
+    *a_args->dest = (char*)res;
     *a_args->dest_len = res_len;
 
     return;
@@ -191,7 +191,7 @@ algo_decode_log_2_transform_64d (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -223,7 +223,7 @@ algo_decode_delta16_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
-    size_t res_len = (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
 
     // Perform delta transform
     res = malloc(res_len); // Allocate space for result and leave room for header and first value
@@ -253,7 +253,7 @@ algo_decode_delta16_transform_32f (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -285,7 +285,7 @@ algo_decode_delta16_transform_64d (void* args)
 
     len = decoded_len / sizeof(double);
 
-    size_t res_len = (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(double);
 
     // Perform delta transform
     res = malloc(res_len); // Allocate space for result and leave room for header and first value
@@ -318,7 +318,7 @@ algo_decode_delta16_transform_64d (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -350,7 +350,7 @@ algo_decode_delta32_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
-    size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    size_t res_len = (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(float);
 
     // Perform delta transform
     res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
@@ -412,7 +412,7 @@ algo_decode_delta32_transform_64d (void* args)
 
     len = decoded_len / sizeof(double);
 
-    size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    size_t res_len = (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(double);
 
     // Perform delta transform
     res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
@@ -658,10 +658,10 @@ algo_encode_delta16_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(float));
+    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -686,7 +686,7 @@ algo_encode_delta16_transform_32f (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
 
     return;
 }
@@ -711,10 +711,10 @@ algo_encode_delta16_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(double));
+    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -739,7 +739,7 @@ algo_encode_delta16_transform_64d (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(double);
 
     return;
 }
@@ -764,10 +764,10 @@ algo_encode_delta32_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(float));
+    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -792,7 +792,7 @@ algo_encode_delta32_transform_32f (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    *a_args->src += (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(float);
 
     return;
 }
@@ -817,10 +817,10 @@ algo_encode_delta32_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(double));
+    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -845,7 +845,7 @@ algo_encode_delta32_transform_64d (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    *a_args->src += (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(double);
 
     return;
 }
