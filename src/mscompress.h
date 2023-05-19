@@ -15,7 +15,9 @@
 #define ZLIB_BUFF_FACTOR 1024000
 // #define ZLIB_BUFF_FACTOR 512000
 // #define ZLIB_BUFF_FACTOR 4096
-#define ZLIB_SIZE_OFFSET sizeof(uint16_t)
+#define ZLIB_TYPE uint32_t // type and size of header used for encode/decode
+#define ZLIB_SIZE_OFFSET sizeof(ZLIB_TYPE)
+
 
 #define REALLOC_FACTOR 1.1
 

@@ -110,7 +110,7 @@ decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
+    ZLIB_TYPE decmp_size = (ZLIB_TYPE)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
@@ -174,7 +174,7 @@ decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, s
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
+    ZLIB_TYPE decmp_size = (ZLIB_TYPE)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     // free(b64_out_buff);
     
@@ -214,7 +214,7 @@ decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* 
 
     decode_base64(src, b64_out_buff + ZLIB_SIZE_OFFSET, src_len, out_len);
 
-    header = (uint16_t)(*out_len);
+    header = (ZLIB_TYPE)(*out_len);
 
     memcpy(b64_out_buff, &header, ZLIB_SIZE_OFFSET);
 
