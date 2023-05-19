@@ -112,8 +112,10 @@ algo_decode_log_2_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
+    size_t res_len = (len + 1) * sizeof(uint16_t);
+
     // Perform log2 transform
-    res = malloc((len + 1) * sizeof(uint16_t)); // Allocate space for result and leave room for header
+    res = calloc(1, res_len); // Allocate space for result and leave room for header
 
     #ifdef ERROR_CHECK
         if(res == NULL)
@@ -122,7 +124,7 @@ algo_decode_log_2_transform_32f (void* args)
     double ltran;
 
     float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
     {
@@ -138,7 +140,7 @@ algo_decode_log_2_transform_32f (void* args)
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = (len + 1) * sizeof(uint16_t);
+    *a_args->dest_len = res_len;
 
     return;
 }
@@ -177,7 +179,7 @@ algo_decode_log_2_transform_64d (void* args)
     double ltran;
 
     double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
     {
@@ -586,7 +588,7 @@ algo_encode_log_2_transform_32f (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;    
+    *a_args->src += ((len + 1) * sizeof(uint16_t));    
 
     return;
 }
@@ -631,13 +633,7 @@ algo_encode_log_2_transform_64d (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len*sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;
-
-    // Encode using specified encoding format
-    a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
-
-    // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;
+    *a_args->src += ((len + 1) * sizeof(uint16_t));
 
     return;
 }
