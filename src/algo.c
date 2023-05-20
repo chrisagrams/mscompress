@@ -66,7 +66,7 @@ algo_decode_cast32_64d (void* args)
             error("algo_decode_cast32: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded); 
     for(int i = 1; i < len + 1; i++)
     {
         res[i] = (float)f[i-1];
@@ -123,7 +123,7 @@ algo_decode_log_2_transform_32f (void* args)
     #endif
     double ltran;
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
     uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
@@ -139,7 +139,7 @@ algo_decode_log_2_transform_32f (void* args)
     memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
-    *a_args->dest = (char*)res;
+    *a_args->dest = res;
     *a_args->dest_len = res_len;
 
     return;
@@ -178,7 +178,7 @@ algo_decode_log_2_transform_64d (void* args)
 
     double ltran;
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
     uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
@@ -226,27 +226,30 @@ algo_decode_delta16_transform_32f (void* args)
     size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
 
     // Perform delta transform
-    res = malloc(res_len); // Allocate space for result and leave room for header and first value
+    res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
 
     #ifdef ERROR_CHECK
         if(res == NULL)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res+1); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
     // *(float*)&res[0] = f[0];
     memcpy(tmp, f, sizeof(float));
 
+    tmp += 2; // Move pointer to next value
+
     // Perform delta transform
+    float diff;
+    uint16_t uint_diff;
     for(int i = 1; i < len; i++)
     {
-        float diff = f[i] - f[i-1];
-        // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        uint16_t uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
-        tmp[i+1] = uint_diff;
+        diff = f[i] - f[i-1];
+        uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
+        tmp[i-1] = uint_diff;
     }
 
     // Free decoded buffer
@@ -295,7 +298,7 @@ algo_decode_delta16_transform_64d (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
     uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
@@ -360,7 +363,7 @@ algo_decode_delta32_transform_32f (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
     uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
@@ -422,7 +425,7 @@ algo_decode_delta32_transform_64d (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
     uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
