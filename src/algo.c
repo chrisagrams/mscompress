@@ -66,7 +66,7 @@ algo_decode_cast32_64d (void* args)
             error("algo_decode_cast32: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded); 
     for(int i = 1; i < len + 1; i++)
     {
         res[i] = (float)f[i-1];
@@ -112,8 +112,10 @@ algo_decode_log_2_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
+    size_t res_len = (len + 1) * sizeof(uint16_t);
+
     // Perform log2 transform
-    res = malloc((len + 1) * sizeof(uint16_t)); // Allocate space for result and leave room for header
+    res = calloc(1, res_len); // Allocate space for result and leave room for header
 
     #ifdef ERROR_CHECK
         if(res == NULL)
@@ -121,12 +123,12 @@ algo_decode_log_2_transform_32f (void* args)
     #endif
     double ltran;
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
     {
-        ltran = log2(f[i]);
+        ltran = log2(f[i] + 1); // Add 1 to avoid log2(0) = -inf
         tmp[i] = floor(ltran * 100);
     }    
 
@@ -134,11 +136,11 @@ algo_decode_log_2_transform_32f (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = (len + 1) * sizeof(uint16_t);
+    *a_args->dest_len = res_len;
 
     return;
 }
@@ -176,12 +178,12 @@ algo_decode_log_2_transform_64d (void* args)
 
     double ltran;
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
     
     for(int i = 0; i < len; i++)
     {
-        ltran = log2(f[i]);
+        ltran = log2(f[i] + 1); // Add 1 to avoid log2(0) = -inf
         tmp[i] = floor(ltran * 100);
     }
 
@@ -189,7 +191,7 @@ algo_decode_log_2_transform_64d (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -221,37 +223,40 @@ algo_decode_delta16_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
-    size_t res_len = (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
 
     // Perform delta transform
-    res = malloc(res_len); // Allocate space for result and leave room for header and first value
+    res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
 
     #ifdef ERROR_CHECK
         if(res == NULL)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
-    uint16_t* tmp = (uint16_t*)(res) + 1; // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res+1); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
     // *(float*)&res[0] = f[0];
     memcpy(tmp, f, sizeof(float));
 
+    tmp += 2; // Move pointer to next value
+
     // Perform delta transform
+    float diff;
+    uint16_t uint_diff;
     for(int i = 1; i < len; i++)
     {
-        float diff = f[i] - f[i-1];
-        // uint16_t uint_diff = (diff > 0) ? (uint16_t)floor(diff) : 0; // clamp to 0 if diff is negative
-        uint16_t uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
-        tmp[i+1] = uint_diff;
+        diff = f[i] - f[i-1];
+        uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
+        tmp[i-1] = uint_diff;
     }
 
     // Free decoded buffer
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -283,7 +288,7 @@ algo_decode_delta16_transform_64d (void* args)
 
     len = decoded_len / sizeof(double);
 
-    size_t res_len = (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(double);
 
     // Perform delta transform
     res = malloc(res_len); // Allocate space for result and leave room for header and first value
@@ -293,7 +298,7 @@ algo_decode_delta16_transform_64d (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
     uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
@@ -316,7 +321,7 @@ algo_decode_delta16_transform_64d (void* args)
     free(decoded);
 
     // Store length of array in first 4 bytes
-    res[0] = len;
+    memcpy(res, &len, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
@@ -348,7 +353,7 @@ algo_decode_delta32_transform_32f (void* args)
 
     len = decoded_len / sizeof(float);
 
-    size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    size_t res_len = (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(float);
 
     // Perform delta transform
     res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
@@ -358,7 +363,7 @@ algo_decode_delta32_transform_32f (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    float* f = (float*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    float* f = (float*)(decoded);
     uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
@@ -410,7 +415,7 @@ algo_decode_delta32_transform_64d (void* args)
 
     len = decoded_len / sizeof(double);
 
-    size_t res_len = (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    size_t res_len = (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(double);
 
     // Perform delta transform
     res = calloc(1, res_len); // Allocate space for result and leave room for header and first value
@@ -420,7 +425,7 @@ algo_decode_delta32_transform_64d (void* args)
             error("algo_decode_delta_transform: malloc failed");
     #endif
 
-    double* f = (double*)(decoded + ZLIB_SIZE_OFFSET); // Ignore header in first 4 bytes
+    double* f = (double*)(decoded);
     uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
@@ -580,13 +585,13 @@ algo_encode_log_2_transform_32f (void* args)
 
     // Perform log2 transform
     for (size_t i = 0; i < len; i++)
-        res[i] = (float)exp2((double)arr[i] / 100);
+        res[i] = (float)exp2((double)arr[i] / 100) - 1; 
 
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;    
+    *a_args->src += ((len + 1) * sizeof(uint16_t));    
 
     return;
 }
@@ -625,19 +630,13 @@ algo_encode_log_2_transform_64d (void* args)
         error("algo_encode_log_2_transform: malloc failed");
     // Perform log2 transform
     for (size_t i = 0; i < len; i++)
-        res[i] = (double)exp2((double)arr[i] / 100);
+        res[i] = (double)exp2((double)arr[i] / 100) - 1;
         
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len*sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;
-
-    // Encode using specified encoding format
-    a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
-
-    // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET;
+    *a_args->src += ((len + 1) * sizeof(uint16_t));
 
     return;
 }
@@ -662,10 +661,10 @@ algo_encode_delta16_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(float));
+    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -690,7 +689,7 @@ algo_encode_delta16_transform_32f (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
 
     return;
 }
@@ -715,10 +714,10 @@ algo_encode_delta16_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(double));
+    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -743,7 +742,7 @@ algo_encode_delta16_transform_64d (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint16_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(double);
 
     return;
 }
@@ -768,10 +767,10 @@ algo_encode_delta32_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(float));
+    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -796,7 +795,7 @@ algo_encode_delta32_transform_32f (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(float);
+    *a_args->src += (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(float);
 
     return;
 }
@@ -821,10 +820,10 @@ algo_encode_delta32_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET);
+    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + ZLIB_SIZE_OFFSET + sizeof(double));
+    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -849,7 +848,7 @@ algo_encode_delta32_transform_64d (void* args)
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
 
     // Move to next array
-    *a_args->src += (len * sizeof(uint32_t)) + ZLIB_SIZE_OFFSET + sizeof(double);
+    *a_args->src += (len * sizeof(uint32_t)) + sizeof(uint16_t) + sizeof(double);
 
     return;
 }

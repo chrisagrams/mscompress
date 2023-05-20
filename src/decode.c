@@ -110,7 +110,7 @@ decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out
 
     zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
+    ZLIB_TYPE decmp_size = (ZLIB_TYPE)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
 
@@ -172,9 +172,9 @@ decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, s
     if (b64_out_buff == NULL)
         error("decode_zlib_fun_no_header: base64_decode returned with an error.\n");
 
-    zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
+    zlib_block_t* decmp_output = zlib_alloc(0);
 
-    uint16_t decmp_size = (uint16_t)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
+    ZLIB_TYPE decmp_size = (ZLIB_TYPE)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
     // free(b64_out_buff);
     
@@ -186,7 +186,7 @@ decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, s
 }
 
 void
-decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
+decode_no_comp_fun_w_header(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
 /**
  * @brief Decodes an mzML binary block with "no comp" encoding.
  *        Decodes base64 string and appends a binary buffer with the length of the 
@@ -210,11 +210,11 @@ decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* 
 
     size_t header;
 
-    b64_out_buff = base64_alloc(sizeof(char) * src_len + ZLIB_SIZE_OFFSET);
+    b64_out_buff = base64_alloc(src_len + ZLIB_SIZE_OFFSET);
 
     decode_base64(src, b64_out_buff + ZLIB_SIZE_OFFSET, src_len, out_len);
 
-    header = (uint16_t)(*out_len);
+    header = (ZLIB_TYPE)(*out_len);
 
     memcpy(b64_out_buff, &header, ZLIB_SIZE_OFFSET);
 
@@ -223,8 +223,21 @@ decode_no_comp_fun(z_stream* z, char* src, size_t src_len, char** dest, size_t* 
     *dest = b64_out_buff;
 }
 
+void
+decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest, size_t* out_len, data_block_t* tmp)
+{
+
+    char* b64_out_buff;
+
+    b64_out_buff = base64_alloc(src_len);
+
+    decode_base64(src, b64_out_buff, src_len, out_len);
+    
+    *dest = b64_out_buff;
+}
+
 decode_fun_ptr
-set_decode_fun(int compression_method, int algo)
+set_decode_fun(int compression_method, int algo, int accession)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.
  * 
@@ -239,12 +252,15 @@ set_decode_fun(int compression_method, int algo)
     switch (compression_method)
     {
     case _zlib_:
-        if(algo == _lossless_)
+        if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
             return decode_zlib_fun;
         else
             return decode_zlib_fun_no_header;
     case _no_comp_:
-        return decode_no_comp_fun;
+        if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
+            return decode_no_comp_fun_w_header;
+        else
+            return decode_no_comp_fun_no_header;
     default:
         error("set_decode_fun: Unknown source compression method.\n");
         return NULL; 

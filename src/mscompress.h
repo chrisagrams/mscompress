@@ -1,6 +1,6 @@
 #include <zstd.h>
-#include "vendor/zlib/zlib.h"
 #include <sys/types.h>
+#include "vendor/zlib/zlib.h"
 
 #define VERSION "0.0.1"
 #define STATUS "Dev"
@@ -12,18 +12,12 @@
 #define FORMAT_VERSION_MINOR 0
 
 #define BUFSIZE 4096
-#define ZLIB_BUFF_FACTOR 1024000
-// #define ZLIB_BUFF_FACTOR 512000
-// #define ZLIB_BUFF_FACTOR 4096
-#define ZLIB_SIZE_OFFSET sizeof(uint16_t)
+#define ZLIB_BUFF_FACTOR 1024000 //initial size of zlib buffer
 
-#define REALLOC_FACTOR 1.1
+#define ZLIB_TYPE uint32_t // type and size of header used for encode/decode
+#define ZLIB_SIZE_OFFSET sizeof(ZLIB_TYPE)
 
-// #define DELTA_SCALE_FACTOR 6553.5   
-#define DELTA_SCALE_FACTOR 100
-// #define DELTA_SCALE_FACTOR 1000
-// #define DELTA_SCALE_FACTOR 3276.75
-// #define DELTA_SCALE_FACTOR 1310.70
+#define REALLOC_FACTOR 1.1 // realloc factor for zlib buffer
 
 #define MAGIC_TAG 0x035F51B5
 #define MESSAGE "MS Compress Format 1.0 Gao Laboratory at UIC"
@@ -108,7 +102,6 @@ typedef decompression_fun (*decompression_fun_ptr)();
 
 typedef struct
 {
-
     /* source information (source mzML) */
     int source_mz_fmt;
     int source_inten_fmt;
@@ -311,11 +304,11 @@ int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
 /* decode.c */
-decode_fun_ptr set_decode_fun(int compression_method, int algo);
+decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 /* encode.c */
-encode_fun_ptr set_encode_fun(int compression_method, int algo);
+encode_fun_ptr set_encode_fun(int compression_method, int algo, int accession);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
