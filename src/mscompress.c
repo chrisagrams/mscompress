@@ -31,14 +31,15 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
   fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
   fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (delta16 default ~128, delta32 default 100)\n");
+  fprintf(stream, "--int-scale-factor factor Set mz scale factors for log transform\n");
   fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
   fprintf(stream, "--extract-only            Only output extracted mzML, no compression (disabled by default)\n");
   fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
   fprintf(stream, "--target-inten-format type Set target inten compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
   fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
   fprintf(stream, "  -h, --help              Show this help message.\n");
@@ -110,7 +111,10 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       }
       arguments->mz_lossy = argv[++i];
       validate_algo_name(arguments->mz_lossy);
-
+      if(strcmp(arguments->mz_lossy, "delta16") == 0)
+        arguments->mz_scale_factor = 127.998046875;
+      else if(strcmp(arguments->mz_lossy, "delta32") == 0)
+        arguments->mz_scale_factor = 262143.99993896484;
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
@@ -118,6 +122,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       }
       arguments->int_lossy = argv[++i];
       validate_algo_name(arguments->int_lossy);
+      if(strcmp(arguments->int_lossy, "log") == 0)
+        arguments->int_scale_factor = 100.0;
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
@@ -149,6 +155,25 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       scale_factor_buffer[j] = '\0'; // Null-terminate the parsed scale factor
 
       arguments->mz_scale_factor = atof(scale_factor_buffer);
+    }
+     else if (strcmp(argv[i], "--int-scale-factor") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "%s\n", "Missing scale factor for inten compression.");
+        print_usage(stderr, 1);
+      }
+      
+      const char* scale_factor_str = argv[++i];
+      int j = 0;
+      char scale_factor_buffer[20];
+
+      // Parse the argument until the first non-digit character
+      while (isdigit(scale_factor_str[j]) || scale_factor_str[j] == '.') {
+        scale_factor_buffer[j] = scale_factor_str[j];
+        j++;
+      }
+      scale_factor_buffer[j] = '\0'; // Null-terminate the parsed scale factor
+
+      arguments->int_scale_factor = atof(scale_factor_buffer);
     }
     else if (strcmp(argv[i], "--extract-indices") == 0) {
       if (i + 1 >= argc) {
@@ -197,10 +222,6 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         print_usage(stderr, 1);
       }
       arguments->target_mz_format = get_compress_type(argv[++i]);
-      if(arguments->target_mz_format == _delta16_transform_)
-        arguments->mz_scale_factor = 127.998046875;
-      else if(arguments->target_mz_format == _delta32_transform_)
-        arguments->mz_scale_factor = 262143.99993896484;
     } 
     else if (strcmp(argv[i], "--target-inten-format") == 0) {
       if (i + 1 >= argc) {
@@ -232,7 +253,11 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     //} 
     else if (arguments->input_file == NULL) {
       arguments->input_file = argv[i];
-    } else {
+    }
+    else if (arguments->output_file == NULL) {
+      arguments->output_file = argv[i];
+    } 
+    else {
       fprintf(stderr, "%s\n", "Too many arguments.");
       print_usage(stderr, 1);
     }
@@ -347,6 +372,7 @@ main(int argc, char* argv[])
 
         // Set scale factor.
         df->mz_scale_factor = arguments.mz_scale_factor;
+        df->int_scale_factor = arguments.int_scale_factor;
 
         //Write df header to file.
         write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");

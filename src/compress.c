@@ -523,6 +523,7 @@ compress_routine(void* args)
     else if(cb_args->mode == _intensity_)
     {
         a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
+        a_args->scale_factor = cb_args->df->int_scale_factor;
     }
     else if(cb_args->mode == _xml_)
         a_args->dec_fun = NULL;

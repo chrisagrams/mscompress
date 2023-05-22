@@ -140,9 +140,10 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *              | Target m/z format         |   4  bytes |    160    |
  *              | Target intensity format   |   4  bytes |    164    |
  *              | mz scale factor           |   8  bytes |    168    |
- *              | Blocksize                 |   8  bytes |    176    |
- *              | MD5                       |  32  bytes |    184    |
- *              | Reserved                  |  296 bytes |    216    |
+ *              | int scale factor          |   8  bytes |    176    |
+ *              | Blocksize                 |   8  bytes |    184    |
+ *              | MD5                       |  32  bytes |    192    |
+ *              | Reserved                  |  288 bytes |    224    |
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|

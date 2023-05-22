@@ -254,6 +254,7 @@ decompress_routine(void* args)
             a_args->dest = buff+buff_off;
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
+            a_args->scale_factor = db_args->df->int_scale_factor;
             db_args->df->target_inten_fun((void*)a_args);
             buff_off += *a_args->dest_len;
             inten_i++;
