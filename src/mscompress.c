@@ -54,7 +54,8 @@ static void validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
       strcmp(name, "log")     != 0 &&
       strcmp(name, "delta16") != 0 &&
-      strcmp(name, "delta32") != 0   )
+      strcmp(name, "delta32") != 0 &&
+      strcmp(name, "vbr")     != 00  )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
     print_usage(stderr, 1);
