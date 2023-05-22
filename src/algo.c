@@ -129,7 +129,7 @@ algo_decode_log_2_transform_32f (void* args)
     for(int i = 0; i < len; i++)
     {
         ltran = log2(f[i] + 1); // Add 1 to avoid log2(0) = -inf
-        tmp[i] = floor(ltran * 100);
+        tmp[i] = floor(ltran * a_args->scale_factor);
     }    
 
     // Free decoded buffer
@@ -184,7 +184,7 @@ algo_decode_log_2_transform_64d (void* args)
     for(int i = 0; i < len; i++)
     {
         ltran = log2(f[i] + 1); // Add 1 to avoid log2(0) = -inf
-        tmp[i] = floor(ltran * 100);
+        tmp[i] = floor(ltran * a_args->scale_factor);
     }
 
     // Free decoded buffer
@@ -585,7 +585,7 @@ algo_encode_log_2_transform_32f (void* args)
 
     // Perform log2 transform
     for (size_t i = 0; i < len; i++)
-        res[i] = (float)exp2((double)arr[i] / 100) - 1; 
+        res[i] = (float)exp2((double)arr[i] / a_args->scale_factor) - 1; 
 
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
@@ -630,7 +630,7 @@ algo_encode_log_2_transform_64d (void* args)
         error("algo_encode_log_2_transform: malloc failed");
     // Perform log2 transform
     for (size_t i = 0; i < len; i++)
-        res[i] = (double)exp2((double)arr[i] / 100) - 1;
+        res[i] = (double)exp2((double)arr[i] / a_args->scale_factor) - 1;
         
     // Encode using specified encoding format
     a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);

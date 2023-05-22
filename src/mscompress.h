@@ -25,9 +25,9 @@
 #define MESSAGE_SIZE         128
 #define MESSAGE_OFFSET       12
 #define DATA_FORMAT_T_OFFSET 140
-#define DATA_FORMAT_T_SIZE   36   /* ignores private members */
-#define BLOCKSIZE_OFFSET     176
-#define MD5_OFFSET           184
+#define DATA_FORMAT_T_SIZE   44   /* ignores private members */
+#define BLOCKSIZE_OFFSET     184
+#define MD5_OFFSET           192
 #define MD5_SIZE             32
 #define HEADER_SIZE          512
 
@@ -115,6 +115,7 @@ typedef struct
 
     /* algo parameters */
     float mz_scale_factor; 
+    float int_scale_factor;
 
     /* runtime variables, not written to disk. */
     int populated;
@@ -258,7 +259,7 @@ data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
-
+char* change_extension(char* input, char* extension);
 int is_mzml(int fd);
 int is_msz(int fd);
 
