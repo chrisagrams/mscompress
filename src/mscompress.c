@@ -86,7 +86,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
 
   program_name = argv[0];
 
-  if(argc <= 2) {
+  if(argc < 2) {
     print_usage(stderr, 1);
   }
 
@@ -232,8 +232,6 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     //} 
     else if (arguments->input_file == NULL) {
       arguments->input_file = argv[i];
-    } else if (arguments->output_file == NULL) {
-      arguments->output_file = argv[i];
     } else {
       fprintf(stderr, "%s\n", "Too many arguments.");
       print_usage(stderr, 1);
@@ -245,8 +243,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     print_usage(stderr, 1);
   }
 
-  if (arguments->output_file == NULL)
-    arguments->output_file = change_extension(arguments->input_file, ".msz");
+  // if (arguments->output_file == NULL)
+  //   arguments->output_file = change_extension(arguments->input_file, ".msz");
 
   if(arguments->mz_lossy == NULL)
       arguments->mz_lossy = "lossless";
