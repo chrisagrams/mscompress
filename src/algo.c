@@ -470,7 +470,7 @@ algo_decode_vbr_64d (void* args)
     a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
 
     // Deternmine length of data based on data format
-    uint16_t len;
+    uint32_t len;
     unsigned char* res;
     
     #ifdef ERROR_CHECK
@@ -494,7 +494,7 @@ algo_decode_vbr_64d (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint16_t res_len = ((int)ceil(len)) + sizeof(uint16_t) + sizeof(double) + sizeof(uint16_t);
+    uint16_t res_len = ((int)ceil(len)) + sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t);
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
@@ -503,7 +503,7 @@ algo_decode_vbr_64d (void* args)
             error("algo_decode_vbr_64d: malloc failed");
     #endif
 
-    unsigned char* tmp_res = res + sizeof(uint16_t) + sizeof(double) + sizeof(uint16_t); // Ignore header
+    unsigned char* tmp_res = res + sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t); // Ignore header
 
     uint16_t bytes_used = 0;
     int bit_index = 0;
@@ -554,15 +554,15 @@ algo_decode_vbr_64d (void* args)
     }
 
     // Store length of array in first 4 bytes
-    memcpy(res, &len, sizeof(uint16_t));
+    memcpy(res, &len, sizeof(uint32_t));
     // Store base peak intensity in next 8 bytes
-    memcpy(res + sizeof(uint16_t), &base_peak_intensity, sizeof(double));
+    memcpy(res + sizeof(uint32_t), &base_peak_intensity, sizeof(double));
     // Store number of bytes in next 4 bytes
-    memcpy(res + sizeof(uint16_t) + sizeof(double), &bytes_used, sizeof(uint16_t));
+    memcpy(res + sizeof(uint32_t) + sizeof(double), &bytes_used, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = sizeof(uint16_t) + sizeof(double) + sizeof(uint16_t) + bytes_used;
+    *a_args->dest_len = sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t) + bytes_used;
 
     return;
 }
@@ -580,7 +580,7 @@ algo_decode_vbr_32f (void* args)
     a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
 
     // Deternmine length of data based on data format
-    uint16_t len;
+    uint32_t len;
     unsigned char* res;
     
     #ifdef ERROR_CHECK
@@ -604,7 +604,7 @@ algo_decode_vbr_32f (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint16_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t) + 1;
+    uint16_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t) + 1;
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
@@ -613,7 +613,7 @@ algo_decode_vbr_32f (void* args)
             error("algo_decode_vbr_64d: malloc failed");
     #endif
 
-    unsigned char* tmp_res = res + sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t); // Ignore header
+    unsigned char* tmp_res = res + sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t); // Ignore header
 
     uint16_t bytes_used = 0;
     int bit_index = 0;
@@ -664,15 +664,15 @@ algo_decode_vbr_32f (void* args)
     }
 
     // Store length of array in first 4 bytes
-    memcpy(res, &len, sizeof(uint16_t));
+    memcpy(res, &len, sizeof(uint32_t));
     // Store base peak intensity in next 8 bytes
-    memcpy(res + sizeof(uint16_t), &base_peak_intensity, sizeof(float));
+    memcpy(res + sizeof(uint32_t), &base_peak_intensity, sizeof(float));
     // Store number of bytes in next 4 bytes
-    memcpy(res + sizeof(uint16_t) + sizeof(float), &bytes_used, sizeof(uint16_t));
+    memcpy(res + sizeof(uint32_t) + sizeof(float), &bytes_used, sizeof(uint16_t));
 
     // Return result
     *a_args->dest = res;
-    *a_args->dest_len = sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t) + bytes_used;
+    *a_args->dest_len = sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t) + bytes_used;
 
     return;
 }
@@ -1097,10 +1097,10 @@ algo_encode_vbr_64d (void* args)
     // Get source array 
     unsigned char* arr = (unsigned char*)(*a_args->src);
 
-    unsigned char* tmp_arr = arr + sizeof(uint16_t) + sizeof(double) + sizeof(uint16_t);
+    unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t);
     
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    u_int32_t len = *(uint32_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1122,9 +1122,9 @@ algo_encode_vbr_64d (void* args)
 
     double* res_arr = (double*)res;
 
-    double base_peak_intensity = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
+    double base_peak_intensity = *(double*)((void*)(*a_args->src) + sizeof(uint32_t));
 
-    uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
+    uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(double));
 
     double threshold = (double)a_args->scale_factor;
 
@@ -1161,7 +1161,7 @@ algo_encode_vbr_64d (void* args)
     a_args->enc_fun(a_args->z, &res, len, a_args->dest, a_args->dest_len);
 
     // Move src pointer
-    *a_args->src += sizeof(uint16_t) + sizeof(double) + sizeof(uint16_t) + num_bytes;
+    *a_args->src += sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t) + num_bytes;
 
     // // Free buffer
     // free(res);
@@ -1191,10 +1191,10 @@ algo_encode_vbr_32f (void* args)
     // Get source array 
     unsigned char* arr = (unsigned char*)(*a_args->src);
 
-    unsigned char* tmp_arr = arr + sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t);
+    unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t);
     
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    u_int32_t len = *(uint32_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1216,9 +1216,9 @@ algo_encode_vbr_32f (void* args)
 
     float* res_arr = (float*)res;
 
-    float base_peak_intensity = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float base_peak_intensity = *(float*)((void*)(*a_args->src) + sizeof(uint32_t));
 
-    uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(float));
 
     double threshold = (double)a_args->scale_factor;
 
@@ -1257,7 +1257,7 @@ algo_encode_vbr_32f (void* args)
     a_args->enc_fun(a_args->z, &res, len, a_args->dest, a_args->dest_len);
 
     // Move src pointer
-    *a_args->src += sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t) + num_bytes;
+    *a_args->src += sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t) + num_bytes;
 
     // // Free buffer
     // free(res);
