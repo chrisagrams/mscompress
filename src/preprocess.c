@@ -483,7 +483,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
             
         ptr = strstr(ptr, "scan=") + 5;
 
-        if(ptr == NULL)
+        if(ptr-5 == NULL)
             error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
 
         e = strstr(ptr, "\"");
@@ -500,7 +500,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "\"ms level\"") + 18;
 
-        if(ptr == NULL)
+        if(ptr-18 == NULL)
             error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
         e = strstr(ptr, "\"");
 
@@ -512,7 +512,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
 
         ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr == NULL)
+        if(ptr-8 == NULL)
             error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
@@ -531,7 +531,7 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
 
 
         ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr == NULL)
+        if(ptr-8 == NULL)
             error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
         inten_dp->start_positions[inten_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
