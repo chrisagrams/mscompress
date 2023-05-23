@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -28,10 +29,10 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "Options:\n");
   fprintf(stream, "  -v, --verbose           Run in verbose mode.\n");
   fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32)). (disabled by default)\n");
-  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform (delta16 default ~128, delta32 default 100)\n");
-  fprintf(stream, "--int-scale-factor factor Set mz scale factors for log transform\n");
+  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform or threshold for vbr.\n");
+  fprintf(stream, "--int-scale-factor factor Set int scale factors for log transform or threshold for vbr\n");
   fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
@@ -54,7 +55,8 @@ static void validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
       strcmp(name, "log")     != 0 &&
       strcmp(name, "delta16") != 0 &&
-      strcmp(name, "delta32") != 0   )
+      strcmp(name, "delta32") != 0 &&
+      strcmp(name, "vbr")     != 00  )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
     print_usage(stderr, 1);
@@ -115,6 +117,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         arguments->mz_scale_factor = 127.998046875;
       else if(strcmp(arguments->mz_lossy, "delta32") == 0)
         arguments->mz_scale_factor = 262143.99993896484;
+      else if(strcmp(arguments->int_lossy, "vbr") == 0)
+        arguments->mz_scale_factor = 0.1;
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
@@ -124,6 +128,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       validate_algo_name(arguments->int_lossy);
       if(strcmp(arguments->int_lossy, "log") == 0)
         arguments->int_scale_factor = 100.0;
+      else if(strcmp(arguments->int_lossy, "vbr") == 0)
+        arguments->int_scale_factor = 0.1;
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
