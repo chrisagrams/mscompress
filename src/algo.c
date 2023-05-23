@@ -494,7 +494,7 @@ algo_decode_vbr_64d (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint16_t res_len = ((int)ceil(len)) + sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t);
+    uint32_t res_len = ((int)ceil(len)) + sizeof(uint32_t) + sizeof(double) + sizeof(uint16_t);
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
@@ -604,7 +604,7 @@ algo_decode_vbr_32f (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint16_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t) + 1;
+    uint32_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint32_t) + sizeof(float) + sizeof(uint16_t) + 1;
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
