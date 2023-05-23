@@ -482,7 +482,7 @@ algo_decode_vbr_64d (void* args)
 
     double* f = (double*)(decoded);
 
-    double threshold = 0.1; // 10% of base peak intensity
+    double threshold = (double)a_args->scale_factor;
 
     double base_peak_intensity = 0;
     // Get base peak intensity (max)
@@ -592,7 +592,7 @@ algo_decode_vbr_32f (void* args)
 
     float* f = (float*)(decoded);
 
-    float threshold = 0.1; // 10% of base peak intensity
+    float threshold = a_args->scale_factor;
 
     float base_peak_intensity = 0;
     // Get base peak intensity (max)
@@ -1126,7 +1126,7 @@ algo_encode_vbr_64d (void* args)
 
     uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
-    double threshold = 0.1; // 10% of base peak intensity
+    double threshold = (double)a_args->scale_factor;
 
     int num_bits = ceil(log2((base_peak_intensity/threshold)+1));
     
@@ -1139,7 +1139,7 @@ algo_encode_vbr_64d (void* args)
     int tmp_int_bit_index = 0;
     for (int i = 0; i < len; i++ ) {
         int value = (tmp_arr[b/8] & (1 << (b%8))) != 0;
-        if(tmp_int_bit_index == num_bits) {
+        if(tmp_int_bit_index == num_bits && result_index*8 < len) {
             res_arr[result_index] = (double)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
             result_index++;
             tmp_int_bit_index = 0;
@@ -1151,7 +1151,7 @@ algo_encode_vbr_64d (void* args)
         tmp_int_bit_index++;
         b++;
     }
-    if(tmp_int_bit_index == num_bits) {
+    if(tmp_int_bit_index == num_bits && result_index*8 < len) {
         res_arr[result_index] = (double)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
         result_index++;
         tmp_int_bit_index = 0;
@@ -1220,7 +1220,7 @@ algo_encode_vbr_32f (void* args)
 
     uint16_t num_bytes = *(uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
-    double threshold = 0.1; // 10% of base peak intensity
+    double threshold = (double)a_args->scale_factor;
 
     int num_bits = ceil(log2((base_peak_intensity/threshold)+1));
     
@@ -1235,7 +1235,7 @@ algo_encode_vbr_32f (void* args)
     int res_len = (int)ceil(num_bytes * 8);
     for (int i = 0; i < res_len; i++ ) {
         int value = (tmp_arr[b >> 3] & (1 << (b & 7))) != 0;
-        if(tmp_int_bit_index == num_bits) {
+        if(tmp_int_bit_index == num_bits && result_index*4 < len) {
             res_arr[result_index] = (float)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
             result_index++;
             tmp_int_bit_index = 0;
@@ -1247,7 +1247,7 @@ algo_encode_vbr_32f (void* args)
         tmp_int_bit_index++;
         b++;
     }
-    if(tmp_int_bit_index == num_bits) {
+    if(tmp_int_bit_index == num_bits && result_index*4 < len) {
         res_arr[result_index] = (float)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
         result_index++;
         tmp_int_bit_index = 0;
