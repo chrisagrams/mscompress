@@ -591,7 +591,7 @@ algo_decode_vbr_32f (void* args)
             error("algo_decode_vbr_32f: Unknown data format");
     #endif
 
-    len = decoded_len;
+    len = (uint32_t)decoded_len;
 
     float* f = (float*)(decoded);
 
