@@ -569,7 +569,6 @@ algo_decode_vbr_64d (void* args)
 
 void
 algo_decode_vbr_32f (void* args)
-
 {
     // Parse args
     algo_args* a_args = (algo_args*)args;
@@ -605,7 +604,7 @@ algo_decode_vbr_32f (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint16_t res_len = ceil(len) + sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t);
+    uint16_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint16_t) + sizeof(float) + sizeof(uint16_t) + 1;
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
@@ -1232,7 +1231,9 @@ algo_encode_vbr_32f (void* args)
     uint64_t tmp_int = 0;
 
     int tmp_int_bit_index = 0;
-    for (int i = 0; i < len; i++ ) {
+
+    int res_len = (int)ceil(num_bytes * 8);
+    for (int i = 0; i < res_len; i++ ) {
         int value = (tmp_arr[b >> 3] & (1 << (b & 7))) != 0;
         if(tmp_int_bit_index == num_bits) {
             res_arr[result_index] = (float)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
