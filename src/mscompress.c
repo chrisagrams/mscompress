@@ -27,27 +27,27 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "MSCompress version %s %s\n", VERSION, STATUS);
   fprintf(stream, "Supports msz versions %s-%s\n", MIN_SUPPORT, MAX_SUPPORT);
   fprintf(stream, "Options:\n");
-  fprintf(stream, "  -v, --verbose           Run in verbose mode.\n");
-  fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
-  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform or threshold for vbr.\n");
-  fprintf(stream, "--int-scale-factor factor Set int scale factors for log transform or threshold for vbr\n");
-  fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
-  fprintf(stream, "--extract-only            Only output extracted mzML, no compression (disabled by default)\n");
-  fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--target-inten-format type Set target inten compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "  -v, --verbose                Run in verbose mode.\n");
+  fprintf(stream, "  -t, --threads num            Set amount of threads to use. (default: auto)\n");
+  fprintf(stream, "  -z, --mz-lossy type          Enable mz lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type         Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, "--mz-scale-factor factor       Set mz scale factors for delta transform or threshold for vbr.\n");
+  fprintf(stream, "--int-scale-factor factor      Set int scale factors for log transform or threshold for vbr\n");
+  fprintf(stream, "--extract-indices [range]      Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, "--extract-scans [range]        Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, "--ms-level level               Extract specified ms level (1, 2, n). (disabled by default)\n");
+  fprintf(stream, "--extract-only                 Only output extracted mzML, no compression (disabled by default)\n");
+  fprintf(stream, "--target-xml-format type       Set target xml compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--target-mz-format type        Set target mz compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, "--target-inten-format type     Set target inten compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
-  fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
-  fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
-  fprintf(stream, "  -h, --help              Show this help message.\n");
-  fprintf(stream, "  -V, --version           Show version information.\n\n");
+  fprintf(stream, "  -b, --blocksize size         Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
+  fprintf(stream, "  -c, --checksum               Enable checksum generation. (disabled by default)\n");
+  fprintf(stream, "  -h, --help                   Show this help message.\n");
+  fprintf(stream, "  -V, --version                Show version information.\n\n");
   fprintf(stream, "Arguments:\n");
-  fprintf(stream, "  input_file              Input file path.\n");
-  fprintf(stream, "  output_file             Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
+  fprintf(stream, "  input_file                   Input file path.\n");
+  fprintf(stream, "  output_file                  Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
   exit(exit_code);
 }
 
@@ -129,7 +129,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       if(strcmp(arguments->int_lossy, "log") == 0)
         arguments->int_scale_factor = 100.0;
       else if(strcmp(arguments->int_lossy, "vbr") == 0)
-        arguments->int_scale_factor = 0.1;
+        arguments->int_scale_factor = 1.0;
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
