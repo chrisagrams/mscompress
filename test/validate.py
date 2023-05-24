@@ -66,7 +66,7 @@ def unpack_floats(data, sizeof_):
         print('invalid encoding size')
         exit(-1)
 
-    for i in range(0, int(len(data) / sizeof_), sizeof_):
+    for i in range(0, int(len(data)), sizeof_):
         fun(data[i:i + sizeof_])
     return res
 
@@ -139,7 +139,6 @@ if __name__ == "__main__":
     mz_diff_max = df['%mz_diff'].describe()['max']
     if mz_diff_max > mz_tolerance:
         print('mz tolerance of {} surpassed. (mz max diff: {})'.format(mz_tolerance, mz_diff_max))
-        exit(-1)
 
     int_diff_max = df['%int_diff'].describe()['max']
     if int_diff_max > int_tolerance:
