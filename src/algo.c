@@ -497,7 +497,10 @@ algo_decode_vbr_64d (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
 
-    uint32_t res_len = len + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t);
+    if (num_bits == 1)
+        num_bits = 2; // 1 bit is not enough
+
+    uint32_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t);
 
     res = calloc(1, res_len); // Allocate space for result and leave room for header
     
@@ -511,7 +514,7 @@ algo_decode_vbr_64d (void* args)
     uint32_t bytes_used = 0;
     int bit_index = 0;
     int result_index = 0;
-    unsigned char tmp_buff[sizeof(double)];
+    unsigned char tmp_buff[8];
     int tmp_index = 0;
 
     for (int i = 0; i < len; i++) {
@@ -609,6 +612,9 @@ algo_decode_vbr_32f (void* args)
     }
 
     int num_bits = ceil(log2((base_peak_intensity / threshold) + 1)); // number of bits required to represent base peak intensity
+
+    if (num_bits == 1)
+        num_bits = 2; // 1 bit is not enough
 
     uint32_t res_len = (int)ceil(len/4*num_bits/8) + sizeof(uint32_t) + sizeof(float) + sizeof(uint32_t) + 1;
 
@@ -1135,6 +1141,9 @@ algo_encode_vbr_64d (void* args)
     double threshold = (double)a_args->scale_factor;
 
     int num_bits = ceil(log2((base_peak_intensity/threshold)+1));
+
+    if (num_bits == 1)
+        num_bits = 2; // 1 bit is not enough
     
     int b = 0;
     
@@ -1143,7 +1152,10 @@ algo_encode_vbr_64d (void* args)
     uint64_t tmp_int = 0;
 
     int tmp_int_bit_index = 0;
-    for (int i = 0; i < len; i++ ) {
+
+    int res_len = (int)ceil(num_bytes * 8); //in bits
+
+    for (int i = 0; i < res_len; i++ ) {
         int value = (tmp_arr[b/8] & (1 << (b%8))) != 0;
         if(tmp_int_bit_index == num_bits && result_index*8 < len) {
             res_arr[result_index] = (double)(tmp_int * base_peak_intensity)/(exp2(num_bits)-1);
@@ -1230,6 +1242,9 @@ algo_encode_vbr_32f (void* args)
 
     int num_bits = ceil(log2((base_peak_intensity/threshold)+1));
     
+    if (num_bits == 1)
+        num_bits = 2; // 1 bit is not enough
+
     int b = 0;
     
     int result_index = 0;
@@ -1238,7 +1253,8 @@ algo_encode_vbr_32f (void* args)
 
     int tmp_int_bit_index = 0;
 
-    int res_len = (int)ceil(num_bytes * 8);
+    int res_len = (int)ceil(num_bytes * 8); //in bits
+
     for (int i = 0; i < res_len; i++ ) {
         int value = (tmp_arr[b >> 3] & (1 << (b & 7))) != 0;
         if(tmp_int_bit_index == num_bits && result_index*4 < len) {
