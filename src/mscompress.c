@@ -117,7 +117,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         arguments->mz_scale_factor = 127.998046875;
       else if(strcmp(arguments->mz_lossy, "delta32") == 0)
         arguments->mz_scale_factor = 262143.99993896484;
-      else if(strcmp(arguments->int_lossy, "vbr") == 0)
+      else if(strcmp(arguments->mz_lossy, "vbr") == 0)
         arguments->mz_scale_factor = 0.1;
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
