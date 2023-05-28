@@ -55,6 +55,7 @@ static void validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
       strcmp(name, "log")     != 0 &&
       strcmp(name, "delta16") != 0 &&
+      strcmp(name, "delta24") != 0 &&
       strcmp(name, "delta32") != 0 &&
       strcmp(name, "vbr")     != 00  )
   {
@@ -115,6 +116,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       validate_algo_name(arguments->mz_lossy);
       if(strcmp(arguments->mz_lossy, "delta16") == 0)
         arguments->mz_scale_factor = 127.998046875;
+      else if(strcmp(arguments->mz_lossy, "delta24") == 0)
+        arguments->mz_scale_factor = 65536;
       else if(strcmp(arguments->mz_lossy, "delta32") == 0)
         arguments->mz_scale_factor = 262143.99993896484;
       else if(strcmp(arguments->mz_lossy, "vbr") == 0)

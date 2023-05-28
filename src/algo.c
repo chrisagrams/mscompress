@@ -313,8 +313,166 @@ algo_decode_delta16_transform_64d (void* args)
     for(int i = 1; i < len; i++)
     {
         diff = f[i] - f[i-1];
-        uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
+        if(diff * a_args->scale_factor > UINT16_MAX)
+        {
+            print("algo_decode_delta16_transform_64d: CLIPPING. diff: %0.4f, scale_factor*diff: %0.4f\n", diff, diff*a_args->scale_factor);
+            uint_diff = UINT16_MAX;
+        }
+        else
+            uint_diff = (uint16_t)floor(diff * a_args->scale_factor); // scale by 2^16 / 10
         tmp[i-1] = uint_diff;
+    }
+
+    // Free decoded buffer
+    free(decoded);
+
+    // Store length of array in first 4 bytes
+    memcpy(res, &len, sizeof(uint16_t));
+
+    // Return result
+    *a_args->dest = res;
+    *a_args->dest_len = res_len;
+
+    return;
+}
+
+void
+algo_decode_delta24_transform_32f (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    char* decoded = NULL;
+    size_t decoded_len = 0;
+
+    //Decode using specified encoding format
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
+
+    // Deternmine length of data based on data format
+    uint16_t len;
+    uint16_t* res;
+
+    #ifdef ERROR_CHECK
+        if(a_args->src_format != _32f_) // non-essential check, but useful for debugging
+            error("algo_decode_delta_transform_32f: Unknown data format");
+    #endif
+
+    len = decoded_len / sizeof(float);
+
+    size_t res_len = (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) + sizeof(float);
+
+    // Perform delta transform
+    res = calloc(res_len, 1); // Allocate space for result and leave room for header and first value
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_decode_delta_transform: malloc failed");
+    #endif
+
+    float* f = (float*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
+
+    //Store first value with full 32-bit precision
+    // *(float*)&res[0] = f[0];
+    memcpy(tmp, f, sizeof(float));
+
+    tmp += 2; // Move pointer to next value
+
+    uint8_t* dest = (uint8_t*)tmp; 
+
+    // Perform delta transform
+    float diff;
+    uint32_t uint_diff;
+
+    int index = 0; //index within dest
+
+    for(int i = 1; i < len; i++)
+    {
+        diff = f[i] - f[i-1];
+        if(floor(diff * a_args->scale_factor) > 16777215) // UINT24 max
+            uint_diff = 16777215;
+        else
+            uint_diff = (uint32_t)floor(diff * a_args->scale_factor);
+        dest[index * 3] = (uint_diff >> 16) & 0xFF;
+        dest[index * 3 + 1] = (uint_diff >> 8) & 0xFF;
+        dest[index * 3 + 2] = (uint_diff) & 0xFF;
+        index++;
+    }
+
+    // Free decoded buffer
+    free(decoded);
+
+    // Store length of array in first 4 bytes
+    memcpy(res, &len, sizeof(uint16_t));
+
+    // Return result
+    *a_args->dest = res;
+    *a_args->dest_len = res_len;
+
+    return;
+}
+
+void
+algo_decode_delta24_transform_64d (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    char* decoded = NULL;
+    size_t decoded_len = 0;
+
+    //Decode using specified encoding format
+    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded, &decoded_len, a_args->tmp);
+
+    // Deternmine length of data based on data format
+    uint16_t len;
+    uint16_t* res;
+
+    #ifdef ERROR_CHECK
+        if(a_args->src_format != _64d_) // non-essential check, but useful for debugging
+            error("algo_decode_delta_transform_64d: Unknown data format");
+    #endif
+
+    len = decoded_len / sizeof(double);
+
+    size_t res_len = (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) + sizeof(double);
+
+    // Perform delta transform
+    res = calloc(res_len, 1); // Allocate space for result and leave room for header and first value
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_decode_delta_transform: malloc failed");
+    #endif
+
+    double* f = (double*)(decoded);
+    uint16_t* tmp = (uint16_t*)(res + 1); // Ignore header in first 4 bytes
+
+    //Store first value with full 32-bit precision
+    // *(float*)&res[0] = f[0];
+    memcpy(tmp, f, sizeof(double));
+
+    tmp += 4; // Move pointer to next value
+
+    uint8_t* dest = (uint8_t*)tmp; 
+
+    // Perform delta transform
+    float diff;
+    uint32_t uint_diff;
+
+    int index = 0; //index within dest
+
+    for(int i = 1; i < len; i++)
+    {
+        diff = f[i] - f[i-1];
+        if(floor(diff * a_args->scale_factor) > 16777215) // UINT24 max
+            uint_diff = 16777215;
+        else
+            uint_diff = (uint32_t)floor(diff * a_args->scale_factor);
+        dest[index * 3] = (uint_diff >> 16) & 0xFF;
+        dest[index * 3 + 1] = (uint_diff >> 8) & 0xFF;
+        dest[index * 3 + 2] = (uint_diff) & 0xFF;
+        index++;
     }
 
     // Free decoded buffer
@@ -981,6 +1139,134 @@ algo_encode_delta16_transform_64d (void* args)
 }
 
 void
+algo_encode_delta24_transform_32f (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    #ifdef ERROR_CHECK
+        if(a_args == NULL)
+            error("algo_encode_delta_transform: args is NULL");
+    #endif
+
+    // Get array length
+    u_int16_t len = *(uint16_t*)(*a_args->src);
+
+    #ifdef ERROR_CHECK
+        if (len <= 0)
+            error("algo_encode_delta_transform: len is <= 0");
+    #endif
+
+    // Get starting value
+    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+
+    // Get source array
+    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+
+    #ifdef ERROR_CHECK
+        if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
+            error("algo_encode_delta_transform: Unknown data format");
+    #endif
+
+    // Allocate buffer
+    size_t res_len = len * sizeof(float);
+    float* res = malloc(res_len);
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_encode_delta_transform: malloc failed");
+    #endif
+
+    // Perform delta transform
+    res[0] = start;
+
+    int index = 0; // index within arr
+
+    uint32_t value;
+    float diff;
+
+    for(size_t i = 1; i < len; i++)
+    {
+        value = (arr[index * 3] << 16) | (arr[index * 3 + 1] << 8) | (arr[index * 3 + 2]);
+        diff = (float)value / a_args->scale_factor;
+        res[i] = res[i-1] + diff;
+        index++;
+    }
+    
+    // Encode using specified encoding format
+    a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
+
+    // Move to next array
+    *a_args->src += (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) + sizeof(float);
+
+    return;
+}
+
+void
+algo_encode_delta24_transform_64d (void* args)
+{
+    // Parse args
+    algo_args* a_args = (algo_args*)args;
+
+    #ifdef ERROR_CHECK
+        if(a_args == NULL)
+            error("algo_encode_delta_transform: args is NULL");
+    #endif
+
+    // Get array length
+    u_int16_t len = *(uint16_t*)(*a_args->src);
+
+    #ifdef ERROR_CHECK
+        if (len <= 0)
+            error("algo_encode_delta_transform: len is <= 0");
+    #endif
+
+    // Get starting value
+    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
+
+    // Get source array
+    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
+
+    #ifdef ERROR_CHECK
+        if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
+            error("algo_encode_delta_transform: Unknown data format");
+    #endif
+
+    // Allocate buffer
+    size_t res_len = len * sizeof(double);
+    double* res = malloc(res_len);
+
+    #ifdef ERROR_CHECK
+        if(res == NULL)
+            error("algo_encode_delta_transform: malloc failed");
+    #endif
+
+    // Perform delta transform
+    res[0] = start;
+
+    int index = 0; // index within arr
+
+    uint32_t value;
+    float diff;
+
+    for(size_t i = 1; i < len; i++)
+    {
+        value = (arr[index * 3] << 16) | (arr[index * 3 + 1] << 8) | (arr[index * 3 + 2]);
+        diff = (float)value / a_args->scale_factor;
+        res[i] = res[i-1] + diff;
+        index++;
+    }
+    
+    // Encode using specified encoding format
+    a_args->enc_fun(a_args->z, (char**)(&res), res_len, a_args->dest, a_args->dest_len);
+
+    // Move to next array
+    *a_args->src += (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) + sizeof(double);
+
+    return;
+}
+
+void
 algo_encode_delta32_transform_32f (void* args)
 {
     // Parse args
@@ -1320,6 +1606,14 @@ set_compress_algo(int algo, int accession)
                 case _64d_ :    return algo_decode_delta16_transform_64d;
             }
         } ;
+        case _delta24_transform_:
+        {
+            switch(accession)
+            {
+                case _32f_:     return algo_decode_delta24_transform_32f;
+                case _64d_:     return algo_decode_delta24_transform_64d;
+            }
+        } ;   
         case _delta32_transform_ :
         {
             switch(accession)
@@ -1370,6 +1664,14 @@ set_decompress_algo(int algo, int accession)
                 case _64d_ :    return algo_encode_delta16_transform_64d;
             }
         } ;
+        case _delta24_transform_:
+        {
+            switch(accession)
+            {
+                case _32f_:     return algo_encode_delta24_transform_32f;
+                case _64d_:     return algo_encode_delta24_transform_64d;
+            }
+        } ;   
         case _delta32_transform_ :
         {
             switch(accession)
@@ -1403,6 +1705,8 @@ get_algo_type(char* arg)
         return _cast_64_to_32_;
     else if(strcmp(arg, "delta16") == 0)
         return _delta16_transform_;
+    else if(strcmp(arg, "delta24") == 0)
+        return _delta24_transform_;
     else if(strcmp(arg, "delta32") == 0)
         return _delta32_transform_;
     else if(strcmp(arg, "vbr") == 0)
