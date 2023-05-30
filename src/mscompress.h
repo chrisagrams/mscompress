@@ -54,6 +54,10 @@
 #define _delta24_transform_ 4700005
 #define _delta32_transform_ 4700006
 #define _vbr_               4700007
+#define _bitpack_           4700008
+#define _vdelta16_transform_ 4700009 //TODO fix these
+#define _vdelta24_transform_ 4700010
+#define _cast_64_to_16_      4700011
 
 #define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 

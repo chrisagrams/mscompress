@@ -53,11 +53,15 @@ print_usage(FILE* stream, int exit_code) {
 
 static void validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
+      strcmp(name, "cast16")  != 0 &&
       strcmp(name, "log")     != 0 &&
       strcmp(name, "delta16") != 0 &&
       strcmp(name, "delta24") != 0 &&
       strcmp(name, "delta32") != 0 &&
-      strcmp(name, "vbr")     != 00  )
+      strcmp(name, "vdelta16") != 0 &&
+      strcmp(name, "vdelta24") != 0 &&
+      strcmp(name, "vbr")     != 0 &&
+      strcmp(name, "bitpack") != 0 )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
     print_usage(stderr, 1);
@@ -122,6 +126,10 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         arguments->mz_scale_factor = 262143.99993896484;
       else if(strcmp(arguments->mz_lossy, "vbr") == 0)
         arguments->mz_scale_factor = 0.1;
+      else if(strcmp(arguments->mz_lossy, "bitpack") == 0)
+        arguments->mz_scale_factor = 10000.0;
+      else if(strcmp(arguments->mz_lossy, "cast16") == 0)
+        arguments->mz_scale_factor = 11.801;
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
@@ -130,7 +138,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->int_lossy = argv[++i];
       validate_algo_name(arguments->int_lossy);
       if(strcmp(arguments->int_lossy, "log") == 0)
-        arguments->int_scale_factor = 100.0;
+        arguments->int_scale_factor = 72.0;
       else if(strcmp(arguments->int_lossy, "vbr") == 0)
         arguments->int_scale_factor = 1.0;
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
