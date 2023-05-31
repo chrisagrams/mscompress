@@ -27,36 +27,41 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "MSCompress version %s %s\n", VERSION, STATUS);
   fprintf(stream, "Supports msz versions %s-%s\n", MIN_SUPPORT, MAX_SUPPORT);
   fprintf(stream, "Options:\n");
-  fprintf(stream, "  -v, --verbose           Run in verbose mode.\n");
-  fprintf(stream, "  -t, --threads num       Set amount of threads to use. (default: auto)\n");
-  fprintf(stream, "  -z, --mz-lossy type     Enable mz lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
-  fprintf(stream, "  -i, --int-lossy type    Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
-  fprintf(stream, "--mz-scale-factor factor  Set mz scale factors for delta transform or threshold for vbr.\n");
-  fprintf(stream, "--int-scale-factor factor Set int scale factors for log transform or threshold for vbr\n");
-  fprintf(stream, "--extract-indices [range] Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, "--extract-scans [range]   Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, "--ms-level level          Extract specified ms level (1, 2, n). (disabled by default)\n");
-  fprintf(stream, "--extract-only            Only output extracted mzML, no compression (disabled by default)\n");
-  fprintf(stream, "--target-xml-format type  Set target xml compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--target-mz-format type   Set target mz compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--target-inten-format type Set target inten compression format (zstd, none). (default: zstd)\n");
-  fprintf(stream, "--zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
-  fprintf(stream, "  -b, --blocksize size    Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
-  fprintf(stream, "  -c, --checksum          Enable checksum generation. (disabled by default)\n");
-  fprintf(stream, "  -h, --help              Show this help message.\n");
-  fprintf(stream, "  -V, --version           Show version information.\n\n");
+  fprintf(stream, "  -v, --verbose                 Run in verbose mode.\n");
+  fprintf(stream, "  -t, --threads num             Set amount of threads to use. (default: auto)\n");
+  fprintf(stream, "  -z, --mz-lossy type           Enable mz lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, "  -i, --int-lossy type          Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
+  fprintf(stream, " --mz-scale-factor factor       Set mz scale factors for delta transform or threshold for vbr.\n");
+  fprintf(stream, " --int-scale-factor factor      Set int scale factors for log transform or threshold for vbr\n");
+  fprintf(stream, " --extract-indices [range]      Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, " --extract-scans [range]        Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, " --ms-level level               Extract specified ms level (1, 2, n). (disabled by default)\n");
+  fprintf(stream, " --extract-only                 Only output extracted mzML, no compression (disabled by default)\n");
+  fprintf(stream, " --target-xml-format type       Set target xml compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, " --target-mz-format type        Set target mz compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, " --target-inten-format type     Set target inten compression format (zstd, none). (default: zstd)\n");
+  fprintf(stream, " --zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
+  fprintf(stream, "  -b, --blocksize size          Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
+  fprintf(stream, "  -c, --checksum                Enable checksum generation. (disabled by default)\n");
+  fprintf(stream, "  -h, --help                    Show this help message.\n");
+  fprintf(stream, "  -V, --version                 Show version information.\n\n");
   fprintf(stream, "Arguments:\n");
-  fprintf(stream, "  input_file              Input file path.\n");
-  fprintf(stream, "  output_file             Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
+  fprintf(stream, "  input_file                    Input file path.\n");
+  fprintf(stream, "  output_file                   Output file path. If not specified, the output file name is the input file name with extension .msz.\n\n");
   exit(exit_code);
 }
 
 static void validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
+      strcmp(name, "cast16")  != 0 &&
       strcmp(name, "log")     != 0 &&
       strcmp(name, "delta16") != 0 &&
+      strcmp(name, "delta24") != 0 &&
       strcmp(name, "delta32") != 0 &&
-      strcmp(name, "vbr")     != 00  )
+      strcmp(name, "vdelta16") != 0 &&
+      strcmp(name, "vdelta24") != 0 &&
+      strcmp(name, "vbr")     != 0 &&
+      strcmp(name, "bitpack") != 0 )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
     print_usage(stderr, 1);
@@ -115,10 +120,16 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       validate_algo_name(arguments->mz_lossy);
       if(strcmp(arguments->mz_lossy, "delta16") == 0)
         arguments->mz_scale_factor = 127.998046875;
+      else if(strcmp(arguments->mz_lossy, "delta24") == 0)
+        arguments->mz_scale_factor = 65536;
       else if(strcmp(arguments->mz_lossy, "delta32") == 0)
         arguments->mz_scale_factor = 262143.99993896484;
-      else if(strcmp(arguments->int_lossy, "vbr") == 0)
+      else if(strcmp(arguments->mz_lossy, "vbr") == 0)
         arguments->mz_scale_factor = 0.1;
+      else if(strcmp(arguments->mz_lossy, "bitpack") == 0)
+        arguments->mz_scale_factor = 10000.0;
+      else if(strcmp(arguments->mz_lossy, "cast16") == 0)
+        arguments->mz_scale_factor = 11.801;
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
@@ -127,9 +138,9 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->int_lossy = argv[++i];
       validate_algo_name(arguments->int_lossy);
       if(strcmp(arguments->int_lossy, "log") == 0)
-        arguments->int_scale_factor = 100.0;
+        arguments->int_scale_factor = 72.0;
       else if(strcmp(arguments->int_lossy, "vbr") == 0)
-        arguments->int_scale_factor = 0.1;
+        arguments->int_scale_factor = 1.0;
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
@@ -249,14 +260,6 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       }
       arguments->zstd_compression_level = num;
     }  
-    // // delta transform for int compression is not implemented
-    // else if (strcmp(argv[i], "--int-scale-factor") == 0) {
-    //   if (i + 1 >= argc) {
-    //     fprintf(stderr, "%s\n", "Missing scale factor for int compression.");
-    //     print_usage(stderr, 1);
-    //   }
-    //   arguments->int_scale_factor = atof(argv[++i]);
-    //} 
     else if (arguments->input_file == NULL) {
       arguments->input_file = argv[i];
     }
@@ -274,9 +277,6 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     print_usage(stderr, 1);
   }
 
-  // if (arguments->output_file == NULL)
-  //   arguments->output_file = change_extension(arguments->input_file, ".msz");
-
   if(arguments->mz_lossy == NULL)
       arguments->mz_lossy = "lossless";
   
@@ -291,8 +291,6 @@ main(int argc, char* argv[])
 
     struct timeval abs_start, abs_stop;
     struct base64_state state;
-
-    data_positions_t **ddp, **mz_binary_divisions, **inten_binary_divisions, **xml_divisions; // TODO: remove
 
     divisions_t* divisions;
     data_format_t* df;
