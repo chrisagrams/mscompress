@@ -18,9 +18,9 @@
 #include <math.h>
 #include <sys/time.h>
 
-#include "vendor/yxml/yxml.h"
-#include "vendor/base64/lib/config.h"
-#include "vendor/base64/include/libbase64.h"
+#include "yxml.h"
+#include "config.h"
+#include "libbase64.h"
 #include "mscompress.h"
 
 #define parse_acc_to_int(attrbuff) atoi(attrbuff+3)     /* Convert an accession to an integer by removing 'MS:' substring and calling atoi() */
