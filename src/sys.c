@@ -39,12 +39,11 @@ prepare_threads(long args_threads, long* n_threads)
         sysctl(mib, 2, &np, &len, NULL, 0);
 
     #elif _WIN32
-        /* TODO */
+
         SYSTEM_INFO sysinfo;
-
         GetSystemInfo(&sysinfo);
-
         np = sysinfo.dwNumberOfProcessors;
+
     #endif
 
     print("\t%d usable processors detected.\n", np);
@@ -72,7 +71,7 @@ get_thread_id()
 
     #elif _WIN32
         
-        /* TODO */
+        tid = (uint64_t)GetCurrentThreadId();
     
     #endif
 

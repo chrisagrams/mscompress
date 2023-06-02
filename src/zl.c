@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "vendor/zlib/zlib.h"
+#include "zlib.h"
 #include "mscompress.h"
 // #define ZLIB_BUFF_FACTOR 100
 

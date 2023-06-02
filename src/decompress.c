@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include "vendor/zlib/zlib.h"
+#include "zlib.h"
 #include <zstd.h>
 #include "mscompress.h"
 

@@ -1,6 +1,6 @@
 #include <zstd.h>
 #include <sys/types.h>
-#include "vendor/zlib/zlib.h"
+#include "zlib.h"
 
 #define VERSION "0.0.1"
 #define STATUS "Dev"
@@ -256,8 +256,8 @@ void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 int get_blksize(char* path);
 size_t get_filesize(char* path);
-ssize_t write_to_file(int fd, char* buff, size_t n);
-ssize_t read_from_file(int fd, void* buff, size_t n);
+size_t write_to_file(int fd, char* buff, size_t n);
+size_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, data_format_t* df, long blocksize, char* md5);
 off_t get_offset(int fd);
 long get_header_blocksize(void* input_map);

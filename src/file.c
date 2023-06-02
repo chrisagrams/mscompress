@@ -14,12 +14,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include "mscompress.h"
 
+#ifdef _WIN32
+    #include <Windows.h>
+#else
+    #include <sys/mman.h>
+#endif
 
 
 void* 
@@ -33,13 +36,32 @@ get_mapping(int fd)
     
     struct stat buff;
 
+    void* mapped_data = NULL;
+
     if (fd == -1) return NULL;
 
     status = fstat(fd, &buff);
 
     if (status == -1 ) return NULL;
 
-    return mmap(NULL, buff.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    #ifdef _WIN32
+
+        HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+        HANDLE hMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+
+        if (hMapping != NULL)
+        {
+            mapped_data = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, buff.st_size);
+            CloseHandle(hMapping);
+        }
+
+    #else
+
+        mapped_data = mmap(NULL, buff.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+
+    #endif
+
+    return mapped_data;
 }
 
 int 
@@ -68,13 +90,13 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-ssize_t
+size_t
 write_to_file(int fd, char* buff, size_t n)
 {
     if(fd < 0)
       error("write_to_file: invalid file descriptor.\n");
     
-    ssize_t rv;
+    size_t rv;
 
     rv = write(fd, buff, n);
 
@@ -84,13 +106,13 @@ write_to_file(int fd, char* buff, size_t n)
     return rv;
 }
 
-ssize_t
+size_t
 read_from_file(int fd, void* buff, size_t n)
 {
     if(fd < 0)
       error("read_from_file: invalid file descriptor.\n");
 
-    ssize_t rv;
+    size_t rv;
 
     rv = read(fd, buff, n);
 
@@ -256,7 +278,7 @@ is_msz(int fd)
     int* magic_buff_cast = (int*)(&magic_buff[0]);
     *magic_buff_cast = MAGIC_TAG;
 
-    ssize_t rv;
+    size_t rv;
 
     rv = read_from_file(fd, (void*)&buff, 512); /* Read 512 byte header from file*/ 
 
@@ -284,7 +306,7 @@ is_mzml(int fd)
  */
 {
     char buff[512];
-    ssize_t rv;
+    size_t rv;
 
     rv = read_from_file(fd, (void*)&buff, 512);
     lseek(fd, 0, SEEK_SET);

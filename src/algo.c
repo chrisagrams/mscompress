@@ -628,7 +628,7 @@ algo_decode_delta32_transform_32f (void* args)
     #endif
 
     float* f = (float*)(decoded);
-    uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
+    uint32_t* tmp = (uint32_t*)((uint8_t*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
     // *(float*)&res[0] = f[0];
@@ -690,13 +690,13 @@ algo_decode_delta32_transform_64d (void* args)
     #endif
 
     double* f = (double*)(decoded);
-    uint32_t* tmp = (uint32_t*)((void*)res + 2); // Ignore header in first 4 bytes
+    uint32_t* tmp = (uint32_t*)((uint8_t*)res + 2); // Ignore header in first 4 bytes
 
     //Store first value with full 32-bit precision
     // *(float*)&res[0] = f[0];
     memcpy(tmp, f, sizeof(double));
 
-    tmp = (uint32_t*)((void*)tmp + sizeof(double));
+    tmp = (uint32_t*)((uint8_t*)tmp + sizeof(double));
 
     // Perform delta transform
     for(int i = 1; i < len; i++)
@@ -1538,7 +1538,7 @@ algo_encode_cast32_64d (void* args)
     float* arr = (float*)(*a_args->src);
     
     // Get array length
-    u_int16_t len = (uint16_t)arr[0];
+    uint16_t len = (uint16_t)arr[0];
 
 
     #ifdef ERROR_CHECK
@@ -1600,7 +1600,7 @@ algo_encode_cast16_32f (void* args)
     uint16_t* arr = (uint16_t*)(*a_args->src);
     
     // Get array length
-    u_int16_t len = (uint16_t)arr[0];
+    uint16_t len = (uint16_t)arr[0];
 
 
     #ifdef ERROR_CHECK
@@ -1666,7 +1666,7 @@ algo_encode_cast16_64d (void* args)
     uint16_t* arr = (uint16_t*)(*a_args->src);
     
     // Get array length
-    u_int16_t len = (uint16_t)arr[0];
+    uint16_t len = (uint16_t)arr[0];
 
 
     #ifdef ERROR_CHECK
@@ -1720,7 +1720,7 @@ algo_encode_log_2_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1728,7 +1728,7 @@ algo_encode_log_2_transform_32f (void* args)
     #endif
 
     // Get source array 
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(u_int16_t));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -1769,7 +1769,7 @@ algo_encode_log_2_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1777,7 +1777,7 @@ algo_encode_log_2_transform_64d (void* args)
     #endif
 
     // Get source array 
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(u_int16_t));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -1814,7 +1814,7 @@ algo_encode_delta16_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1822,10 +1822,10 @@ algo_encode_delta16_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -1867,7 +1867,7 @@ algo_encode_delta16_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1875,10 +1875,10 @@ algo_encode_delta16_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
+    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -1920,7 +1920,7 @@ algo_encode_vdelta16_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1928,14 +1928,14 @@ algo_encode_vdelta16_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get scale factor
 
-    float scale_factor = *(float*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    float scale_factor = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -1977,7 +1977,7 @@ algo_encode_vdelta16_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -1985,14 +1985,14 @@ algo_encode_vdelta16_transform_64d (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get scale factor
 
-    float scale_factor = *(float*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    float scale_factor = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     // Get source array
-    uint16_t* arr = (uint16_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
+    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -2034,7 +2034,7 @@ algo_encode_vdelta24_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2042,14 +2042,14 @@ algo_encode_vdelta24_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get scale factor
 
-    float scale_factor = *(float*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    float scale_factor = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     // Get source array
-    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
+    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -2102,7 +2102,7 @@ algo_encode_vdelta24_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2110,14 +2110,14 @@ algo_encode_vdelta24_transform_64d (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get scale factor
 
-    float scale_factor = *(float*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    float scale_factor = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     // Get source array
-    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
+    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -2170,7 +2170,7 @@ algo_encode_delta24_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2178,10 +2178,10 @@ algo_encode_delta24_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -2234,7 +2234,7 @@ algo_encode_delta24_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2242,10 +2242,10 @@ algo_encode_delta24_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
+    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint8_t* arr = (uint8_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
+    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -2298,7 +2298,7 @@ algo_encode_delta32_transform_32f (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2306,10 +2306,10 @@ algo_encode_delta32_transform_32f (void* args)
     #endif
 
     // Get starting value
-    float start = *(float*)((void*)(*a_args->src) + sizeof(uint16_t));
+    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
+    uint32_t* arr = (uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _32f_) // non-essential check, but useful for debugging
@@ -2351,7 +2351,7 @@ algo_encode_delta32_transform_64d (void* args)
     #endif
 
     // Get array length
-    u_int16_t len = *(uint16_t*)(*a_args->src);
+    uint16_t len = *(uint16_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2359,10 +2359,10 @@ algo_encode_delta32_transform_64d (void* args)
     #endif
 
     // Get starting value
-    double start = *(double*)((void*)(*a_args->src) + sizeof(uint16_t));
+    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
 
     // Get source array
-    uint32_t* arr = (uint32_t*)((void*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
+    uint32_t* arr = (uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
     #ifdef ERROR_CHECK
         if (a_args->src_format != _64d_) // non-essential check, but useful for debugging
@@ -2418,7 +2418,7 @@ algo_encode_vbr_32f (void* args)
     unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(float) + sizeof(uint32_t);
     
     // Get array length
-    u_int32_t len = *(uint32_t*)(*a_args->src);
+    uint32_t len = *(uint32_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2440,9 +2440,9 @@ algo_encode_vbr_32f (void* args)
 
     float* res_arr = (float*)res;
 
-    float base_peak_intensity = *(float*)((void*)(*a_args->src) + sizeof(uint32_t));
+    float base_peak_intensity = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint32_t));
 
-    uint32_t num_bytes = *(uint32_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(float));
+    uint32_t num_bytes = *(uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t) + sizeof(float));
 
     double threshold = (double)a_args->scale_factor;
 
@@ -2518,7 +2518,7 @@ algo_encode_vbr_64d (void* args)
     unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t);
     
     // Get array length
-    u_int32_t len = *(uint32_t*)(*a_args->src);
+    uint32_t len = *(uint32_t*)(*a_args->src);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2540,9 +2540,9 @@ algo_encode_vbr_64d (void* args)
 
     double* res_arr = (double*)res;
 
-    double base_peak_intensity = *(double*)((void*)(*a_args->src) + sizeof(uint32_t));
+    double base_peak_intensity = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint32_t));
 
-    uint32_t num_bytes = *(uint32_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(double));
+    uint32_t num_bytes = *(uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t) + sizeof(double));
 
     double threshold = (double)a_args->scale_factor;
 
@@ -2618,7 +2618,7 @@ algo_encode_bitpack_32f (void* args)
     unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t);
     
     // Get array length (in bytes)
-    u_int32_t len = *(uint32_t*)(*a_args->src) * sizeof(float);
+    uint32_t len = *(uint32_t*)(*a_args->src) * sizeof(float);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2640,9 +2640,9 @@ algo_encode_bitpack_32f (void* args)
 
     float* res_arr = (float*)res;
 
-    uint8_t num_bits = *(uint8_t*)((void*)(*a_args->src) + sizeof(uint32_t));
+    uint8_t num_bits = *(uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t));
 
-    uint32_t num_bytes = *(uint32_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(uint8_t));
+    uint32_t num_bytes = *(uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t) + sizeof(uint8_t));
 
     int b = 0;
     
@@ -2711,7 +2711,7 @@ algo_encode_bitpack_64d (void* args)
     unsigned char* tmp_arr = arr + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t);
     
     // Get array length (in bytes)
-    u_int32_t len = *(uint32_t*)(*a_args->src) * sizeof(double);
+    uint32_t len = *(uint32_t*)(*a_args->src) * sizeof(double);
 
     #ifdef ERROR_CHECK
         if (len <= 0)
@@ -2733,9 +2733,9 @@ algo_encode_bitpack_64d (void* args)
 
     double* res_arr = (double*)res;
 
-    uint8_t num_bits = *(uint8_t*)((void*)(*a_args->src) + sizeof(uint32_t));
+    uint8_t num_bits = *(uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t));
 
-    uint32_t num_bytes = *(uint32_t*)((void*)(*a_args->src) + sizeof(uint32_t) + sizeof(uint8_t));
+    uint32_t num_bytes = *(uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint32_t) + sizeof(uint8_t));
 
     int b = 0;
     

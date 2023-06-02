@@ -9,11 +9,10 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
 #include <zstd.h>
 
-#include "vendor/base64/include/libbase64.h"
-#include "vendor/yxml/yxml.h"
+#include "libbase64.h"
+#include "yxml.h"
 #include "mscompress.h"
 
 int verbose = 0;

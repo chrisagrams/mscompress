@@ -5,3 +5,6 @@
 [submodule "vendor/zlib"]
 	path = vendor/zlib
 	url = https://github.com/cloudflare/zlib.git
+[submodule "vendor/zstd"]
+	path = vendor/zstd
+	url = https://github.com/facebook/zstd.git
