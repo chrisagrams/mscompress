@@ -2,11 +2,14 @@
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <unistd.h>
 #elif __APPLE__
 #include <sys/sysctl.h>
+#include <sys/time.h>
 #include <pthread.h>
 #elif _WIN32
+#include <windows.h>
 #include <sysinfoapi.h>
 #endif
 
@@ -78,6 +81,21 @@ get_thread_id()
     return (int)tid;
 }
 
+double
+get_time()
+{
+    #ifdef _WIN32
+        LARGE_INTEGER frequency, counter;
+        QueryPerformanceFrequency(&frequency);
+        QueryPerformanceCounter(&counter);
+        return (double)counter.QuadPart / frequency.QuadPart;
+    #else
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec + (tv.tv_usec / 1e6);
+    #endif
+}
+
 int
 print(const char* format, ...)
 /**
@@ -85,13 +103,15 @@ print(const char* format, ...)
  *        Drop-in replacement to printf().
  */
 {
+    int ret = -1;
     if (verbose)
     {
         va_list args;
         va_start(args, format);
-        vprintf(format, args);
-        va_end(args);    
+        ret = vprintf(format, args);
+        va_end(args);
     }
+    return ret;
 }
 
 int

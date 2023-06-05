@@ -67,17 +67,19 @@ get_mapping(int fd)
 int 
 remove_mapping(void* addr, int fd)
 {
-    return munmap(addr, fd);
-}
+    int result = -1;
 
-int
-get_blksize(char* path)
-{
-    struct stat fi;
+    #ifdef _WIN32
 
-    stat(path, &fi);
+        result = UnmapViewOfFile(addr);
 
-    return fi.st_blksize;
+    #else
+
+        result = munmap(addr, fd);
+
+    #endif
+
+    return result;
 }
 
 size_t
@@ -208,7 +210,7 @@ get_header_blocksize(void* input_map)
  */
 {
     long* r;
-    r = (long*)(&input_map[0] + BLOCKSIZE_OFFSET);
+    r = (long*)((char*)input_map + BLOCKSIZE_OFFSET);
     return *r;
 }
 
@@ -219,7 +221,7 @@ get_header_df(void* input_map)
   
   r = malloc(sizeof(data_format_t));
   
-  memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
+  memcpy(r, (char*)input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
 
   r->populated = 2;
 
@@ -254,7 +256,7 @@ read_footer(void* input_map, long filesize)
 {
     footer_t* footer;
 
-    footer = (footer_t*)(&input_map[0] + filesize - sizeof(footer_t));
+    footer = (footer_t*)((char*)input_map + filesize - sizeof(footer_t));
 
     if (footer->magic_tag != MAGIC_TAG)
         error("read_footer: invalid magic tag.\n");

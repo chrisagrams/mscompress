@@ -254,7 +254,6 @@ typedef struct
 /* file.c */
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
-int get_blksize(char* path);
 size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
@@ -305,6 +304,7 @@ void parse_footer(footer_t** footer, void* input_map, long input_filesize, block
 /* sys.c */
 void prepare_threads(long args_threads, long* n_threads);
 int get_thread_id();
+double get_time();
 int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);

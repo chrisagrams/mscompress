@@ -16,11 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <sys/time.h>
 
 #include "yxml.h"
-#include "config.h"
-#include "libbase64.h"
 #include "mscompress.h"
 
 #define parse_acc_to_int(attrbuff) atoi(attrbuff+3)     /* Convert an accession to an integer by removing 'MS:' substring and calling atoi() */
@@ -1235,15 +1232,15 @@ read_dp(void* input_map, long* position)
     if(r == NULL) return NULL;
 
     // Read total_spec
-    r->total_spec = *((int*)(input_map + *position));
+    r->total_spec = *((int*)((char*)input_map + *position));
     *position += sizeof(int);
 
     // Read start positions
-    r->start_positions = (off_t*)(input_map + *position);
+    r->start_positions = (off_t*)((char*)input_map + *position);
     *position += sizeof(off_t)*r->total_spec;
 
     // Read end positions
-    r->end_positions = (off_t*)(input_map + *position);
+    r->end_positions = (off_t*)((char*)input_map + *position);
     *position += sizeof(off_t)*r->total_spec;
 
     return r;
@@ -1288,7 +1285,7 @@ read_division(void* input_map, long* position)
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
-    r->size = *((size_t*)(input_map + *position));
+    r->size = *((size_t*)((char*)input_map + *position));
     *position += sizeof(size_t);
 
     return r;
@@ -1664,9 +1661,9 @@ preprocess_mzml(char* input_map,
                 data_format_t** df,
                 divisions_t** divisions)
 {
-    struct timeval start, stop;
+    double start, end;
 
-    gettimeofday(&start, NULL);
+    start = get_time();
 
     print("\nPreprocessing...\n");
 
@@ -1741,9 +1738,9 @@ preprocess_mzml(char* input_map,
     if (*divisions == NULL)
         return -1;
 
-    gettimeofday(&stop, NULL);
+    end = get_time();
 
-    print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6)); 
+    print("Preprocessing time: %1.4fs\n", end - start); 
     print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, n_threads);
 
 }

@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <zstd.h>
@@ -288,7 +287,7 @@ main(int argc, char* argv[])
 {
     struct Arguments arguments;
 
-    struct timeval abs_start, abs_stop;
+    double abs_start, abs_stop;
     struct base64_state state;
 
     divisions_t* divisions;
@@ -304,7 +303,7 @@ main(int argc, char* argv[])
 
     verbose = arguments.verbose;    
 
-    gettimeofday(&abs_start, NULL);
+    abs_start = get_time();
 
     print("=== %s ===\n", MESSAGE);
 
@@ -472,9 +471,9 @@ main(int argc, char* argv[])
     close(fds[1]);
     print("\tClosed file descriptors\n");
 
-    gettimeofday(&abs_stop, NULL);
+    abs_stop = get_time();
 
-    print("\n=== Operation finished in %1.4fs ===\n", (abs_stop.tv_sec-abs_start.tv_sec)+((abs_stop.tv_usec-abs_start.tv_usec)/1e+6));
+    print("\n=== Operation finished in %1.4fs ===\n", abs_stop-abs_start);
 
     return 0;
 }
