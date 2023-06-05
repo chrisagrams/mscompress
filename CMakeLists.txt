@@ -2,8 +2,28 @@ cmake_minimum_required(VERSION 3.10)
 project(mscompress VERSION 1.0)
 file(GLOB SOURCES src/*.c)
 add_executable(mscompress ${SOURCES})
-target_include_directories(mscompress PUBLIC vendor/zstd/lib vendor/zlib vendor/base64/include vendor/base64/lib vendor/yxml src)
-add_subdirectory(vendor/zlib) # zlib library
+target_include_directories(mscompress PUBLIC vendor/zstd/lib vendor/base64/include vendor/base64/lib vendor/yxml src)
+
+set(ZLIB_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/zlib)
+# Add a custom target to run nmake and build zlib
+if(WIN32)
+  add_custom_target(
+    zlib_build
+    COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc
+    WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+  )
+else()
+  add_custom_target(
+    zlib_build
+    COMMAND make -f ${ZLIB_SOURCE_DIR}/Makefile
+    WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+  )
+endif()
+# Set the location of the built zlib library
+set(ZLIB_LIBRARY ${ZLIB_SOURCE_DIR}/zlib.lib)
+
+include_directories(${ZLIB_SOURCE_DIR})
+add_dependencies(mscompress zlib_build)
 
 
 
@@ -44,36 +64,50 @@ add_library(base64 STATIC ${BASE64_SOURCES})
 
 target_include_directories(base64 PUBLIC lib)
 
-if($ENV{AVX2_CFLAGS})
-  set_source_files_properties(lib/arch/avx2/codec.c PROPERTIES COMPILE_FLAGS ${AVX2_CFLAGS})
+# Set the variables based on environment flags
+if(DEFINED ENV{AVX2_CFLAGS})
+  set(HAVE_AVX2 1)
+else()
+  set(HAVE_AVX2 0)
 endif()
 
-if($ENV{NEON32_CFLAGS})
-  set_source_files_properties(lib/arch/neon32/codec.c PROPERTIES COMPILE_FLAGS ${NEON32_CFLAGS})
+if(DEFINED ENV{NEON32_CFLAGS})
+  set(HAVE_NEON32 1)
+else()
+  set(HAVE_NEON32 0)
 endif()
 
-if($ENV{NEON64_CFLAGS})
-  set_source_files_properties(lib/arch/neon64/codec.c PROPERTIES COMPILE_FLAGS ${NEON64_CFLAGS})
+if(DEFINED ENV{NEON64_CFLAGS})
+  set(HAVE_NEON64 1)
+else()
+  set(HAVE_NEON64 0)
 endif()
 
-if($ENV{SSSE3_CFLAGS})
-  set_source_files_properties(lib/arch/ssse3/codec.c PROPERTIES COMPILE_FLAGS ${SSSE3_CFLAGS})
+if(DEFINED ENV{SSSE3_CFLAGS})
+  set(HAVE_SSSE3 1)
+else()
+  set(HAVE_SSSE3 0)
 endif()
 
-if($ENV{SSE41_CFLAGS})
-  set_source_files_properties(lib/arch/sse41/codec.c PROPERTIES COMPILE_FLAGS ${SSE41_CFLAGS})
+if(DEFINED ENV{SSE41_CFLAGS})
+  set(HAVE_SSE41 1)
+else()
+  set(HAVE_SSE41 0)
 endif()
 
-if($ENV{SSE42_CFLAGS})
-  set_source_files_properties(lib/arch/sse42/codec.c PROPERTIES COMPILE_FLAGS ${SSE42_CFLAGS})
+if(DEFINED ENV{SSE42_CFLAGS})
+  set(HAVE_SSE42 1)
+else()
+  set(HAVE_SSE42 0)
 endif()
 
-if($ENV{AVX_CFLAGS})
-  set_source_files_properties(lib/arch/avx/codec.c PROPERTIES COMPILE_FLAGS ${AVX_CFLAGS})
+if(DEFINED ENV{AVX_CFLAGS})
+  set(HAVE_AVX 1)
+else()
+  set(HAVE_AVX 0)
 endif()
 
-if($ENV{OPENMP})
-  target_compile_options(base64 PUBLIC -fopenmp)
-endif()
+# Generate the config.h file
+configure_file(vendor/config.h.in vendor/base64/lib/config.h)
 
-target_link_libraries(mscompress PRIVATE zlib zstd yxml base64 m)
+target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64 m)
