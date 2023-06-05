@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include "zlib.h"
 #include <zstd.h>
 #include "mscompress.h"
@@ -294,7 +293,7 @@ decompress_parallel(char* input_map,
     int divisions_used = 0;
     int divisions_left = divisions->n_divisions;
 
-    clock_t start, stop;
+    double start, stop;
 
     for(i = 0; i < divisions->n_divisions; i++)
     {
@@ -340,11 +339,11 @@ decompress_parallel(char* input_map,
                 exit(-1);
             }
 
-            start = clock();
+            start = get_time();
             write_to_file(fd, args[i]->ret, args[i]->ret_len);
-            stop = clock();
+            stop = get_time();
 
-            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, (float)args[i]->ret_len / (stop - start) * CLOCKS_PER_SEC / 1024 / 1024);
+            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, (float)args[i]->ret_len / (stop - start) / 1024 / 1024);
 
             dealloc_decompress_args(args[i]);
         }

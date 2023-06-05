@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include "zlib.h"
 #include <zstd.h>
 #include "mscompress.h"
@@ -370,7 +369,7 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
  */
 {
     cmp_block_t* front;
-    clock_t start, stop;
+    double start, end;
 
     if(cmp_buff == NULL) return; // Nothing to do.
 
@@ -380,11 +379,11 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
 
         append_block_len(blk_len_queue, front->original_size, front->size);
 
-        start = clock();
+        start = get_time();
         write_cmp_blk(front, fd);
-        stop = clock();
+        end = get_time();
 
-        print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size, ((double)front->size/1000000)/((double)(stop-start)/CLOCKS_PER_SEC));
+        print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size, ((double)front->size/1000000)/(end-start));
 
         dealloc_cmp_block(front);
     }
@@ -648,9 +647,9 @@ compress_mzml(char* input_map,
                      **mz_divisions  = join_mz(divisions),
                      **inten_divisions = join_inten(divisions); 
 
-    struct timeval start, stop;
+    double start, end;
 
-    gettimeofday(&start, NULL);
+    start = get_time();
 
     print("\nDecoding and compression...\n");
 
@@ -681,9 +680,9 @@ compress_mzml(char* input_map,
     footer->inten_binary_blk_pos = get_offset(output_fd);
     dump_block_len_queue(inten_binary_block_lens, output_fd);
 
-    gettimeofday(&stop, NULL);
+    end = get_time();
 
-    print("Decoding and compression time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6));
+    print("Decoding and compression time: %1.4fs\n", end-start);
 }
 
 compression_fun
