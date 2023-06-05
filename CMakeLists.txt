@@ -11,6 +11,7 @@ if(WIN32)
     zlib_build
     COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc
     WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+    set(ZLIB_LIBRARY ${ZLIB_SOURCE_DIR}/zlib.lib)
   )
 else()
   add_custom_target(
@@ -18,10 +19,9 @@ else()
     COMMAND ${ZLIB_SOURCE_DIR}/configure
     COMMAND make -C ${ZLIB_SOURCE_DIR}
     WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+    set(ZLIB_LIBRARY ${ZLIB_SOURCE_DIR}/libz.a)
   )
 endif()
-# Set the location of the built zlib library
-set(ZLIB_LIBRARY ${ZLIB_SOURCE_DIR}/zlib.lib)
 
 include_directories(${ZLIB_SOURCE_DIR})
 add_dependencies(mscompress zlib_build)
