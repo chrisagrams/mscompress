@@ -115,4 +115,4 @@ endif()
 # Generate the config.h file
 configure_file(vendor/config.h.in vendor/base64/lib/config.h)
 
-target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64 m)
+target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64)

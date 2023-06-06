@@ -1,5 +1,9 @@
 #include <assert.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <pthread.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -472,6 +476,14 @@ cmp_binary_routine(
     free(binary_buff);
 }
 
+#ifdef _WIN32
+DWORD WINAPI compress_routine_win(LPVOID lpParam) {
+    compress_args_t* args = (compress_args_t*)lpParam;
+    compress_routine(args);
+    return 0;
+}
+#endif
+
 void
 compress_routine(void* args)
 /**
@@ -563,33 +575,21 @@ compress_routine(void* args)
 
 block_len_queue_t*
 compress_parallel(char* input_map,
-                  data_positions_t** ddp,
-                  data_format_t* df,
-                  compression_fun comp_fun,
-                  size_t cmp_blk_size, long blocksize, int mode,
-                  int divisions, int threads, int fd)
-/**
- * @brief Creates and executes compression threads using compress_routine.
- * 
- * @param input_map Pointer representing position within mmap'ed mzML file.
- * 
- * @param ddp An array of data_positions_t struct with size equals to divisions.
- * 
- * @param df Data format struct.
- * 
- * @param cmp_blk_size The size of a data block before it is compressed. 
- * 
- * @param divisions Number of divisions within ddp.
- * 
- * @param threads Number of threads to create at a given time.
- * 
- * @param fd File descriptor to write to.
- */
+    data_positions_t** ddp,
+    data_format_t* df,
+    compression_fun comp_fun,
+    size_t cmp_blk_size, long blocksize, int mode,
+    int divisions, int threads, int fd)
 {
     block_len_queue_t* blk_len_queue;
     compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
+
+    #ifdef _WIN32
+    HANDLE* ptid = malloc(sizeof(HANDLE) * divisions);
+    #else
     pthread_t* ptid = malloc(sizeof(pthread_t) * divisions);
-    
+    #endif
+
     int i = 0;
 
     blk_len_queue = alloc_block_len_queue();
@@ -597,32 +597,49 @@ compress_parallel(char* input_map,
     int divisions_used = 0;
     int divisions_left = divisions;
 
-    for(i = divisions_used; i < divisions; i++)
+    for (i = divisions_used; i < divisions; i++)
         args[i] = alloc_compress_args(input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
 
-    while(divisions_left > 0)
+    while (divisions_left > 0)
     {
-        if(divisions_left < threads)
+        if (divisions_left < threads)
             threads = divisions_left;
 
-        for(i = divisions_used; i < divisions_used + threads; i++)
+        for (i = divisions_used; i < divisions_used + threads; i++)
         {
-            int ret = pthread_create(&ptid[i], NULL, &compress_routine, (void*)args[i]);
-            if(ret != 0)
+            #ifdef _WIN32
+            ptid[i] = CreateThread(NULL, 0, compress_routine_win, args[i], 0, NULL);
+            if (ptid[i] == NULL)
+            {
+                perror("CreateThread");
+                exit(-1);
+            }
+            #else
+            int ret = pthread_create(&ptid[i], NULL, compress_routine, (void*)args[i]);
+            if (ret != 0)
             {
                 perror("pthread_create");
                 exit(-1);
-            }   
+            }
+            #endif
         }
 
-        for(i = divisions_used; i < divisions_used + threads; i++)
+        #ifdef _WIN32
+        WaitForMultipleObjects(threads, ptid + divisions_used, TRUE, INFINITE);
+        #else
+        for (i = divisions_used; i < divisions_used + threads; i++)
         {
             int ret = pthread_join(ptid[i], NULL);
-            if(ret != 0)
+            if (ret != 0)
             {
                 perror("pthread_join");
                 exit(-1);
             }
+        }
+        #endif
+
+        for (i = divisions_used; i < divisions_used + threads; i++)
+        {
             cmp_dump(args[i]->ret, blk_len_queue, fd);
             dealloc_compress_args(args[i]);
         }
