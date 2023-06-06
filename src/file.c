@@ -120,7 +120,7 @@ write_to_file(int fd, char* buff, size_t n)
 
     //Debug
     long pos = get_offset(fd);
-    print("write_to_file: curr offset: %d\n");
+    print("write_to_file: curr offset: %ld\n", pos);
 
     return (size_t)rv;
 }
