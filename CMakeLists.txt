@@ -1,5 +1,31 @@
 cmake_minimum_required(VERSION 3.10)
 project(mscompress VERSION 1.0)
+
+# Set the build type to Release by default
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Add an option to enable/disable debugging symbols
+option(ENABLE_DEBUG_SYMBOLS "Enable debugging symbols" OFF)
+
+# Set the build type based on the CMAKE_BUILD_TYPE variable
+set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of build.")
+
+# Set the build type to Debug if debugging symbols are enabled
+if(ENABLE_DEBUG_SYMBOLS)
+  set(CMAKE_BUILD_TYPE Debug)
+else()
+  # Silence warnings for non-debug builds
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options("-w")
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    add_compile_options("/W0")
+  endif()
+endif()
+
+
+
 file(GLOB SOURCES src/*.c)
 add_executable(mscompress ${SOURCES})
 target_include_directories(mscompress PUBLIC vendor/zstd/lib vendor/base64/include vendor/base64/lib vendor/yxml src)
