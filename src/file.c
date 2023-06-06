@@ -140,38 +140,16 @@ read_from_file(int fd, void* buff, size_t n)
     return (size_t)rv;
 }
 
-long 
+long
 get_offset(int fd)
 {
-    FILE* file = fdopen(fd, "r+");
-    if (file == NULL)
-    {
-        perror("fdopen");
-        exit(-1);
-    }
-
-    int ret = fseek(file, 0, SEEK_END);
-    if (ret != 0)
-    {
-        perror("fseek");
-        exit(-1);
-    }
-
-    long offset = ftell(file);
-    if (offset == -1)
-    {
-        perror("ftell");
-        exit(-1);
-    }
-
-    ret = fseek(file, offset, SEEK_SET);
-    if (ret != 0)
-    {
-        perror("fseek");
-        exit(-1);
-    }
-
-    return offset;
+  long ret = (long)lseek64(fd, 0, SEEK_CUR);
+  if (ret == -1)
+  {
+    perror("lseek64");
+    exit(-1);
+  }
+  return ret;
 }
 
 void
