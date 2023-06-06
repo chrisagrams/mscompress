@@ -20,8 +20,16 @@
 
 #ifdef _WIN32
     #include <Windows.h>
+    #include <io.h>
+    #include <fcntl.h>
+    #define open _open
+    #define read _read
+    #define write _write
+    #define close _close
+    #define ssize_t int
 #else
     #include <sys/mman.h>
+    #include <unistd.h>
 #endif
 
 
@@ -92,56 +100,78 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-size_t
+size_t 
 write_to_file(int fd, char* buff, size_t n)
 {
-    if(fd < 0)
-      error("write_to_file: invalid file descriptor.\n");
-    
-    size_t rv;
+    if (fd < 0)
+        error("write_to_file: invalid file descriptor.\n");
 
-    rv = write(fd, buff, n);
+    ssize_t rv;
+
+    #ifdef _WIN32
+        rv = write(fd, buff, (unsigned int)n);
+    #else
+        rv = write(fd, buff, n);
+    #endif
 
     if (rv < 0)
-      error("Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
+        error("Error in writing %ld bytes to file descriptor %d. Attempted to write %s", n, fd, buff);
 
-    return rv;
+    return (size_t)rv;
 }
 
-size_t
+size_t 
 read_from_file(int fd, void* buff, size_t n)
 {
-    if(fd < 0)
-      error("read_from_file: invalid file descriptor.\n");
+    if (fd < 0)
+        error("read_from_file: invalid file descriptor.\n");
 
-    size_t rv;
+    ssize_t rv;
 
-    rv = read(fd, buff, n);
+    #ifdef _WIN32
+        rv = read(fd, buff, (unsigned int)n);
+    #else
+        rv = read(fd, buff, n);
+    #endif
 
     if (rv < 0)
-      error("Error in reading %ld bytes from file descritor %d.", n, fd);
+        error("Error in reading %ld bytes from file descriptor %d.", n, fd);
 
-    return rv;
-    
+    return (size_t)rv;
 }
 
-off_t
+long 
 get_offset(int fd)
-/**
- * @brief Get current offset within a file descriptor
- * 
- * @param fd Opened file descriptor.
- * 
- * @return Numeric offset within file descriptor.
- */
 {
-  off_t ret = lseek(fd, 0, SEEK_CUR);
-  if (ret == -1)
-  {
-    perror("lseek");
-    exit(-1);
-  }
-  return ret;
+    FILE* file = fdopen(fd, "r+");
+    if (file == NULL)
+    {
+        perror("fdopen");
+        exit(-1);
+    }
+
+    int ret = fseek(file, 0, SEEK_END);
+    if (ret != 0)
+    {
+        perror("fseek");
+        exit(-1);
+    }
+
+    long offset = ftell(file);
+    if (offset == -1)
+    {
+        perror("ftell");
+        exit(-1);
+    }
+
+    ret = fseek(file, offset, SEEK_SET);
+    if (ret != 0)
+    {
+        perror("fseek");
+        exit(-1);
+    }
+
+    return offset;
 }
 
 void
@@ -464,4 +494,15 @@ prepare_fds(char* input_path,
   fds[1] = output_fd;
 
   return type;
+}
+
+void
+close_fd(int fd)
+{
+    int ret = close(fd);
+    if (ret != 0)
+    {
+        perror("close_fd");
+        exit(-1);
+    }
 }

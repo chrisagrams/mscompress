@@ -467,13 +467,13 @@ main(int argc, char* argv[])
 
     remove_mapping(input_map, fds[0]);
 
-    close(fds[0]);
-    close(fds[1]);
+    close_fd(fds[0]);
+    close_fd(fds[1]);
     print("\tClosed file descriptors\n");
 
     abs_stop = get_time();
 
     print("\n=== Operation finished in %1.4fs ===\n", abs_stop-abs_start);
 
-    return 0;
+    exit(0);
 }

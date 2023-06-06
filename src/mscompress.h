@@ -258,7 +258,7 @@ size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, data_format_t* df, long blocksize, char* md5);
-off_t get_offset(int fd);
+long get_offset(int fd);
 long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
@@ -267,6 +267,7 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output, char**
 char* change_extension(char* input, char* extension);
 int is_mzml(int fd);
 int is_msz(int fd);
+void close_fd(int fd);
 
 
 /* mem.c */
