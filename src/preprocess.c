@@ -1208,17 +1208,17 @@ write_dp(data_positions_t* dp, int fd)
 
 
     // Write total_spec (spectrum count)
-    num_buff = malloc(sizeof(int));
-    *((int*)num_buff) = dp->total_spec;
-    write_to_file(fd, num_buff, sizeof(int));
+    num_buff = malloc(sizeof(uint64_t));
+    *((uint64_t*)num_buff) = dp->total_spec;
+    write_to_file(fd, num_buff, sizeof(uint64_t));
 
     // Write start positions
     buff = (char*)dp->start_positions;
-    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
+    write_to_file(fd, buff, sizeof(uint64_t)*dp->total_spec);
 
     // Write end positions
     buff = (char*)dp->end_positions;
-    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
+    write_to_file(fd, buff, sizeof(uint64_t)*dp->total_spec);
 
     free(num_buff);
 
@@ -1232,16 +1232,16 @@ read_dp(void* input_map, long* position)
     if(r == NULL) return NULL;
 
     // Read total_spec
-    r->total_spec = *((int*)((uint8_t*)input_map + *position));
-    *position += sizeof(int);
+    r->total_spec = *((uint64_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint64_t);
 
     // Read start positions
-    r->start_positions = (off_t*)((uint8_t*)input_map + *position);
-    *position += sizeof(off_t)*r->total_spec;
+    r->start_positions = (uint64_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint64_t)*r->total_spec;
 
     // Read end positions
-    r->end_positions = (off_t*)((uint8_t*)input_map + *position);
-    *position += sizeof(off_t)*r->total_spec;
+    r->end_positions = (uint64_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint64_t)*r->total_spec;
 
     return r;
 }
@@ -1257,9 +1257,9 @@ write_division(division_t* div, int fd)
     write_dp(div->inten, fd);
 
     // Write size of division
-    num_buff = malloc(sizeof(size_t));
-    *((size_t*)num_buff) = div->size;
-    write_to_file(fd, num_buff, sizeof(size_t));
+    num_buff = malloc(sizeof(uint64_t));
+    *((uint64_t*)num_buff) = (uint64_t)div->size;
+    write_to_file(fd, num_buff, sizeof(uint64_t));
     free(num_buff);
 
     return;
@@ -1285,8 +1285,8 @@ read_division(void* input_map, long* position)
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
-    r->size = *((size_t*)((uint8_t*)input_map + *position));
-    *position += sizeof(size_t);
+    r->size = *((uint64_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint64_t);
 
     return r;
 }

@@ -160,7 +160,7 @@ typedef struct
     data_positions_t* mz;
     data_positions_t* inten;
 
-    size_t size;
+    uint64_t size;
 
     long* scans;
     long* ms_levels;
