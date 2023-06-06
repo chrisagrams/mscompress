@@ -146,8 +146,8 @@ typedef struct
 
 typedef struct
 {
-    off_t* start_positions;
-    off_t* end_positions;
+    uint64_t* start_positions;
+    uint64_t* end_positions;
     int total_spec;
     size_t file_end; //TODO: remove this
 } data_positions_t;
@@ -224,15 +224,15 @@ typedef struct
 
 typedef struct
 {
-    off_t xml_pos;          // msz file position of start of compressed XML data.
-    off_t mz_binary_pos;    // msz file position of start of compressed m/z binary data.
-    off_t inten_binary_pos;   // msz file position of start of compressed int binary data.
-    off_t xml_blk_pos;
-    off_t mz_binary_blk_pos;
-    off_t inten_binary_blk_pos;
-    off_t divisions_t_pos;
+    uint64_t xml_pos;          // msz file position of start of compressed XML data.
+    uint64_t mz_binary_pos;    // msz file position of start of compressed m/z binary data.
+    uint64_t inten_binary_pos;   // msz file position of start of compressed int binary data.
+    uint64_t xml_blk_pos;
+    uint64_t mz_binary_blk_pos;
+    uint64_t inten_binary_blk_pos;
+    uint64_t divisions_t_pos;
     size_t num_spectra;
-    off_t original_filesize;
+    uint64_t original_filesize;
     int n_divisions;
     int magic_tag;
     int mz_fmt;
@@ -358,9 +358,9 @@ typedef struct
     block_len_t* mz_binary_blk;
     block_len_t* inten_binary_blk;
     division_t* division;
-    off_t footer_xml_off;
-    off_t footer_mz_bin_off;
-    off_t footer_inten_bin_off;
+    uint64_t footer_xml_off;
+    uint64_t footer_mz_bin_off;
+    uint64_t footer_inten_bin_off;
 
     char* ret;
     size_t ret_len;

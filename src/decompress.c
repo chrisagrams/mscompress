@@ -83,9 +83,9 @@ alloc_decompress_args(char* input_map,
                       block_len_t* mz_binary_blk,
                       block_len_t* inten_binary_blk,
                       division_t* division,
-                      off_t footer_xml_off,
-                      off_t footer_mz_bin_off,
-                      off_t footer_inten_bin_off)
+                      uint64_t footer_xml_off,
+                      uint64_t footer_mz_bin_off,
+                      uint64_t footer_inten_bin_off)
 {
     decompress_args_t* r;
     
@@ -304,7 +304,7 @@ decompress_parallel(char* input_map,
 
     block_len_t* xml_blk, * mz_binary_blk, * inten_binary_blk;
 
-    off_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_inten_bin_off = 0; // offset within corresponding data_block.
+    uint64_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_inten_bin_off = 0; // offset within corresponding data_block.
 
     int i;
 

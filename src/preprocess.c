@@ -94,8 +94,8 @@ alloc_dp(int total_spec)
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
-    dp->start_positions = malloc(sizeof(off_t)*total_spec*2);
-    dp->end_positions = malloc(sizeof(off_t)*total_spec*2);
+    dp->start_positions = malloc(sizeof(uint64_t)*total_spec*2);
+    dp->end_positions = malloc(sizeof(uint64_t)*total_spec*2);
 
     if(dp->start_positions == NULL || dp->end_positions == NULL)
         error("alloc_dp: malloc failure.\n");
@@ -426,7 +426,7 @@ find_binary(char* input_map, data_format_t* df)
 }
 
 void
-validate_positions(off_t* arr, int len)
+validate_positions(uint64_t* arr, int len)
 {
     int i;
     for(i = 0; i < len; i++)
