@@ -73,7 +73,7 @@ decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, 
 {
     if(blk == NULL) // Empty block, return null.
         return NULL; 
-    return decompress_fun(dctx, (char*)input_map+offset, blk->compressed_size, blk->original_size);
+    return decompress_fun(dctx, (uint8_t*)input_map+offset, blk->compressed_size, blk->original_size);
 }
 
 decompress_args_t*

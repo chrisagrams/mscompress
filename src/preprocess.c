@@ -1232,15 +1232,15 @@ read_dp(void* input_map, long* position)
     if(r == NULL) return NULL;
 
     // Read total_spec
-    r->total_spec = *((int*)((char*)input_map + *position));
+    r->total_spec = *((int*)((uint8_t*)input_map + *position));
     *position += sizeof(int);
 
     // Read start positions
-    r->start_positions = (off_t*)((char*)input_map + *position);
+    r->start_positions = (off_t*)((uint8_t*)input_map + *position);
     *position += sizeof(off_t)*r->total_spec;
 
     // Read end positions
-    r->end_positions = (off_t*)((char*)input_map + *position);
+    r->end_positions = (off_t*)((uint8_t*)input_map + *position);
     *position += sizeof(off_t)*r->total_spec;
 
     return r;
@@ -1285,7 +1285,7 @@ read_division(void* input_map, long* position)
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
-    r->size = *((size_t*)((char*)input_map + *position));
+    r->size = *((size_t*)((uint8_t*)input_map + *position));
     *position += sizeof(size_t);
 
     return r;

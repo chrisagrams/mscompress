@@ -173,29 +173,28 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *              |====================================================|
  */             
 {
+    // Allocate header_buff
     char header_buff[HEADER_SIZE] = "";
 
-    int* header_buff_cast = (int*)(&header_buff[0]);
-
-    *header_buff_cast = MAGIC_TAG;
-
-    *(header_buff_cast + 1) = FORMAT_VERSION_MAJOR;
-
-    *(header_buff_cast + 2) = FORMAT_VERSION_MINOR;
-    
+    // Interpret #defines 
     char message_buff[MESSAGE_SIZE] = MESSAGE;
+    int magic_tag = MAGIC_TAG;
+    int format_version_major = FORMAT_VERSION_MAJOR;
+    int format_version_minor = FORMAT_VERSION_MINOR;
+
+    memcpy(header_buff, &magic_tag, sizeof(magic_tag));
+    memcpy(header_buff + sizeof(magic_tag), &format_version_major, sizeof(format_version_major));
+    memcpy(header_buff + sizeof(magic_tag) + sizeof(format_version_major), &format_version_minor, sizeof(format_version_minor));
 
     memcpy(header_buff + MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
-
     memcpy(header_buff + DATA_FORMAT_T_OFFSET, df, DATA_FORMAT_T_SIZE);
 
-    long* header_buff_cast_long = (long*)(&header_buff[0] + BLOCKSIZE_OFFSET);
-
-    *header_buff_cast_long = blocksize;
+    memcpy(header_buff + BLOCKSIZE_OFFSET, &blocksize, sizeof(blocksize));
 
     memcpy(header_buff + MD5_OFFSET, md5, MD5_SIZE);
 
     write_to_file(fd, header_buff, HEADER_SIZE);
+
 
 }
 
@@ -210,7 +209,7 @@ get_header_blocksize(void* input_map)
  */
 {
     long* r;
-    r = (long*)((char*)input_map + BLOCKSIZE_OFFSET);
+    r = (long*)((uint8_t*)input_map + BLOCKSIZE_OFFSET);
     return *r;
 }
 
@@ -221,7 +220,7 @@ get_header_df(void* input_map)
   
   r = malloc(sizeof(data_format_t));
   
-  memcpy(r, (char*)input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
+  memcpy(r, (uint8_t*)input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
 
   r->populated = 2;
 
