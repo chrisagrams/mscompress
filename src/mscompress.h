@@ -252,6 +252,8 @@ typedef struct
 
 
 /* file.c */
+extern long fd_pos[3];
+extern int fds[3];
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
 size_t get_filesize(char* path);

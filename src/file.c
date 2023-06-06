@@ -101,6 +101,20 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
+long
+update_fd_pos(int fd, long increment)
+{
+  for(int i = 0; i < 3; i++)
+  {
+    if(fds[i] == fd)
+    {
+      fd_pos[i] += increment;
+      return fd_pos[i];
+    }
+  }
+  return 0;
+}
+
 size_t 
 write_to_file(int fd, char* buff, size_t n)
 {
@@ -121,6 +135,9 @@ write_to_file(int fd, char* buff, size_t n)
     //Debug
     long pos = get_offset(fd);
     print("write_to_file: curr offset: %ld\n", pos);
+
+    if(!update_fd_pos(fd, rv))
+      error("write_to_file: error in updating fd pos\n");
 
     return (size_t)rv;
 }
@@ -148,13 +165,20 @@ read_from_file(int fd, void* buff, size_t n)
 long
 get_offset(int fd)
 {
-  long ret = (long)lseek64(fd, 0, SEEK_CUR);
-  if (ret == -1)
+  // long ret = (long)lseek64(fd, 0, SEEK_CUR);
+  // if (ret == -1)
+  // {
+  //   perror("lseek64");
+  //   exit(-1);
+  // }
+  // return ret;
+  for(int i = 0; i < 3; i++)
   {
-    perror("lseek64");
-    exit(-1);
+    if(fds[i] == fd)
+      return fd_pos[i];
   }
-  return ret;
+  error("get_offset: invalid fd\n");
+  exit(-1);
 }
 
 void

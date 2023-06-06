@@ -18,6 +18,9 @@ int verbose = 0;
 
 static const char* program_name = NULL;
 
+int fds[3] = {-1, -1, -1};
+long fd_pos[3] = {0, 0, 0};
+
 static void
 print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "Usage: %s [OPTION...] input_file [output_file]\n", program_name);
@@ -293,7 +296,6 @@ main(int argc, char* argv[])
     divisions_t* divisions;
     data_format_t* df;
 
-    int fds[3] = {-1, -1, -1};
     void* input_map = NULL;
     size_t input_filesize = 0;
     long n_threads = 0;
