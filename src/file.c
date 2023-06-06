@@ -23,9 +23,10 @@
     #include <io.h>
     #include <fcntl.h>
     #define open _open
+    #define close _close
     #define read _read
     #define write _write
-    #define close _close
+    #define lseek64 _lseeki64
     #define ssize_t int
 #else
     #include <sys/mman.h>
@@ -116,6 +117,10 @@ write_to_file(int fd, char* buff, size_t n)
 
     if (rv < 0)
         error("Error in writing %ld bytes to file descriptor %d. Attempted to write %s", n, fd, buff);
+
+    //Debug
+    long pos = get_offset(fd);
+    print("write_to_file: curr offset: %d\n");
 
     return (size_t)rv;
 }
