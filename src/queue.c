@@ -281,7 +281,9 @@ read_block_len_queue(void* input_map, long offset, long end)
 
     factor = sizeof(size_t)*2;
 
-    char* input_ptr = (char*)(input_map + offset);
+    char* input_ptr = (char*)(input_map);
+
+    input_ptr += offset;
 
     for(i = 0; i < diff; i+=factor)
         append_block_len(r, *(size_t*)(input_ptr+i), *(size_t*)(input_ptr+i+sizeof(size_t)));
