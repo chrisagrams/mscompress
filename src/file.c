@@ -181,6 +181,41 @@ get_offset(int fd)
   exit(-1);
 }
 
+char* serialize_df(data_format_t* df)
+{
+  char* r = calloc(1, DATA_FORMAT_T_SIZE);
+  if(r == NULL)
+    error("serialize_df: malloc failed.\n");
+  
+  size_t offset = 0;
+
+  /* source information (source mzML) */
+  memcpy(r + offset, &df->source_mz_fmt, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_inten_fmt, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_compression, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_total_spec, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* target information (target msz) */
+  memcpy(r + offset, &df->target_xml_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->target_mz_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->target_inten_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* algo parameters */
+  memcpy(r + offset, &df->mz_scale_factor, sizeof(float));
+  offset += sizeof(float);
+  memcpy(r + offset, &df->int_scale_factor, sizeof(float));
+  offset += sizeof(float);
+
+  return r;
+}
+
 void
 write_header(int fd, data_format_t* df, long blocksize, char* md5)
 /**
@@ -200,11 +235,11 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *              | Target XML format         |   4  bytes |    156    |
  *              | Target m/z format         |   4  bytes |    160    |
  *              | Target intensity format   |   4  bytes |    164    |
- *              | mz scale factor           |   8  bytes |    168    |
- *              | int scale factor          |   8  bytes |    176    |
- *              | Blocksize                 |   8  bytes |    184    |
- *              | MD5                       |  32  bytes |    192    |
- *              | Reserved                  |  288 bytes |    224    |
+ *              | mz scale factor           |   4  bytes |    168    |
+ *              | int scale factor          |   4  bytes |    172    |
+ *              | Blocksize                 |   8  bytes |    176    |
+ *              | MD5                       |  32  bytes |    184    |
+ *              | Reserved                  |  296 bytes |    216    |
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|
@@ -224,7 +259,9 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
     memcpy(header_buff + sizeof(magic_tag) + sizeof(format_version_major), &format_version_minor, sizeof(format_version_minor));
 
     memcpy(header_buff + MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
-    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df, DATA_FORMAT_T_SIZE);
+
+    char* df_buff = serialize_df(df);
+    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df_buff, DATA_FORMAT_T_SIZE);
 
     memcpy(header_buff + BLOCKSIZE_OFFSET, &blocksize, sizeof(blocksize));
 

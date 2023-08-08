@@ -1,4 +1,5 @@
 #include <zstd.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include "zlib.h"
 
@@ -25,9 +26,9 @@
 #define MESSAGE_SIZE         128
 #define MESSAGE_OFFSET       12
 #define DATA_FORMAT_T_OFFSET 140
-#define DATA_FORMAT_T_SIZE   44   /* ignores private members */
-#define BLOCKSIZE_OFFSET     184
-#define MD5_OFFSET           192
+#define DATA_FORMAT_T_SIZE   36   /* ignores private members (serialized)*/
+#define BLOCKSIZE_OFFSET     176
+#define MD5_OFFSET           184
 #define MD5_SIZE             32
 #define HEADER_SIZE          512
 
@@ -109,15 +110,15 @@ typedef decompression_fun (*decompression_fun_ptr)();
 typedef struct
 {
     /* source information (source mzML) */
-    int source_mz_fmt;
-    int source_inten_fmt;
-    int source_compression;
-    int source_total_spec;
+    uint32_t source_mz_fmt;
+    uint32_t source_inten_fmt;
+    uint32_t source_compression;
+    uint32_t source_total_spec;
 
-    /* target information */
-    int target_xml_format;
-    int target_mz_format;
-    int target_inten_format;
+    /* target information (target msz)*/
+    uint32_t target_xml_format;
+    uint32_t target_mz_format;
+    uint32_t target_inten_format;
 
     /* algo parameters */
     float mz_scale_factor; 
