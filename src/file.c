@@ -22,7 +22,6 @@
     #include <Windows.h>
     #include <io.h>
     #include <fcntl.h>
-    #define open _open
     #define close _close
     #define read _read
     #define write _write
@@ -132,10 +131,6 @@ write_to_file(int fd, char* buff, size_t n)
     if (rv < 0)
         error("Error in writing %ld bytes to file descriptor %d. Attempted to write %s", n, fd, buff);
 
-    //Debug
-    long pos = get_offset(fd);
-    print("write_to_file: curr offset: %ld\n", pos);
-
     if(!update_fd_pos(fd, rv))
       error("write_to_file: error in updating fd pos\n");
 
@@ -149,17 +144,31 @@ read_from_file(int fd, void* buff, size_t n)
         error("read_from_file: invalid file descriptor.\n");
 
     ssize_t rv;
+    size_t total_read = 0;
+    char* current_buff = (char*)buff;
 
-    #ifdef _WIN32
-        rv = read(fd, buff, (unsigned int)n);
-    #else
-        rv = read(fd, buff, n);
-    #endif
+    while (total_read < n) {
+        #ifdef _WIN32
+                rv = read(fd, current_buff, (unsigned int)(n - total_read));
+        #else
+                rv = read(fd, current_buff, n - total_read);
+        #endif
 
-    if (rv < 0)
-        error("Error in reading %ld bytes from file descriptor %d.", n, fd);
+        if (rv < 0) {
+            error("Error in reading %ld bytes from file descriptor %d.", n - total_read, fd);
+        }
+        else if (rv == 0) {
+            // End of file reached before reading the required number of bytes.
+            warning("End of file reached\n");
+            break;
+        }
+        else {
+            total_read += rv;
+            current_buff += rv;
+        }
+}
 
-    return (size_t)rv;
+    return total_read;
 }
 
 long
@@ -491,8 +500,12 @@ prepare_fds(char* input_path,
   int output_fd;
   int type;
 
-  if(input_path)
-    input_fd = open(input_path, O_RDONLY);
+  if (input_path)
+    #ifdef _WIN32
+      input_fd = _open(input_path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
+    #else
+        input_fd = open(input_path, O_RDONLY);
+    #endif
   else
     error("No input file specified.\n");
   
@@ -517,7 +530,11 @@ prepare_fds(char* input_path,
 
   if(*output_path)
   {
-    output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    #ifdef _WIN32
+          output_fd = _open(*output_path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_APPEND | _O_BINARY, 0666); // open in binary mode to avoid newline translation in Windows. 
+    #else 
+        output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    #endif
     if(output_fd < 0)
       error("Error in opening output file descriptor. (%s)\n", strerror(errno));
     fds[1] = output_fd;
