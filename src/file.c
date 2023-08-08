@@ -216,6 +216,41 @@ char* serialize_df(data_format_t* df)
   return r;
 }
 
+data_format_t* deserialize_df(char* buff)
+{
+  data_format_t* r = malloc(sizeof(data_format_t));
+  if(r == NULL)
+    error("deserialize_df: malloc failed.\n");
+
+  size_t offset = 0;
+
+  /* source information (source mzML) */
+  memcpy(&r->source_mz_fmt, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_inten_fmt, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_compression, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_total_spec, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* target information (target msz) */
+  memcpy(&r->target_xml_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->target_mz_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->target_inten_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* algo parameters */
+  memcpy(&r->mz_scale_factor, buff + offset, sizeof(float));
+  offset += sizeof(float);
+  memcpy(&r->int_scale_factor, buff + offset, sizeof(float));
+  offset += sizeof(float);
+
+  return r;
+}
+
 void
 write_header(int fd, data_format_t* df, long blocksize, char* md5)
 /**
@@ -292,9 +327,7 @@ get_header_df(void* input_map)
 {
   data_format_t* r;
   
-  r = malloc(sizeof(data_format_t));
-  
-  memcpy(r, (uint8_t*)input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
+  r = deserialize_df((char*)((uint8_t*)input_map + DATA_FORMAT_T_OFFSET));
 
   r->populated = 2;
 
