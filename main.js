@@ -7,8 +7,8 @@ const iconPath = path.join(__dirname, 'assets/icons/icon.icns')
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 900,
+    height: 500,
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
