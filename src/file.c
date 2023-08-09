@@ -498,6 +498,21 @@ change_extension(char* input, char* extension)
 }
 
 int
+open_file(char* path)
+{
+  int fd = -1;
+
+  if (path)
+    #ifdef _WIN32
+      fd = _open(path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
+    #else
+        input_fd = open(input_path, O_RDONLY);
+    #endif
+
+  return fd;
+}
+
+int
 prepare_fds(char* input_path,
             char** output_path,
             char* debug_output,

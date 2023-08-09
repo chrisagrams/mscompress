@@ -257,7 +257,15 @@ extern long fd_pos[3];
 extern int fds[3];
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 size_t get_filesize(char* path);
+
+#ifdef __cplusplus
+}
+#endif
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, data_format_t* df, long blocksize, char* md5);
@@ -267,7 +275,26 @@ data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int determine_filetype(int fd);
+
+#ifdef __cplusplus
+}
+#endif
 char* change_extension(char* input, char* extension);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int open_file(char* path);
+
+#ifdef __cplusplus
+}
+#endif
 int is_mzml(int fd);
 int is_msz(int fd);
 void close_fd(int fd);

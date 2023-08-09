@@ -10,6 +10,7 @@ function createWindow () {
     width: 900,
     height: 500,
     icon: iconPath,
+    autoHideMenuBar: true, // remove top menu bar
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
