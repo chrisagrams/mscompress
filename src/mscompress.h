@@ -306,6 +306,15 @@ int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, long
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 
 /* sys.c */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int get_num_threads();
+
+#ifdef __cplusplus
+}
+#endif
 void prepare_threads(long args_threads, long* n_threads);
 int get_thread_id();
 #ifdef __cplusplus

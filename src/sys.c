@@ -21,8 +21,8 @@
 
 #include "mscompress.h"
 
-void
-prepare_threads(long args_threads, long* n_threads)
+int
+get_num_threads()
 {
     int np;
 
@@ -48,6 +48,16 @@ prepare_threads(long args_threads, long* n_threads)
         np = sysinfo.dwNumberOfProcessors;
 
     #endif
+
+    return np;
+}
+
+void
+prepare_threads(long args_threads, long* n_threads)
+{
+    int np;
+
+    np = get_num_threads();
 
     print("\t%d usable processors detected.\n", np);
 
