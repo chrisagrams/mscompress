@@ -20,3 +20,4 @@ CTestTestfile.cmake
 _deps
 build/
 *.a
+node_modules/

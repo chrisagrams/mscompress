@@ -185,7 +185,7 @@ typedef struct
 } data_block_t;
 
 
-typedef struct
+typedef struct cmp_block_t
 {
     char* mem;
     size_t size;
@@ -205,7 +205,7 @@ typedef struct
 } cmp_blk_queue_t;
 
 
-typedef struct 
+typedef struct block_len_t
 {
     size_t original_size;
     size_t compressed_size;
@@ -308,7 +308,15 @@ void parse_footer(footer_t** footer, void* input_map, long input_filesize, block
 /* sys.c */
 void prepare_threads(long args_threads, long* n_threads);
 int get_thread_id();
-double get_time();
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+double get_time(void);
+
+#ifdef __cplusplus
+}
+#endif
 int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
