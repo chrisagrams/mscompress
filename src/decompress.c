@@ -180,7 +180,8 @@ decompress_routine(void* args)
     if(len <= 0)
         error("decompress_routine: Error determining decompression buffer size.\n");
 
-    char* buff = malloc(len*2); // *2 to be safe TODO: fix this
+    char* buff = malloc(len*(5/4));
+
     if(buff == NULL)
         error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
