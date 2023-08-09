@@ -1,18 +1,26 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, nativeImage } = require('electron')
 const path = require('path')
+
+const iconPath = path.join(__dirname, 'assets/icons/icon.icns')
 
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       nodeIntegrationInWorker: true
     }
   })
+
+  // Set the dock icon on macOS
+  if (process.platform === 'darwin') {
+    app.dock.setIcon(nativeImage.createFromPath(iconPath));
+  }
 
   // and load the index.html of the app.
   mainWindow.loadFile('index.html')
