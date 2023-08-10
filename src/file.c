@@ -506,7 +506,7 @@ open_file(char* path)
     #ifdef _WIN32
       fd = _open(path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
     #else
-        input_fd = open(input_path, O_RDONLY);
+        fd = open(path, O_RDONLY);
     #endif
 
   return fd;
