@@ -33,6 +33,11 @@ class FileHandle {
     await this.get_mmap();
   }
 
+  async close() {
+    console.error("Not implemented");
+    return;
+  }
+
   async get_type() {
     if (this.fd <= 0)
       throw new Error("File not open");
@@ -120,6 +125,25 @@ const hideLoading = () => {
   document.querySelector(".main").classList.remove('blur');
 }
 
+const showError = (message) => {
+  hideLoading(); // Hide loading in case it's showing
+
+  document.querySelector(".error").classList.remove('hidden');
+  document.querySelector(".main").classList.add('blur');
+  document.querySelector(".error p").textContent = message;
+}
+
+const hideError = () => {
+  document.querySelector(".error").classList.add('hidden');
+  document.querySelector(".main").classList.remove('blur');
+  document.querySelector(".error p").textContent = "";
+}
+
+// Add error button handler
+document.querySelector(".error #error-close").addEventListener('click', () => {
+  hideError();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   // Handle file when dropped
   const leftContainer = document.querySelector('#left-container');
@@ -191,6 +215,13 @@ const clearFileCards = () => {
   document.querySelectorAll(".fileCard").forEach(c => c.classList.remove("selected"));
 }
 
+const removeFileCard = (fd) => {
+  const card = document.querySelector("#fd_" + fd);
+  filehandles[filehandles.findIndex(fh => fh.fd == fd)].close();
+  filehandles.splice(filehandles.findIndex(fh => fh.fd == fd), 1);
+  card.remove();
+}
+
 const createFileCard = async (path) => {
   showLoading();
   console.log("createFileCard: ", path);
@@ -210,6 +241,7 @@ const createFileCard = async (path) => {
     // Create card
     const card = document.createElement('div');
     card.classList.add("fileCard");
+    card.id = "fd_" + fh.fd;
 
     card.addEventListener("click", e => {
       clearFileCards(); // Remove selection from previous card
@@ -228,6 +260,22 @@ const createFileCard = async (path) => {
       type.classList.add("msz");
       type.innerText = "msz";
     }
+    else
+    {
+      showError("Not a valid file (mzML/msz)");
+      throw new Error("Not a valid file (mzML/msz)");
+    }
+
+    const card_header = document.createElement('div');
+
+    const close = document.createElement('button');
+    close.textContent = "X";
+    close.addEventListener('click', e => {
+      e.stopPropagation();
+      removeFileCard(fh.fd);
+    });
+
+    card_header.append(type, close);
 
     const name = document.createElement('h1');
     name.innerText = smartTrim(fh.filename, 25);
@@ -238,7 +286,7 @@ const createFileCard = async (path) => {
     const p = document.createElement('p');
     p.textContent = fh.path;
 
-    card.append(type, name, size, p);
+    card.append(card_header, name, size, p);
 
     // Append card to container
     document.querySelector("#left-container").append(card);
