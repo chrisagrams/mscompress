@@ -168,7 +168,7 @@ img {
     display: flex;
     flex-direction: column;
     margin: 10px;
-    padding: 5px;
+    padding: 10px;
     background-color: white;
     border-radius: 3px;
     filter: drop-shadow(0px 0px 6px hsl(0 0% 91% / 1));
@@ -180,13 +180,13 @@ img {
     line-height: 1.5;
     height: 1.5em;
     overflow: hidden;
-    color: hsl(0 0% 30% / 1);
 }
 
 /* Filesize / Type */
 .fileCard > h3 {
     margin: 0;
     font-size: 14px;
+    color: hsl(0 0% 30% / 1);
 }
 
 .fileCard > h3.mzml {

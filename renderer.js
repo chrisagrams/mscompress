@@ -176,9 +176,6 @@ const createFileCard = async (path) => {
     const card = document.createElement('div');
     card.classList.add("fileCard");
 
-    const name = document.createElement('h1');
-    name.innerText = smartTrim(fh.filename, 25);
-
     const type = document.createElement('h3');
     if(fh.type == 1)
     {
@@ -191,13 +188,16 @@ const createFileCard = async (path) => {
       type.innerText = "msz";
     }
 
+    const name = document.createElement('h1');
+    name.innerText = smartTrim(fh.filename, 25);
+
     const size = document.createElement('h3');
     size.innerText = formatBytes(fh.filesize);
 
     const p = document.createElement('p');
     p.textContent = fh.path;
 
-    card.append(name, type, size, p);
+    card.append(type, name, size, p);
 
     // Append card to container
     document.querySelector("#left-container").append(card);
