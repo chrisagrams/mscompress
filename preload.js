@@ -43,4 +43,6 @@ window.addEventListener('DOMContentLoaded', () => {
         leftContainer.classList.remove('dragover');
     });
 
+    // Remove loading
+    document.querySelector(".loading").classList.add('hidden');
 });
