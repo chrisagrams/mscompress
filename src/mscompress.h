@@ -255,7 +255,15 @@ typedef struct
 /* file.c */
 extern long fd_pos[3];
 extern int fds[3];
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void* get_mapping(int fd);
+
+#ifdef __cplusplus
+}
+#endif
 int remove_mapping(void* addr, int fd);
 #ifdef __cplusplus
 extern "C" {
@@ -308,7 +316,13 @@ cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
 void dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
+#ifdef __cplusplus
+extern "C" {
+#endif
 data_format_t* pattern_detect(char* input_map);
+#ifdef __cplusplus
+}
+#endif
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);

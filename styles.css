@@ -170,9 +170,21 @@ img {
     margin: 10px;
     padding: 10px;
     background-color: white;
-    border-radius: 3px;
+    border-radius: 8px;
     filter: drop-shadow(0px 0px 6px hsl(0 0% 91% / 1));
+    transition: border-color 0.2s ease-in-out;
+    border: 2px solid transparent; /* Initially, the border is transparent */
 }
+
+.fileCard:hover {
+    border-color: var(--mscompress-blue); 
+    
+}
+
+.fileCard.selected {
+    border-color: var(--mscompress-purple); 
+}
+
 /* Filename */
 .fileCard > h1 {
     font-size: 16px;

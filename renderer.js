@@ -17,6 +17,7 @@ class FileHandle {
     this.fd = -1;
     this.filesize = 0;
     this.type = -1;
+    this.mmap = null;
   }
 
   async open() {
@@ -29,6 +30,7 @@ class FileHandle {
     this.fd = fd;
     await this.get_type();
     await this.get_filesize();
+    await this.get_mmap();
   }
 
   async get_type() {
@@ -49,6 +51,35 @@ class FileHandle {
     
     return this.filesize;
   }
+
+  async get_mmap() {
+    if (this.fd <= 0) {
+      throw new Error("File not open");
+    }
+
+    this.mmap = await systemWorkerPromise({'type': "get_mmap", 'fd': this.fd});
+
+    return this.mmap;
+  }
+
+  async get_512bytes(offset) {
+    if (this.fd <= 0) {
+      throw new Error("File not open");
+    }
+    
+    let buffer = await systemWorkerPromise({'type': "get_512bytes", 'fd': this.fd, 'offset': offset});
+    
+    return buffer;
+  }
+
+  async get_accessions() {
+    if (this.fd <= 0) {
+      throw new Error("File not open");
+    }
+
+    return await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd});
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;
@@ -156,6 +187,10 @@ system_worker.onerror = (e) => {
 };
 
 
+const clearFileCards = () => {
+  document.querySelectorAll(".fileCard").forEach(c => c.classList.remove("selected"));
+}
+
 const createFileCard = async (path) => {
   showLoading();
   console.log("createFileCard: ", path);
@@ -175,6 +210,12 @@ const createFileCard = async (path) => {
     // Create card
     const card = document.createElement('div');
     card.classList.add("fileCard");
+
+    card.addEventListener("click", e => {
+      clearFileCards(); // Remove selection from previous card
+      card.classList.add("selected");
+      // TODO: more logic on click
+    })
 
     const type = document.createElement('h3');
     if(fh.type == 1)
