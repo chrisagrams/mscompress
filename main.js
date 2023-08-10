@@ -11,6 +11,8 @@ function createWindow () {
     height: 500,
     icon: iconPath,
     autoHideMenuBar: true, // remove top menu bar
+    resizable: false, // disable resizing
+    frame: false, // remove window frame
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,

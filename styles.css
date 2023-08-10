@@ -1,5 +1,70 @@
-#msc_logo {
+html {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    user-select: none;
+}
+
+body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: "Open Sans", sans-serif;
+}
+
+/* Titlebar */
+.titlebar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    height: 30px;
+    -webkit-app-region: drag;
+}
+
+/* Header */
+.header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    height: 66px;
+    -webkit-app-region: drag;
+}
+.header > #msc_logo {
     display: block;
     height: 30px;
     padding: 10px;
+    margin: auto 0;
+}
+.header > .info {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0;
+    padding: 0 10px;
+}
+.header > .info > p {
+    text-align: right;
+    font-weight: lighter;
+    font-size: 12px;
+    font-style: italic;
+    margin: 0;
+}
+
+/* Content */
+.content {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+
+}
+
+.content > .container {
+    display: flex;
+    flex-direction: column;
+    width: calc(100%/3);
+    height: 100%;
 }

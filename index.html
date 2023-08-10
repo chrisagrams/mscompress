@@ -8,13 +8,26 @@
     <title>mscompress</title>
   </head>
   <body>
-    <img id="msc_logo" src="./assets/logos/msc_logo.svg" alt="mscompress logo">
-    We are using Node.js <span id="node-version"></span>,
-    Chromium <span id="chrome-version"></span>,
-    and Electron <span id="electron-version"></span>.
+    <div class="titlebar">
 
-    <input type="file" id="test-file-input" />
+    </div>
+    <div class="header">
+      <img id="msc_logo" src="./assets/logos/msc_logo.svg" alt="mscompress logo">
+      <div class="info">
+        <p>UI Version 1.0.0</p>
+        <p>Backend Version 1.0.0</p>
+      </div>
+    </div>
+    <div class="content">
+      <div class="container" id="left-container">
+        <input type="file" id="test-file-input" />
+      </div>
+      <div class="container" id="center-container">
 
+      </div>
+      <div class="container" id="right-container">
+      </div>
+    </div>
     <!-- You can also require other files to run in this process -->
     <script src="./renderer.js"></script>
   </body>
