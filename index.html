@@ -8,9 +8,9 @@
     <title>mscompress</title>
   </head>
   <body>
-    <div class="titlebar">
+    <!-- <div class="titlebar">
 
-    </div>
+    </div> -->
     <div class="header">
       <img id="msc_logo" src="./assets/logos/msc_logo.svg" alt="mscompress logo">
       <div class="info">
@@ -20,13 +20,21 @@
     </div>
     <div class="content">
       <div class="container" id="left-container">
-        <input type="file" id="test-file-input" />
+        <div class="placeholder">
+          <p>Drag and drop .mzML or .msz files here</p>
+          <p id="system-dialog">... or use <a href="#">system dialog</a></p>
+        </div>
+        <!-- <input type="file" id="test-file-input" /> -->
       </div>
       <div class="container" id="center-container">
 
       </div>
       <div class="container" id="right-container">
       </div>
+    </div>
+    <div class="footer">
+      <img id="gao_lab_banner" src="./assets/logos/gao-lab-banner.png" alt="Gao Lab">
+      <img id="github_logo" src="./assets/logos/github-mark.svg" alt="View Github repository">
     </div>
     <!-- You can also require other files to run in this process -->
     <script src="./renderer.js"></script>

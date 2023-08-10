@@ -14,6 +14,19 @@ body {
     font-family: "Open Sans", sans-serif;
 }
 
+a {
+    text-decoration: none;  /* Remove underline from all <a> elements */
+}
+
+img {
+    -webkit-user-drag: none; /* Don't let images be draggable */
+}
+
+/* Generic classes */
+.hidden {
+    display: none;
+}
+
 /* Titlebar */
 .titlebar {
     display: flex;
@@ -33,18 +46,21 @@ body {
     height: 66px;
     -webkit-app-region: drag;
 }
+
 .header > #msc_logo {
     display: block;
     height: 30px;
-    padding: 10px;
+    padding: 12px 10px 8px 10px;
     margin: auto 0;
 }
+
 .header > .info {
     display: flex;
     flex-direction: column;
     margin: auto 0;
     padding: 0 10px;
 }
+
 .header > .info > p {
     text-align: right;
     font-weight: lighter;
@@ -58,7 +74,7 @@ body {
     display: flex;
     flex-direction: row;
     width: 100%;
-    height: 100%;
+    height: calc(100% - 99px);
 
 }
 
@@ -67,4 +83,46 @@ body {
     flex-direction: column;
     width: calc(100%/3);
     height: 100%;
+    background-color: hsl(0 0% 99% / 1);
+    transition: background-color 0.3s;
+}
+
+/* Left container */
+
+/* dragover class for file hover */
+.content > .container#left-container.dragover {
+    background-color: #64B5F6;
+}
+
+/* Placeholder class */
+.content > .container#left-container > .placeholder {
+    margin: auto;
+    text-align: center;
+    font-size: 14px;
+}
+
+
+/* Center container */
+
+.content > .container#center-container {
+    background-color: hsl(0 0% 97% / 1);
+}
+
+/* Footer */
+.footer {
+    display: flex;
+    justify-content: center;
+    height: 33px;
+    width: 100%;
+    gap: 10px;
+}
+
+.footer > #gao_lab_banner {
+    padding: 6px;
+    filter: opacity(0.5);
+}
+
+.footer > #github_logo {
+    padding: 8px;
+    filter: opacity(0.5);
 }
