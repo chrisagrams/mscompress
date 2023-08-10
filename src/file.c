@@ -461,7 +461,7 @@ determine_filetype(int fd)
     return DECOMPRESS;
   }  
   else
-    error("Invalid input file.\n");
+    warning("Invalid input file.\n");
   return -1;
 
 }

@@ -1,3 +1,8 @@
+:root {
+    --mscompress-purple: #e60f8a;
+    --mscompress-blue: #24a8df;
+}
+
 html {
     height: 100%;
     width: 100%;
@@ -26,6 +31,41 @@ img {
 .hidden {
     display: none;
 }
+.blur {
+    filter: blur(5px);
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top: 4px solid var(--mscompress-blue);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    position: fixed;
+    top: calc(50% - 20px);
+    left: calc(50% - 20px);
+    transform: translate(-50%, -50%);
+    z-index: 9999; /* Ensure the spinner is above other content */
+}
+
+@keyframes spin {
+    0% 
+    { 
+        border-top-color: var(--mscompress-blue);
+        transform: rotate(0deg);
+    }
+    50%
+    {
+        border-top-color: var(--mscompress-purple);
+        transform: rotate(180deg);
+    }
+    100% 
+    { 
+        border-top-color: var(--mscompress-blue);
+        transform: rotate(360deg); 
+    }
+}
 
 /* Titlebar */
 .titlebar {
@@ -35,6 +75,22 @@ img {
     width: 100%;
     height: 30px;
     -webkit-app-region: drag;
+}
+
+/* Main encapsulating div */
+.main {
+    width: 100%;
+    height: 100%;
+    transition: filter 0.3s;
+}
+
+/* Loading div */
+.loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 /* Header */
@@ -103,11 +159,51 @@ img {
 
 
 /* Center container */
-
 .content > .container#center-container {
     background-color: hsl(0 0% 97% / 1);
 }
 
+/* File card (in container) */
+.fileCard {
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+    padding: 5px;
+    background-color: white;
+    border-radius: 3px;
+    filter: drop-shadow(0px 0px 6px hsl(0 0% 91% / 1));
+}
+/* Filename */
+.fileCard > h1 {
+    font-size: 16px;
+    margin: 0;
+    line-height: 1.5;
+    height: 1.5em;
+    overflow: hidden;
+    color: hsl(0 0% 30% / 1);
+}
+
+/* Filesize / Type */
+.fileCard > h3 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.fileCard > h3.mzml {
+    color: var(--mscompress-purple);
+}
+.fileCard >h3.msz {
+    color: var(--mscompress-blue);
+}
+
+/* Path */
+.fileCard > p {
+    margin: 0;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 /* Footer */
 .footer {
     display: flex;

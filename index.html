@@ -11,30 +11,35 @@
     <!-- <div class="titlebar">
 
     </div> -->
-    <div class="header">
-      <img id="msc_logo" src="./assets/logos/msc_logo.svg" alt="mscompress logo">
-      <div class="info">
-        <p>UI Version 1.0.0</p>
-        <p>Backend Version 1.0.0</p>
-      </div>
-    </div>
-    <div class="content">
-      <div class="container" id="left-container">
-        <div class="placeholder">
-          <p>Drag and drop .mzML or .msz files here</p>
-          <p id="system-dialog">... or use <a href="#">system dialog</a></p>
+    <div class="main">
+      <div class="header">
+        <img id="msc_logo" src="./assets/logos/msc_logo.svg" alt="mscompress logo">
+        <div class="info">
+          <p>UI Version 1.0.0</p>
+          <p>Backend Version 1.0.0</p>
         </div>
-        <!-- <input type="file" id="test-file-input" /> -->
       </div>
-      <div class="container" id="center-container">
+      <div class="content">
+        <div class="container" id="left-container">
+          <div class="placeholder">
+            <p>Drag and drop .mzML or .msz files here</p>
+            <p id="system-dialog">... or use <a href="#">system dialog</a></p>
+          </div>
+          <!-- <input type="file" id="test-file-input" /> -->
+        </div>
+        <div class="container" id="center-container">
 
+        </div>
+        <div class="container" id="right-container">
+        </div>
       </div>
-      <div class="container" id="right-container">
+      <div class="footer">
+        <img id="gao_lab_banner" src="./assets/logos/gao-lab-banner.png" alt="Gao Lab">
+        <img id="github_logo" src="./assets/logos/github-mark.svg" alt="View Github repository">
       </div>
     </div>
-    <div class="footer">
-      <img id="gao_lab_banner" src="./assets/logos/gao-lab-banner.png" alt="Gao Lab">
-      <img id="github_logo" src="./assets/logos/github-mark.svg" alt="View Github repository">
+    <div class="loading hidden">
+      <div class="spinner"></div>
     </div>
     <!-- You can also require other files to run in this process -->
     <script src="./renderer.js"></script>
