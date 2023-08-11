@@ -144,6 +144,21 @@ document.querySelector(".error #error-close").addEventListener('click', () => {
   hideError();
 });
 
+const calculateTotalMetrics = (metrics) => {
+  let totalCpuUsage = 0;
+  let totalMemoryUsage = 0;
+
+  metrics.forEach((metric) => {
+    totalCpuUsage += metric.cpu.percentCPUUsage;
+    totalMemoryUsage += metric.memory.workingSetSize;
+  });
+
+  return {
+    totalCpuUsage,
+    totalMemoryUsage
+  };
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   // Handle file when dropped
   const leftContainer = document.querySelector('#left-container');
@@ -171,6 +186,17 @@ document.addEventListener('DOMContentLoaded', () => {
       createFileCard(f);
     })
   })
+
+  window.ipcRenderer.on('current-app-metrics', (metrics) => {
+    console.log("App metrics: ", calculateTotalMetrics(metrics));
+    document.querySelector("#cpu").textContent = "CPU: " + calculateTotalMetrics(metrics).totalCpuUsage.toFixed(2) + "%";
+    document.querySelector("#memory").textContent = "Mem: " + formatBytes(calculateTotalMetrics(metrics).totalMemoryUsage);
+  });
+
+  // Get app metrics every second
+  setInterval(() => {
+    window.ipcRenderer.send('app-metrics');
+  }, 2000);
 
 });
 

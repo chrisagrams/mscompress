@@ -10,14 +10,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ipcRenderer', {
     send: (channel, data) => {
         //whitelist channels
-        let validChannels = ['open-file-dialog'];
+        let validChannels = ['open-file-dialog', 'app-metrics'];
         if(validChannels.includes(channel)) {
             ipcRenderer.send(channel, data);
         }
     },
     on: (channel, callback) => {
         //whitelist channels
-        let validChannels = ['selected-files'];
+        let validChannels = ['selected-files', 'current-app-metrics'];
         if(validChannels.includes(channel)) {
             ipcRenderer.on(channel, (e, ...args) => callback(...args));
         }

@@ -74,3 +74,8 @@ ipcMain.on('open-file-dialog', e => {
     console.error(err);
   })
 })
+
+// Get the current app metrics
+ipcMain.on('app-metrics', e => {
+  e.sender.send('current-app-metrics', app.getAppMetrics());
+})

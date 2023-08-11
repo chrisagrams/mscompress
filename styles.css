@@ -144,6 +144,22 @@ img {
     margin: 0;
 }
 
+.header > .metrics {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0;
+    padding: 0 10px;
+    margin-left: auto; /* Push to the right */
+}
+
+.header > .metrics > p {
+    text-align: right;
+    font-weight: lighter;
+    font-size: 12px;
+    font-style: italic;
+    margin: 0;
+}
+
 /* Content */
 .content {
     display: flex;
