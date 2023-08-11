@@ -210,6 +210,10 @@ system_worker.onerror = (e) => {
   console.error(e.message, e);
 };
 
+const checkPlaceholder = () => {
+  if (filehandles.length == 0)
+    document.querySelector(".placeholder").classList.remove('hidden');
+}
 
 const clearFileCards = () => {
   document.querySelectorAll(".fileCard").forEach(c => c.classList.remove("selected"));
@@ -220,6 +224,7 @@ const removeFileCard = (fd) => {
   filehandles[filehandles.findIndex(fh => fh.fd == fd)].close();
   filehandles.splice(filehandles.findIndex(fh => fh.fd == fd), 1);
   card.remove();
+  checkPlaceholder();
 }
 
 const createFileCard = async (path) => {
@@ -262,6 +267,8 @@ const createFileCard = async (path) => {
     }
     else
     {
+      filehandles.splice(filehandles.findIndex(h => h.fd == fh.fd), 1);
+      checkPlaceholder(); // if error, make sure placeholder is shown if no cards are present
       showError("Not a valid file (mzML/msz)");
       throw new Error("Not a valid file (mzML/msz)");
     }
@@ -293,7 +300,11 @@ const createFileCard = async (path) => {
 
   }
   else
+  {
+    filehandles.splice(filehandles.findIndex(fh => fh.fd == fd), 1);
+    checkPlaceholder(); // if error, make sure placeholder is shown if no cards are present
     throw new Error("Not a valid file (mzML/msz)");
+  }
 
   hideLoading();
 }

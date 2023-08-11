@@ -228,6 +228,10 @@ img {
     font-weight: bold;
 }
 
+.fileCard > div > button:hover {
+    cursor: pointer;
+}
+
 /* Filesize / Type */
 .fileCard h3 {
     margin: 0;
