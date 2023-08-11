@@ -28,9 +28,9 @@ class FileHandle {
       throw new Error("get_fd error");
 
     this.fd = fd;
+    await this.get_mmap();
     await this.get_type();
     await this.get_filesize();
-    await this.get_mmap();
   }
 
   async close() {
@@ -222,16 +222,7 @@ console.log("Running system detection...");
 
 system_worker.postMessage({'type': "get_threads"});
 system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System32\\notepad.exe"});
-system_worker.onmessage = (e) => { 
-   console.log(e.data);
-  //  document.querySelector('h1').innerHTML = "get_threads(): " + e.data;
-  if (e.data.type == "get_fd")
-  {
-    console.log("get_fd(): " + e.data.value);
-    system_worker.postMessage({'type': "get_filetype", 'fd': e.data.value});
-  }
 
-}
 system_worker.onerror = (e) => {
   console.error(e.message, e);
 };
@@ -251,6 +242,52 @@ const removeFileCard = (fd) => {
   filehandles.splice(filehandles.findIndex(fh => fh.fd == fd), 1);
   card.remove();
   checkPlaceholder();
+}
+
+const updateFileInfo = async (fh) => {
+    const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd});
+    console.log(df);
+    const mz_format = document.querySelector("#mz_format");
+    const inten_format = document.querySelector("#inten_format");
+    const source_format = document.querySelector("#source_format");
+
+    switch(df['source_mz_fmt']){
+      case '_32f_':
+        mz_format.textContent = "float32";
+        break;
+      case '_64d_':
+        mz_format.textContent = "double64";
+        break;
+      default:
+        mz_format.textContent = "..."; 
+        break;
+      //TODO: do the rest of the cases
+    }
+    switch(df['source_inten_fmt']){
+      case '_32f_':
+        inten_format.textContent = "float32";
+        break;
+      case '_64d_':
+        inten_format.textContent = "double64";
+        break;
+      default:
+        inten_format.textContent = "unknown"; 
+        break;
+      //TODO: do the rest of the cases
+    }
+    switch(df['source_compression']){
+      case '_zlib_':
+        source_format.textContent = "zlib";
+        break;
+      case '_no_comp_':
+        source_format.textContent = "none";
+        break;
+      default:
+        source_format.textContent = "unknown";
+        break;
+    }
+
+    document.querySelector("#num_spectra").textContent = df['source_total_spec'];
 }
 
 const createFileCard = async (path) => {
@@ -277,7 +314,7 @@ const createFileCard = async (path) => {
     card.addEventListener("click", e => {
       clearFileCards(); // Remove selection from previous card
       card.classList.add("selected");
-      // TODO: more logic on click
+      updateFileInfo(fh);
     })
 
     const type = document.createElement('h3');

@@ -195,7 +195,38 @@ img {
 
 /* Center container */
 .content > .container#center-container {
+    padding: 5px;
+    height: calc(100% - 10px);
     background-color: hsl(0 0% 97% / 1);
+}
+
+.fileStats {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+#center-container > h6 {
+    margin: 0;
+}
+
+.fileStats > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 10px;
+}
+
+.fileStats > div > h6 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: normal;
+}
+.fileStats > div > p {
+    margin: 0;
+    font-size: 12px;
+    font-weight: lighter;
 }
 
 /* File card (in container) */
@@ -227,6 +258,7 @@ img {
     line-height: 1.5;
     height: 1.5em;
     overflow: hidden;
+    font-weight: normal;
 }
 
 /* fileCard header */
@@ -253,13 +285,16 @@ img {
     margin: 0;
     font-size: 14px;
     color: hsl(0 0% 30% / 1);
+    font-weight: normal;
 }
 
 .fileCard h3.mzml {
     color: var(--mscompress-purple);
+    font-weight: bold;
 }
 .fileCard h3.msz {
     color: var(--mscompress-blue);
+    font-weight: bold;
 }
 
 /* Path */

@@ -53,13 +53,14 @@ Napi::Number get_fileDescriptorWrapped(const Napi::CallbackInfo& info) {
 Napi::Number get_fileTypeWrapped(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
-    if (info.Length() < 1 || !info[0].IsNumber()) {
-        Napi::TypeError::New(env, "Number argument expected").ThrowAsJavaScriptException();
-        return Napi::Number::New(env, 0); // Returning a default value in case of error
+    if (info.Length() < 1 || !info[0].IsExternal()) {
+        Napi::TypeError::New(env, "Expected arguments: (External<void>)").ThrowAsJavaScriptException();
+        return Napi::Number::New(env, -1); // Returning a default value in case of error
     }
 
-    int fd = info[0].As<Napi::Number>().Int32Value();
-    int fileType = determine_filetype(fd);
+    void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
+
+    int fileType = determine_filetype(mmap_ptr);
 
     return Napi::Number::New(env, fileType);
 }
@@ -86,7 +87,7 @@ Napi::Value Get512BytesFromMmap(const Napi::CallbackInfo& info) {
 
     if (info.Length() < 2 || !info[0].IsExternal() || !info[1].IsNumber()) {
         Napi::TypeError::New(env, "Expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
-        return env.Null();
+        return Napi::Number::New(env, 0); // Returning a default value in case of error
     }
 
     void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
@@ -120,7 +121,18 @@ Napi::Value GetAccessions(const Napi::CallbackInfo& info) {
 
     void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
 
-    data_format_t* df = pattern_detect((char*)mmap_ptr);
+    int type = determine_filetype(mmap_ptr);
+
+    data_format_t* df;
+    if(type == COMPRESS) // mzML
+        df = pattern_detect((char*)mmap_ptr);
+    else if(type == DECOMPRESS) //msz
+        df = get_header_df(mmap_ptr);
+    else
+    {
+        Napi::Error::New(env, "Unsupported file provided.").ThrowAsJavaScriptException();
+        return env.Null();
+    }
 
     Napi::Object result = CreateDataFormatObject(env, df);
 

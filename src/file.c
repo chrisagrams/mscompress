@@ -380,90 +380,74 @@ read_footer(void* input_map, long filesize)
 }
 
 int
-is_msz(int fd)
+is_msz(void* input_map)
 /**
- * @brief Determines if file on file descriptor fd is an msz file.
+ * @brief Determines if file mapped in input_map is an msz file.
  *        Reads first 512 bytes of file and looks for MAGIC_TAG.
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return 1 if file is a msz file. 0 otherwise.
  */
 {
-    char buff [512];
+    char* mapped_data = (char*)input_map;
     char magic_buff[4];
     int* magic_buff_cast = (int*)(&magic_buff[0]);
     *magic_buff_cast = MAGIC_TAG;
 
-    size_t rv;
-
-    rv = read_from_file(fd, (void*)&buff, 512); /* Read 512 byte header from file*/ 
-
-    lseek(fd, 0, SEEK_SET);
-    
-    if(rv != 512)
-        return 0;
-
-    if(strncmp(buff, magic_buff, 4) == 0)
+    if(strncmp(mapped_data, magic_buff, 4) == 0)
         return 1;
     
     return 0;
-    
 }
 
 int
-is_mzml(int fd)
+is_mzml(void* input_map)
 /**
- * @brief Determines if file on file descriptor fd is an mzML file.
+ * @brief Determines if file mapped in input_map is an mzML file.
  *        Reads first 512 bytes of file and looks for substring "indexedmzML".
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return 1 if file is a mzML file. 0 otherwise.
  */
 {
-    char buff[512];
-    size_t rv;
-
-    rv = read_from_file(fd, (void*)&buff, 512);
-    lseek(fd, 0, SEEK_SET);
+    char* mapped_data = (char*)input_map;
     
-    if(rv != 512)
-        return 0;
-    
-    if(strstr(buff, "indexedmzML") != NULL)
+    if(strstr(mapped_data, "indexedmzML") != NULL)
         return 1;
 
     return 0;
-        
 }
 
+
 int
-determine_filetype(int fd)
+determine_filetype(void* input_map)
 /**
- * @brief Determines what file is on file descriptor fd.
+ * @brief Determines what file is in the memory-mapped file.
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return COMPRESS (1) if file is a mzML file.
  *         DECOMPRESS (2) if file is a msz file.
  *         -1 on error.
  */
 {
-  if(is_mzml(fd))
-  {
-    print("\t.mzML file detected.\n");
-    return COMPRESS;
-  }
-  else if(is_msz(fd))
-  {
-    print("\t.msz file detected.\n");
-    return DECOMPRESS;
-  }  
-  else
-    warning("Invalid input file.\n");
-  return -1;
-
+    if(is_mzml(input_map))
+    {
+        print("\t.mzML file detected.\n");
+        return COMPRESS;
+    }
+    else if(is_msz(input_map))
+    {
+        print("\t.msz file detected.\n");
+        return DECOMPRESS;
+    }  
+    else
+    {
+        warning("Invalid input file.\n");
+    }
+    return -1;
 }
 
 char*
@@ -567,14 +551,14 @@ prepare_fds(char* input_path,
     print("\tDEBUG OUTPUT: %s\n", debug_output);
   }
 
-  type = determine_filetype(input_fd);
-
-  if(type != COMPRESS && type != DECOMPRESS)
-    error("Cannot determine file type.\n");
-
   fds[0] = input_fd;
   *input_map = get_mapping(input_fd);
   *input_filesize = get_filesize(input_path);
+
+  type = determine_filetype(*input_map);
+
+  if(type != COMPRESS && type != DECOMPRESS)
+    error("Cannot determine file type.\n");
 
   if(*output_path)
   {

@@ -77,19 +77,20 @@ onmessage = (e) => {
             'value': mscompress.getFileDescriptor(e.data.path)
         });
     }
-    else if (e.data.type === "get_filetype") {
-        postMessage({
-            'type': "get_filetype",
-            'fd': e.data.fd,
-            'value': mscompress.getFileType(e.data.fd)
-        });
-    }
     else if (e.data.type === "get_mmap") {
         let pointer = mscompress.getMmapPointer(e.data.fd);
         mmapStore.set(e.data.fd, pointer); // Store the pointer in a map so we can access it later
         postMessage({
             'type': "get_mmap",
             'fd': e.data.fd,
+        });
+    }
+    else if (e.data.type === "get_filetype") {
+        let pointer = mmapStore.get(e.data.fd);
+        postMessage({
+            'type': "get_filetype",
+            'fd': e.data.fd,
+            'value': mscompress.getFileType(pointer)
         });
     }
     else if(e.data.type === "get_512bytes") {
