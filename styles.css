@@ -215,7 +215,7 @@ img {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 10px;
+    padding: 5px;
 }
 
 .fileStats > div > h6 {
@@ -247,8 +247,13 @@ img {
     
 }
 
-.fileCard.selected {
+.fileCard.selected.mzml {
     border-color: var(--mscompress-purple); 
+}
+
+
+.fileCard.selected.msz {
+    border-color: var(--mscompress-blue); 
 }
 
 /* Filename */

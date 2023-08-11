@@ -320,11 +320,13 @@ const createFileCard = async (path) => {
     const type = document.createElement('h3');
     if(fh.type == 1)
     {
+      card.classList.add("mzml");
       type.classList.add("mzml");
       type.innerText = "mzML";
     }
     else if (fh.type == 2)
     {
+      card.classList.add("msz");
       type.classList.add("msz");
       type.innerText = "msz";
     }
