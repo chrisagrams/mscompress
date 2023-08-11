@@ -10,7 +10,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ipcRenderer', {
     send: (channel, data) => {
         //whitelist channels
-        let validChannels = ['open-file-dialog', 'app-metrics'];
+        let validChannels = ['open-browser', 'open-file-dialog', 'app-metrics'];
         if(validChannels.includes(channel)) {
             ipcRenderer.send(channel, data);
         }
@@ -45,4 +45,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Remove loading
     document.querySelector(".loading").classList.add('hidden');
+
+    // Add url to Gao Lab logo
+    document.querySelector("#gao_lab_banner").addEventListener("click", () => {
+        ipcRenderer.send("open-browser", "https://lab.gy/");
+    });
+
+    // Add url to Github repo logo
+    document.querySelector("#github_logo").addEventListener("click", () => {
+        ipcRenderer.send("open-browser", "https://github.com/chrisagrams/mscompress_dev");
+    });
 });

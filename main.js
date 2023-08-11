@@ -1,5 +1,5 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow, nativeImage, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, nativeImage, ipcMain, dialog, shell } = require('electron')
 const path = require('path')
 
 const iconPath = path.join(__dirname, 'assets/icons/icon.icns')
@@ -55,6 +55,10 @@ app.on('window-all-closed', function () {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+
+ipcMain.on('open-browser', (e, url) => {
+  shell.openExternal(url);
+});
 
 ipcMain.on('open-file-dialog', e => {
   dialog.showOpenDialog({

@@ -319,6 +319,10 @@ img {
     gap: 10px;
 }
 
+.footer > img {
+    cursor: pointer;
+}
+
 .footer > #gao_lab_banner {
     padding: 6px;
     filter: opacity(0.5);
