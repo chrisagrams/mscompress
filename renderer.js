@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   window.ipcRenderer.on('current-app-metrics', (metrics) => {
-    console.log("App metrics: ", calculateTotalMetrics(metrics));
+    // console.log("App metrics: ", calculateTotalMetrics(metrics));
     document.querySelector("#cpu").textContent = "CPU: " + calculateTotalMetrics(metrics).totalCpuUsage.toFixed(2) + "%";
     document.querySelector("#memory").textContent = "Mem: " + formatBytes(calculateTotalMetrics(metrics).totalMemoryUsage);
   });
@@ -228,8 +228,10 @@ system_worker.onerror = (e) => {
 };
 
 const checkPlaceholder = () => {
-  if (filehandles.length == 0)
+  if (filehandles.length == 0) {
     document.querySelector(".placeholder").classList.remove('hidden');
+    clearFileInfo(); // Also, clear file info
+  }
 }
 
 const clearFileCards = () => {
@@ -288,6 +290,13 @@ const updateFileInfo = async (fh) => {
     }
 
     document.querySelector("#num_spectra").textContent = df['source_total_spec'];
+}
+
+const clearFileInfo = () => {
+  document.querySelector("#mz_format").textContent = "...";
+  document.querySelector("#inten_format").textContent = "...";
+  document.querySelector("#source_format").textContent = "...";
+  document.querySelector("#num_spectra").textContent = "...";
 }
 
 const createFileCard = async (path) => {
@@ -362,6 +371,9 @@ const createFileCard = async (path) => {
 
     // Append card to container
     document.querySelector("#left-container").append(card);
+
+    // Select card
+    card.click();
 
   }
   else
