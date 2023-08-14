@@ -1,4 +1,4 @@
-const mscompress = require("./build/Release/mscompress.node");
+const mscompress = require("../../build/Release/mscompress.node");
 
 const mmapStore = new Map(); // Store the mmap pointers inside system_worker so we can access them later
 
