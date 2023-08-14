@@ -15,3 +15,17 @@ const sumMsLevels = (msLevels) => {
         }
     });
 }
+
+const computeSumOfDistances = (dict) => {
+    const { start_positions, end_positions } = dict;
+
+    if (!start_positions || !end_positions) {
+        throw new Error("Missing start_positions or end_positions in the provided dictionary.");
+    }
+
+    if (start_positions.length !== end_positions.length) {
+        throw new Error("The length of start_positions and end_positions arrays should be the same.");
+    }
+
+    return start_positions.reduce((acc, start, index) => acc + (end_positions[index] - start), 0);
+};
