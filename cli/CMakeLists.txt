@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(mscompress VERSION 1.0)
 
-# Set output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/build)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/build)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/build)
-
 # Set the build type to Release by default
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -38,71 +33,20 @@ add_executable(mscompress ${SOURCES})
 
 target_include_directories(mscompress PUBLIC ${VENDOR_DIR}/zstd/lib ${VENDOR_DIR}/base64/include ${VENDOR_DIR}/base64/lib ${VENDOR_DIR}/yxml ${SRC_DIR})
 
-set(ZLIB_SOURCE_DIR ${VENDOR_DIR}/zlib)
-# Add a custom target to run nmake and build zlib
-if(WIN32)
-    add_custom_target(
-        zlib_build
-        COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc
-        WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
-    )
-else()
-    add_custom_target(
-        zlib_build
-        COMMAND ${ZLIB_SOURCE_DIR}/configure
-        COMMAND make -C ${ZLIB_SOURCE_DIR}
-        WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
-    )
-endif()
-# Set the location of the built zlib library
-if(WIN32)
-    set(ZLIB_LIBRARY "${ZLIB_SOURCE_DIR}/zlib.lib")
-else()
-    set(ZLIB_LIBRARY "${ZLIB_SOURCE_DIR}/libz.a")
-endif()
 
-include_directories(${ZLIB_SOURCE_DIR})
-add_dependencies(mscompress zlib_build)
-
-
+#zlib
+include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
 
 #zstd
-file(GLOB ZSTD_SOURCES 
-    ${VENDOR_DIR}/zstd/lib/common/*.c
-    ${VENDOR_DIR}/zstd/lib/compress/*.c
-    ${VENDOR_DIR}/zstd/lib/decompress/*.c
-    ${VENDOR_DIR}/zstd/lib/decompress/huf_decompress_amd64.S)
-
-add_library(zstd STATIC ${ZSTD_SOURCES})
-enable_language(ASM)
-set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
-
+include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
+set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C) # set zstd library language to C
 
 #yxml
-file(GLOB YXML_SOURCES ${VENDOR_DIR}/yxml/*.c)
-add_library(yxml STATIC ${YXML_SOURCES})
-set_target_properties(yxml PROPERTIES LINKER_LANGUAGE C)
+include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
 
 #base64
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
-
-set(BASE64_SOURCES
-    ${VENDOR_DIR}/base64/lib/arch/avx2/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/generic/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/neon32/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/neon64/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/ssse3/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/sse41/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/sse42/codec.c
-    ${VENDOR_DIR}/base64/lib/arch/avx/codec.c
-    ${VENDOR_DIR}/base64/lib/lib.c
-    ${VENDOR_DIR}/base64/lib/codec_choose.c
-    ${VENDOR_DIR}/base64/lib/tables/tables.c
-)
-
-add_library(base64 STATIC ${BASE64_SOURCES})
-
-target_include_directories(base64 PUBLIC lib)
+include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
 if(WIN32)
     target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64)

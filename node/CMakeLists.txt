@@ -13,6 +13,7 @@ set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 
 include_directories(
   ${CMAKE_JS_INC}
+  ${VENDOR_DIR}/zlib
   ${VENDOR_DIR}/zstd/lib
   ${VENDOR_DIR}/base64/include
   ${VENDOR_DIR}/base64/lib
@@ -20,42 +21,21 @@ include_directories(
   ${SRC_DIR}
 )
 
-#zstd
-file(GLOB ZSTD_SOURCES
-  ${VENDOR_DIR}/zstd/lib/common/*.c
-  ${VENDOR_DIR}/zstd/lib/compress/*.c
-  ${VENDOR_DIR}/zstd/lib/decompress/*.c
-  ${VENDOR_DIR}/zstd/lib/decompress/huf_decompress_amd64.S)
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
-add_library(zstd STATIC ${ZSTD_SOURCES})
-enable_language(ASM)
-set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
+#zlib
+include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
+
+#zstd
+include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
+set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C) # set zstd library language to C
 
 #yxml
-file(GLOB YXML_SOURCES ${VENDOR_DIR}/yxml/*.c)
-add_library(yxml STATIC ${YXML_SOURCES})
-set_target_properties(yxml PROPERTIES LINKER_LANGUAGE C)
+include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
 
 #base64
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
-
-set(BASE64_SOURCES
-  ${VENDOR_DIR}/base64/lib/arch/avx2/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/generic/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/neon32/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/neon64/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/ssse3/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/sse41/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/sse42/codec.c
-  ${VENDOR_DIR}/base64/lib/arch/avx/codec.c
-  ${VENDOR_DIR}/base64/lib/lib.c
-  ${VENDOR_DIR}/base64/lib/codec_choose.c
-  ${VENDOR_DIR}/base64/lib/tables/tables.c
-)
-
-add_library(base64 STATIC ${BASE64_SOURCES})
-
-target_include_directories(base64 PUBLIC lib)
+include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
 # Define an option to choose between library and executable
 option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
@@ -65,8 +45,6 @@ file(GLOB SOURCE_FILES ${SRC_DIR}/*.c wrapper.cpp)
 
 
 # Create the shared library (node-addon)
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
-
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} zstd yxml base64)
