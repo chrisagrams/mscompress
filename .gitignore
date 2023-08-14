@@ -21,3 +21,6 @@ _deps
 build/
 *.a
 node_modules/
+package-lock.json
+*.vcxproj*
+*.log
