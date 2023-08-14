@@ -1656,7 +1656,6 @@ int
 preprocess_mzml(char* input_map,
                 long  input_filesize,
                 long* blocksize,
-                long n_threads,
                 struct Arguments* arguments,
                 data_format_t** df,
                 divisions_t** divisions)
@@ -1701,9 +1700,9 @@ preprocess_mzml(char* input_map,
     if (div == NULL)
         return -1;
 
-    if(n_threads == -1) // force divisions to be only 1
+    if(arguments->threads == -1) // force divisions to be only 1
     {
-        n_threads = 1;
+        arguments->threads = 1;
         *blocksize = div->size;
         *divisions = (divisions_t*)malloc(sizeof(divisions_t));
         (*divisions) -> divisions = (division_t**)malloc(sizeof(division_t*));
@@ -1720,17 +1719,17 @@ preprocess_mzml(char* input_map,
             n_divisions = div->mz->total_spec;
         }
 
-        if(arguments->indices_length != 0 && n_threads > arguments->indices_length) // If we have more threads than selected specta, we need to decrease the number of divisions
+        if(arguments->indices_length != 0 && arguments->threads > arguments->indices_length) // If we have more threads than selected specta, we need to decrease the number of divisions
         {
-            print("Warning: n_threads (%ld) > indices_length (%ld). Setting n_divisions to indices_length)\n", n_threads, arguments->indices_length);
+            print("Warning: n_threads (%ld) > indices_length (%ld). Setting n_divisions to indices_length)\n", arguments->threads, arguments->indices_length);
             n_divisions = arguments->indices_length;
             *divisions = create_divisions(div, n_divisions);
         }
-        else if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
+        else if(n_divisions >= arguments->threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
             *divisions = create_divisions(div, n_divisions);
         else
         {
-            *divisions = create_divisions(div, n_threads);
+            *divisions = create_divisions(div, arguments->threads);
             *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
         }
     }
@@ -1741,7 +1740,7 @@ preprocess_mzml(char* input_map,
     end = get_time();
 
     print("Preprocessing time: %1.4fs\n", end - start); 
-    print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, n_threads);
+    print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, arguments->threads);
 
 }
 

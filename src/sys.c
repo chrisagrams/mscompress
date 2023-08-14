@@ -52,8 +52,25 @@ get_num_threads()
     return np;
 }
 
+// void
+// prepare_threads(long args_threads, long* n_threads)
+// {
+//     int np;
+
+//     np = get_num_threads();
+
+//     print("\t%d usable processors detected.\n", np);
+
+//     if(args_threads == 0)
+//       *n_threads = np;
+//     else
+//       *n_threads = args_threads;
+    
+//     print("\tUsing %d threads.\n", *n_threads);
+// }
+
 void
-prepare_threads(long args_threads, long* n_threads)
+prepare_threads(struct Arguments* args)
 {
     int np;
 
@@ -61,12 +78,10 @@ prepare_threads(long args_threads, long* n_threads)
 
     print("\t%d usable processors detected.\n", np);
 
-    if(args_threads == 0)
-      *n_threads = np;
-    else
-      *n_threads = args_threads;
+    if(args->threads == 0)
+      args->threads = np;
     
-    print("\tUsing %d threads.\n", *n_threads);
+    print("\tUsing %d threads.\n", args->threads);
 }
 
 int

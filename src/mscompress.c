@@ -299,7 +299,6 @@ main(int argc, char* argv[])
 
     void* input_map = NULL;
     size_t input_filesize = 0;
-    long n_threads = 0;
     int operation = -1;
     
     parse_arguments(argc, argv, &arguments);
@@ -312,7 +311,7 @@ main(int argc, char* argv[])
 
     print("\nPreparing...\n");
 
-    prepare_threads(arguments.threads, &n_threads);
+    prepare_threads(&arguments); // Populate threads variable if not set.
 
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
@@ -340,7 +339,6 @@ main(int argc, char* argv[])
         preprocess_mzml((char*)input_map,
                         input_filesize,
                         &(arguments.blocksize),
-                        n_threads,
                         &arguments,
                         &df,
                         &divisions);
@@ -385,7 +383,7 @@ main(int argc, char* argv[])
         //Start compress routine.
         compress_mzml((char*)input_map,
                       arguments.blocksize,
-                      n_threads,
+                      arguments.threads,
                       footer,
                       df,
                       divisions,
@@ -441,7 +439,7 @@ main(int argc, char* argv[])
                             mz_binary_block_lens,
                             inten_binary_block_lens,
                             divisions,
-                            df, msz_footer, n_threads, fds[1]);
+                            df, msz_footer, arguments.threads, fds[1]);
 
         break;
       };
