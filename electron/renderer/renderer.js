@@ -18,6 +18,8 @@ class FileHandle {
     this.filesize = 0;
     this.type = -1;
     this.mmap = null;
+    this.df = null;
+    this.positions = null;
   }
 
   async open() {
@@ -84,8 +86,22 @@ class FileHandle {
       throw new Error("File not open");
     }
 
-    return await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd});
+    this.df = await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd});
+    return this.df;
   }
+
+  async get_positions() {
+    if (this.fd <= 0)
+      throw new Error("File not open");
+
+    if (this.df == null)
+      await this.get_accessions();
+
+    if (this.positions == null)
+      this.positions = await systemWorkerPromise({'type': 'get_positions', 'fd': this.fd, 'df': this.df, 'end': this.filesize});
+
+    return this.positions;
+  } 
 
 
   isValid() {
@@ -390,3 +406,41 @@ const createFileCard = async (path) => {
 
   hideLoading();
 }
+
+const getSelectedFileHandle = () => {
+  const selectedCard = document.querySelector(".fileCard.selected");
+  if (selectedCard == null)
+    return null;
+  const fd = selectedCard.id.split("_")[1];
+  return filehandles.find(fh => fh.fd == fd);
+}
+
+const showAnalysisWindow = () => {
+  document.querySelector(".analysis").classList.remove("hidden");
+  document.querySelector(".main").classList.add("blur");
+}
+
+const closeAnalysisWindow = () => {
+  document.querySelector(".analysis").classList.add("hidden");
+  document.querySelector(".main").classList.remove("blur");
+}
+
+// Add close button handler
+document.querySelector(".analysis #close").addEventListener('click', () => {
+  closeAnalysisWindow();
+});
+
+// Add analyze button handler
+document.querySelector("#analyze").addEventListener('click', e => {
+  e.preventDefault();
+  const fh = getSelectedFileHandle();
+  if (fh == null)
+    throw new Error("No file selected");
+
+  showLoading();
+  fh.get_positions().then(positions => {
+    console.log(positions);
+    hideLoading();
+    showAnalysisWindow();
+  });
+})

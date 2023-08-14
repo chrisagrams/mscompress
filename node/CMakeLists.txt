@@ -19,7 +19,11 @@ include_directories(
   ${VENDOR_DIR}/base64/lib
   ${VENDOR_DIR}/yxml
   ${SRC_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# Common source files
+file(GLOB SOURCE_FILES ${SRC_DIR}/*.c wrapper.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
@@ -39,9 +43,6 @@ include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
 # Define an option to choose between library and executable
 option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
-
-# Common source files
-file(GLOB SOURCE_FILES ${SRC_DIR}/*.c wrapper.cpp)
 
 
 # Create the shared library (node-addon)

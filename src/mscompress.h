@@ -310,6 +310,7 @@ data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 long* string_to_array(char* str, long* size);
 void map_scan_to_index(struct Arguments* arguments, division_t* div);
+division_t* find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end);
 int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 

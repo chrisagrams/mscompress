@@ -114,6 +114,7 @@ onmessage = (e) => {
     }
     else if (e.data.type === "get_accessions"){
         let pointer = mmapStore.get(e.data.fd);
+        console.log("pointer:", typeof pointer);
         let df = mscompress.getAccessions(pointer);
         let mapped_df = {};
         Object.keys(df).forEach(key => {
@@ -123,6 +124,19 @@ onmessage = (e) => {
             'type': "get_accessions",
             'fd': e.data.fd,
             'value': mapped_df // return the df with accession numbers mapped to strings
+        });
+    }
+    else if (e.data.type === "get_positions") {
+        let pointer = mmapStore.get(e.data.fd);
+        console.log("pointer:", typeof pointer);
+        console.log("df:", typeof e.data.df);
+        console.log("end:", typeof e.data.end);
+        let division = mscompress.getPositions(pointer, e.data.df, e.data.end);
+    
+        postMessage({
+            'type': "get_positions",
+            'fd': e.data.fd,
+            'value': division
         });
     }
 }
