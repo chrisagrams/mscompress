@@ -77,6 +77,15 @@ onmessage = (e) => {
             'value': mscompress.getFileDescriptor(e.data.path)
         });
     }
+    else if (e.data.type === "close_fd") {
+        let ret = mscompress.closeFileDescriptor(e.data.fd);
+        mmapStore.delete(e.data.fd);
+        postMessage({
+            'type': "close_fd",
+            'fd': e.data.fd,
+            'value': ret
+        });
+    }
     else if (e.data.type === "get_mmap") {
         let pointer = mscompress.getMmapPointer(e.data.fd);
         mmapStore.set(e.data.fd, pointer); // Store the pointer in a map so we can access it later

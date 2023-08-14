@@ -50,6 +50,21 @@ Napi::Number get_fileDescriptorWrapped(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, fd);
 }
 
+Napi::Number CloseFileDescriptor(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    // Check if at least one argument is passed
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "Number expected as argument").ThrowAsJavaScriptException();
+        return Napi::Number::New(env, 0);
+    }
+
+    int fd = info[0].As<Napi::Number>().Int32Value();
+
+    int result = close_file(fd);
+    return Napi::Number::New(env, result);
+}
+
 Napi::Number get_fileTypeWrapped(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
@@ -146,6 +161,7 @@ Napi::Object mscompress::Init(Napi::Env env, Napi::Object exports)
     exports.Set("getThreads", Napi::Function::New(env, get_num_threadsWrapped));
     exports.Set("getFilesize", Napi::Function::New(env, get_filesizeWrapped));
     exports.Set("getFileDescriptor", Napi::Function::New(env, get_fileDescriptorWrapped));
+    exports.Set("closeFileDescriptor", Napi::Function::New(env, CloseFileDescriptor));
     exports.Set("getFileType", Napi::Function::New(env, get_fileTypeWrapped));
     exports.Set("getMmapPointer", Napi::Function::New(env, CreateMmapPointer));
     exports.Set("get512BytesFromMmap", Napi::Function::New(env, Get512BytesFromMmap));

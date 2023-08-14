@@ -34,7 +34,9 @@ class FileHandle {
   }
 
   async close() {
-    console.error("Not implemented");
+    const ret = await systemWorkerPromise({'type': "close_fd", 'fd': this.fd});
+    if (ret != 0)
+      throw new Error("close_fd error");
     return;
   }
 

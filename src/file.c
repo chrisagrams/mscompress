@@ -497,6 +497,18 @@ open_file(char* path)
 }
 
 int
+close_file(int fd)
+{
+  int ret = close(fd); // expands to _close on Windows
+  if (ret != 0)
+  {
+    perror("close_file");
+    exit(-1);
+  }
+  return ret;
+}
+
+int
 prepare_fds(char* input_path,
             char** output_path,
             char* debug_output,
@@ -587,15 +599,4 @@ prepare_fds(char* input_path,
   fds[1] = output_fd;
 
   return type;
-}
-
-void
-close_fd(int fd)
-{
-    int ret = close(fd);
-    if (ret != 0)
-    {
-        perror("close_fd");
-        exit(-1);
-    }
 }
