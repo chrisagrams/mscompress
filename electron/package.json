@@ -1,0 +1,21 @@
+{
+  "name": "mscompress",
+  "version": "1.0.0",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "install": "cmake-js compile -d ../node/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-addon-api": "^7.0.0"
+  },
+  "devDependencies": {
+    "cmake-js": "^7.2.1",
+    "electron": "^25.4.0",
+    "electron-packager": "^17.1.1"
+  },
+  "description": ""
+}

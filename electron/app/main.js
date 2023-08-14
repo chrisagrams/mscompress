@@ -2,7 +2,7 @@
 const { app, BrowserWindow, nativeImage, ipcMain, dialog, shell } = require('electron')
 const path = require('path')
 
-const iconPath = path.join(__dirname, '../assets/icons/icon.icns')
+const iconPath = path.join(__dirname, 'assets/icons/icon.icns')
 
 function createWindow () {
   // Create the browser window.
@@ -27,7 +27,7 @@ function createWindow () {
   }
 
   // and load the index.html of the app.
-  mainWindow.loadFile('../renderer/index.html')
+  mainWindow.loadFile('renderer/index.html')
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
