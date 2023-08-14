@@ -2,19 +2,19 @@
 #include "export.h"
 #include "mscompress.h"
 
-Napi::Number get_timeWrapped(const Napi::CallbackInfo& info) {
+Napi::Number GetTime(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     double time = get_time();
     return Napi::Number::New(env, time);
 }
 
-Napi::Number get_num_threadsWrapped(const Napi::CallbackInfo& info) {
+Napi::Number GetNumThreads(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     int np = get_num_threads();
     return Napi::Number::New(env, np);
 }
 
-Napi::Number get_filesizeWrapped(const Napi::CallbackInfo& info) {
+Napi::Number GetFilesize(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
     // Check if at least one argument is passed
@@ -32,7 +32,7 @@ Napi::Number get_filesizeWrapped(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, fs);
 }
 
-Napi::Number get_fileDescriptorWrapped(const Napi::CallbackInfo& info) {
+Napi::Number GetFileDescriptor(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
     // Check if at least one argument is passed
@@ -157,10 +157,10 @@ Napi::Value GetAccessions(const Napi::CallbackInfo& info) {
 
 Napi::Object mscompress::Init(Napi::Env env, Napi::Object exports)
 {
-    exports.Set("getTime", Napi::Function::New(env, get_timeWrapped));
-    exports.Set("getThreads", Napi::Function::New(env, get_num_threadsWrapped));
-    exports.Set("getFilesize", Napi::Function::New(env, get_filesizeWrapped));
-    exports.Set("getFileDescriptor", Napi::Function::New(env, get_fileDescriptorWrapped));
+    exports.Set("getTime", Napi::Function::New(env, GetTime));
+    exports.Set("getThreads", Napi::Function::New(env, GetNumThreads));
+    exports.Set("getFilesize", Napi::Function::New(env, GetFilesize));
+    exports.Set("getFileDescriptor", Napi::Function::New(env, GetFileDescriptor));
     exports.Set("closeFileDescriptor", Napi::Function::New(env, CloseFileDescriptor));
     exports.Set("getFileType", Napi::Function::New(env, get_fileTypeWrapped));
     exports.Set("getMmapPointer", Napi::Function::New(env, CreateMmapPointer));
