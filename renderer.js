@@ -290,6 +290,8 @@ const updateFileInfo = async (fh) => {
     }
 
     document.querySelector("#num_spectra").textContent = df['source_total_spec'];
+    document.querySelector(".fileStats").classList.remove("blur");
+
 }
 
 const clearFileInfo = () => {
@@ -297,6 +299,7 @@ const clearFileInfo = () => {
   document.querySelector("#inten_format").textContent = "...";
   document.querySelector("#source_format").textContent = "...";
   document.querySelector("#num_spectra").textContent = "...";
+  document.querySelector(".fileStats").classList.add("blur");
 }
 
 const createFileCard = async (path) => {

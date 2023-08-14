@@ -204,6 +204,7 @@ img {
     display: flex;
     flex-direction: row;
     justify-content: center;
+    transition: filter 0.3s;
 }
 
 #center-container > h6 {
