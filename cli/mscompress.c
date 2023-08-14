@@ -442,10 +442,10 @@ main(int argc, char* argv[])
       {
           print("\nExtracting ...\n");
 
+          arguments.threads = -1, //force single threaded
           preprocess_mzml((char*)input_map,
                 input_filesize,
                 &(arguments.blocksize),
-                -1, //force single threaded
                 &arguments,
                 &df,
                 &divisions);
