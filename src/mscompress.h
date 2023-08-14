@@ -66,6 +66,10 @@
 #define DECOMPRESS 2
 #define EXTRACT 3
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern int verbose;
 
 struct Arguments {
@@ -255,68 +259,28 @@ typedef struct
 /* file.c */
 extern long fd_pos[3];
 extern int fds[3];
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 void* get_mapping(int fd);
-
-#ifdef __cplusplus
-}
-#endif
 int remove_mapping(void* addr, int fd);
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 size_t get_filesize(char* path);
-
-#ifdef __cplusplus
-}
-#endif
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, data_format_t* df, long blocksize, char* md5);
 long get_offset(int fd);
 long get_header_blocksize(void* input_map);
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 data_format_t* get_header_df(void* input_map);
-
-#ifdef __cplusplus
-}
-#endif
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 int determine_filetype(void* input_map);
-
-#ifdef __cplusplus
-}
-#endif
 char* change_extension(char* input, char* extension);
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 int open_file(char* path);
-
-#ifdef __cplusplus
-}
-#endif
 int is_mzml(void* input_map);
 int is_msz(void* input_map);
-void close_fd(int fd);
-
+int close_file(int fd);
 
 /* mem.c */
+
 data_block_t* alloc_data_block(size_t max_size);
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
 void dealloc_data_block(data_block_t* db);
@@ -324,13 +288,8 @@ cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
 void dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 data_format_t* pattern_detect(char* input_map);
-#ifdef __cplusplus
-}
-#endif
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize, int* divisions, int* threads);
@@ -355,38 +314,27 @@ int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, long
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 
 /* sys.c */
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 int get_num_threads();
-
-#ifdef __cplusplus
-}
-#endif
 void prepare_threads(long args_threads, long* n_threads);
 int get_thread_id();
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 double get_time(void);
-
-#ifdef __cplusplus
-}
-#endif
 int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
 /* decode.c */
+
 decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
+
 /* encode.c */
+
 encode_fun_ptr set_encode_fun(int compression_method, int algo, int accession);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
+
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* extract.c */
@@ -497,3 +445,7 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input
 
 /* debug.c */
 void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, int fd);
+
+#ifdef __cplusplus
+}
+#endif

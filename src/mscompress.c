@@ -470,8 +470,8 @@ main(int argc, char* argv[])
 
     remove_mapping(input_map, fds[0]);
 
-    close_fd(fds[0]);
-    close_fd(fds[1]);
+    close_file(fds[0]);
+    close_file(fds[1]);
     print("\tClosed file descriptors\n");
 
     abs_stop = get_time();
