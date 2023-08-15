@@ -31,8 +31,8 @@ class FileHandle {
 
     this.fd = fd;
     await this.get_mmap();
-    await this.get_type();
     await this.get_filesize();
+    await this.get_type();
   }
 
   async close() {
@@ -46,7 +46,7 @@ class FileHandle {
     if (this.fd <= 0)
       throw new Error("File not open");
 
-    this.type = await systemWorkerPromise({'type': "get_filetype", 'fd': this.fd});
+    this.type = await systemWorkerPromise({'type': "get_filetype", 'fd': this.fd, 'size': this.filesize});
 
     return this.type;
   }
@@ -86,7 +86,7 @@ class FileHandle {
       throw new Error("File not open");
     }
 
-    this.df = await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd});
+    this.df = await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd, 'size': this.filesize});
     return this.df;
   }
 
@@ -98,7 +98,7 @@ class FileHandle {
       await this.get_accessions();
 
     if (this.positions == null)
-      this.positions = await systemWorkerPromise({'type': 'get_positions', 'fd': this.fd, 'df': this.df, 'end': this.filesize});
+      this.positions = await systemWorkerPromise({'type': 'get_positions', 'fd': this.fd, 'df': this.df, 'size': this.filesize});
 
     return this.positions;
   } 
@@ -265,7 +265,7 @@ const removeFileCard = (fd) => {
 }
 
 const updateFileInfo = async (fh) => {
-    const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd});
+    const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd, 'size': fh.filesize});
     console.log(df);
     const mz_format = document.querySelector("#mz_format");
     const inten_format = document.querySelector("#inten_format");
@@ -415,9 +415,24 @@ const getSelectedFileHandle = () => {
   return filehandles.find(fh => fh.fd == fd);
 }
 
-const showAnalysisWindow = () => {
-  document.querySelector(".analysis").classList.remove("hidden");
+const showAnalysisWindow = (fh) => {
+  const analysis_div = document.querySelector(".analysis");
+  analysis_div.classList.remove("hidden");
   document.querySelector(".main").classList.add("blur");
+  fh.get_type().then(type => { // Assign type to analysis window
+    const type_text = analysis_div.querySelector("#type");
+    if (type == 1) //mzML
+    {
+      type_text.classList.add("mzml");
+      type_text.textContent = "mzML";
+      
+    }
+    else if (type == 2) //msz
+    {
+      type_text.classList.add("msz");
+      type_text.textContent = "msz";
+    }
+  });
 }
 
 const closeAnalysisWindow = () => {
@@ -441,6 +456,6 @@ document.querySelector("#analyze").addEventListener('click', e => {
   fh.get_positions().then(positions => {
     console.log(positions);
     hideLoading();
-    showAnalysisWindow();
+    showAnalysisWindow(fh);
   });
 })

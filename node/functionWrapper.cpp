@@ -22,7 +22,7 @@ namespace mscompress {
 
         // Check if at least one argument is passed
         if (info.Length() < 1 || !info[0].IsString()) {
-            Napi::TypeError::New(env, "String expected as argument").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "GetFilesize: string expected as argument").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0);
         }
 
@@ -40,7 +40,7 @@ namespace mscompress {
 
         // Check if at least one argument is passed
         if (info.Length() < 1 || !info[0].IsString()) {
-            Napi::TypeError::New(env, "String expected as argument").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "GetFileDescriptor: string expected as argument").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0);
         }
 
@@ -58,7 +58,7 @@ namespace mscompress {
 
         // Check if at least one argument is passed
         if (info.Length() < 1 || !info[0].IsNumber()) {
-            Napi::TypeError::New(env, "Number expected as argument").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "CloseFileDescriptor number expected as argument").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0);
         }
 
@@ -71,14 +71,16 @@ namespace mscompress {
     Napi::Number GetFileType(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 
-        if (info.Length() < 1 || !info[0].IsExternal()) {
-            Napi::TypeError::New(env, "Expected arguments: (External<void>)").ThrowAsJavaScriptException();
+        if (info.Length() < 1 || !info[0].IsExternal() || !info[1].IsNumber()) {
+            Napi::TypeError::New(env, "GetFileType expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
             return Napi::Number::New(env, -1); // Returning a default value in case of error
         }
 
         void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
 
-        int fileType = determine_filetype(mmap_ptr);
+        size_t filesize = info[1].As<Napi::Number>().Int64Value();
+
+        int fileType = determine_filetype(mmap_ptr, filesize);
 
         return Napi::Number::New(env, fileType);
     }
@@ -88,7 +90,7 @@ namespace mscompress {
         Napi::Env env = info.Env();
         
         if (info.Length() < 1 || !info[0].IsNumber()) {
-            Napi::TypeError::New(env, "Number argument expected").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "CreateMmapPointer number argument expected").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0); // Returning a default value in case of error
         }
 
@@ -104,7 +106,7 @@ namespace mscompress {
         Napi::Env env = info.Env();
 
         if (info.Length() < 2 || !info[0].IsExternal() || !info[1].IsNumber()) {
-            Napi::TypeError::New(env, "Expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "Get512BytesFromMmap expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0); // Returning a default value in case of error
         }
 
@@ -121,14 +123,16 @@ namespace mscompress {
     Napi::Value GetAccessions(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 
-        if (info.Length() < 1 || !info[0].IsExternal()) {
-            Napi::TypeError::New(env, "Expected arguments: (External<void>)").ThrowAsJavaScriptException();
-            return env.Null();
+        if (info.Length() < 1 || !info[0].IsExternal() || !info[1].IsNumber()) {
+            Napi::TypeError::New(env, "GetAccessions expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
+            return Napi::Number::New(env, -1); // Returning a default value in case of error
         }
 
         void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
 
-        int type = determine_filetype(mmap_ptr);
+        size_t filesize = info[1].As<Napi::Number>().Int64Value();
+
+        int type = determine_filetype(mmap_ptr, filesize);
 
         data_format_t* df;
         if(type == COMPRESS) // mzML
@@ -137,7 +141,7 @@ namespace mscompress {
             df = get_header_df(mmap_ptr);
         else
         {
-            Napi::Error::New(env, "Unsupported file provided.").ThrowAsJavaScriptException();
+            Napi::Error::New(env, "GetAccessions: unsupported file provided.").ThrowAsJavaScriptException();
             return env.Null();
         }
 
@@ -149,24 +153,24 @@ namespace mscompress {
     Napi::Value GetPositions(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 
-        if (info.Length() < 3 || !info[0].IsExternal() || !info[1].IsObject() || !info[2].IsNumber()) {
-            Napi::TypeError::New(env, "Expected arguments: (External<void>, Object, Number)").ThrowAsJavaScriptException();
+        if (info.Length() < 3 || !info[0].IsExternal() || !info[1].IsNumber() || !info[2].IsObject()) {
+            Napi::TypeError::New(env, "GetPositions expected arguments: (External<void>, Number, Object)").ThrowAsJavaScriptException();
             return env.Null();
         }
 
         void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
-        data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
-        long end = info[2].As<Napi::Number>().Int64Value();
+        size_t filesize = info[1].As<Napi::Number>().Int64Value();
+        data_format_t* df = NapiObjectToDataFormatT(info[2].As<Napi::Object>());
 
-        int type = determine_filetype(mmap_ptr);
+        int type = determine_filetype(mmap_ptr, filesize);
 
         division_t* result = NULL;
 
         if(type == COMPRESS)
-            result = find_binary_quick_w_spectra((char*)mmap_ptr, df, end);
+            result = find_binary_quick_w_spectra((char*)mmap_ptr, df, filesize);
         else if (type == DECOMPRESS)
         {
-            Napi::Error::New(env, "Not yet implemented for msz files.").ThrowAsJavaScriptException();
+            Napi::Error::New(env, "GetPositions: not yet implemented for msz files.").ThrowAsJavaScriptException();
             return env.Null();
         }
 

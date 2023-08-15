@@ -380,7 +380,7 @@ read_footer(void* input_map, long filesize)
 }
 
 int
-is_msz(void* input_map)
+is_msz(void* input_map, size_t input_length)
 /**
  * @brief Determines if file mapped in input_map is an msz file.
  *        Reads first 512 bytes of file and looks for MAGIC_TAG.
@@ -390,6 +390,10 @@ is_msz(void* input_map)
  * @return 1 if file is a msz file. 0 otherwise.
  */
 {
+    if (input_length < 4) {  // If there's less than 4 bytes, it can't match the MAGIC_TAG
+        return 0;
+    }
+
     char* mapped_data = (char*)input_map;
     char magic_buff[4];
     int* magic_buff_cast = (int*)(&magic_buff[0]);
@@ -402,7 +406,7 @@ is_msz(void* input_map)
 }
 
 int
-is_mzml(void* input_map)
+is_mzml(void* input_map, size_t input_length)
 /**
  * @brief Determines if file mapped in input_map is an mzML file.
  *        Reads first 512 bytes of file and looks for substring "indexedmzML".
@@ -412,9 +416,13 @@ is_mzml(void* input_map)
  * @return 1 if file is a mzML file. 0 otherwise.
  */
 {
-    char* mapped_data = (char*)input_map;
+    char buffer[513]; // 512 for data + 1 for null-terminator
+    size_t check_length = (input_length > 512) ? 512 : input_length;
     
-    if(strstr(mapped_data, "indexedmzML") != NULL)
+    memcpy(buffer, input_map, check_length);
+    buffer[check_length] = '\0'; // null-terminate
+    
+    if (strstr(buffer, "indexedmzML") != NULL)
         return 1;
 
     return 0;
@@ -422,7 +430,7 @@ is_mzml(void* input_map)
 
 
 int
-determine_filetype(void* input_map)
+determine_filetype(void* input_map, size_t input_length)
 /**
  * @brief Determines what file is in the memory-mapped file.
  * 
@@ -433,12 +441,12 @@ determine_filetype(void* input_map)
  *         -1 on error.
  */
 {
-    if(is_mzml(input_map))
+    if(is_mzml(input_map, input_length))
     {
         print("\t.mzML file detected.\n");
         return COMPRESS;
     }
-    else if(is_msz(input_map))
+    else if(is_msz(input_map, input_length))
     {
         print("\t.msz file detected.\n");
         return DECOMPRESS;
@@ -567,7 +575,7 @@ prepare_fds(char* input_path,
   *input_map = get_mapping(input_fd);
   *input_filesize = get_filesize(input_path);
 
-  type = determine_filetype(*input_map);
+  type = determine_filetype(*input_map, *input_filesize);
 
   if(type != COMPRESS && type != DECOMPRESS)
     error("Cannot determine file type.\n");

@@ -99,7 +99,7 @@ onmessage = (e) => {
         postMessage({
             'type': "get_filetype",
             'fd': e.data.fd,
-            'value': mscompress.getFileType(pointer)
+            'value': mscompress.getFileType(pointer, e.data.size)
         });
     }
     else if(e.data.type === "get_512bytes") {
@@ -114,7 +114,7 @@ onmessage = (e) => {
     }
     else if (e.data.type === "get_accessions"){
         let pointer = mmapStore.get(e.data.fd);
-        let df = mscompress.getAccessions(pointer);
+        let df = mscompress.getAccessions(pointer, e.data.size);
         let mapped_df = {};
         Object.keys(df).forEach(key => {
             mapped_df[key] = mapAccession(df[key]);
@@ -127,7 +127,7 @@ onmessage = (e) => {
     }
     else if (e.data.type === "get_positions") {
         let pointer = mmapStore.get(e.data.fd);
-        let division = mscompress.getPositions(pointer, e.data.df, e.data.end);
+        let division = mscompress.getPositions(pointer, e.data.size, e.data.df);
     
         postMessage({
             'type': "get_positions",

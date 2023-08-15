@@ -272,11 +272,11 @@ data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
-int determine_filetype(void* input_map);
+int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
 int open_file(char* path);
-int is_mzml(void* input_map);
-int is_msz(void* input_map);
+int is_mzml(void* input_map, size_t input_length);
+int is_msz(void* input_map, size_t input_length);
 int close_file(int fd);
 
 /* mem.c */
