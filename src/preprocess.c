@@ -581,6 +581,79 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     return div;    
 }
 
+size_t
+get_binary(char* spectrum_start, size_t* binary_start, size_t* binary_end)
+{
+    char* ptr = strstr(spectrum_start, "<binary>") + sizeof("<binary>");
+    if(ptr == NULL)
+        return 0;
+    *binary_start = ptr - spectrum_start;
+
+    ptr = strstr(ptr, "</binary>");
+    if(ptr == NULL)
+        return 0;
+    *binary_end = ptr - spectrum_start;
+
+    return *binary_end - *binary_start;
+}
+
+int
+get_ms_level(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "\"ms level\"") + sizeof("\"ms level\"");
+    if(ptr == NULL)
+        return 0;
+    ptr = strstr(ptr, "value=\"") + sizeof("value=\"");
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtol(ptr, &e, 10);
+}
+
+int 
+get_scan(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "scan=") + sizeof("scan=");
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtol(ptr, &e, 10);
+}
+
+float
+get_ret_time(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "accession=\"MS:1000016\"") + sizeof("accession=\"MS:1000016\"");
+    if(ptr == NULL)
+        return 0;
+    ptr = strstr(ptr, "value=\"") + sizeof("value=\"");
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtof(ptr, &e);
+}
+
+#define MSLEVEL 0x01
+#define SCANNUM 0x02
+#define RETTIME 0x04
+
+division_t*
+scan_mzml(char* input_map, data_format_t* df, long end, int flags)
+{
+    if(input_map == NULL || df == NULL)
+    {
+        warning("find_binary_quick: NULL pointer passed in.\n");
+        return NULL;
+    }
+    if(end < 0)
+    {
+        error("find_binary_quick: end position is negative.\n");
+        return NULL;
+    }
+
+    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
+}
+
 division_t*
 find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 {

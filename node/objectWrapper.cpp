@@ -25,6 +25,15 @@ namespace mscompress {
         return jsArr;
     }
 
+    Napi::Array FloatArrayToNapiArray(const Napi::Env& env, float* arr, uint64_t size) {
+        Napi::Array jsArr = Napi::Array::New(env, size);
+        for(uint64_t i = 0; i < size; i++)
+        {
+            jsArr.Set(i, Napi::Number::New(env, arr[i]));
+        }
+        return jsArr;
+    }
+
     // Function to get an uint32 value from a Napi::Object with a default
     uint32_t getUint32OrDefault(const Napi::Object& obj, const std::string& key, uint32_t defaultValue) {
         if (obj.Has(key) && obj.Get(key).IsNumber()) {
