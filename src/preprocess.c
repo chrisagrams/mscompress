@@ -585,9 +585,15 @@ division_t*
 find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 {
     if(input_map == NULL || df == NULL)
-        error("find_binary_quick: NULL pointer passed in.\n");
+    {
+        warning("find_binary_quick: NULL pointer passed in.\n");
+        return NULL;
+    }
     if(end < 0)
+    {
         error("find_binary_quick: end position is negative.\n");
+        return NULL;
+    }
 
     data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
@@ -600,7 +606,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     long* ms_levels = (long*)malloc(sizeof(long) * df->source_total_spec);
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
-        error("find_binary_quick: failed to allocate memory.\n");
+    {
+        warning("find_binary_quick: failed to allocate memory.\n");
+        return NULL;
+    }
 
     char* ptr = input_map;
 
@@ -622,29 +631,44 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
             break;
         
         if(xml_curr >= bound || mz_curr >= df->source_total_spec || inten_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
-            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+        {
+            warning("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+            return NULL;
+        }
             
         ptr = strstr(ptr, "<spectrum ");
 
         if(ptr == NULL)
-            error("find_binary_quick: failed to find spectrum. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find spectrum. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         
         spectra_dp->start_positions[spec_curr] = ptr - input_map;
 
         ptr = strstr(ptr, "scan=") + 5;
 
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+        if(ptr == NULL) 
+        {
+            warning("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
 
         e = strstr(ptr, "\"");
 
-        if(e == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+        if(e == NULL) 
+        {
+            warning("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
 
         curr_scan = strtol(ptr, &e, 10);
 
-        if(curr_scan == 0)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+        if(curr_scan == 0) 
+        {
+            warning("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
 
         scans[spec_curr] = curr_scan;
 
@@ -653,11 +677,17 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
         ptr = strstr(ptr, "\"ms level\"") + 18;
 
         if(ptr == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         e = strstr(ptr, "\"");
 
         if(e == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         curr_ms_level = strtol(ptr, &e, 10);
         ms_levels[spec_curr] = curr_ms_level;
 
@@ -666,7 +696,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "<binary>") + 8;
         if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
@@ -674,7 +707,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
         
         ptr = strstr(ptr, "</binary>");
         if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         mz_dp->end_positions[mz_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
@@ -685,14 +721,20 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "<binary>") + 8;
         if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         inten_dp->start_positions[inten_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
 
         
         ptr = strstr(ptr, "</binary>");
         if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         inten_dp->end_positions[inten_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
         
@@ -702,7 +744,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
         ptr = strstr(ptr, "</spectrum>") + 11;
         if(ptr == NULL)
-            error("find_binary_quick: failed to find end of spectrum. index: %d\n", mz_curr + inten_curr);
+        {
+            warning("find_binary_quick: failed to find end of spectrum. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
         
         spectra_dp->end_positions[spec_curr] = ptr - input_map;
         spec_curr++;
@@ -710,8 +755,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     }
 
     if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
-        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
-
+    {
+        warning("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+        return NULL;
+    }
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
     xml_curr++;
@@ -734,8 +781,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
     division_t* div = (division_t*)malloc(sizeof(division_t));
     if(div == NULL)
-        error("find_binary_quick: failed to allocate division_t.\n");
-
+    {
+        warning("find_binary_quick: failed to allocate division_t.\n");
+        return NULL;
+    }
     div->spectra = spectra_dp;
     div->xml = xml_dp;
     div->mz = mz_dp;
@@ -1675,11 +1724,15 @@ preprocess_mzml(char* input_map,
     if(arguments->indices_length > 0)
     {
         division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->scans_length > 0)
     {
         division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         map_scan_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
@@ -1687,6 +1740,8 @@ preprocess_mzml(char* input_map,
     else if(arguments->ms_level > 0 || arguments->ms_level == -1)
     {
         division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         map_ms_level_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
@@ -1753,23 +1808,23 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
             int* n_divisions)
 {
 
-      *footer = read_footer(input_map, input_filesize);
+    *footer = read_footer(input_map, input_filesize);
 
-      print("\tXML position: %ld\n", (*footer)->xml_pos);
-      print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
-      print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
-      print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-      print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-      print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
-      print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
-      print("\tEOF position: %ld\n", input_filesize);
-      print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
+    print("\tXML position: %ld\n", (*footer)->xml_pos);
+    print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
+    print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
+    print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
+    print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
+    print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
+    print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
+    print("\tEOF position: %ld\n", input_filesize);
+    print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
 
-      *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
-      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
-      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
+    *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
+    *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
+    *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
 
-      *n_divisions = (*footer)->n_divisions;
+    *n_divisions = (*footer)->n_divisions;
 
-      *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
+    *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
 }

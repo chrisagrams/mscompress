@@ -245,10 +245,24 @@ Napi::Value GetPositions(const Napi::CallbackInfo& info) {
 
     void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
     data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
-
     long end = info[2].As<Napi::Number>().Int64Value();
 
-    division_t* result = find_binary_quick_w_spectra((char*)mmap_ptr, df, end);
+    int type = determine_filetype(mmap_ptr);
+
+    division_t* result = NULL;
+
+    if(type == COMPRESS)
+        result = find_binary_quick_w_spectra((char*)mmap_ptr, df, end);
+    else if (type == DECOMPRESS)
+    {
+        Napi::Error::New(env, "Not yet implemented for msz files.").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    if (result == NULL) {
+        Napi::Error::New(env, "Error in GetPositions").ThrowAsJavaScriptException();
+        return env.Null();
+    }
 
     Napi::Object obj = CreateDivisionObject(env, result);
 
