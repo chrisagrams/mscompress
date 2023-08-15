@@ -23,7 +23,7 @@ include_directories(
 )
 
 # Common source files
-file(GLOB SOURCE_FILES ${SRC_DIR}/*.c wrapper.cpp)
+file(GLOB SOURCE_FILES ${SRC_DIR}/*.c *.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 

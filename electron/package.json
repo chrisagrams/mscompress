@@ -4,7 +4,8 @@
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",
-    "install": "cmake-js compile -d ../node/"
+    "install": "cmake-js compile -d ../node/",
+    "clean": "cmake-js -d ../node/ clean"
   },
   "keywords": [],
   "author": "",

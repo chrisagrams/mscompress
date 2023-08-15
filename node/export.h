@@ -1,9 +1,32 @@
 #include <napi.h>
+#include "mscompress.h"
+
 using namespace std;
 
 namespace mscompress
 {
+    // Object Wraps
+    Napi::Array Uint64ArrayToNapiArray(const Napi::Env & env, uint64_t* arr, uint64_t size);
+    Napi::Array LongArrayToNapiArray(const Napi::Env& env, long* arr, uint64_t size);
+    uint32_t getUint32OrDefault(const Napi::Object& obj, const std::string& key, uint32_t defaultValue);
+    float getFloatOrDefault(const Napi::Object& obj, const std::string& key, float defaultValue);
+    Napi::Object CreateDataFormatObject(const Napi::Env& env, data_format_t* df);
+    data_format_t* NapiObjectToDataFormatT(const Napi::Object& obj);
+    Napi::Object CreateDataPositionsObject(const Napi::Env& env, data_positions_t* dp);
+    Napi::Object CreateDivisionObject(const Napi::Env& env, division_t* division);
+
+    // Function Wraps
+    Napi::Number GetTime(const Napi::CallbackInfo& info);
+    Napi::Number GetNumThreads(const Napi::CallbackInfo& info);
+    Napi::Number GetFilesize(const Napi::CallbackInfo& info);
+    Napi::Number GetFileDescriptor(const Napi::CallbackInfo& info);
+    Napi::Number CloseFileDescriptor(const Napi::CallbackInfo& info);
+    Napi::Number GetFileType(const Napi::CallbackInfo& info);
+    Napi::Value CreateMmapPointer(const Napi::CallbackInfo& info);
+    Napi::Value Get512BytesFromMmap(const Napi::CallbackInfo& info);
+    Napi::Value GetAccessions(const Napi::CallbackInfo& info);
+    Napi::Value GetPositions(const Napi::CallbackInfo& info);
+
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);
-    NODE_API_MODULE(mscompress, Init)
 }
