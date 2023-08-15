@@ -101,21 +101,22 @@ namespace mscompress {
         return Napi::External<void>::New(env, mmap_ptr);
     }
 
-    // Function to retrieve a 512-byte chunk from a memory-mapped region. (for testing purposes)
-    Napi::Value Get512BytesFromMmap(const Napi::CallbackInfo& info) {
+    // Function to retrieve a chunk from a memory-mapped region.
+    Napi::Value ReadFromFile(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 
-        if (info.Length() < 2 || !info[0].IsExternal() || !info[1].IsNumber()) {
-            Napi::TypeError::New(env, "Get512BytesFromMmap expected arguments: (External<void>, Number)").ThrowAsJavaScriptException();
+        if (info.Length() < 2 || !info[0].IsExternal() || !info[1].IsNumber() || !info[2].IsNumber()) {
+            Napi::TypeError::New(env, "Get512BytesFromMmap expected arguments: (External<void>, Number, Number)").ThrowAsJavaScriptException();
             return Napi::Number::New(env, 0); // Returning a default value in case of error
         }
 
         void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
         uint32_t offset = info[1].As<Napi::Number>().Uint32Value();
+        uint32_t len = info[2].As<Napi::Number>().Uint32Value();
 
         // Create a buffer for 512 bytes.
-        Napi::Buffer<uint8_t> buffer = Napi::Buffer<uint8_t>::New(env, 512);
-        std::memcpy(buffer.Data(), static_cast<uint8_t*>(mmap_ptr) + offset, 512);
+        Napi::Buffer<uint8_t> buffer = Napi::Buffer<uint8_t>::New(env, len);
+        std::memcpy(buffer.Data(), static_cast<uint8_t*>(mmap_ptr) + offset, len);
 
         return buffer;
     }

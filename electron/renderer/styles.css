@@ -396,6 +396,17 @@ img {
     transition: background-color 0.3s;
 }
 
+.analysis > .content > .left > h3 {
+    margin: 10px auto;
+    font-weight: normal;
+}
+
+.analysis > .content > .left > hr {
+    width: 80%;
+    margin: 0 auto;
+    border-style: groove;
+}
+
 .analysis > .content > .right {
     display: flex;
     flex-direction: column;

@@ -71,12 +71,12 @@ class FileHandle {
     return this.mmap;
   }
 
-  async get_512bytes(offset) {
+  async read_file(offset, length) {
     if (this.fd <= 0) {
       throw new Error("File not open");
     }
     
-    let buffer = await systemWorkerPromise({'type': "get_512bytes", 'fd': this.fd, 'offset': offset});
+    let buffer = await systemWorkerPromise({'type': "read_file", 'fd': this.fd, 'offset': offset, 'length': length});
     
     return buffer;
   }
@@ -265,58 +265,61 @@ const removeFileCard = (fd) => {
 }
 
 const updateFileInfo = async (fh) => {
-    const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd, 'size': fh.filesize});
-    console.log(df);
-    const mz_format = document.querySelector("#mz_format");
-    const inten_format = document.querySelector("#inten_format");
-    const source_format = document.querySelector("#source_format");
+  const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd, 'size': fh.filesize});
+  console.log(df);
+  
+  const setElementsTextContentByClass = (className, value) => {
+      const elements = document.querySelectorAll(`.${className}`);
+      elements.forEach(el => el.textContent = value);
+  };
 
-    switch(df['source_mz_fmt']){
+  switch(df['source_mz_fmt']){
       case '_32f_':
-        mz_format.textContent = "float32";
-        break;
+          setElementsTextContentByClass("mz_format", "float32");
+          break;
       case '_64d_':
-        mz_format.textContent = "double64";
-        break;
+          setElementsTextContentByClass("mz_format", "double64");
+          break;
       default:
-        mz_format.textContent = "..."; 
-        break;
-      //TODO: do the rest of the cases
-    }
-    switch(df['source_inten_fmt']){
+          setElementsTextContentByClass("mz_format", "...");
+          break;
+  }
+
+  switch(df['source_inten_fmt']){
       case '_32f_':
-        inten_format.textContent = "float32";
-        break;
+          setElementsTextContentByClass("inten_format", "float32");
+          break;
       case '_64d_':
-        inten_format.textContent = "double64";
-        break;
+          setElementsTextContentByClass("inten_format", "double64");
+          break;
       default:
-        inten_format.textContent = "unknown"; 
-        break;
-      //TODO: do the rest of the cases
-    }
-    switch(df['source_compression']){
+          setElementsTextContentByClass("inten_format", "unknown");
+          break;
+  }
+
+  switch(df['source_compression']){
       case '_zlib_':
-        source_format.textContent = "zlib";
-        break;
+          setElementsTextContentByClass("source_format", "zlib");
+          break;
       case '_no_comp_':
-        source_format.textContent = "none";
-        break;
+          setElementsTextContentByClass("source_format", "none");
+          break;
       default:
-        source_format.textContent = "unknown";
-        break;
-    }
+          setElementsTextContentByClass("source_format", "unknown");
+          break;
+  }
 
-    document.querySelector("#num_spectra").textContent = df['source_total_spec'];
-    document.querySelector(".fileStats").classList.remove("blur");
-
+  setElementsTextContentByClass("num_spectra", df['source_total_spec']);
+  
+  const fileStatsElements = document.querySelectorAll(".fileStats");
+  fileStatsElements.forEach(el => el.classList.remove("blur"));
 }
 
 const clearFileInfo = () => {
-  document.querySelector("#mz_format").textContent = "...";
-  document.querySelector("#inten_format").textContent = "...";
-  document.querySelector("#source_format").textContent = "...";
-  document.querySelector("#num_spectra").textContent = "...";
+  document.querySelector(".mz_format").textContent = "...";
+  document.querySelector(".inten_format").textContent = "...";
+  document.querySelector(".source_format").textContent = "...";
+  document.querySelector(".num_spectra").textContent = "...";
   document.querySelector(".fileStats").classList.add("blur");
 }
 
@@ -419,6 +422,8 @@ const showAnalysisWindow = (fh) => {
   const analysis_div = document.querySelector(".analysis");
   analysis_div.classList.remove("hidden");
   document.querySelector(".main").classList.add("blur");
+  // Update filename
+  analysis_div.querySelector("#filename").textContent = fh.filename;
   fh.get_type().then(type => { // Assign type to analysis window
     const type_text = analysis_div.querySelector("#type");
     if (type == 1) //mzML

@@ -102,13 +102,14 @@ onmessage = (e) => {
             'value': mscompress.getFileType(pointer, e.data.size)
         });
     }
-    else if(e.data.type === "get_512bytes") {
+    else if(e.data.type === "read_file") {
         let pointer = mmapStore.get(e.data.fd);
-        let buffer = mscompress.get512BytesFromMmap(pointer, e.data.offset);
+        let buffer = mscompress.readFromFile(pointer, e.data.offset, e.data.length);
         postMessage({
-            'type': "get_512bytes",
+            'type': "read_file",
             'fd': e.data.fd,
             'offset': e.data.offset,
+            'length': e.data.length,
             'value': buffer.toString('utf8')
         });
     }

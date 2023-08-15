@@ -13,7 +13,7 @@ namespace mscompress {
         exports.Set("closeFileDescriptor", Napi::Function::New(env, CloseFileDescriptor));
         exports.Set("getFileType", Napi::Function::New(env, GetFileType));
         exports.Set("getMmapPointer", Napi::Function::New(env, CreateMmapPointer));
-        exports.Set("get512BytesFromMmap", Napi::Function::New(env, Get512BytesFromMmap));
+        exports.Set("readFromFile", Napi::Function::New(env, ReadFromFile));
         exports.Set("getAccessions", Napi::Function::New(env, GetAccessions));
         exports.Set("getPositions", Napi::Function::New(env, GetPositions));
         return exports;

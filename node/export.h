@@ -23,7 +23,7 @@ namespace mscompress
     Napi::Number CloseFileDescriptor(const Napi::CallbackInfo& info);
     Napi::Number GetFileType(const Napi::CallbackInfo& info);
     Napi::Value CreateMmapPointer(const Napi::CallbackInfo& info);
-    Napi::Value Get512BytesFromMmap(const Napi::CallbackInfo& info);
+    Napi::Value ReadFromFile(const Napi::CallbackInfo& info);
     Napi::Value GetAccessions(const Napi::CallbackInfo& info);
     Napi::Value GetPositions(const Napi::CallbackInfo& info);
 
