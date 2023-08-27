@@ -435,10 +435,6 @@ get_ret_time(char* spectrum_start)
     return strtof(ptr, &e);
 }
 
-#define MSLEVEL 0x01
-#define SCANNUM 0x02
-#define RETTIME 0x04
-
 division_t*
 scan_mzml(char* input_map, data_format_t* df, long end, int flags)
 {
@@ -589,6 +585,7 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
 
     div->scans = scans;
     div->ms_levels = ms_levels;
+    div->ret_times = ret_times;
 
     return div;    
 }
@@ -1519,14 +1516,14 @@ preprocess_mzml(char* input_map,
     division_t* div = NULL;
     if(arguments->indices_length > 0)
     {
-        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM|RETTIME); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
             return -1;
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->scans_length > 0)
     {
-        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM|RETTIME); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
             return -1;
         map_scan_to_index(arguments, tmp);
@@ -1535,7 +1532,7 @@ preprocess_mzml(char* input_map,
     }
     else if(arguments->ms_level > 0 || arguments->ms_level == -1)
     {
-        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM|RETTIME); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
             return -1;
         map_ms_level_to_index(arguments, tmp);
@@ -1543,7 +1540,7 @@ preprocess_mzml(char* input_map,
     }
     else if(arguments->indices_length == 0 && arguments->scans_length == 0)
     {
-        div = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM|RETTIME); // A division encapsulating the entire file
+        div = scan_mzml((char*)input_map, *df, input_filesize, NULL); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);

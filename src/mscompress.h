@@ -66,6 +66,10 @@
 #define DECOMPRESS 2
 #define EXTRACT 3
 
+#define MSLEVEL 0x01
+#define SCANNUM 0x02
+#define RETTIME 0x04
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -169,6 +173,7 @@ typedef struct
 
     long* scans;
     long* ms_levels;
+    float* ret_times;
 
 } division_t;
 
@@ -327,6 +332,7 @@ long parse_blocksize(char* arg);
 
 /* decode.c */
 
+void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len);
 decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 

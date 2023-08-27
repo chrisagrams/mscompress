@@ -8,6 +8,8 @@ namespace mscompress
     // Object Wraps
     Napi::Array Uint64ArrayToNapiArray(const Napi::Env & env, uint64_t* arr, uint64_t size);
     Napi::Array LongArrayToNapiArray(const Napi::Env& env, long* arr, uint64_t size);
+    Napi::Array FloatArrayToNapiArray(const Napi::Env& env, float* arr, uint64_t size);
+    Napi::Array DoubleArrayToNapiArray(const Napi::Env& env, double* arr, uint64_t size);
     uint32_t getUint32OrDefault(const Napi::Object& obj, const std::string& key, uint32_t defaultValue);
     float getFloatOrDefault(const Napi::Object& obj, const std::string& key, float defaultValue);
     Napi::Object CreateDataFormatObject(const Napi::Env& env, data_format_t* df);
@@ -26,6 +28,7 @@ namespace mscompress
     Napi::Value ReadFromFile(const Napi::CallbackInfo& info);
     Napi::Value GetAccessions(const Napi::CallbackInfo& info);
     Napi::Value GetPositions(const Napi::CallbackInfo& info);
+    Napi::Value DecodeBinary(const Napi::CallbackInfo& info);
 
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);

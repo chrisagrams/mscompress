@@ -16,6 +16,7 @@ namespace mscompress {
         exports.Set("readFromFile", Napi::Function::New(env, ReadFromFile));
         exports.Set("getAccessions", Napi::Function::New(env, GetAccessions));
         exports.Set("getPositions", Napi::Function::New(env, GetPositions));
+        exports.Set("decodeBinary", Napi::Function::New(env, DecodeBinary));
         return exports;
     }
 
