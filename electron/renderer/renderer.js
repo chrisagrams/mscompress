@@ -103,6 +103,17 @@ class FileHandle {
     return this.positions;
   } 
 
+  async decode_binary(start, end) {
+    if (this.fd <= 0)
+    throw new Error("File not open");
+
+    if (this.df == null)
+      await this.get_accessions();
+
+    return await systemWorkerPromise({'type': 'decode_binary', 'fd': this.fd, 'df': this.df, 'start': start, 'end': end});
+
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;
