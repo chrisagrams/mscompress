@@ -581,8 +581,25 @@ find_binary_quick(char* input_map, data_format_t* df, long end)
     return div;    
 }
 
+int
+get_spectrum_start(char* input_map)
+/*
+    Returns the index of the start of the spectrum tag.
+    Returns 0 if not found.
+*/
+{
+    char* ptr = strstr(ptr, "<spectrum ");
+    if(ptr == NULL)
+        return 0;
+    return ptr - input_map;
+}
+
 size_t
 get_binary(char* spectrum_start, size_t* binary_start, size_t* binary_end)
+/*
+    Returns the size of the binary data and the start and end positions of the binary data.
+    Returns 0 if not found.
+*/
 {
     char* ptr = strstr(spectrum_start, "<binary>") + sizeof("<binary>");
     if(ptr == NULL)
@@ -652,6 +669,89 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     }
 
     data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
+
+    spectra_dp = alloc_dp(df->source_total_spec);
+    xml_dp = alloc_dp(df->source_total_spec * 2);
+    mz_dp = alloc_dp(df->source_total_spec);
+    inten_dp = alloc_dp(df->source_total_spec);
+
+    long* scans = (long*)malloc(sizeof(long) * df->source_total_spec);
+    long* ms_levels = (long*)malloc(sizeof(long) * df->source_total_spec);
+    double* ret_times = (double*)malloc(sizeof(double) * df->source_total_spec);
+
+    if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
+    {
+        warning("find_binary_quick: failed to allocate memory.\n");
+        return NULL;
+    }
+
+    char* ptr = input_map;
+
+    // xml base case
+    xml_dp->start_positions[0] = 0;
+
+    int spec_curr = 0, mz_curr = 0, inten_curr = 0, xml_curr = 0, curr_scan = 0, curr_ms_level = 0;
+
+    ptr = get_spectrum_start(ptr);
+
+    while (ptr && ptr < input_map + end) {
+        char* spectrum_start = get_spectrum_start(ptr);
+        if (spectrum_start == NULL) {
+            break; // No more spectrums found
+        }
+
+        // Extract other info based on flags
+        if (flags & MSLEVEL) {
+            ms_levels[spec_curr] = get_ms_level(spectrum_start);
+        }
+
+        if (flags & SCANNUM) {
+            scans[spec_curr] = get_scan(spectrum_start);
+        }
+
+        if (flags & RETTIME) {
+            ret_times[spec_curr] = get_ret_time(spectrum_start);
+        }
+
+        // Get binary data positions
+        size_t binary_start, binary_end;
+        size_t binary_size = get_binary(spectrum_start, &binary_start, &binary_end);
+
+        if(binary_size == 0)
+        {
+            warning("scan_mzml: failed to find binary data. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
+
+        mz_dp->start_positions[mz_curr] = binary_start;
+        mz_dp->end_positions[mz_curr] = binary_end;
+
+        binary_size = get_binary(spectrum_start, &binary_start, &binary_end);
+
+        if(binary_size == 0)
+        {
+            warning("scan_mzml: failed to find binary data. index: %d\n", mz_curr + inten_curr);
+            return NULL;
+        }
+        
+        inten_dp->start_positions[inten_curr] = binary_start;
+        inten_dp->end_positions[inten_curr] = binary_end;
+
+
+        // Move to the next spectrum
+        ptr = strstr(spectrum_start, "</spectrum>");
+        if (ptr) {
+            ptr += sizeof("</spectrum>");
+        }
+
+        spec_curr++;
+        mz_curr++;
+        inten_curr++;
+        xml_curr++;
+    }
+
+    return NULL;
+    
 }
 
 division_t*
