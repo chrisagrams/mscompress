@@ -168,7 +168,7 @@ namespace mscompress {
         division_t* result = NULL;
 
         if(type == COMPRESS)
-            result = find_binary_quick_w_spectra((char*)mmap_ptr, df, filesize);
+            result = scan_mzml((char*)mmap_ptr, df, filesize, NULL);
         else if (type == DECOMPRESS)
         {
             Napi::Error::New(env, "GetPositions: not yet implemented for msz files.").ThrowAsJavaScriptException();
