@@ -1,10 +1,20 @@
 #include <napi.h>
+#include <variant>
+#include <vector>
 #include "mscompress.h"
 
 using namespace std;
 
 namespace mscompress
 {
+    // processing.cpp (internal, not exported)
+    std::variant<std::vector<float>, std::vector<double>> decodeAndDecompress(
+        int source_compression,
+        int source_format,
+        char* src,
+        size_t src_len
+    );
+
     // Object Wraps
     Napi::Array Uint64ArrayToNapiArray(const Napi::Env & env, uint64_t* arr, uint64_t size);
     Napi::Array LongArrayToNapiArray(const Napi::Env& env, long* arr, uint64_t size);

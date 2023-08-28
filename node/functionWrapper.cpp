@@ -1,5 +1,7 @@
 #include <napi.h>
 #include <iostream>
+#include <variant>
+#include <vector>
 #include "export.h"
 using namespace std;
 
@@ -203,77 +205,34 @@ namespace mscompress {
             return env.Null();
         }
 
-        std::cout << "DecodeBinary" << std::endl;
+        // std::cout << "DecodeBinary" << std::endl;
 
         void* mmap_ptr = info[0].As<Napi::External<void>>().Data();
         data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
         uint64_t start = info[2].As<Napi::Number>().Int64Value();
         uint64_t end = info[3].As<Napi::Number>().Int64Value();
 
-        std::cout << "start: " << start << std::endl;
-        std::cout << "end: " << end << std::endl;
+        // std::cout << "start: " << start << std::endl;
+        // std::cout << "end: " << end << std::endl;
 
 
         char* src = (char*)mmap_ptr + start;
         size_t src_len = end-start;
-        size_t max_buffer_size = ((src_len + 3) / 4) * 3;
-        char* dest = (char*)malloc(max_buffer_size);
-        size_t out_len = 0;
         
-        decode_base64(src, dest, src_len, &out_len);
+        try {
+            auto result = decodeAndDecompress(df->source_compression, df->source_mz_fmt, src, src_len);
+            if(std::holds_alternative<std::vector<double>>(result)) {
+                std::vector<double>& vec = std::get<std::vector<double>>(result);
+                return DoubleArrayToNapiArray(env, vec.data(), vec.size());
+            } else {
+                std::vector<float>& vec = std::get<std::vector<float>>(result);
+                return FloatArrayToNapiArray(env, vec.data(), vec.size());
+            }
+        } catch(const std::runtime_error& e) {
+            Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
+            return env.Null();
+        }       
 
-        std::cout << "out_len: " << out_len << std::endl;
-
-        switch(df->source_compression) {
-            case _zlib_ :
-                {
-                    z_stream* z = alloc_z_stream();
-                    zlib_block_t* decmp_output = zlib_alloc(0);
-                    if(decmp_output == NULL) {
-                        Napi::Error::New(env, "Error in zlib_alloc").ThrowAsJavaScriptException();
-                        return env.Null();
-                    }
-                    ZLIB_TYPE decmp_size = (ZLIB_TYPE)zlib_decompress(z, (Bytef*)dest, decmp_output, out_len);
-                    std::cout << "decmp_size: " << decmp_size << std::endl;
-                    dest = (char*)decmp_output->buff;
-                    out_len = decmp_size;
-                    break;
-                }
-            case _no_comp_:
-                {
-                    // Shrink the buffer to the actual size needed
-                    char* new_dest = (char*)realloc(dest, out_len);
-                    if (new_dest == NULL) {
-                        free(dest);
-                        Napi::Error::New(env, "Error in realloc").ThrowAsJavaScriptException();
-                        return env.Null();
-                    }
-                    dest = new_dest;
-                    break;
-                }
-            
-            default:
-            {
-                Napi::Error::New(env, "df does not contain proper source_compression").ThrowAsJavaScriptException();
-                return env.Null();
-            }
-        }
-
-        switch(df->source_mz_fmt) {
-            case _64d_:
-            {
-                return DoubleArrayToNapiArray(env, (double*)dest, out_len/sizeof(double));
-            }
-            case _32f_:
-            {
-                return FloatArrayToNapiArray(env, (float*)dest, out_len/sizeof(float));
-            }
-            default:
-            {
-                Napi::Error::New(env, "df does not contain proper source_fmt").ThrowAsJavaScriptException();
-                return env.Null();
-            }
-        }
     }
 
 }

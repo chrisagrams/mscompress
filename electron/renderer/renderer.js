@@ -150,6 +150,32 @@ class FileHandle {
     return this.positions['ms_levels'].map((l, i) => l == level ? i : null).filter(i => i != null);
   }
 
+  async gen_tic_table() {
+    if (this.fd <= 0)
+    throw new Error("File not open");
+  
+    if (this.df == null)
+      await this.get_accessions();
+
+    if (this.positions == null)
+      await this.get_positions();
+
+    let table = {
+      'mz': [],
+      'intensity': [],
+      'retention_time': []
+    }
+    let ms1 = await this.get_ms_levels(1);
+    for (let i of ms1) {
+      let spectrum = await this.get_spectrum(i);
+      table['mz'].push(spectrum['mz']);
+      table['intensity'].push(spectrum['intensity']);
+      table['retention_time'].push(spectrum['retention_time']);
+    };
+
+    console.log(table);
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;
