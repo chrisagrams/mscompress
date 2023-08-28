@@ -105,13 +105,35 @@ class FileHandle {
 
   async decode_binary(start, end) {
     if (this.fd <= 0)
-    throw new Error("File not open");
+      throw new Error("File not open");
 
     if (this.df == null)
       await this.get_accessions();
 
     return await systemWorkerPromise({'type': 'decode_binary', 'fd': this.fd, 'df': this.df, 'start': start, 'end': end});
 
+  }
+
+  async get_spectrum(index) {
+    if (this.fd <= 0)
+      throw new Error("File not open");
+
+    if (this.df == null)
+      await this.get_accessions();
+
+    if (this.positions == null)
+      await this.get_positions();
+
+    if (index < 0 || index >= this.positions['scans'].length)
+      throw new Error("Index out of bounds");
+
+    return {
+      'index': index,
+      'scan': this.positions['scans'][index],
+      'retention_time': this.positions['retention_times'][index],
+      'mz': await this.decode_binary(this.positions['mz']['start_positions'][index], this.positions['mz']['end_positions'][index]),
+      'intensity': await this.decode_binary(this.positions['inten']['start_positions'][index], this.positions['inten']['end_positions'][index])
+    }
   }
 
 
