@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "zlib.h"
+#include "../vendor/zlib/zlib.h"
 #include "mscompress.h"
 #include "libbase64.h"
 

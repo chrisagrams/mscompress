@@ -78,6 +78,12 @@ onmessage = (e) => {
             'value': division
         });
     }
+    else if (e.data.type === "get_zlib_version") {
+        postMessage({
+            'type': "get_zlib_version",
+            'value': mscompress.getZlibVersion()
+        });
+    }
     else if (e.data.type == "decode_binary") {
         let pointer = mmapStore.get(e.data.fd);
         postMessage({

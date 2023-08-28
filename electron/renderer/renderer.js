@@ -120,6 +120,10 @@ class FileHandle {
   }
 }
 
+const getZlibVersion = async () => {
+  return await systemWorkerPromise({'type': 'get_zlib_version'});
+}
+
 const smartTrim = (string, maxLength) => {
   if (!string) return string;
   if (maxLength < 1) return string;

@@ -22,13 +22,23 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+message("Include dirs are: ${dirs}")
+
+
 # Common source files
 file(GLOB SOURCE_FILES ${SRC_DIR}/*.c *.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
 #zlib
-include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
+# include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
+file(GLOB ZLIB_SOURCES 
+    ${VENDOR_DIR}/zlib/*.c)
+
+add_library(my_zlib STATIC ${ZLIB_SOURCES})
+set_target_properties(my_zlib PROPERTIES LINKER_LANGUAGE C) # set zlib library language to C
+
 
 #zstd
 include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
@@ -48,7 +58,11 @@ option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
 # Create the shared library (node-addon)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
-target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} zstd yxml base64)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 my_zlib)
+
+get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)
+message("Link libraries of target ${PROJECT_NAME}: ${TMP_TARGET_LINK_LIBRARIES}")
+
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"

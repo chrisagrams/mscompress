@@ -9,6 +9,7 @@ let mmap = mscompress.getMmapPointer(fd);
 let filesize = mscompress.getFilesize(file);
 let df = mscompress.getAccessions(mmap, filesize);
 let division = mscompress.getPositions(mmap, filesize, df);
+console.log(mscompress.getZlibVersion());
 let binary = mscompress.decodeBinary(mmap, df, division.mz.start_positions[0], division.mz.end_positions[0]);
 
 console.log(threads);

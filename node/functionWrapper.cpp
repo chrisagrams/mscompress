@@ -187,6 +187,14 @@ namespace mscompress {
         return obj;
     }
 
+    Napi::String GetZlibVersion(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+
+        const char* version = zlibVersion();
+
+        return Napi::String::New(env, version);
+    }
+
     Napi::Value DecodeBinary(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 

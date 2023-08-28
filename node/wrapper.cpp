@@ -17,6 +17,7 @@ namespace mscompress {
         exports.Set("getAccessions", Napi::Function::New(env, GetAccessions));
         exports.Set("getPositions", Napi::Function::New(env, GetPositions));
         exports.Set("decodeBinary", Napi::Function::New(env, DecodeBinary));
+        exports.Set("getZlibVersion", Napi::Function::New(env, GetZlibVersion));
         return exports;
     }
 

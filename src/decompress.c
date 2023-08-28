@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "zlib.h"
+#include "../vendor/zlib/zlib.h"
 #include <zstd.h>
 #include "mscompress.h"
 

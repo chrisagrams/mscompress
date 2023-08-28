@@ -29,6 +29,7 @@ namespace mscompress
     Napi::Value GetAccessions(const Napi::CallbackInfo& info);
     Napi::Value GetPositions(const Napi::CallbackInfo& info);
     Napi::Value DecodeBinary(const Napi::CallbackInfo& info);
+    Napi::String GetZlibVersion(const Napi::CallbackInfo& info);
 
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);

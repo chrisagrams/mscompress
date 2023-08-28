@@ -1,7 +1,7 @@
 #include <zstd.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include "zlib.h"
+#include "../vendor/zlib/zlib.h"
 
 #define VERSION "0.0.1"
 #define STATUS "Dev"
