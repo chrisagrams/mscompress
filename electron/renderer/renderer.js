@@ -136,6 +136,20 @@ class FileHandle {
     }
   }
 
+  async get_ms_levels(level) {
+    if (this.fd <= 0)
+      throw new Error("File not open");
+    
+    if (this.df == null)
+      await this.get_accessions();
+
+    if (this.positions == null)
+      await this.get_positions();
+
+    // return an array of indices that match the given level
+    return this.positions['ms_levels'].map((l, i) => l == level ? i : null).filter(i => i != null);
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;
