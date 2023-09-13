@@ -67,27 +67,8 @@ static void validate_algo_name(const char* name) {
 static void 
 parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   int i;
-  arguments->verbose          = 0;
-  arguments->threads          = 0;
-  arguments->extract_only     = 0;
-  arguments->mz_lossy         = NULL;
-  arguments->int_lossy        = NULL;
-  arguments->blocksize        = 1e+8;
-  arguments->input_file       = NULL;
-  arguments->output_file      = NULL;
-  arguments->mz_scale_factor  = 1000; // initialize scale factor to default value
-  arguments->int_scale_factor = 0;
-  arguments->indices          = NULL;
-  arguments->indices_length   = 0;
-  arguments->scans            = NULL;
-  arguments->scans_length     = 0;
-  arguments->ms_level         = 0;
 
-  arguments->target_xml_format   = _ZSTD_compression_; // default
-  arguments->target_mz_format    = _ZSTD_compression_; // default
-  arguments->target_inten_format = _ZSTD_compression_; // default
-
-  arguments->zstd_compression_level = 3; // default
+  init_args(arguments);
 
   program_name = argv[0];
 

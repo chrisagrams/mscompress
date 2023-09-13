@@ -330,6 +330,7 @@ int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
+void init_args(struct Arguments* args);
 
 /* decode.c */
 
