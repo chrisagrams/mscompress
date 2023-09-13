@@ -170,7 +170,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
 
       arguments->mz_scale_factor = atof(scale_factor_buffer);
     }
-     else if (strcmp(argv[i], "--int-scale-factor") == 0) {
+    else if (strcmp(argv[i], "--int-scale-factor") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing scale factor for inten compression.");
         print_usage(stderr, 1);
