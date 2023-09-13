@@ -310,6 +310,7 @@ void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
 void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+divisions_t* create_divisions(division_t* div, long n_divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);

@@ -181,10 +181,15 @@ alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
     if(d == NULL)
         error("alloc_division: malloc failure.\n");
 
+    d->spectra = NULL;
     d->xml = alloc_dp(n_xml);
     d->mz = alloc_dp(n_mz);
     d->inten = alloc_dp(n_inten);
     d->size = 0;
+
+    d->scans = NULL;
+    d->ms_levels = NULL;
+    d->ret_times = NULL;
 
     if(d->xml == NULL || d->mz == NULL || d->inten == NULL)
         error("alloc_division: malloc failure.\n");
@@ -1185,7 +1190,7 @@ join_inten(divisions_t* divisions)
     return r;    
 }
 
-division_t**
+divisions_t*
 create_divisions(division_t* div, long n_divisions)
 {
     divisions_t* r;

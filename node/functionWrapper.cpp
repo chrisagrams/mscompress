@@ -235,4 +235,65 @@ namespace mscompress {
 
     }
 
+    Napi::Value PrepareCompression(const Napi::CallbackInfo& info) 
+    /* Need to receive:
+        div, single encapsulating division
+        df, Also need to populate this
+        arguments
+
+        Run:
+            populate runtime fields in df
+            create_divisions(div, n_divisions)
+
+        Return: divisons, df
+    */
+    {
+        Napi::Env env = info.Env();
+
+        //TEMPORARY COMMENTED OUT
+        // if(info.Length() < 3 || !info[0].IsObject() || !info[1].IsObject() || !info[2].IsObject())
+        // {
+        //     Napi::TypeError::New(env, "PrepareCompression expected arguments: (Object, Object, Object)").ThrowAsJavaScriptException();
+        //     return env.Null();
+        // }
+
+
+        // Parse div
+        division_t* div = NapiObjectToDivisionT(info[0].As<Napi::Object>());
+
+        // Parse df
+        data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
+
+        //TODO : Parse arguments
+
+        // Run
+        int n_divisions = 1;
+        divisions_t* divisions = create_divisions(div, n_divisions);
+
+        std::cout << "PrepareCompression" << std::endl;
+
+        Napi::Array jsDivisions = Napi::Array::New(env, n_divisions);
+        for(int i = 0; i < n_divisions; i++)
+        {
+            Napi::Object obj = CreateDivisionObject(env, divisions->divisions[i]);
+            jsDivisions[i] = obj;
+        }
+
+
+        // Return
+        Napi::Object result = Napi::Object::New(env);
+        result.Set("divisions", jsDivisions);
+        result.Set("df", CreateDataFormatObject(env, df));
+
+        return result;
+    }
+
+    // Napi::Value CreateFooter(const Napi::CallbackInfo& info)
+    // /*
+    
+    // */
+    // {
+
+    // }
+
 }

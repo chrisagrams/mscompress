@@ -92,6 +92,13 @@ onmessage = (e) => {
             'value': mscompress.decodeBinary(pointer, e.data.df, e.data.start, e.data.end)
         });
     }
+    else if (e.data.type == "prepare_compress") {
+        postMessage({
+            'type': "prepare_compress",
+            'fd': e.data.fd,
+            'value': mscompress.prepareCompression(e.data.div, e.data.df) //TODO: add arguments
+        });
+    }
 }
 
 onerror = (e) => {

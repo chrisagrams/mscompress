@@ -114,6 +114,17 @@ class FileHandle {
 
   }
 
+  async prepare_compress() {
+    if (this.fd <= 0)
+      throw new Error("File not open");
+    if (this.df == null)
+      await this.get_accessions();
+    if (this.positions == null)
+      await this.get_positions();
+
+    return await systemWorkerPromise({'type': 'prepare_compress', 'fd': this.fd, 'df': this.df, 'div': this.positions});
+  }
+
   async get_spectrum(index) {
     if (this.fd <= 0)
       throw new Error("File not open");
