@@ -79,7 +79,7 @@ prepare_threads(struct Arguments* args)
     print("\t%d usable processors detected.\n", np);
 
     if(args->threads == 0)
-      args->threads = np;
+        args->threads = np;
     
     print("\tUsing %d threads.\n", args->threads);
 }
@@ -161,22 +161,22 @@ warning(const char* format, ...)
 long
 parse_blocksize(char* arg)
 {
-  int num;
-  int len;
-  char prefix[2];
-  long res = -1;
+    int num;
+    int len;
+    char prefix[2];
+    long res = -1;
 
-  len = strlen(arg);
-  num = atoi(arg);
-  
-  memcpy(prefix, arg+len-2, 2);
+    len = strlen(arg);
+    num = atoi(arg);
 
-  if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
+    memcpy(prefix, arg+len-2, 2);
+
+    if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
     res = num*1e+3;
-  else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
+    else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
     res = num*1e+6;
-  else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
+    else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
     res = num*1e+9;
 
-  return res;
+    return res;
 }
