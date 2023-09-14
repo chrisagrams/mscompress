@@ -403,7 +403,7 @@ typedef struct
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
-void decompress_parallel(char* input_map,
+void decompress_msz(char* input_map,
                     block_len_queue_t* xml_block_lens,
                     block_len_queue_t* mz_binary_block_lens,
                     block_len_queue_t* inten_binary_block_lens,

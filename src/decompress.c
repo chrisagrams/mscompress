@@ -285,7 +285,7 @@ decompress_routine(void* args)
 }
 
 void
-decompress_parallel(char* input_map,
+decompress_msz(char* input_map,
     block_len_queue_t* xml_block_lens,
     block_len_queue_t* mz_binary_block_lens,
     block_len_queue_t* inten_binary_block_lens,

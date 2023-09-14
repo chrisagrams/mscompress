@@ -333,7 +333,7 @@ main(int argc, char* argv[])
         df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
 
         //Start decompress routine.
-        decompress_parallel(input_map,
+        decompress_msz(input_map,
                             xml_block_lens,
                             mz_binary_block_lens,
                             inten_binary_block_lens,
