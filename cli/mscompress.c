@@ -47,24 +47,7 @@ print_usage(FILE* stream, int exit_code) {
   exit(exit_code);
 }
 
-static void validate_algo_name(const char* name) {
-  if (strcmp(name, "cast")    != 0 &&
-      strcmp(name, "cast16")  != 0 &&
-      strcmp(name, "log")     != 0 &&
-      strcmp(name, "delta16") != 0 &&
-      strcmp(name, "delta24") != 0 &&
-      strcmp(name, "delta32") != 0 &&
-      strcmp(name, "vdelta16") != 0 &&
-      strcmp(name, "vdelta24") != 0 &&
-      strcmp(name, "vbr")     != 0 &&
-      strcmp(name, "bitpack") != 0 )
-  {
-    fprintf(stderr, "Invalid lossy compression type: %s\n", name);
-    print_usage(stderr, 1);
-  }
-}
-
-static void 
+static int 
 parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   int i;
 
@@ -73,7 +56,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
   program_name = argv[0];
 
   if(argc < 2) {
-    print_usage(stderr, 1);
+    return 1;
   }
 
   for (i = 1; i < argc; i++) {
@@ -82,47 +65,25 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--threads") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid number of threads.");
-        print_usage(stderr, 1);
+        return 1;
       }
-      arguments->threads = atoi(argv[++i]);
-      if (arguments->threads <= 0) {
-        fprintf(stderr, "%s\n", "Number of threads cannot be less than 1.");
-        print_usage(stderr, 1);
-      }
+      set_threads(arguments, atoi(argv[++i]));
     } else if (strcmp(argv[i], "-z") == 0 || strcmp(argv[i], "--mz-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid mz lossy compression type.");
-        print_usage(stderr, 1);
+        return 1;
       }
-      arguments->mz_lossy = argv[++i];
-      validate_algo_name(arguments->mz_lossy);
-      if(strcmp(arguments->mz_lossy, "delta16") == 0)
-        arguments->mz_scale_factor = 127.998046875;
-      else if(strcmp(arguments->mz_lossy, "delta24") == 0)
-        arguments->mz_scale_factor = 65536;
-      else if(strcmp(arguments->mz_lossy, "delta32") == 0)
-        arguments->mz_scale_factor = 262143.99993896484;
-      else if(strcmp(arguments->mz_lossy, "vbr") == 0)
-        arguments->mz_scale_factor = 0.1;
-      else if(strcmp(arguments->mz_lossy, "bitpack") == 0)
-        arguments->mz_scale_factor = 10000.0;
-      else if(strcmp(arguments->mz_lossy, "cast16") == 0)
-        arguments->mz_scale_factor = 11.801;
+      set_mz_lossy(arguments, argv[++i]);
     } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--int-lossy") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid int lossy compression type.");
-        print_usage(stderr, 1);
+        return 1;
       }
-      arguments->int_lossy = argv[++i];
-      validate_algo_name(arguments->int_lossy);
-      if(strcmp(arguments->int_lossy, "log") == 0)
-        arguments->int_scale_factor = 72.0;
-      else if(strcmp(arguments->int_lossy, "vbr") == 0)
-        arguments->int_scale_factor = 1.0;
+      set_int_lossy(arguments, argv[++i]);
     } else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blocksize") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Invalid blocksize.");
-        print_usage(stderr, 1);
+        return 1;
       }
       long blksize = parse_blocksize(argv[++i]);
       if (blksize == -1) {
@@ -135,59 +96,35 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     } else if (strcmp(argv[i], "--mz-scale-factor") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing scale factor for mz compression.");
-        print_usage(stderr, 1);
+        return 1;
       }
-      
-      const char* scale_factor_str = argv[++i];
-      int j = 0;
-      char scale_factor_buffer[20];
-
-      // Parse the argument until the first non-digit character
-      while (isdigit(scale_factor_str[j]) || scale_factor_str[j] == '.') {
-        scale_factor_buffer[j] = scale_factor_str[j];
-        j++;
-      }
-      scale_factor_buffer[j] = '\0'; // Null-terminate the parsed scale factor
-
-      arguments->mz_scale_factor = atof(scale_factor_buffer);
+      if (set_mz_scale_factor(arguments, argv[++i]) != 0) return 1;
     }
     else if (strcmp(argv[i], "--int-scale-factor") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing scale factor for inten compression.");
-        print_usage(stderr, 1);
+        return 1;
       }
-      
-      const char* scale_factor_str = argv[++i];
-      int j = 0;
-      char scale_factor_buffer[20];
-
-      // Parse the argument until the first non-digit character
-      while (isdigit(scale_factor_str[j]) || scale_factor_str[j] == '.') {
-        scale_factor_buffer[j] = scale_factor_str[j];
-        j++;
-      }
-      scale_factor_buffer[j] = '\0'; // Null-terminate the parsed scale factor
-
-      arguments->int_scale_factor = atof(scale_factor_buffer);
+      if (set_int_scale_factor(arguments, argv[++i]) != 0) return 1;
     }
     else if (strcmp(argv[i], "--extract-indices") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing indices array for extraction.");
-        print_usage(stderr, 1);
+        return 1;
       }
       arguments->indices = string_to_array(argv[++i], &arguments->indices_length);
     } 
     else if (strcmp(argv[i], "--extract-scans") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing scan array for extraction.");
-        print_usage(stderr, 1);
+        return 1;
       }
       arguments->scans = string_to_array(argv[++i], &arguments->scans_length);
     }
     else if (strcmp(argv[i], "--ms-level") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing ms level for extraction.");
-        print_usage(stderr, 1);
+        return 1;
       }
       if(argv[++i] == 'n')
         arguments->ms_level = -1; //still valid, set to "n"
@@ -197,7 +134,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         if(!(arguments->ms_level == 1 || arguments->ms_level == 2))
         {
           fprintf(stderr, "%s\n", "Invalid ms level for extraction.");
-          print_usage(stderr, 1);
+          return 1;
         }
       }
     }
@@ -207,28 +144,28 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     else if (strcmp(argv[i], "--target-xml-format") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing target xml format.");
-        print_usage(stderr, 1);
+        return 1;
       }
       arguments->target_xml_format = get_compress_type(argv[++i]);
     } 
     else if (strcmp(argv[i], "--target-mz-format") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing target mz format.");
-        print_usage(stderr, 1);
+        return 1;
       }
       arguments->target_mz_format = get_compress_type(argv[++i]);
     } 
     else if (strcmp(argv[i], "--target-inten-format") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing target inten format.");
-        print_usage(stderr, 1);
+        return 1;
       }
       arguments->target_inten_format = get_compress_type(argv[++i]);
     }
     else if (strcmp(argv[i], "--zstd-compression-level") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing compression level");
-        print_usage(stderr, 1);
+        return 1;
       }
       int num = 0;
       const char* str = argv[++i];
@@ -246,20 +183,16 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
     } 
     else {
       fprintf(stderr, "%s\n", "Too many arguments.");
-      print_usage(stderr, 1);
+      return 1;
     }
   }
 
   if (arguments->input_file == NULL) {
     fprintf(stderr, "%s\n", "Missing input file.");
-    print_usage(stderr, 1);
+    return 1;
   }
 
-  if(arguments->mz_lossy == NULL)
-      arguments->mz_lossy = "lossless";
-  
-  if(arguments->int_lossy == NULL)
-      arguments->int_lossy = "lossless";
+  return 0;
 }
 
 int 
@@ -277,7 +210,8 @@ main(int argc, char* argv[])
     size_t input_filesize = 0;
     int operation = -1;
     
-    parse_arguments(argc, argv, &arguments);
+    if (parse_arguments(argc, argv, &arguments))
+      print_usage(stderr, 1);
 
     verbose = arguments.verbose;    
 

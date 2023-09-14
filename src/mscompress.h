@@ -261,6 +261,16 @@ typedef struct
 } zlib_block_t;
 
 
+/* arguments.c */
+static void validate_algo_name(const char* name);
+void init_args(struct Arguments* args);
+int set_threads(struct Arguments* args, int threads);
+int set_mz_lossy(struct Arguments* args, const char* mz_lossy);
+int set_int_lossy(struct Arguments* args, const char* int_lossy);
+int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
+int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
+
+
 /* file.c */
 extern long fd_pos[3];
 extern int fds[3];
@@ -330,7 +340,6 @@ int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
-void init_args(struct Arguments* args);
 
 /* decode.c */
 

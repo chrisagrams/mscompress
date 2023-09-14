@@ -180,28 +180,3 @@ parse_blocksize(char* arg)
 
     return res;
 }
-
-void init_args(struct Arguments* args)
-{
-    args->verbose          = 0;
-    args->threads          = 0;
-    args->extract_only     = 0;
-    args->mz_lossy         = NULL;
-    args->int_lossy        = NULL;
-    args->blocksize        = 1e+8;
-    args->input_file       = NULL;
-    args->output_file      = NULL;
-    args->mz_scale_factor  = 1000; // initialize scale factor to default value
-    args->int_scale_factor = 0;
-    args->indices          = NULL;
-    args->indices_length   = 0;
-    args->scans            = NULL;
-    args->scans_length     = 0;
-    args->ms_level         = 0;
-
-    args->target_xml_format   = _ZSTD_compression_; // default
-    args->target_mz_format    = _ZSTD_compression_; // default
-    args->target_inten_format = _ZSTD_compression_; // default
-
-    args->zstd_compression_level = 3; // default
-}
