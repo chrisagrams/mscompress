@@ -262,7 +262,6 @@ typedef struct
 
 
 /* arguments.c */
-static void validate_algo_name(const char* name);
 void init_args(struct Arguments* args);
 int set_threads(struct Arguments* args, int threads);
 int set_mz_lossy(struct Arguments* args, const char* mz_lossy);

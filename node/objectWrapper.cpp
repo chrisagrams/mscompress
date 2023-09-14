@@ -279,4 +279,18 @@ namespace mscompress {
 
         return division;
     }
+
+    /* Napi -> C arguments */
+    struct Arguments* NapiObjectToArguments(const Napi::Object& obj) {
+        struct Arguments* args = new Arguments();
+
+        // Init arguments
+        init_args(args);
+
+        // Set arguments
+        set_threads(args, getUint32OrDefault(obj, "threads", 1));
+        //TODO: the rest
+
+        return args;
+    }
 }

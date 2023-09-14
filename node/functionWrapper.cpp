@@ -251,11 +251,11 @@ namespace mscompress {
         Napi::Env env = info.Env();
 
         //TEMPORARY COMMENTED OUT
-        // if(info.Length() < 3 || !info[0].IsObject() || !info[1].IsObject() || !info[2].IsObject())
-        // {
-        //     Napi::TypeError::New(env, "PrepareCompression expected arguments: (Object, Object, Object)").ThrowAsJavaScriptException();
-        //     return env.Null();
-        // }
+        if(info.Length() < 3 || !info[0].IsObject() || !info[1].IsObject() || !info[2].IsObject())
+        {
+            Napi::TypeError::New(env, "PrepareCompression expected arguments: (Object, Object, Object)").ThrowAsJavaScriptException();
+            return env.Null();
+        }
 
 
         // Parse div
@@ -264,10 +264,13 @@ namespace mscompress {
         // Parse df
         data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
 
+        // Parse arguments
+        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+
         //TODO : Parse arguments
 
         // Run
-        int n_divisions = 1;
+        int n_divisions = args->threads;
         divisions_t* divisions = create_divisions(div, n_divisions);
 
         std::cout << "PrepareCompression" << std::endl;

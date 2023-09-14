@@ -96,7 +96,7 @@ onmessage = (e) => {
         postMessage({
             'type': "prepare_compress",
             'fd': e.data.fd,
-            'value': mscompress.prepareCompression(e.data.div, e.data.df) //TODO: add arguments
+            'value': mscompress.prepareCompression(e.data.div, e.data.df, {"threads": 2}) //TODO: add arguments
         });
     }
 }

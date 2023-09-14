@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "mscompress.h"
 
-static void validate_algo_name(const char* name) {
+static int validate_algo_name(const char* name) {
   if (strcmp(name, "cast")    != 0 &&
       strcmp(name, "cast16")  != 0 &&
       strcmp(name, "log")     != 0 &&
@@ -14,8 +14,10 @@ static void validate_algo_name(const char* name) {
       strcmp(name, "bitpack") != 0 )
   {
     fprintf(stderr, "Invalid lossy compression type: %s\n", name);
-    print_usage(stderr, 1);
+    return 1; // Indicate error
   }
+
+  return 0; // Indicate success
 }
 
 void init_args(struct Arguments* args)
@@ -59,7 +61,7 @@ int set_threads(struct Arguments* args, int threads)
 
 int set_mz_lossy(struct Arguments* args, const char* mz_lossy) {
   // Validate the algorithm name
-  validate_algo_name(mz_lossy);
+  if(validate_algo_name(mz_lossy)) return 1;
 
   // Assign the algorithm to arguments
   args->mz_lossy = mz_lossy;
@@ -86,7 +88,7 @@ int set_mz_lossy(struct Arguments* args, const char* mz_lossy) {
 
 int set_int_lossy(struct Arguments* args, const char* int_lossy) {
   //Validate the algorithm name
-  validate_algo_name(int_lossy);
+  if(validate_algo_name(int_lossy)) return 1;
 
   // Assign the algorithm to arguments
   args->int_lossy = int_lossy;

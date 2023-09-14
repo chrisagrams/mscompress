@@ -31,6 +31,7 @@ namespace mscompress
     Napi::Object CreateDataPositionsObject(const Napi::Env& env, data_positions_t* dp);
     Napi::Object CreateDivisionObject(const Napi::Env& env, division_t* division);
     division_t* NapiObjectToDivisionT(const Napi::Object& obj);
+    Arguments* NapiObjectToArguments(const Napi::Object& obj);
 
     // Function Wraps
     Napi::Number GetTime(const Napi::CallbackInfo& info);
