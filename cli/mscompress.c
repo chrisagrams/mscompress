@@ -287,9 +287,6 @@ main(int argc, char* argv[])
         df->mz_scale_factor = arguments.mz_scale_factor;
         df->int_scale_factor = arguments.int_scale_factor;
 
-        //Write df header to file.
-        write_header(fds[1], df, arguments.blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
         //Start compress routine.
         compress_mzml((char*)input_map,
                       arguments.blocksize,
@@ -299,14 +296,6 @@ main(int argc, char* argv[])
                       divisions,
                       fds[1]);
 
-        // Write divisions to file.
-        footer->divisions_t_pos = get_offset(fds[1]);
-        write_divisions(divisions, fds[1]);
-
-        // Write footer to file.
-        write_footer(footer, fds[1]);
-
-        free(footer);
         break;
       }
       case DECOMPRESS:

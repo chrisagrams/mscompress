@@ -668,6 +668,9 @@ compress_mzml(char* input_map,
 
     start = get_time();
 
+    //Write df header to file.
+    write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
     print("\nDecoding and compression...\n");
 
     print("\t===XML===\n");
@@ -696,6 +699,15 @@ compress_mzml(char* input_map,
 
     footer->inten_binary_blk_pos = get_offset(output_fd);
     dump_block_len_queue(inten_binary_block_lens, output_fd);
+
+    // Write divisions to file.
+    footer->divisions_t_pos = get_offset(fds[1]);
+    write_divisions(divisions, fds[1]);
+
+    // Write footer to file.
+    write_footer(footer, fds[1]);
+
+    free(footer);
 
     end = get_time();
 
