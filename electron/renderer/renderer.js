@@ -187,6 +187,13 @@ class FileHandle {
     console.log(table);
   }
 
+  async gen_tic_plot() {
+    if (this.path == null)
+      throw new Error("File not open");
+
+    window.ipcRenderer.send('render-tic-plot', this.path);
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;
@@ -303,6 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     window.ipcRenderer.send('app-metrics');
   }, 2000);
+
+  // Render TIC plot
+  window.ipcRenderer.on('tic-plot', (e) => {
+    console.log(e); //TODO: Add img element to analysis window
+  });
 
 });
 

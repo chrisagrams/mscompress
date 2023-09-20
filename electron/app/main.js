@@ -1,6 +1,7 @@
 // Modules to control application life and create native browser window
 const { app, BrowserWindow, nativeImage, ipcMain, dialog, shell } = require('electron')
 const path = require('path')
+const { spawn } = require('child_process');
 
 const iconPath = path.join(__dirname, 'assets/icons/icon.icns')
 
@@ -77,7 +78,20 @@ ipcMain.on('open-file-dialog', e => {
   .catch(err => {
     console.error(err);
   })
-})
+});
+
+ipcMain.on('render-tic-plot', (e, file) => {
+  const ticPlot = spawn('python3', ['../modules/python/mzml_to_tic.py', file]);
+  ticPlot.stdout.on('data', data => {
+    e.sender.send('tic-plot', data.toString());
+  });
+  ticPlot.stderr.on('data', data => {
+    console.error(data.toString());
+  });
+  ticPlot.on('close', code => {
+    console.log(`TIC plot process exited with code ${code}`);
+  });
+});
 
 // Get the current app metrics
 ipcMain.on('app-metrics', e => {
