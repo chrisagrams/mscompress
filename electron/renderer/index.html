@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'">
     <link href="./styles.css" rel="stylesheet">
     <title>mscompress</title>
   </head>
@@ -101,8 +101,11 @@
               <h6 class="source_format">...</h6>
               <p>Source Compression</p>
             </div>
+          </div>
         </div>
-        <div class="right"></div>
+        <div class="right">
+          <img id="tic_plot">
+        </div>
       </div>
     </div>
     <!-- You can also require other files to run in this process -->

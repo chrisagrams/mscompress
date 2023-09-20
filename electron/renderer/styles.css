@@ -414,3 +414,7 @@ img {
     height: 100%;
     background-color: hsl(0 0% 97% / 1);
 }
+
+.analysis > .content > .right img {
+    width: 100%;
+}

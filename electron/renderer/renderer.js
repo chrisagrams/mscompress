@@ -314,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render TIC plot
   window.ipcRenderer.on('tic-plot', (e) => {
     console.log(e); //TODO: Add img element to analysis window
+    document.querySelector("#tic_plot").src = "data:image/png;base64," + e;
   });
 
 });
@@ -563,4 +564,6 @@ document.querySelector("#analyze").addEventListener('click', e => {
     hideLoading();
     showAnalysisWindow(fh);
   });
+
+  fh.gen_tic_plot(); // Start generation of tic_plot.
 })
