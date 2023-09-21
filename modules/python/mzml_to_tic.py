@@ -75,11 +75,12 @@ def generate_tic_fig(data_table:pa.Table) -> str:
     xic_heatmap_df = np.cbrt(xic_heatmap_df)
 
     # set the figure size, y axis range, and splot the heatmap
-    plt.figure(figsize=(10, 5), dpi=150)
+    plt.figure(figsize=(5.39, 4.02), dpi=150)
     plt.ylim(xic_data_df['mz'].min(), xic_data_df['mz'].max())
     ax = sns.heatmap(xic_heatmap_df, cmap=cmp)
     ax.set_xticklabels(['{:.1f}'.format(float(t.get_text())) for t in ax.get_xticklabels()])
     ax.invert_yaxis()
+    plt.tight_layout()
 
     # Save the figure to a BytesIO object
     buf = io.BytesIO()
