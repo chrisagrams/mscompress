@@ -1,3 +1,4 @@
+import os
 import base64
 import io
 import sys
@@ -100,6 +101,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     mzml_file_name = sys.argv[1]
+    # os.write(3, b'Starting read_mzml\n')
     array_data, index_dict = read_mzml(mzml_file_name)
+    os.write(3, b'Generating figure...')
     data_table = pa.Table.from_arrays(array_data, schema=table_schema)
     print(generate_tic_fig(data_table))

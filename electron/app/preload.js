@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     },
     on: (channel, callback) => {
         //whitelist channels
-        let validChannels = ['selected-files', 'current-app-metrics', 'tic-plot'];
+        let validChannels = ['selected-files', 'current-app-metrics', 'tic-plot', 'tic-plot-status'];
         if(validChannels.includes(channel)) {
             ipcRenderer.on(channel, (e, ...args) => callback(...args));
         }

@@ -315,7 +315,14 @@ document.addEventListener('DOMContentLoaded', () => {
   window.ipcRenderer.on('tic-plot', (e) => {
     console.log(e); //TODO: Add img element to analysis window
     document.querySelector("#tic_plot").src = "data:image/png;base64," + e;
+    document.querySelector(".analysis").querySelector(".loading").classList.add("hidden");
   });
+
+  // Get TIC plot status
+  window.ipcRenderer.on('tic-plot-status', (e) => {
+    console.log(e);
+    document.querySelector(".analysis").querySelector('.message').textContent = e;
+  })
 
 });
 

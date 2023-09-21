@@ -82,7 +82,9 @@ ipcMain.on('open-file-dialog', e => {
 
 ipcMain.on('render-tic-plot', (e, file) => {
   let completeData = "";
-  const ticPlot = spawn('python3', ['../modules/python/mzml_to_tic.py', file]);
+  const ticPlot = spawn('python3', ['../modules/python/mzml_to_tic.py', file], {
+    stdio: ['pipe', 'pipe', 'pipe', 'pipe'] // stdin, stdout, stderr, and progress
+  });
   ticPlot.stdout.on('data', data => {
     completeData += data.toString(); // Accumulate the base64 data
   });
@@ -93,6 +95,10 @@ ipcMain.on('render-tic-plot', (e, file) => {
     console.log(`TIC plot process exited with code ${code}`);
     e.sender.send('tic-plot', completeData);
   });
+  ticPlot.stdio[3].on('data', data => {
+    const message = data.toString();
+    e.sender.send('tic-plot-status', message);
+  })
 });
 
 // Get the current app metrics

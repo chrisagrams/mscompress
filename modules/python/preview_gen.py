@@ -94,14 +94,25 @@ def read_mzml(filename):
     with open(filename) as fo:
         tree = etree.parse(fo)
         i = 0  # index
+        spec_index = 0 # index of spectrum
+        last_percent = -1 # keep track of last message
         # determine how many floating numbers in total, to create an empty array for fill
-        total_numbers = sum([int(each_spectrum.get('defaultArrayLength')) for each_spectrum in tree.findall("//mzML/run/spectrumList/spectrum", namespaces=tree.getroot().nsmap)])
+
+        spectrums = tree.findall("//mzML/run/spectrumList/spectrum", namespaces=tree.getroot().nsmap)
+        total_numbers = sum([int(each_spectrum.get('defaultArrayLength')) for each_spectrum in spectrums])
         # print(total_numbers)
         data_array = np.zeros([8, total_numbers], dtype=np.float32)
         # pretty_print_xml_structure(tree)
         # find each spectrum and read data into data_array[spectrum number, retention time, mass, intensity, ms_level, precursor, charge]
-        for each_spectrum in tree.findall("//mzML/run/spectrumList/spectrum", namespaces=tree.getroot().nsmap):
+        for each_spectrum in spectrums:
             # "/binaryDataArrayList/binaryDataArray"
+            
+            current_percent = int((spec_index / len(spectrums)) * 100)
+            if current_percent != last_percent:
+                message = '{:.0%} processed'.format(spec_index / len(spectrums))
+                os.write(3, message.encode() + b'\n')
+                last_percent = current_percent
+
             spec_no = int(each_spectrum.get('id').split("scan=")[-1])
             spectrum_length = int(each_spectrum.get('defaultArrayLength'))
             if spectrum_length > 0:
@@ -151,6 +162,7 @@ def read_mzml(filename):
 
                 global_spec_id += 1
                 i += spectrum_length
+                spec_index += 1
     # data_table_dict[spec_no]=[spec_no_array, ret_time_array, mz_array, int_array, ms_level_array, precursor_array, charge_state_array]
     # print(filename, start_global_id, global_spec_id)
     return data_array, index_dict

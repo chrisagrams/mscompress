@@ -42,9 +42,10 @@ img {
     width: 40px;
     height: 40px;
     animation: spin 1s linear infinite;
-    position: fixed;
+    /* position: absolute;
     top: calc(50% - 20px);
-    left: calc(50% - 20px);
+    left: calc(50% - 20px); */
+    margin: 0 auto;
     transform: translate(-50%, -50%);
     z-index: 9999; /* Ensure the spinner is above other content */
 }
@@ -91,6 +92,13 @@ img {
     left: 0;
     width: 100%;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.loading > .message {
+    margin:  10px auto;
 }
 
 .error {
@@ -397,7 +405,7 @@ img {
 }
 
 .analysis > .content > .left > h3 {
-    margin: 10px auto;
+    margin: 10px;
     font-weight: normal;
 }
 
@@ -408,6 +416,7 @@ img {
 }
 
 .analysis > .content > .right {
+    position: relative;
     display: flex;
     flex-direction: column;
     width: calc(100% / 3 * 2);
