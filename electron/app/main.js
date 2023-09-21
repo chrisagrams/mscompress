@@ -80,6 +80,20 @@ ipcMain.on('open-file-dialog', e => {
   })
 });
 
+ipcMain.on('output-directory-dialog', e => {
+  dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+  .then(result => {
+    if(!result.canceled && result.filePaths.length > 0) {
+      e.sender.send('selected-output-directory', result.filePaths[0]);
+    }
+  })
+  .catch(err => {
+    console.error(err);
+  })
+})
+
 ipcMain.on('render-tic-plot', (e, file) => {
   let completeData = "";
   const ticPlot = spawn('python3', ['../modules/python/mzml_to_tic.py', file], {

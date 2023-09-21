@@ -298,7 +298,20 @@ document.addEventListener('DOMContentLoaded', () => {
     arr.forEach(f => {
       createFileCard(f);
     })
-  })
+  });
+
+
+  document.querySelector("#output-directory-dialog").addEventListener('click', e => {
+    e.preventDefault();
+    // Send message to main process to open the output directory dialog
+    window.ipcRenderer.send('output-directory-dialog');
+  });
+
+  // main process returns selected output directory from system dialog
+  window.ipcRenderer.on('selected-output-directory', (dir) => {
+    console.log("Selected output directory: ", dir);
+    document.querySelector("#output-directory-path").value = dir;
+  });
 
   window.ipcRenderer.on('current-app-metrics', (metrics) => {
     // console.log("App metrics: ", calculateTotalMetrics(metrics));

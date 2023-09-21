@@ -219,6 +219,20 @@ img {
     margin: 0;
 }
 
+#right-container > h6 {
+    margin: 0;
+}
+
+#right-container > div {
+    display: flex;
+    flex-direction: row;
+    padding: 10px;
+}
+
+#right-container > div > input {
+    width: 100%;
+}
+
 .fileStats > div {
     display: flex;
     flex-direction: column;
