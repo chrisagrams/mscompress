@@ -203,7 +203,7 @@ class FileHandle {
         await this.get_accessions();
       if(this.positions == null)
         await this.get_positions();
-      output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+      const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
       if(output_fd <= 0)
         throw new Error("get_output_fd error");
       await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
