@@ -50,6 +50,7 @@ namespace mscompress
     Napi::String GetZlibVersion(const Napi::CallbackInfo& info);
     Napi::Value PrepareCompression(const Napi::CallbackInfo& info);
     Napi::Value Compress(const Napi::CallbackInfo& info);
+    Napi::Value Decompress(const Napi::CallbackInfo& info);
 
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);

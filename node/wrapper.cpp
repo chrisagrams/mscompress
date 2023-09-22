@@ -21,6 +21,7 @@ namespace mscompress {
         exports.Set("getZlibVersion", Napi::Function::New(env, GetZlibVersion));
         exports.Set("prepareCompression", Napi::Function::New(env, PrepareCompression));
         exports.Set("compress", Napi::Function::New(env, Compress));
+        exports.Set("decompress", Napi::Function::New(env, Decompress));
         return exports;
     }
 

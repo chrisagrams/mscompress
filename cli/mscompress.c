@@ -263,45 +263,11 @@ main(int argc, char* argv[])
       }
       case DECOMPRESS:
       {
-        print("\tDetected .msz file, reading header and footer...\n");
-
-        block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
-        footer_t* msz_footer;
-        int n_divisions = 0;
-
-        df = get_header_df(input_map);
-
-        parse_footer(&msz_footer, input_map, input_filesize,
-                    &xml_block_lens, 
-                    &mz_binary_block_lens,
-                    &inten_binary_block_lens,
-                    &divisions,
-                    &n_divisions);
-
-        if(n_divisions == 0)
-          error("No divisions found in file, aborting...\n");
 
         print("\nDecompression and encoding...\n");
 
-        // Set target encoding and decompression functions.
-        df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
-        df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt, df->source_mz_fmt);
-
-        df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
-        df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
-
-        // Set target decompression functions.
-        df->xml_decompression_fun   = set_decompress_fun(df->target_xml_format);
-        df->mz_decompression_fun    = set_decompress_fun(df->target_mz_format);
-        df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
-
         //Start decompress routine.
-        decompress_msz(input_map,
-                            xml_block_lens,
-                            mz_binary_block_lens,
-                            inten_binary_block_lens,
-                            divisions,
-                            df, msz_footer, arguments.threads, fds[1]);
+        decompress_msz(input_map, input_filesize, &arguments, fds[1]);
 
         break;
       };

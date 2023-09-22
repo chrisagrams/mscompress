@@ -206,7 +206,10 @@ class FileHandle {
       const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
       if(output_fd <= 0)
         throw new Error("get_output_fd error");
+
+      showLoading();
       await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
+      hideLoading();
     }
   }
 
@@ -316,11 +319,35 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   });
 
+  window.ipcRenderer.send('get-default-path');
+  // Set default path to downloads folder
+  window.ipcRenderer.on('set-default-path', (path) => {
+    document.querySelector("#output-directory-path").value = path;
+  });
 
   document.querySelector("#output-directory-dialog").addEventListener('click', e => {
     e.preventDefault();
     // Send message to main process to open the output directory dialog
     window.ipcRenderer.send('output-directory-dialog');
+  });
+
+  document.querySelector("#start").addEventListener('click', e => {
+    const fh = getSelectedFileHandle();
+    const output_path = document.querySelector("#output-directory-path").value;
+
+   // Extract just the filename
+   const filename = fh.path.split('/').pop();
+
+   // Replace the extension with .msz
+   const newFilename = filename.replace(/\.[^\.]+$/, '.msz');
+
+    // Set the output path
+    const newOutputPath = `${output_path}/${newFilename}`;
+
+    console.log(newOutputPath);
+
+    fh.convert(newOutputPath);
+
   });
 
   // main process returns selected output directory from system dialog

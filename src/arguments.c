@@ -177,3 +177,20 @@ void set_compress_runtime_variables(struct Arguments* args, data_format_t* df)
 
   return;
 }
+
+void set_decompress_runtime_variables(struct Arguments* args, data_format_t* df, footer_t* msz_footer)
+{
+  // Set target encoding and decompression functions.
+  df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
+  df->encode_source_compression_inten_fun = set_encode_fun(df->source_compression, msz_footer->inten_fmt, df->source_mz_fmt);
+
+  df->target_mz_fun    = set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
+  df->target_inten_fun = set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
+
+  // Set target decompression functions.
+  df->xml_decompression_fun   = set_decompress_fun(df->target_xml_format);
+  df->mz_decompression_fun    = set_decompress_fun(df->target_mz_format);
+  df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
+
+  return;
+}

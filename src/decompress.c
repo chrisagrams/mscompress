@@ -286,14 +286,34 @@ decompress_routine(void* args)
 
 void
 decompress_msz(char* input_map,
-    block_len_queue_t* xml_block_lens,
-    block_len_queue_t* mz_binary_block_lens,
-    block_len_queue_t* inten_binary_block_lens,
-    divisions_t* divisions,
-    data_format_t* df,
-    footer_t* msz_footer,
-    int threads, int fd)
+    size_t input_filesize,
+    struct Arguments* arguments,
+    int fd)
 {
+    block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
+    footer_t* msz_footer;
+
+    int n_divisions = 0;
+    divisions_t* divisions;
+    data_format_t* df;
+    int threads = arguments->threads;
+    
+    print("\tDetected .msz file, reading header and footer...\n");
+
+    df = get_header_df(input_map);
+
+    parse_footer(&msz_footer, input_map, input_filesize,
+            &xml_block_lens, 
+            &mz_binary_block_lens,
+            &inten_binary_block_lens,
+            &divisions,
+            &n_divisions);
+
+    if(n_divisions == 0)
+        error("No divisions found in file, aborting...\n");
+
+    set_decompress_runtime_variables(arguments, df, msz_footer);
+    
     decompress_args_t** args = malloc(sizeof(decompress_args_t*) * divisions->n_divisions);
 
     #ifdef _WIN32

@@ -269,6 +269,7 @@ int set_int_lossy(struct Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
 void set_compress_runtime_variables(struct Arguments* args, data_format_t* df);
+void set_decompress_runtime_variables(struct Arguments* args, data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
 extern long fd_pos[3];
@@ -405,13 +406,9 @@ ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
 void decompress_msz(char* input_map,
-                    block_len_queue_t* xml_block_lens,
-                    block_len_queue_t* mz_binary_block_lens,
-                    block_len_queue_t* inten_binary_block_lens,
-                    divisions_t* divisions,
-                    data_format_t* df,
-                    footer_t* msz_footer,
-                    int threads, int fd);
+    size_t input_filesize,
+    struct Arguments* args,
+    int fd);
 decompression_fun set_decompress_fun(int accession);
 
 
