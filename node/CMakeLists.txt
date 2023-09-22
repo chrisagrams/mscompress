@@ -39,7 +39,16 @@ if(WIN32)
     add_library(my_zlib STATIC ${ZLIB_SOURCES})
     set_target_properties(my_zlib PROPERTIES LINKER_LANGUAGE C) # set zlib library language to C
 else()
-    find_package(ZLIB REQUIRED) # Look for system zlib
+    set(ZLIB_SOURCE_DIR ${VENDOR_DIR}/zlib)
+    add_custom_target(
+        zlib_build
+        COMMAND ${ZLIB_SOURCE_DIR}/configure
+        COMMAND make -C ${ZLIB_SOURCE_DIR}
+        WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+    )
+    set(ZLIB_LIBRARY "${ZLIB_SOURCE_DIR}/libz.a")
+    include_directories(${ZLIB_SOURCE_DIR})
+    add_dependencies(mscompress zlib_build)
 endif()
 
 
@@ -65,7 +74,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 my_zlib)
 else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 ${ZLIB_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 ${ZLIB_LIBRARY})
 endif()
 
 get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)
