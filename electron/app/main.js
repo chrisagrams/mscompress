@@ -118,4 +118,10 @@ ipcMain.on('render-tic-plot', (e, file) => {
 // Get the current app metrics
 ipcMain.on('app-metrics', e => {
   e.sender.send('current-app-metrics', app.getAppMetrics());
+});
+
+// Get default path
+ipcMain.on('get-default-path', e => {
+    const userDownloadsPath = app.getPath('downloads');
+    e.sender.send('set-default-path', userDownloadsPath);
 })
