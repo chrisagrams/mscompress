@@ -651,13 +651,15 @@ compress_parallel(char* input_map,
 
 void 
 compress_mzml(char* input_map,
-              long blocksize,
-              int threads,
-              footer_t* footer,
+              size_t input_filesize,
+              struct Arguments* arguments,
               data_format_t* df,
               divisions_t* divisions,
               int output_fd)
 {
+    // Initialize footer to all 0's to not write garbage to file.
+    footer_t* footer = calloc(1, sizeof(footer_t));   
+
     block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
 
     data_positions_t **xml_divisions = join_xml(divisions),
@@ -667,6 +669,15 @@ compress_mzml(char* input_map,
     double start, end;
 
     start = get_time();
+
+    set_compress_runtime_variables(arguments, df); // Set compression variables (e.g. compression level, compression function, etc.)
+
+    // Store format integer in footer.
+    footer->mz_fmt    = get_algo_type(arguments->mz_lossy);
+    footer->inten_fmt = get_algo_type(arguments->int_lossy);
+    
+    long blocksize = arguments->blocksize;
+    int threads = arguments->threads;
 
     //Write df header to file.
     write_header(fds[1], df, blocksize, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
@@ -705,6 +716,9 @@ compress_mzml(char* input_map,
     write_divisions(divisions, fds[1]);
 
     // Write footer to file.
+    footer->original_filesize = input_filesize;
+    footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
+
     write_footer(footer, fds[1]);
 
     free(footer);

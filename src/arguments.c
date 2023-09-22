@@ -143,3 +143,37 @@ int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str) {
   args->int_scale_factor = parse_scale_factor(scale_factor_str);
   return 0;
 }
+
+void set_compress_runtime_variables(struct Arguments* args, data_format_t* df)
+{
+  int mz_fmt = get_algo_type(args->mz_lossy);
+  int inten_fmt = get_algo_type(args->int_lossy);
+
+  // Set target compression functions.
+  df->target_mz_fun    = set_compress_algo(mz_fmt, df->source_mz_fmt);
+  df->target_inten_fun = set_compress_algo(inten_fmt, df->source_inten_fmt);
+  
+  // Set decoding function based on source compression format.
+  df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, mz_fmt, df->source_mz_fmt);
+  df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, inten_fmt, df->source_inten_fmt);
+
+  // Set target formats.
+  df->target_xml_format   = args->target_xml_format;
+  df->target_mz_format    = args->target_mz_format;
+  df->target_inten_format = args->target_inten_format;
+
+  // Set target compression functions.
+  df->xml_compression_fun   = set_compress_fun(df->target_xml_format);
+  df->mz_compression_fun    = set_compress_fun(df->target_mz_format);
+  df->inten_compression_fun = set_compress_fun(df->target_inten_format);
+
+
+  // Set ZSTD compression level.
+  df->zstd_compression_level = args->zstd_compression_level; 
+
+  // Set scale factor.
+  df->mz_scale_factor = args->mz_scale_factor;
+  df->int_scale_factor = args->int_scale_factor;
+
+  return;
+}

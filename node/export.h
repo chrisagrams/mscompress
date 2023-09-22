@@ -31,6 +31,7 @@ namespace mscompress
     Napi::Object CreateDataPositionsObject(const Napi::Env& env, data_positions_t* dp);
     Napi::Object CreateDivisionObject(const Napi::Env& env, division_t* division);
     division_t* NapiObjectToDivisionT(const Napi::Object& obj);
+    divisions_t* NapiObjectToDivisionsT(const Napi::Object& obj);
     Arguments* NapiObjectToArguments(const Napi::Object& obj);
 
     // Function Wraps
@@ -38,6 +39,7 @@ namespace mscompress
     Napi::Number GetNumThreads(const Napi::CallbackInfo& info);
     Napi::Number GetFilesize(const Napi::CallbackInfo& info);
     Napi::Number GetFileDescriptor(const Napi::CallbackInfo& info);
+    Napi::Number GetOutputFileDescriptor(const Napi::CallbackInfo& info);
     Napi::Number CloseFileDescriptor(const Napi::CallbackInfo& info);
     Napi::Number GetFileType(const Napi::CallbackInfo& info);
     Napi::Value CreateMmapPointer(const Napi::CallbackInfo& info);
@@ -47,6 +49,7 @@ namespace mscompress
     Napi::Value DecodeBinary(const Napi::CallbackInfo& info);
     Napi::String GetZlibVersion(const Napi::CallbackInfo& info);
     Napi::Value PrepareCompression(const Napi::CallbackInfo& info);
+    Napi::Value Compress(const Napi::CallbackInfo& info);
 
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);

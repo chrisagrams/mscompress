@@ -55,6 +55,24 @@ namespace mscompress {
         return Napi::Number::New(env, fd);
     }
 
+    Napi::Number GetOutputFileDescriptor(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+
+        // Check if at least one argument is passed
+        if (info.Length() < 1 || !info[0].IsString()) {
+            Napi::TypeError::New(env, "GetOutputFileDescriptor: string expected as argument").ThrowAsJavaScriptException();
+            return Napi::Number::New(env, 0);
+        }
+        // Get the path
+        Napi::String pathValue = info[0].As<Napi::String>();
+        std::string path = pathValue.Utf8Value();
+        char* charPath = (char*)path.c_str(); // Convert to char*
+
+        std::cout << "GetOutputFileDescriptor: " << charPath << std::endl;
+        int fd = open_output_file(charPath);
+        return Napi::Number::New(env, fd);
+    }
+
     Napi::Number CloseFileDescriptor(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
 
@@ -291,12 +309,58 @@ namespace mscompress {
         return result;
     }
 
-    // Napi::Value CreateFooter(const Napi::CallbackInfo& info)
-    // /*
-    
-    // */
-    // {
+    Napi::Value Compress(const Napi::CallbackInfo& info)
+    {
+        /*
+        Need to receive:
+            char* input_map
+            size_t input_filesize
+            arguments
+            df
+            divisions
+            output_fd
+        */
+        Napi::Env env = info.Env();
 
-    // }
+        if(info.Length() < 6 || !info[0].IsExternal() || !info[1].IsNumber() || !info[2].IsObject() || !info[3].IsObject() || !info[4].IsObject() || !info[5].IsNumber())
+        {
+            Napi::TypeError::New(env, "Compress expected arguments: (External<void>, Number, Object, Object, Object, Number)").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+
+        // Parse input_map
+        void* input_map = info[0].As<Napi::External<void>>().Data();
+
+        // Parse input_filesize
+        size_t input_filesize = info[1].As<Napi::Number>().Int64Value();
+
+        // Parse arguments
+        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+
+        // Parse df
+        data_format_t* df = NapiObjectToDataFormatT(info[3].As<Napi::Object>());
+
+        // Parse divisions (not working yet)
+        // divisions_t* divisions = NapiObjectToDivisionsT(info[4].As<Napi::Object>());
+
+        // For now, recompute divisions
+        divisions_t* divisions;
+        preprocess_mzml((char*)input_map,
+                        input_filesize,
+                        &(args->blocksize),
+                        args,
+                        &df,
+                        &divisions);
+        
+        // Parse output_fd
+        int output_fd = info[5].As<Napi::Number>().Int32Value();
+
+        // Run
+        std::cout << "Starting compression..." << std::endl;
+        compress_mzml((char*)input_map, input_filesize, args, df, divisions, output_fd);
+        std::cout << "Compression finished." << std::endl;
+
+        return env.Null();
+    }
 
 }

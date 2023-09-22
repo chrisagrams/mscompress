@@ -10,6 +10,7 @@ namespace mscompress {
         exports.Set("getThreads", Napi::Function::New(env, GetNumThreads));
         exports.Set("getFilesize", Napi::Function::New(env, GetFilesize));
         exports.Set("getFileDescriptor", Napi::Function::New(env, GetFileDescriptor));
+        exports.Set("getOutputFileDescriptor", Napi::Function::New(env, GetOutputFileDescriptor));
         exports.Set("closeFileDescriptor", Napi::Function::New(env, CloseFileDescriptor));
         exports.Set("getFileType", Napi::Function::New(env, GetFileType));
         exports.Set("getMmapPointer", Napi::Function::New(env, CreateMmapPointer));
@@ -19,6 +20,7 @@ namespace mscompress {
         exports.Set("decodeBinary", Napi::Function::New(env, DecodeBinary));
         exports.Set("getZlibVersion", Napi::Function::New(env, GetZlibVersion));
         exports.Set("prepareCompression", Napi::Function::New(env, PrepareCompression));
+        exports.Set("compress", Napi::Function::New(env, Compress));
         return exports;
     }
 

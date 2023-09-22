@@ -505,6 +505,28 @@ open_file(char* path)
 }
 
 int
+open_output_file(char* path)
+{
+  int fd = -1;
+
+  if (path)
+  {
+    #ifdef _WIN32
+        fd = _open(path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_APPEND | _O_BINARY, 0666); // open in binary mode to avoid newline translation in Windows. 
+    #else 
+        fd = open(path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    #endif
+    if(fd < 0)
+      warning("Error in opening output file descriptor. (%s)\n", strerror(errno));
+    else
+      fds[1] = fd;
+  }
+
+  return fd;
+
+}
+
+int
 close_file(int fd)
 {
   int ret = close(fd); // expands to _close on Windows
@@ -582,14 +604,7 @@ prepare_fds(char* input_path,
 
   if(*output_path)
   {
-    #ifdef _WIN32
-          output_fd = _open(*output_path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_APPEND | _O_BINARY, 0666); // open in binary mode to avoid newline translation in Windows. 
-    #else 
-        output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
-    #endif
-    if(output_fd < 0)
-      error("Error in opening output file descriptor. (%s)\n", strerror(errno));
-    fds[1] = output_fd;
+    output_fd = open_output_file(*output_path);
     return type;
   }
    
@@ -599,7 +614,7 @@ prepare_fds(char* input_path,
   else if(type == DECOMPRESS)
     *output_path = change_extension(input_path, ".mzML\0");
 
-  output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+   output_fd = open_output_file(*output_path);
 
   if(output_fd < 0)
     error("Error in opening output file descriptor. (%s)\n", strerror(errno));

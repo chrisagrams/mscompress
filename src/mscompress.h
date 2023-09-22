@@ -268,7 +268,7 @@ int set_mz_lossy(struct Arguments* args, const char* mz_lossy);
 int set_int_lossy(struct Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
-
+void set_compress_runtime_variables(struct Arguments* args, data_format_t* df);
 
 /* file.c */
 extern long fd_pos[3];
@@ -289,6 +289,7 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output, char**
 int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
 int open_file(char* path);
+int open_output_file(char* path);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
 int close_file(int fd);
@@ -376,7 +377,7 @@ ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
-void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
+void compress_mzml(char* input_map, size_t input_filesize, struct Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 

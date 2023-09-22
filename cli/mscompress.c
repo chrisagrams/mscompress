@@ -240,9 +240,6 @@ main(int argc, char* argv[])
     {
       case COMPRESS:
       {
-        // Initialize footer to all 0's to not write garbage to file.
-        footer_t* footer = calloc(1, sizeof(footer_t));   
-
         print("\tDetected .mzML file, starting compression...\n");
 
         // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
@@ -252,46 +249,12 @@ main(int argc, char* argv[])
                         &arguments,
                         &df,
                         &divisions);
-        
-        footer->original_filesize = input_filesize;
-        footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
-
-        // Set target formats.
-        df->target_xml_format   = arguments.target_xml_format;
-        df->target_mz_format    = arguments.target_mz_format;
-        df->target_inten_format = arguments.target_inten_format;
-
-        // Set target compression functions.
-        df->xml_compression_fun   = set_compress_fun(df->target_xml_format);
-        df->mz_compression_fun    = set_compress_fun(df->target_mz_format);
-        df->inten_compression_fun = set_compress_fun(df->target_inten_format);
-
-        // Parse arguments for compression algorithms and set formats accordingly.
-        
-        // Store format integer in footer.
-        footer->mz_fmt    = get_algo_type(arguments.mz_lossy);
-        footer->inten_fmt = get_algo_type(arguments.int_lossy);
-        
-        // Set target compression functions.
-        df->target_mz_fun    = set_compress_algo(footer->mz_fmt, df->source_mz_fmt);
-        df->target_inten_fun = set_compress_algo(footer->inten_fmt, df->source_inten_fmt);
-        
-        // Set decoding function based on source compression format.
-        df->decode_source_compression_mz_fun    = set_decode_fun(df->source_compression, footer->mz_fmt, df->source_mz_fmt);
-        df->decode_source_compression_inten_fun = set_decode_fun(df->source_compression, footer->inten_fmt, df->source_inten_fmt);
-
-        // Set ZSTD compression level.
-        df->zstd_compression_level = arguments.zstd_compression_level; 
-
-        // Set scale factor.
-        df->mz_scale_factor = arguments.mz_scale_factor;
-        df->int_scale_factor = arguments.int_scale_factor;
+      
 
         //Start compress routine.
         compress_mzml((char*)input_map,
-                      arguments.blocksize,
-                      arguments.threads,
-                      footer,
+                      input_filesize,
+                      &arguments,
                       df,
                       divisions,
                       fds[1]);

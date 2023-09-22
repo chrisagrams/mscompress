@@ -219,6 +219,10 @@ img {
     margin: 0;
 }
 
+#center-container > #start {
+    margin-top: auto;
+}
+
 #right-container > h6 {
     margin: 0;
 }

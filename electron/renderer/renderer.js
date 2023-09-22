@@ -194,6 +194,22 @@ class FileHandle {
     window.ipcRenderer.send('render-tic-plot', this.path);
   }
 
+  async convert(output_path) {
+    if (this.type == 1) //mzml
+    {
+      if (output_path == null)
+        throw new Error("Output path not specified");
+      if(this.df == null)
+        await this.get_accessions();
+      if(this.positions == null)
+        await this.get_positions();
+      output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+      if(output_fd <= 0)
+        throw new Error("get_output_fd error");
+      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
+    }
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2;

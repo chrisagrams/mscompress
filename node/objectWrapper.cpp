@@ -280,6 +280,20 @@ namespace mscompress {
         return division;
     }
 
+    /* Napi -> C divisions (multiple) */
+    divisions_t* NapiObjectToDivisionsT(const Napi::Object& obj) {
+        divisions_t* divisions = new divisions_t();
+        Napi::Array divisionsArray = obj.Get("divisions").As<Napi::Array>();
+        divisions->divisions = new division_t*[divisionsArray.Length()];
+        divisions->n_divisions = divisionsArray.Length();
+
+        for (uint32_t i = 0; i < divisionsArray.Length(); i++) {
+            Napi::Object division = divisionsArray.Get(i).As<Napi::Object>();
+            divisions->divisions[i] = NapiObjectToDivisionT(division);
+        }
+        return divisions;
+    }
+
     /* Napi -> C arguments */
     struct Arguments* NapiObjectToArguments(const Napi::Object& obj) {
         struct Arguments* args = new Arguments();

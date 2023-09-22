@@ -23,6 +23,13 @@ onmessage = (e) => {
             'value': mscompress.getFileDescriptor(e.data.path)
         });
     }
+    else if (e.data.type === "get_output_fd") {
+        postMessage({
+            'type': "get_output_fd",
+            'path': e.data.path,
+            'value': mscompress.getOutputFileDescriptor(e.data.path)
+        });
+    }
     else if (e.data.type === "close_fd") {
         let ret = mscompress.closeFileDescriptor(e.data.fd);
         mmapStore.delete(e.data.fd);
@@ -97,6 +104,14 @@ onmessage = (e) => {
             'type': "prepare_compress",
             'fd': e.data.fd,
             'value': mscompress.prepareCompression(e.data.div, e.data.df, {"threads": 2}) //TODO: add arguments
+        });
+    }
+    else if (e.data.type == "compress") {
+        let pointer = mmapStore.get(e.data.fd);
+        postMessage({
+            'type': "compress",
+            'fd': e.data.fd,
+            'value': mscompress.compress(pointer, e.data.filesize, {"threads": 2}, e.data.df, {}, e.data.output_fd) //TODO: add arguments
         });
     }
 }
