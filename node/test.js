@@ -1,10 +1,16 @@
-const mscompress = require("./build/Debug/mscompress.node");
+const mscompress = require("./build/Release/mscompress.node");
 
 
-let file = "C:\\Users\\Chris\\Downloads\\SP_HighGrade-PrCa-Set1_Fr12.mzML"
-let output_file = "C:\\Users\\Chris\\Downloads\\node_test.msz"
+// let file = "C:\\Users\\Chris\\Downloads\\SP_HighGrade-PrCa-Set1_Fr12.mzML"
+// let output_file = "C:\\Users\\Chris\\Downloads\\node_test.msz"
 
-let test_file = "C:\\Users\\Chris\\Downloads\\test.mzML"
+// let test_file = "C:\\Users\\Chris\\Downloads\\test.mzML"
+
+
+let file = "/Users/chrisgrams/Notes/Gao\ Lab/SP_HighGrade-PrCa-Set1_Fr12.mzML";
+let output_file = "/Users/chrisgrams/Downloads/node_test.msz"
+
+let test_file = "/Users/chrisgrams/Downloads/node_test.mzML"
 
 let threads = mscompress.getThreads();
 let fd = mscompress.getFileDescriptor(file);

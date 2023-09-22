@@ -211,6 +211,20 @@ class FileHandle {
       await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
       hideLoading();
     }
+    else if (this.type == 2) //msz
+    {
+      if (output_path == null)
+        throw new Error("Output path not specified");
+      if(this.fd <= 0)
+        this.open();
+      const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+      if(output_fd <= 0)
+        throw new Error("get_output_fd error");
+
+      showLoading();
+      await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd});
+      hideLoading();
+    }
   }
 
 
@@ -335,11 +349,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const fh = getSelectedFileHandle();
     const output_path = document.querySelector("#output-directory-path").value;
 
-   // Extract just the filename
-   const filename = fh.path.split('/').pop();
+    // Extract just the filename
+    const filename = fh.path.split('/').pop();
 
-   // Replace the extension with .msz
-   const newFilename = filename.replace(/\.[^\.]+$/, '.msz');
+    // Replace the extension with .msz or .mzML
+
+    let newFilename = "";
+    if(fh.type == 1)
+      newFilename = filename.replace(/\.[^\.]+$/, '.msz');
+    else if(fh.type == 2)
+      newFilename = filename.replace(/\.[^\.]+$/, '.mzML');
 
     // Set the output path
     const newOutputPath = `${output_path}/${newFilename}`;

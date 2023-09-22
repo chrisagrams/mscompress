@@ -310,7 +310,10 @@ decompress_msz(char* input_map,
             &n_divisions);
 
     if(n_divisions == 0)
-        error("No divisions found in file, aborting...\n");
+    {
+        warning("No divisions found in file, aborting...\n");
+        return;
+    }
 
     set_decompress_runtime_variables(arguments, df, msz_footer);
     

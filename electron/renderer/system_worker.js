@@ -114,6 +114,14 @@ onmessage = (e) => {
             'value': mscompress.compress(pointer, e.data.filesize, {"threads": 2}, e.data.df, {}, e.data.output_fd) //TODO: add arguments
         });
     }
+    else if (e.data.type == "decompress") {
+        let pointer = mmapStore.get(e.data.fd);
+        postMessage({
+            'type': "decompress",
+            'fd': e.data.fd,
+            'value': mscompress.decompress(pointer, e.data.filesize, {"threads": 2}, e.data.output_fd)
+        });
+    }
 }
 
 onerror = (e) => {
