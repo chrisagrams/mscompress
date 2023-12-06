@@ -314,7 +314,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const files = e.dataTransfer.files;
 
     Array.from(files).forEach(f => {
-      createFileCard(f.path);
+      createFileCard(f.path).then(card => {
+        // Append card to container
+        document.querySelector("#left-container").append(card);
+        // Select card
+        card.click();
+      });
     })
   });
 
@@ -329,7 +334,12 @@ document.addEventListener('DOMContentLoaded', () => {
   window.ipcRenderer.on('selected-files', (arr) => {
     console.log("Selected files: ", arr);
     arr.forEach(f => {
-      createFileCard(f);
+      createFileCard(f).then(card => {
+        // Append card to container
+        document.querySelector("#left-container").append(card);
+        // Select card
+        card.click();
+      });
     })
   });
 
@@ -517,11 +527,17 @@ const createFileCard = async (path) => {
   showLoading();
   console.log("createFileCard: ", path);
 
+  if(path == null) {
+    throw new Error("path is null");
+  }
   // Create new FileHandle
   const fh = new FileHandle(path);
   filehandles.push(fh);
   await fh.open();
   console.log(fh);
+
+  // Create card
+  let card;
 
   // Check if valid
   if(fh.isValid)
@@ -530,7 +546,7 @@ const createFileCard = async (path) => {
     document.querySelector(".placeholder").classList.add('hidden');
 
     // Create card
-    const card = document.createElement('div');
+    card = document.createElement('div');
     card.classList.add("fileCard");
     card.id = "fd_" + fh.fd;
 
@@ -583,12 +599,6 @@ const createFileCard = async (path) => {
 
     card.append(card_header, name, size, p);
 
-    // Append card to container
-    document.querySelector("#left-container").append(card);
-
-    // Select card
-    card.click();
-
   }
   else
   {
@@ -596,8 +606,8 @@ const createFileCard = async (path) => {
     checkPlaceholder(); // if error, make sure placeholder is shown if no cards are present
     throw new Error("Not a valid file (mzML/msz)");
   }
-
   hideLoading();
+  return card;
 }
 
 const getSelectedFileHandle = () => {
