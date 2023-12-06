@@ -104,6 +104,7 @@ ipcMain.on('render-tic-plot', (e, file) => {
   });
   ticPlot.stderr.on('data', data => {
     console.error(data.toString());
+    e.sender.send('tic-plot-error', data.toString());
   });
   ticPlot.on('close', code => {
     console.log(`TIC plot process exited with code ${code}`);

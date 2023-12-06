@@ -397,7 +397,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.ipcRenderer.on('tic-plot-status', (e) => {
     console.log(e);
     document.querySelector(".analysis").querySelector('.message').textContent = e;
-  })
+  });
+
+  // Handle TIC plot error
+  window.ipcRenderer.on('tic-plot-error', (e) => {
+    console.error(e);
+    showError(e);
+  });
 
 });
 
@@ -426,6 +432,7 @@ system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System3
 
 system_worker.onerror = (e) => {
   console.error(e.message, e);
+  showError(e.message);
 };
 
 const checkPlaceholder = () => {

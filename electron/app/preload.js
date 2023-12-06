@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     },
     on: (channel, callback) => {
         //whitelist channels
-        let validChannels = ['selected-files', 'selected-output-directory', 'current-app-metrics', 'tic-plot', 'tic-plot-status', 'set-default-path'];
+        let validChannels = ['selected-files', 'selected-output-directory', 'current-app-metrics', 'tic-plot', 'tic-plot-status', 'tic-plot-error', 'set-default-path'];
         if(validChannels.includes(channel)) {
             ipcRenderer.on(channel, (e, ...args) => callback(...args));
         }
