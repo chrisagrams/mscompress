@@ -360,18 +360,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const output_path = document.querySelector("#output-directory-path").value;
 
     // Extract just the filename
-    const filename = fh.path.split('/').pop();
+    const pathParts = fh.path.split(/[/\\]/); // Split on both forward and backward slashes
+    const filename = pathParts.pop(); // Get the last part of the path, which should be the filename
 
     // Replace the extension with .msz or .mzML
-
     let newFilename = "";
     if(fh.type == 1)
       newFilename = filename.replace(/\.[^\.]+$/, '.msz');
     else if(fh.type == 2)
       newFilename = filename.replace(/\.[^\.]+$/, '.mzML');
 
-    // Set the output path
-    const newOutputPath = `${output_path}/${newFilename}`;
+    // Construct the new output path in a platform-independent way
+    const newOutputPath = [output_path, newFilename].join('/').replace(/\\/g, '/');
 
     console.log(newOutputPath);
 
