@@ -9,6 +9,7 @@
 #include <string.h>
 #include "../vendor/zlib/zlib.h"
 #include <zstd.h>
+#include <lz4.h>
 #include "mscompress.h"
 
 ZSTD_DCtx *
@@ -50,6 +51,45 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 
     return out_buff;
 
+}
+
+void*
+lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
+{
+    void* out_buff;
+    int decompressed_size;
+
+    if(src_buff == NULL)
+    {
+        warning("lz4_decompress: src_buff is null.\n");
+        return NULL;
+    }
+    if(src_len < 0)
+    {
+        warning("lz4_decompress: src_len < 0.\n");
+        return NULL;
+    }
+    if(org_len < 0)
+    {
+        warning("lz4_decompress: org_len <0.\n");
+        return NULL;
+    }
+
+    out_buff = malloc(org_len);
+    if(out_buff == NULL)
+    {
+        warning("lz4_decompress: error in malloc()\n");
+        return NULL;
+    }
+
+    decompressed_size = LZ4_decompress_safe(src_buff, out_buff, src_len, org_len);
+    if (decompressed_size < 0) {
+        warning("lz4_decompress: error in LZ4_decompress_safe\n");
+        free(out_buff);
+        return NULL;
+    }
+
+    return out_buff;
 }
 
 void*
@@ -422,6 +462,7 @@ set_decompress_fun(int accession)
     switch(accession)
     {
         case _ZSTD_compression_ :       return zstd_decompress;
+        case _LZ4_compression_ :        return lz4_decompress;
         case _no_comp_ :                return no_decompress;
         default :                       error("Compression type not supported.");
     }

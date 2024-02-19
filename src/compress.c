@@ -9,6 +9,7 @@
 #include <string.h>
 #include "../vendor/zlib/zlib.h"
 #include <zstd.h>
+#include <lz4.h>
 #include "mscompress.h"
 
 
@@ -140,6 +141,65 @@ zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, 
     #endif
 
     return out_buff;
+}
+
+void* 
+lz4_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level)
+{
+    void* out_buff;
+    int max_compressed_size;
+    int compressed_data_size;
+
+    if (src_buff == NULL)
+    {
+        warning("lz4_compress: src_buff is null.\n");
+        return NULL;
+    }
+    if (src_len < 0)
+    {
+        warning("lz4_compress: src_len < 0.\n");
+        return NULL;
+    }
+    if (out_len == NULL)
+    {
+        warning("lz4_compress: out_len is null.\n");
+        return NULL;
+    }
+    if(compression_level < 1 || compression_level > 12)
+    {
+        warning("lz4_compress: compression_level out of bounds.\n");
+        return NULL;
+    }
+
+    if(src_len == 0)
+    {
+        *out_len = 0;
+        return NULL;
+    }
+
+    max_compressed_size = LZ4_compressBound(src_len);
+    out_buff = malloc(max_compressed_size);
+
+    if (out_buff == NULL)
+    {
+        warning("lz4_compress: error in malloc().\n");
+        return NULL;
+    }
+
+    compressed_data_size = LZ4_compress_default(src_buff, out_buff, src_len, max_compressed_size);
+    if(compressed_data_size > 0) 
+    {
+        *out_len = compressed_data_size;
+        return out_buff;
+    }
+    else
+    {
+        warning("lz4_compress: error in LZ4_compress_default\n");
+        free(out_buff);
+        return NULL;
+    }
+
+    return NULL;
 }
 
 void*
@@ -734,6 +794,7 @@ set_compress_fun(int accession)
     switch(accession)
     {
         case _ZSTD_compression_ :       return zstd_compress;
+        case _LZ4_compression_ :        return lz4_compress;
         case _no_comp_ :                return no_compress;
         default :                       error("Compression type not supported.");
     }
@@ -746,6 +807,8 @@ get_compress_type(char* arg)
         error("Compression type not specified.");
     if(strcmp(arg, "zstd") == 0 || strcmp(arg, "ZSTD") == 0)
         return _ZSTD_compression_;
+    if(strcmp(arg, "lz4") == 0 || strcmp(arg, "LZ4") == 0)
+        return _LZ4_compression_;
     if(strcmp(arg, "nocomp") == 0 || strcmp(arg, "none") == 0)
         return _no_comp_;
 }
