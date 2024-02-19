@@ -12,6 +12,12 @@ option(ENABLE_DEBUG_SYMBOLS "Enable debugging symbols" OFF)
 # Set the build type based on the CMAKE_BUILD_TYPE variable
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of build.")
 
+if(APPLE)
+    # Set the compiler to Clang
+    set(CMAKE_C_COMPILER "/usr/bin/clang")
+    set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+endif()
+
 # Set the build type to Debug if debugging symbols are enabled
 if(ENABLE_DEBUG_SYMBOLS)
     set(CMAKE_BUILD_TYPE Debug)

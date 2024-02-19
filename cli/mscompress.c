@@ -292,7 +292,7 @@ main(int argc, char* argv[])
     // free_ddp(mz_binary_divisions, divisions);
     // free_ddp(inten_binary_divisions, divisions);
 
-    dealloc_df(df);
+    // dealloc_df(df);
 
     remove_mapping(input_map, fds[0]);
 
