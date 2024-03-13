@@ -1,6 +1,7 @@
 #include <zstd.h>
+#include <stdint.h>
 #include <sys/types.h>
-#include "vendor/zlib/zlib.h"
+#include "../vendor/zlib/zlib.h"
 
 #define VERSION "0.0.1"
 #define STATUS "Dev"
@@ -25,9 +26,9 @@
 #define MESSAGE_SIZE         128
 #define MESSAGE_OFFSET       12
 #define DATA_FORMAT_T_OFFSET 140
-#define DATA_FORMAT_T_SIZE   44   /* ignores private members */
-#define BLOCKSIZE_OFFSET     184
-#define MD5_OFFSET           192
+#define DATA_FORMAT_T_SIZE   36   /* ignores private members (serialized)*/
+#define BLOCKSIZE_OFFSET     176
+#define MD5_OFFSET           184
 #define MD5_SIZE             32
 #define HEADER_SIZE          512
 
@@ -59,11 +60,21 @@
 #define _vdelta24_transform_ 4700010
 #define _cast_64_to_16_      4700011
 
+#define _LZ4_compression_   4700012
+
 #define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
+
+#define MSLEVEL 0x01
+#define SCANNUM 0x02
+#define RETTIME 0x04
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern int verbose;
 
@@ -109,15 +120,15 @@ typedef decompression_fun (*decompression_fun_ptr)();
 typedef struct
 {
     /* source information (source mzML) */
-    int source_mz_fmt;
-    int source_inten_fmt;
-    int source_compression;
-    int source_total_spec;
+    uint32_t source_mz_fmt;
+    uint32_t source_inten_fmt;
+    uint32_t source_compression;
+    uint32_t source_total_spec;
 
-    /* target information */
-    int target_xml_format;
-    int target_mz_format;
-    int target_inten_format;
+    /* target information (target msz)*/
+    uint32_t target_xml_format;
+    uint32_t target_mz_format;
+    uint32_t target_inten_format;
 
     /* algo parameters */
     float mz_scale_factor; 
@@ -146,8 +157,8 @@ typedef struct
 
 typedef struct
 {
-    off_t* start_positions;
-    off_t* end_positions;
+    uint64_t* start_positions;
+    uint64_t* end_positions;
     int total_spec;
     size_t file_end; //TODO: remove this
 } data_positions_t;
@@ -160,10 +171,11 @@ typedef struct
     data_positions_t* mz;
     data_positions_t* inten;
 
-    size_t size;
+    uint64_t size;
 
     long* scans;
     long* ms_levels;
+    float* ret_times;
 
 } division_t;
 
@@ -184,7 +196,7 @@ typedef struct
 } data_block_t;
 
 
-typedef struct
+typedef struct cmp_block_t
 {
     char* mem;
     size_t size;
@@ -204,7 +216,7 @@ typedef struct
 } cmp_blk_queue_t;
 
 
-typedef struct 
+typedef struct block_len_t
 {
     size_t original_size;
     size_t compressed_size;
@@ -224,15 +236,15 @@ typedef struct
 
 typedef struct
 {
-    off_t xml_pos;          // msz file position of start of compressed XML data.
-    off_t mz_binary_pos;    // msz file position of start of compressed m/z binary data.
-    off_t inten_binary_pos;   // msz file position of start of compressed int binary data.
-    off_t xml_blk_pos;
-    off_t mz_binary_blk_pos;
-    off_t inten_binary_blk_pos;
-    off_t divisions_t_pos;
+    uint64_t xml_pos;          // msz file position of start of compressed XML data.
+    uint64_t mz_binary_pos;    // msz file position of start of compressed m/z binary data.
+    uint64_t inten_binary_pos;   // msz file position of start of compressed int binary data.
+    uint64_t xml_blk_pos;
+    uint64_t mz_binary_blk_pos;
+    uint64_t inten_binary_blk_pos;
+    uint64_t divisions_t_pos;
     size_t num_spectra;
-    off_t original_filesize;
+    uint64_t original_filesize;
     int n_divisions;
     int magic_tag;
     int mz_fmt;
@@ -251,26 +263,42 @@ typedef struct
 } zlib_block_t;
 
 
+/* arguments.c */
+void init_args(struct Arguments* args);
+int set_threads(struct Arguments* args, int threads);
+int set_mz_lossy(struct Arguments* args, const char* mz_lossy);
+int set_int_lossy(struct Arguments* args, const char* int_lossy);
+int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
+int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
+void set_compress_runtime_variables(struct Arguments* args, data_format_t* df);
+void set_decompress_runtime_variables(struct Arguments* args, data_format_t* df, footer_t* msz_footer);
+
 /* file.c */
+extern long fd_pos[3];
+extern int fds[3];
+
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
-int get_blksize(char* path);
 size_t get_filesize(char* path);
-ssize_t write_to_file(int fd, char* buff, size_t n);
-ssize_t read_from_file(int fd, void* buff, size_t n);
+size_t write_to_file(int fd, char* buff, size_t n);
+size_t read_from_file(int fd, void* buff, size_t n);
 void write_header(int fd, data_format_t* df, long blocksize, char* md5);
-off_t get_offset(int fd);
+long get_offset(int fd);
 long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
+int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
-int is_mzml(int fd);
-int is_msz(int fd);
-
+int open_file(char* path);
+int open_output_file(char* path);
+int is_mzml(void* input_map, size_t input_length);
+int is_msz(void* input_map, size_t input_length);
+int close_file(int fd);
 
 /* mem.c */
+
 data_block_t* alloc_data_block(size_t max_size);
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
 void dealloc_data_block(data_block_t* db);
@@ -278,6 +306,7 @@ cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
 void dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
+
 data_format_t* pattern_detect(char* input_map);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
@@ -294,29 +323,39 @@ void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
 void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+divisions_t* create_divisions(division_t* div, long n_divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 long* string_to_array(char* str, long* size);
 void map_scan_to_index(struct Arguments* arguments, division_t* div);
-int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, long n_threads, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
+division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
+int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 
 /* sys.c */
-void prepare_threads(long args_threads, long* n_threads);
+
+int get_num_threads();
+void prepare_threads(struct Arguments* args);
 int get_thread_id();
+double get_time(void);
 int print(const char* format, ...);
 int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
 /* decode.c */
+
+void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len);
 decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
+
 /* encode.c */
+
 encode_fun_ptr set_encode_fun(int compression_method, int algo, int accession);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
+
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
 /* extract.c */
@@ -341,7 +380,7 @@ ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
-void compress_mzml(char* input_map, long blocksize, int threads, footer_t* footer, data_format_t* df, divisions_t* divisions, int output_fd);
+void compress_mzml(char* input_map, size_t input_filesize, struct Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
@@ -355,9 +394,9 @@ typedef struct
     block_len_t* mz_binary_blk;
     block_len_t* inten_binary_blk;
     division_t* division;
-    off_t footer_xml_off;
-    off_t footer_mz_bin_off;
-    off_t footer_inten_bin_off;
+    uint64_t footer_xml_off;
+    uint64_t footer_mz_bin_off;
+    uint64_t footer_inten_bin_off;
 
     char* ret;
     size_t ret_len;
@@ -368,14 +407,10 @@ typedef struct
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
 void decompress_routine(void* args);
-void decompress_parallel(char* input_map,
-                    block_len_queue_t* xml_block_lens,
-                    block_len_queue_t* mz_binary_block_lens,
-                    block_len_queue_t* inten_binary_block_lens,
-                    divisions_t* divisions,
-                    data_format_t* df,
-                    footer_t* msz_footer,
-                    int threads, int fd);
+void decompress_msz(char* input_map,
+    size_t input_filesize,
+    struct Arguments* args,
+    int fd);
 decompression_fun set_decompress_fun(int accession);
 
 
@@ -427,3 +462,7 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output, uInt input
 
 /* debug.c */
 void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, int fd);
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,0 +1,45 @@
+# Set the variables based on environment flags (note, VENDOR_DIR is set in the parent CMakeLists.txt)
+if(DEFINED ENV{AVX2_CFLAGS})
+    set(HAVE_AVX2 1)
+else()
+    set(HAVE_AVX2 0)
+endif()
+
+if(DEFINED ENV{NEON32_CFLAGS})
+    set(HAVE_NEON32 1)
+else()
+    set(HAVE_NEON32 0)
+endif()
+
+if(DEFINED ENV{NEON64_CFLAGS})
+    set(HAVE_NEON64 1)
+else()
+    set(HAVE_NEON64 0)
+endif()
+
+if(DEFINED ENV{SSSE3_CFLAGS})
+    set(HAVE_SSSE3 1)
+else()
+    set(HAVE_SSSE3 0)
+endif()
+
+if(DEFINED ENV{SSE41_CFLAGS})
+    set(HAVE_SSE41 1)
+else()
+    set(HAVE_SSE41 0)
+endif()
+
+if(DEFINED ENV{SSE42_CFLAGS})
+    set(HAVE_SSE42 1)
+else()
+    set(HAVE_SSE42 0)
+endif()
+
+if(DEFINED ENV{AVX_CFLAGS})
+    set(HAVE_AVX 1)
+else()
+    set(HAVE_AVX 0)
+endif()
+
+# Generate the config.h file
+configure_file(${VENDOR_DIR}/config.h.in ${VENDOR_DIR}/base64/lib/config.h)

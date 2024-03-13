@@ -5,15 +5,93 @@
             "name": "Compress",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/mscompress",
+            "program": "${workspaceFolder}/cli/mscompress",
             "args": ["-v", "test.mzML", "test.msz"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "preLaunchTask": "C build"
-        }
+            "preLaunchTask": "CMake Configure and Build",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug N-API Module",
+            "program": "${workspaceFolder}/node/test.js",
+            "preLaunchTask": "Build N-API Module",
+            "cwd": "${workspaceFolder}/node",
+            "runtimeExecutable": "node",
+            "runtimeArgs": ["--napi-modules"],
+            "windows": {
+              "runtimeExecutable": "node.exe"
+            }
+          },
+          {
+            "name": "(gdb) Attach",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/node/build/Release/mscompress.node",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false
+          },
+          {
+            "name": "(Windows) Attach",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/node/build/Debug/mscompress.node",
+            "processId": "${command:pickProcess}",
+            "logging": {
+              "engineLogging": true,
+              "trace": true,
+              "traceResponse": true
+            }
+          },
+          {
+            "name": "Debug Electron Main",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/electron",
+            "runtimeExecutable": "${workspaceFolder}/electron/node_modules/.bin/electron",
+            "runtimeArgs": [
+              "--remote-debugging-port=9223",
+              "."
+            ],
+            "protocol": "inspector"
+          },
+          {
+            "name": "Debug N-API Addon",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/node_modules/electron/dist/electron.exe",
+            "args": ["."],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/electron",
+            "environment": [],
+            "externalConsole": false,
+          }
+          
     ],
-    "compounds": []
+    "compounds": [
+      {
+      "name": "Debug Electron + N-API Addon",
+      "configurations": ["Debug Electron Main", "Debug N-API Addon"]
+      }
+  ]
 }

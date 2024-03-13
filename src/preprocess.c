@@ -16,11 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <sys/time.h>
 
-#include "vendor/yxml/yxml.h"
-#include "vendor/base64/lib/config.h"
-#include "vendor/base64/include/libbase64.h"
+#include "yxml.h"
 #include "mscompress.h"
 
 #define parse_acc_to_int(attrbuff) atoi(attrbuff+3)     /* Convert an accession to an integer by removing 'MS:' substring and calling atoi() */
@@ -97,8 +94,8 @@ alloc_dp(int total_spec)
 
     dp->total_spec = total_spec;
     dp->file_end = 0;
-    dp->start_positions = malloc(sizeof(off_t)*total_spec*2);
-    dp->end_positions = malloc(sizeof(off_t)*total_spec*2);
+    dp->start_positions = malloc(sizeof(uint64_t)*total_spec*2);
+    dp->end_positions = malloc(sizeof(uint64_t)*total_spec*2);
 
     if(dp->start_positions == NULL || dp->end_positions == NULL)
         error("alloc_dp: malloc failure.\n");
@@ -184,10 +181,15 @@ alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
     if(d == NULL)
         error("alloc_division: malloc failure.\n");
 
+    d->spectra = NULL;
     d->xml = alloc_dp(n_xml);
     d->mz = alloc_dp(n_mz);
     d->inten = alloc_dp(n_inten);
     d->size = 0;
+
+    d->scans = NULL;
+    d->ms_levels = NULL;
+    d->ret_times = NULL;
 
     if(d->xml == NULL || d->mz == NULL || d->inten == NULL)
         error("alloc_division: malloc failure.\n");
@@ -353,83 +355,8 @@ pattern_detect(char* input_map)
     return NULL;
 }
 
-data_positions_t*
-find_binary(char* input_map, data_format_t* df)
-/**
- * @brief Find the position of all binary data within .mzML file using the yxml library traversal.
- * As the file is mmaped, majority of the .mzML will be loaded into memory during this traversal.
- * Thus, the runtime of this function may be significantly slower as there are many disk reads in this step.
- * 
- * @param input_map A mmap pointer to the .mzML file.
- * 
- * @param df A populated data_format_t struct from pattern_detect(). Use the total_spec field in the struct
- *  to stop the XML traversal once all spectra binary data are found (ignore the chromatogramList)
- *
- * @return A data_positions_t array populated with starting and ending positions of each data section on success.
- *         NULL pointer on failure.
- */
-{
-    data_positions_t* dp = alloc_dp(df->source_total_spec);
-
-    yxml_t* xml = alloc_yxml();
-
-    int spec_index = 0;                         /* Current spectra index in the traversal */
-    int in_binary = 0;                          /* Boolean representing if in a <binary> tag or not. Ignore events if not in <binary> tag. */
-
-    int tag_offset = strlen("</binary>");       /*  
-                                                    yxml triggers an event once it finishes processing a tag.
-                                                    Discard the </binary> tag from the current position by
-                                                    subtracting tag_offset
-                                                */
-
-    for(; *input_map; input_map++)
-    {
-        yxml_ret_t r = yxml_parse(xml, *input_map);
-        if(r < 0)   /* Critical error */
-        {
-            free(xml);
-            free(dp);
-            return NULL;
-        }
-
-        switch(r)
-        {
-            case YXML_ELEMSTART:
-                if(strcmp(xml->elem, "binary") == 0)
-                {
-                    dp->start_positions[spec_index] = xml->total;
-                    in_binary = 1;
-                }
-                else
-                    in_binary = 0;
-                break;
-            
-            case YXML_ELEMEND:
-                if(in_binary)
-                {
-                    dp->end_positions[spec_index] = xml->total - tag_offset;
-                    spec_index++;
-                    if (spec_index >= dp->total_spec * 2)
-                    {
-                        print("\tDetected %d spectra.\n", df->source_total_spec);
-                        free(xml);
-                        return dp;
-                    }
-                    in_binary = 0;
-                }
-                break;
-
-            default:
-                break;
-        }
-    }
-    dealloc_dp(dp);
-    return NULL;
-
-}
-
 void
-validate_positions(off_t* arr, int len)
+validate_positions(uint64_t* arr, int len)
 {
     int i;
     for(i = 0; i < len; i++)
@@ -441,156 +368,91 @@ validate_positions(off_t* arr, int len)
     }
 }
 
-
-division_t*
-find_binary_quick(char* input_map, data_format_t* df, long end)
+char*
+get_spectrum_start(char* ptr)
 {
-    if(input_map == NULL || df == NULL)
-        error("find_binary_quick: NULL pointer passed in.\n");
-    if(end < 0)
-        error("find_binary_quick: end position is negative.\n");
+    char* res = strstr(ptr, "<spectrum ");
+    if(res == NULL)
+        warning("Could not find next spectrum.\n");
+    return res;
+}
 
-    data_positions_t *mz_dp, *inten_dp, *xml_dp;
+char*
+get_spectrum_end(char* ptr)
+{
+    char* res = strstr(ptr, "</spectrum>") + strlen("</spectrum>");
+        if(res == NULL)
+        warning("Could not find end of spectrum.\n");
+    return res;
+}
 
-    xml_dp = alloc_dp(df->source_total_spec * 2);
-    mz_dp = alloc_dp(df->source_total_spec);
-    inten_dp = alloc_dp(df->source_total_spec);
+char*
+get_binary_start(char* ptr)
+{
+    char* res = strstr(ptr, "<binary>") + strlen("<binary>");
+    if(res == NULL)
+        warning("Could not find start of binary.\n");
+    return res;
+}
 
-    if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
-        error("find_binary_quick: failed to allocate memory.\n");
+char*
+get_binary_end(char* ptr)
+{
+    char* res = strstr(ptr, "</binary>");
+    if(res == NULL)
+        warning("Could not find end of binary.\n");
+    return res;
+}
 
-    char* ptr = input_map;
+long
+get_ms_level(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "\"ms level\"") + sizeof("\"ms level\"");
+    if(ptr == NULL)
+        return 0;
+    ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtol(ptr, &e, 10);
+}
 
-    int mz_curr = 0, inten_curr = 0, xml_curr = 0;
+long 
+get_scan(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "scan=") + sizeof("scan=") - 1;
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtol(ptr, &e, 10);
+}
 
-    int curr_scan = 0;
-    int curr_ms_level = 0;
-
-    char* e;
-
-    int bound = df->source_total_spec * 2;
-
-    // xml base case
-    xml_dp->start_positions[xml_curr] = 0;
-
-    while (ptr)
-    {   
-        if(mz_curr + inten_curr == bound)
-            break;
-        
-        if(xml_curr >= bound || mz_curr >= df->source_total_spec || inten_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
-            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
-            
-        ptr = strstr(ptr, "scan=") + 5;
-
-        if(ptr-5 == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
-
-        e = strstr(ptr, "\"");
-
-        if(e == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
-
-        curr_scan = strtol(ptr, &e, 10);
-
-        if(curr_scan == 0)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
-
-        ptr = e;
-
-        ptr = strstr(ptr, "\"ms level\"") + 18;
-
-        if(ptr-18 == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
-        e = strstr(ptr, "\"");
-
-        if(e == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
-        curr_ms_level = strtol(ptr, &e, 10);
-
-        ptr = e;
-
-
-        ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr-8 == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
-        mz_dp->start_positions[mz_curr] = ptr - input_map;
-        xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
-
-
-        
-        ptr = strstr(ptr, "</binary>");
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
-        mz_dp->end_positions[mz_curr] = ptr - input_map;
-        xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
-
-        // scan_nums[curr] = curr_scan;
-        // ms_levels[curr++] = curr_ms_level;
-        mz_curr++;
-
-
-        ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr-8 == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
-        inten_dp->start_positions[inten_curr] = ptr - input_map;
-        xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
-
-        
-        ptr = strstr(ptr, "</binary>");
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
-        inten_dp->end_positions[inten_curr] = ptr - input_map;
-        xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
-        
-        // scan_nums[curr] = curr_scan;
-        // ms_levels[curr++] = curr_ms_level;
-        inten_curr++;
-    
-    }
-
-    if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
-        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
-
-    // xml base case
-    xml_dp->end_positions[xml_curr] = end;
-    xml_curr++;
-    xml_dp->total_spec = xml_curr;
-
-    mz_dp->total_spec = df->source_total_spec;
-    inten_dp->total_spec = df->source_total_spec;
-
-    mz_dp->file_end = inten_dp->file_end = xml_dp->file_end = end;
-
-    // Sanity check
-    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
-    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
-    validate_positions(inten_dp->start_positions, inten_dp->total_spec);
-    validate_positions(inten_dp->end_positions, inten_dp->total_spec);
-    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
-    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
-
-    // Create division_t 
-
-    division_t* div = (division_t*)malloc(sizeof(division_t));
-    if(div == NULL)
-        error("find_binary_quick: failed to allocate division_t.\n");
-
-    div->xml = xml_dp;
-    div->mz = mz_dp;
-    div->inten = inten_dp;
-    div->size = end; // Size is the end of the file
-
-    return div;    
+float
+get_ret_time(char* spectrum_start)
+{
+    char* ptr = strstr(spectrum_start, "accession=\"MS:1000016\"") + sizeof("accession=\"MS:1000016\"");
+    if(ptr == NULL)
+        return 0;
+    ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
+    char* e = strstr(ptr, "\"");
+    if(e == NULL)
+        return 0;
+    return strtof(ptr, &e);
 }
 
 division_t*
-find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
+scan_mzml(char* input_map, data_format_t* df, long end, int flags)
 {
     if(input_map == NULL || df == NULL)
-        error("find_binary_quick: NULL pointer passed in.\n");
+    {
+        warning("scan_mzml: NULL pointer passed in.\n");
+        return NULL;
+    }
     if(end < 0)
-        error("find_binary_quick: end position is negative.\n");
+    {
+        error("scan_mzml: end position is negative.\n");
+        return NULL;
+    }
 
     data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
@@ -599,18 +461,22 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     mz_dp = alloc_dp(df->source_total_spec);
     inten_dp = alloc_dp(df->source_total_spec);
 
-    long* scans = (long*)malloc(sizeof(long) * df->source_total_spec);
-    long* ms_levels = (long*)malloc(sizeof(long) * df->source_total_spec);
+    long* scans = (long*)calloc(df->source_total_spec, sizeof(long));
+    long* ms_levels = (long*)calloc(df->source_total_spec, sizeof(long));
+    float* ret_times = (float*)calloc(df->source_total_spec, sizeof(float));
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
-        error("find_binary_quick: failed to allocate memory.\n");
+    {
+        warning("scan_mzml: failed to allocate memory.\n");
+        return NULL;
+    }
 
     char* ptr = input_map;
 
     int spec_curr = 0, mz_curr = 0, inten_curr = 0, xml_curr = 0;
 
-    int curr_scan = 0;
-    int curr_ms_level = 0;
+    long curr_scan = 0;
+    long curr_ms_level = 0;
 
     char* e;
 
@@ -625,87 +491,60 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
             break;
         
         if(xml_curr >= bound || mz_curr >= df->source_total_spec || inten_curr >= df->source_total_spec) // We cannot continue if we have reached the end of the array
-            error("find_binary_quick: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+        {
+            warning("scan_mzml: index out of bounds. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+            return NULL;
+        }
             
-        ptr = strstr(ptr, "<spectrum ");
-
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find spectrum. index: %d\n", mz_curr + inten_curr);
+        ptr = get_spectrum_start(ptr); // Ptr now points to start of spectrum on successs.
+        if(ptr == NULL) return NULL;
         
         spectra_dp->start_positions[spec_curr] = ptr - input_map;
 
-        ptr = strstr(ptr, "scan=") + 5;
+        // From here, get any metadata we want to extract from the spectrum
+        if(flags & SCANNUM) { // If we want to extract scan numbers
+            scans[spec_curr] = get_scan(ptr);
+            if(ptr == NULL) return NULL;
+        }
 
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
+        if(flags & MSLEVEL) { // If we want to extract ms levels
+            ms_levels[spec_curr] = get_ms_level(ptr);
+            if(ptr == NULL) return NULL;
+        }
 
-        e = strstr(ptr, "\"");
+        if(flags & RETTIME) { // If we want to extract ret_times
+            ret_times[spec_curr] = get_ret_time(ptr); 
+            if(ptr == NULL) return NULL;
+        }
 
-        if(e == NULL)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
-
-        curr_scan = strtol(ptr, &e, 10);
-
-        if(curr_scan == 0)
-            error("find_binary_quick: failed to find scan number. index: %d\n", mz_curr + inten_curr);
-
-        scans[spec_curr] = curr_scan;
-
-        ptr = e;
-
-        ptr = strstr(ptr, "\"ms level\"") + 18;
-
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
-        e = strstr(ptr, "\"");
-
-        if(e == NULL)
-            error("find_binary_quick: failed to find ms level. index: %d\n", mz_curr + inten_curr);
-        curr_ms_level = strtol(ptr, &e, 10);
-        ms_levels[spec_curr] = curr_ms_level;
-
-        ptr = e;
-
-
-        ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        // Now, get the binaries and set the start and end positions
+        ptr = get_binary_start(ptr);
+        if(ptr == NULL) return NULL;
         mz_dp->start_positions[mz_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
-
-
         
-        ptr = strstr(ptr, "</binary>");
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        ptr = get_binary_end(ptr);
+        if(ptr == NULL) return NULL;
         mz_dp->end_positions[mz_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
-        // scan_nums[curr] = curr_scan;
-        // ms_levels[curr++] = curr_ms_level;
         mz_curr++;
 
-
-        ptr = strstr(ptr, "<binary>") + 8;
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find start of binary. index: %d\n", mz_curr + inten_curr);
+        ptr = get_binary_start(ptr);
+        if(ptr == NULL) return NULL;
         inten_dp->start_positions[inten_curr] = ptr - input_map;
         xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
 
         
-        ptr = strstr(ptr, "</binary>");
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find end of binary. index: %d\n", mz_curr + inten_curr);
+        ptr = get_binary_end(ptr);
+        if(ptr == NULL) return NULL;
         inten_dp->end_positions[inten_curr] = ptr - input_map;
         xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
         
-        // scan_nums[curr] = curr_scan;
-        // ms_levels[curr++] = curr_ms_level;
         inten_curr++;
 
-        ptr = strstr(ptr, "</spectrum>") + 11;
-        if(ptr == NULL)
-            error("find_binary_quick: failed to find end of spectrum. index: %d\n", mz_curr + inten_curr);
+        ptr = get_spectrum_end(ptr);
+        if(ptr == NULL) return NULL;
         
         spectra_dp->end_positions[spec_curr] = ptr - input_map;
         spec_curr++;
@@ -713,8 +552,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
     }
 
     if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
-        error("find_binary_quick: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
-
+    {
+        warning("scan_mzml: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
+        return NULL;
+    }
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
     xml_curr++;
@@ -737,8 +578,10 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
     division_t* div = (division_t*)malloc(sizeof(division_t));
     if(div == NULL)
-        error("find_binary_quick: failed to allocate division_t.\n");
-
+    {
+        warning("scan_mzml: failed to allocate division_t.\n");
+        return NULL;
+    }
     div->spectra = spectra_dp;
     div->xml = xml_dp;
     div->mz = mz_dp;
@@ -747,6 +590,7 @@ find_binary_quick_w_spectra(char* input_map, data_format_t* df, long end)
 
     div->scans = scans;
     div->ms_levels = ms_levels;
+    div->ret_times = ret_times;
 
     return div;    
 }
@@ -1211,17 +1055,17 @@ write_dp(data_positions_t* dp, int fd)
 
 
     // Write total_spec (spectrum count)
-    num_buff = malloc(sizeof(int));
-    *((int*)num_buff) = dp->total_spec;
-    write_to_file(fd, num_buff, sizeof(int));
+    num_buff = malloc(sizeof(uint64_t));
+    *((uint64_t*)num_buff) = dp->total_spec;
+    write_to_file(fd, num_buff, sizeof(uint64_t));
 
     // Write start positions
     buff = (char*)dp->start_positions;
-    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
+    write_to_file(fd, buff, sizeof(uint64_t)*dp->total_spec);
 
     // Write end positions
     buff = (char*)dp->end_positions;
-    write_to_file(fd, buff, sizeof(off_t)*dp->total_spec);
+    write_to_file(fd, buff, sizeof(uint64_t)*dp->total_spec);
 
     free(num_buff);
 
@@ -1235,16 +1079,16 @@ read_dp(void* input_map, long* position)
     if(r == NULL) return NULL;
 
     // Read total_spec
-    r->total_spec = *((int*)(input_map + *position));
-    *position += sizeof(int);
+    r->total_spec = *((uint64_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint64_t);
 
     // Read start positions
-    r->start_positions = (off_t*)(input_map + *position);
-    *position += sizeof(off_t)*r->total_spec;
+    r->start_positions = (uint64_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint64_t)*r->total_spec;
 
     // Read end positions
-    r->end_positions = (off_t*)(input_map + *position);
-    *position += sizeof(off_t)*r->total_spec;
+    r->end_positions = (uint64_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint64_t)*r->total_spec;
 
     return r;
 }
@@ -1260,9 +1104,9 @@ write_division(division_t* div, int fd)
     write_dp(div->inten, fd);
 
     // Write size of division
-    num_buff = malloc(sizeof(size_t));
-    *((size_t*)num_buff) = div->size;
-    write_to_file(fd, num_buff, sizeof(size_t));
+    num_buff = malloc(sizeof(uint64_t));
+    *((uint64_t*)num_buff) = (uint64_t)div->size;
+    write_to_file(fd, num_buff, sizeof(uint64_t));
     free(num_buff);
 
     return;
@@ -1288,8 +1132,8 @@ read_division(void* input_map, long* position)
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
-    r->size = *((size_t*)(input_map + *position));
-    *position += sizeof(size_t);
+    r->size = *((uint64_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint64_t);
 
     return r;
 }
@@ -1346,7 +1190,7 @@ join_inten(divisions_t* divisions)
     return r;    
 }
 
-division_t**
+divisions_t*
 create_divisions(division_t* div, long n_divisions)
 {
     divisions_t* r;
@@ -1659,14 +1503,13 @@ int
 preprocess_mzml(char* input_map,
                 long  input_filesize,
                 long* blocksize,
-                long n_threads,
                 struct Arguments* arguments,
                 data_format_t** df,
                 divisions_t** divisions)
 {
-    struct timeval start, stop;
+    double start, end;
 
-    gettimeofday(&start, NULL);
+    start = get_time();
 
     print("\nPreprocessing...\n");
 
@@ -1678,25 +1521,31 @@ preprocess_mzml(char* input_map,
     division_t* div = NULL;
     if(arguments->indices_length > 0)
     {
-        division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->scans_length > 0)
     {
-        division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         map_scan_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
     }
     else if(arguments->ms_level > 0 || arguments->ms_level == -1)
     {
-        division_t* tmp = find_binary_quick_w_spectra((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
+        if (tmp == NULL)
+            return -1;
         map_ms_level_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->indices_length == 0 && arguments->scans_length == 0)
     {
-        div = find_binary_quick((char*)input_map, *df, input_filesize); // A division encapsulating the entire file
+        div = scan_mzml((char*)input_map, *df, input_filesize, NULL); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);
@@ -1704,9 +1553,9 @@ preprocess_mzml(char* input_map,
     if (div == NULL)
         return -1;
 
-    if(n_threads == -1) // force divisions to be only 1
+    if(arguments->threads == -1) // force divisions to be only 1
     {
-        n_threads = 1;
+        arguments->threads = 1;
         *blocksize = div->size;
         *divisions = (divisions_t*)malloc(sizeof(divisions_t));
         (*divisions) -> divisions = (division_t**)malloc(sizeof(division_t*));
@@ -1723,17 +1572,17 @@ preprocess_mzml(char* input_map,
             n_divisions = div->mz->total_spec;
         }
 
-        if(arguments->indices_length != 0 && n_threads > arguments->indices_length) // If we have more threads than selected specta, we need to decrease the number of divisions
+        if(arguments->indices_length != 0 && arguments->threads > arguments->indices_length) // If we have more threads than selected specta, we need to decrease the number of divisions
         {
-            print("Warning: n_threads (%ld) > indices_length (%ld). Setting n_divisions to indices_length)\n", n_threads, arguments->indices_length);
+            print("Warning: n_threads (%ld) > indices_length (%ld). Setting n_divisions to indices_length)\n", arguments->threads, arguments->indices_length);
             n_divisions = arguments->indices_length;
             *divisions = create_divisions(div, n_divisions);
         }
-        else if(n_divisions >= n_threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
+        else if(n_divisions >= arguments->threads) // Create divisions. Either n_divisions or n_threads, whichever is greater
             *divisions = create_divisions(div, n_divisions);
         else
         {
-            *divisions = create_divisions(div, n_threads);
+            *divisions = create_divisions(div, arguments->threads);
             *blocksize = get_division_size_max(*divisions); // If we have more threads than divisions, we need to increase the blocksize to the max division size
         }
     }
@@ -1741,10 +1590,10 @@ preprocess_mzml(char* input_map,
     if (*divisions == NULL)
         return -1;
 
-    gettimeofday(&stop, NULL);
+    end = get_time();
 
-    print("Preprocessing time: %1.4fs\n", (stop.tv_sec-start.tv_sec)+((stop.tv_usec-start.tv_usec)/1e+6)); 
-    print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, n_threads);
+    print("Preprocessing time: %1.4fs\n", end - start); 
+    print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, arguments->threads);
 
 }
 
@@ -1757,23 +1606,23 @@ parse_footer(footer_t** footer, void* input_map, long input_filesize,
             int* n_divisions)
 {
 
-      *footer = read_footer(input_map, input_filesize);
+    *footer = read_footer(input_map, input_filesize);
 
-      print("\tXML position: %ld\n", (*footer)->xml_pos);
-      print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
-      print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
-      print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-      print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-      print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
-      print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
-      print("\tEOF position: %ld\n", input_filesize);
-      print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
+    print("\tXML position: %ld\n", (*footer)->xml_pos);
+    print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
+    print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
+    print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
+    print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
+    print("\tinten binary blocks position: %ld\n", (*footer)->inten_binary_blk_pos);
+    print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
+    print("\tEOF position: %ld\n", input_filesize);
+    print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
 
-      *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
-      *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
-      *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
+    *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos, (*footer)->mz_binary_blk_pos);
+    *mz_binary_block_lens = read_block_len_queue(input_map, (*footer)->mz_binary_blk_pos, (*footer)->inten_binary_blk_pos);
+    *inten_binary_block_lens = read_block_len_queue(input_map, (*footer)->inten_binary_blk_pos, (*footer)->divisions_t_pos);
 
-      *n_divisions = (*footer)->n_divisions;
+    *n_divisions = (*footer)->n_divisions;
 
-      *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
+    *divisions = read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);   
 }

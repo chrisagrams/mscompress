@@ -2,11 +2,14 @@
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <unistd.h>
 #elif __APPLE__
 #include <sys/sysctl.h>
+#include <sys/time.h>
 #include <pthread.h>
 #elif _WIN32
+#include <windows.h>
 #include <sysinfoapi.h>
 #endif
 
@@ -18,8 +21,8 @@
 
 #include "mscompress.h"
 
-void
-prepare_threads(long args_threads, long* n_threads)
+int
+get_num_threads()
 {
     int np;
 
@@ -39,22 +42,46 @@ prepare_threads(long args_threads, long* n_threads)
         sysctl(mib, 2, &np, &len, NULL, 0);
 
     #elif _WIN32
-        /* TODO */
+
         SYSTEM_INFO sysinfo;
-
         GetSystemInfo(&sysinfo);
-
         np = sysinfo.dwNumberOfProcessors;
+
     #endif
+
+    return np;
+}
+
+// void
+// prepare_threads(long args_threads, long* n_threads)
+// {
+//     int np;
+
+//     np = get_num_threads();
+
+//     print("\t%d usable processors detected.\n", np);
+
+//     if(args_threads == 0)
+//       *n_threads = np;
+//     else
+//       *n_threads = args_threads;
+    
+//     print("\tUsing %d threads.\n", *n_threads);
+// }
+
+void
+prepare_threads(struct Arguments* args)
+{
+    int np;
+
+    np = get_num_threads();
 
     print("\t%d usable processors detected.\n", np);
 
-    if(args_threads == 0)
-      *n_threads = np;
-    else
-      *n_threads = args_threads;
+    if(args->threads == 0)
+        args->threads = np;
     
-    print("\tUsing %d threads.\n", *n_threads);
+    print("\tUsing %d threads.\n", args->threads);
 }
 
 int
@@ -72,11 +99,26 @@ get_thread_id()
 
     #elif _WIN32
         
-        /* TODO */
+        tid = (uint64_t)GetCurrentThreadId();
     
     #endif
 
     return (int)tid;
+}
+
+double
+get_time()
+{
+    #ifdef _WIN32
+        LARGE_INTEGER frequency, counter;
+        QueryPerformanceFrequency(&frequency);
+        QueryPerformanceCounter(&counter);
+        return (double)counter.QuadPart / frequency.QuadPart;
+    #else
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec + (tv.tv_usec / 1e6);
+    #endif
 }
 
 int
@@ -86,13 +128,15 @@ print(const char* format, ...)
  *        Drop-in replacement to printf().
  */
 {
+    int ret = -1;
     if (verbose)
     {
         va_list args;
         va_start(args, format);
-        vprintf(format, args);
-        va_end(args);    
+        ret = vprintf(format, args);
+        va_end(args);
     }
+    return ret;
 }
 
 int
@@ -117,22 +161,22 @@ warning(const char* format, ...)
 long
 parse_blocksize(char* arg)
 {
-  int num;
-  int len;
-  char prefix[2];
-  long res = -1;
+    int num;
+    int len;
+    char prefix[2];
+    long res = -1;
 
-  len = strlen(arg);
-  num = atoi(arg);
-  
-  memcpy(prefix, arg+len-2, 2);
+    len = strlen(arg);
+    num = atoi(arg);
 
-  if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
+    memcpy(prefix, arg+len-2, 2);
+
+    if(!strcmp(prefix, "KB") || !strcmp(prefix, "kb"))
     res = num*1e+3;
-  else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
+    else if(!strcmp(prefix, "MB") || !strcmp(prefix, "mb"))
     res = num*1e+6;
-  else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
+    else if(!strcmp(prefix, "GB") || !strcmp(prefix, "gb"))
     res = num*1e+9;
 
-  return res;
+    return res;
 }

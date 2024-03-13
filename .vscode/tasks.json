@@ -2,19 +2,63 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "C build",
-            "command": "make",
+            "label": "CMake Configure",
             "type": "shell",
-            "args": ["debug"],
-            "problemMatcher": [
-                "$tsc"
+            "command": "cmake",
+            "args": [
+                "-DENABLE_DEBUG_SYMBOLS=ON",
+                "."
             ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "presentation": {
                 "reveal": "always"
             },
-            "group": "build",
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}/cli"
+            }
+        },
+        {
+            "label": "CMake Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "."
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/cli"
+            }
+        },
+        {
+            "label": "CMake Configure and Build",
+            "dependsOn": [
+                "CMake Configure",
+                "CMake Build"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "Build N-API Module",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "build:debug"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/node"
             }
         }
     ]

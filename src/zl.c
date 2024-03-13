@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "vendor/zlib/zlib.h"
+#include "../vendor/zlib/zlib.h"
 #include "mscompress.h"
 // #define ZLIB_BUFF_FACTOR 100
 
@@ -10,19 +10,25 @@
 zlib_block_t*
 zlib_alloc(int offset)
 {
-    if(offset < 0)
-        error("zlib_alloc: offset must be >= 0");
+    if(offset < 0) {
+        warning("zlib_alloc: offset must be >= 0");
+        return NULL;
+    }
     
     zlib_block_t* r = malloc(sizeof(zlib_block_t));
 
-    if(r == NULL)
-        error("zlib_alloc: malloc error");
+    if(r == NULL) {
+        warning("zlib_alloc: malloc error");
+        return NULL;
+    }
     r->len = ZLIB_BUFF_FACTOR;
     r->size = r->len + offset;
     r->offset = offset;
     r->mem = malloc(r->size);
-    if(r->mem == NULL)
-        error("zlib_alloc: malloc error");
+    if(r->mem == NULL) {
+        warning("zlib_alloc: malloc error");
+        return NULL;
+    }
     r->buff = r->mem + r->offset;
     
     return r;
@@ -78,8 +84,14 @@ alloc_z_stream()
 
     z = calloc(1, sizeof(z_stream));
 
-    if (deflateInit(z, Z_DEFAULT_COMPRESSION) != Z_OK)
-        error("alloc_z_stream: deflateInit error\n");
+    if(z == NULL) {
+        warning("alloc_z_stream: calloc error\n");
+        return NULL;
+    }
+    if (deflateInit(z, Z_DEFAULT_COMPRESSION) != Z_OK) {
+        warning("alloc_z_stream: deflateInit error\n");
+        return NULL;
+    }
 
     return z;
 }

@@ -15,8 +15,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "vendor/zlib/zlib.h"
-#include "vendor/base64/include/libbase64.h"
+#include "../vendor/zlib/zlib.h"
+#include "libbase64.h"
 #include "mscompress.h"
 
 
@@ -135,9 +135,11 @@ encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len, char* dest, si
 
     zlib_block_t* cmp_output;
  
-    decmp_input = zlib_alloc(ZLIB_SIZE_OFFSET);
+    decmp_input = malloc(sizeof(zlib_block_t));
+    decmp_input->offset = ZLIB_SIZE_OFFSET;
     decmp_input->mem = *src;
     decmp_input->buff = decmp_input->mem + decmp_input->offset;
+    decmp_input->len = src_len + decmp_input->offset;
 
     cmp_output = zlib_alloc(0);
 

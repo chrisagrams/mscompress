@@ -1,0 +1,18 @@
+{
+  "name": "mscompress",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "install": "cmake-js compile",
+    "build:debug": "cmake-js compile --debug"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-addon-api": "^7.0.0"
+  },
+  "devDependencies": {
+    "cmake-js": "^7.2.1"
+  }
+}

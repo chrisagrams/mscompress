@@ -1,0 +1,454 @@
+:root {
+    --mscompress-purple: #e60f8a;
+    --mscompress-blue: #24a8df;
+}
+
+html {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    user-select: none;
+}
+
+body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: "Open Sans", sans-serif;
+}
+
+a {
+    text-decoration: none;  /* Remove underline from all <a> elements */
+}
+
+img {
+    -webkit-user-drag: none; /* Don't let images be draggable */
+}
+
+/* Generic classes */
+.hidden {
+    display: none !important;
+}
+.blur {
+    filter: blur(5px);
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top: 4px solid var(--mscompress-blue);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    /* position: absolute;
+    top: calc(50% - 20px);
+    left: calc(50% - 20px); */
+    margin: 0 auto;
+    transform: translate(-50%, -50%);
+    z-index: 9999; /* Ensure the spinner is above other content */
+}
+
+@keyframes spin {
+    0% 
+    { 
+        border-top-color: var(--mscompress-blue);
+        transform: rotate(0deg);
+    }
+    50%
+    {
+        border-top-color: var(--mscompress-purple);
+        transform: rotate(180deg);
+    }
+    100% 
+    { 
+        border-top-color: var(--mscompress-blue);
+        transform: rotate(360deg); 
+    }
+}
+
+/* Titlebar */
+.titlebar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    height: 30px;
+    -webkit-app-region: drag;
+}
+
+/* Main encapsulating div */
+.main {
+    width: 100%;
+    height: 100%;
+    transition: filter 0.3s;
+}
+
+/* Loading div */
+.loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.loading > .message {
+    margin:  10px auto;
+}
+
+.error {
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    background-color: white;
+    border-radius: 8px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: fixed;
+    width: 66%;
+    height: 66%;
+}
+
+.error button {
+    margin: 10px;
+}
+
+#error-message {
+    color: red;
+    font-family: 'Courier New', Courier, monospace;
+    margin: 10px;
+}
+
+/* Header */
+.header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    height: 66px;
+    -webkit-app-region: drag;
+}
+
+.header > #msc_logo {
+    display: block;
+    height: 30px;
+    padding: 12px 10px 8px 10px;
+    margin: auto 0;
+}
+
+.header > .info {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0;
+    padding: 0 10px;
+}
+
+.header > .info > p {
+    text-align: right;
+    font-weight: lighter;
+    font-size: 12px;
+    font-style: italic;
+    margin: 0;
+}
+
+.header > .metrics {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0;
+    padding: 0 10px;
+    margin-left: auto; /* Push to the right */
+}
+
+.header > .metrics > p {
+    text-align: right;
+    font-weight: lighter;
+    font-size: 12px;
+    font-style: italic;
+    margin: 0;
+}
+
+/* Content */
+.content {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: calc(100% - 99px);
+
+}
+
+.content > .container {
+    display: flex;
+    flex-direction: column;
+    width: calc(100%/3);
+    height: 100%;
+    background-color: hsl(0 0% 99% / 1);
+    transition: background-color 0.3s;
+}
+
+/* Left container */
+
+/* dragover class for file hover */
+.content > .container#left-container.dragover {
+    background-color: #64B5F6;
+}
+
+/* Placeholder class */
+.content > .container#left-container > .placeholder {
+    margin: auto;
+    text-align: center;
+    font-size: 14px;
+}
+
+
+/* Center container */
+.content > .container#center-container {
+    padding: 5px;
+    height: calc(100% - 10px);
+    background-color: hsl(0 0% 97% / 1);
+}
+
+.fileStats {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    transition: filter 0.3s;
+}
+
+#center-container > h6 {
+    margin: 0;
+}
+
+#center-container > #start {
+    margin-top: auto;
+}
+
+#right-container > h6 {
+    margin: 0;
+}
+
+#right-container > div {
+    display: flex;
+    flex-direction: row;
+    padding: 10px;
+}
+
+#right-container > div > input {
+    width: 100%;
+}
+
+.fileStats > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 5px;
+}
+
+.fileStats > div > h6 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: normal;
+}
+.fileStats > div > p {
+    margin: 0;
+    font-size: 12px;
+    font-weight: lighter;
+}
+
+/* File card (in container) */
+.fileCard {
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+    padding: 10px;
+    background-color: white;
+    border-radius: 8px;
+    filter: drop-shadow(0px 0px 6px hsl(0 0% 91% / 1));
+    transition: border-color 0.2s ease-in-out;
+    border: 2px solid transparent; /* Initially, the border is transparent */
+}
+
+.fileCard:hover {
+    border-color: var(--mscompress-blue); 
+    
+}
+
+.fileCard.selected.mzml {
+    border-color: var(--mscompress-purple); 
+}
+
+
+.fileCard.selected.msz {
+    border-color: var(--mscompress-blue); 
+}
+
+/* Filename */
+.fileCard > h1 {
+    font-size: 16px;
+    margin: 0;
+    line-height: 1.5;
+    height: 1.5em;
+    overflow: hidden;
+    font-weight: normal;
+}
+
+/* fileCard header */
+.fileCard > div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+/* Close button */
+.fileCard > div > button {
+    margin: 0;
+    background: none;
+    border: none;
+    font-weight: bold;
+}
+
+.fileCard > div > button:hover {
+    cursor: pointer;
+}
+
+/* Filesize / Type */
+.fileCard h3 {
+    margin: 0;
+    font-size: 14px;
+    color: hsl(0 0% 30% / 1);
+    font-weight: normal;
+}
+
+.fileCard h3.mzml {
+    color: var(--mscompress-purple);
+    font-weight: bold;
+}
+.fileCard h3.msz {
+    color: var(--mscompress-blue);
+    font-weight: bold;
+}
+
+/* Path */
+.fileCard > p {
+    margin: 0;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* Footer */
+.footer {
+    display: flex;
+    justify-content: center;
+    height: 33px;
+    width: 100%;
+    gap: 10px;
+}
+
+.footer > img {
+    cursor: pointer;
+}
+
+.footer > #gao_lab_banner {
+    padding: 6px;
+    filter: opacity(0.5);
+}
+
+.footer > #github_logo {
+    padding: 8px;
+    filter: opacity(0.5);
+}
+
+/* Analysis Page */
+
+.analysis {
+    position: fixed;
+    width: 90%;
+    height: 90%;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border-radius: 8px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.analysis > .top {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: calc(100% - 20px);
+    height: 33px;
+    padding: 10px;
+}
+
+.analysis > .top > div {
+    display: flex;
+    flex-direction: row;
+}
+
+.analysis > .top > div > #type {
+    width: 4rem;
+    text-align: center;
+}
+
+.analysis > .top > div > #type.mzml {
+    color: var(--mscompress-purple);
+}
+
+.analysis > .top > div > #type.msz {
+    color: var(--mscompress-blue);
+}
+
+.analysis > .top > div >h3 {
+    margin: auto 0;
+}
+
+.analysis > .content {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: calc(100% - 33px);
+}
+
+.analysis > .content > .left {
+    display: flex;
+    flex-direction: column;
+    width: calc(100% / 3);
+    height: 100%;
+    background-color: hsl(0 0% 99% / 1);
+    transition: background-color 0.3s;
+}
+
+.analysis > .content > .left > h3 {
+    margin: 10px;
+    font-weight: normal;
+}
+
+.analysis > .content > .left > hr {
+    width: 80%;
+    margin: 0 auto;
+    border-style: groove;
+}
+
+.analysis > .content > .right {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: calc(100% / 3 * 2);
+    height: 100%;
+    background-color: hsl(0 0% 97% / 1);
+}
+
+.analysis > .content > .right img {
+    width: 100%;
+}

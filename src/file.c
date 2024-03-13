@@ -14,12 +14,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include "mscompress.h"
 
+#ifdef _WIN32
+    #include <Windows.h>
+    #include <io.h>
+    #include <fcntl.h>
+    #define close _close
+    #define read _read
+    #define write _write
+    #define lseek64 _lseeki64
+    #define ssize_t int
+#else
+    #include <sys/mman.h>
+    #include <unistd.h>
+#endif
 
 
 void* 
@@ -33,29 +44,50 @@ get_mapping(int fd)
     
     struct stat buff;
 
+    void* mapped_data = NULL;
+
     if (fd == -1) return NULL;
 
     status = fstat(fd, &buff);
 
     if (status == -1 ) return NULL;
 
-    return mmap(NULL, buff.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    #ifdef _WIN32
+
+        HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+        HANDLE hMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+
+        if (hMapping != NULL)
+        {
+            mapped_data = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, buff.st_size);
+            CloseHandle(hMapping);
+        }
+
+    #else
+
+        mapped_data = mmap(NULL, buff.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+
+    #endif
+
+    return mapped_data;
 }
 
 int 
 remove_mapping(void* addr, int fd)
 {
-    return munmap(addr, fd);
-}
+    int result = -1;
 
-int
-get_blksize(char* path)
-{
-    struct stat fi;
+    #ifdef _WIN32
 
-    stat(path, &fi);
+        result = UnmapViewOfFile(addr);
 
-    return fi.st_blksize;
+    #else
+
+        result = munmap(addr, fd);
+
+    #endif
+
+    return result;
 }
 
 size_t
@@ -68,56 +100,164 @@ get_filesize(char* path)
     return fi.st_size;
 }
 
-ssize_t
+long
+update_fd_pos(int fd, long increment)
+{
+  for(int i = 0; i < 3; i++)
+  {
+    if(fds[i] == fd)
+    {
+      fd_pos[i] += increment;
+      return fd_pos[i];
+    }
+  }
+  return 0;
+}
+
+size_t 
 write_to_file(int fd, char* buff, size_t n)
 {
-    if(fd < 0)
-      error("write_to_file: invalid file descriptor.\n");
-    
+    if (fd < 0)
+        error("write_to_file: invalid file descriptor.\n");
+
     ssize_t rv;
 
-    rv = write(fd, buff, n);
+    #ifdef _WIN32
+        rv = write(fd, buff, (unsigned int)n);
+    #else
+        rv = write(fd, buff, n);
+    #endif
 
     if (rv < 0)
-      error("Error in writing %ld bytes to file descritor %d. Attempted to write %s", n, fd, buff);
+        error("Error in writing %ld bytes to file descriptor %d. Attempted to write %s", n, fd, buff);
 
-    return rv;
+    if(!update_fd_pos(fd, rv))
+      error("write_to_file: error in updating fd pos\n");
+
+    return (size_t)rv;
 }
 
-ssize_t
+size_t 
 read_from_file(int fd, void* buff, size_t n)
 {
-    if(fd < 0)
-      error("read_from_file: invalid file descriptor.\n");
+    if (fd < 0)
+        error("read_from_file: invalid file descriptor.\n");
 
     ssize_t rv;
+    size_t total_read = 0;
+    char* current_buff = (char*)buff;
 
-    rv = read(fd, buff, n);
+    while (total_read < n) {
+        #ifdef _WIN32
+                rv = read(fd, current_buff, (unsigned int)(n - total_read));
+        #else
+                rv = read(fd, current_buff, n - total_read);
+        #endif
 
-    if (rv < 0)
-      error("Error in reading %ld bytes from file descritor %d.", n, fd);
-
-    return rv;
-    
+        if (rv < 0) {
+            error("Error in reading %ld bytes from file descriptor %d.", n - total_read, fd);
+        }
+        else if (rv == 0) {
+            // End of file reached before reading the required number of bytes.
+            warning("End of file reached\n");
+            break;
+        }
+        else {
+            total_read += rv;
+            current_buff += rv;
+        }
 }
 
-off_t
+    return total_read;
+}
+
+long
 get_offset(int fd)
-/**
- * @brief Get current offset within a file descriptor
- * 
- * @param fd Opened file descriptor.
- * 
- * @return Numeric offset within file descriptor.
- */
 {
-  off_t ret = lseek(fd, 0, SEEK_CUR);
-  if (ret == -1)
+  // long ret = (long)lseek64(fd, 0, SEEK_CUR);
+  // if (ret == -1)
+  // {
+  //   perror("lseek64");
+  //   exit(-1);
+  // }
+  // return ret;
+  for(int i = 0; i < 3; i++)
   {
-    perror("lseek");
-    exit(-1);
+    if(fds[i] == fd)
+      return fd_pos[i];
   }
-  return ret;
+  error("get_offset: invalid fd\n");
+  exit(-1);
+}
+
+char* serialize_df(data_format_t* df)
+{
+  char* r = calloc(1, DATA_FORMAT_T_SIZE);
+  if(r == NULL)
+    error("serialize_df: malloc failed.\n");
+  
+  size_t offset = 0;
+
+  /* source information (source mzML) */
+  memcpy(r + offset, &df->source_mz_fmt, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_inten_fmt, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_compression, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->source_total_spec, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* target information (target msz) */
+  memcpy(r + offset, &df->target_xml_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->target_mz_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(r + offset, &df->target_inten_format, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* algo parameters */
+  memcpy(r + offset, &df->mz_scale_factor, sizeof(float));
+  offset += sizeof(float);
+  memcpy(r + offset, &df->int_scale_factor, sizeof(float));
+  offset += sizeof(float);
+
+  return r;
+}
+
+data_format_t* deserialize_df(char* buff)
+{
+  data_format_t* r = malloc(sizeof(data_format_t));
+  if(r == NULL)
+    error("deserialize_df: malloc failed.\n");
+
+  size_t offset = 0;
+
+  /* source information (source mzML) */
+  memcpy(&r->source_mz_fmt, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_inten_fmt, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_compression, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->source_total_spec, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* target information (target msz) */
+  memcpy(&r->target_xml_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->target_mz_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+  memcpy(&r->target_inten_format, buff + offset, sizeof(uint32_t));
+  offset += sizeof(uint32_t);
+
+  /* algo parameters */
+  memcpy(&r->mz_scale_factor, buff + offset, sizeof(float));
+  offset += sizeof(float);
+  memcpy(&r->int_scale_factor, buff + offset, sizeof(float));
+  offset += sizeof(float);
+
+  return r;
 }
 
 void
@@ -139,39 +279,40 @@ write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *              | Target XML format         |   4  bytes |    156    |
  *              | Target m/z format         |   4  bytes |    160    |
  *              | Target intensity format   |   4  bytes |    164    |
- *              | mz scale factor           |   8  bytes |    168    |
- *              | int scale factor          |   8  bytes |    176    |
- *              | Blocksize                 |   8  bytes |    184    |
- *              | MD5                       |  32  bytes |    192    |
- *              | Reserved                  |  288 bytes |    224    |
+ *              | mz scale factor           |   4  bytes |    168    |
+ *              | int scale factor          |   4  bytes |    172    |
+ *              | Blocksize                 |   8  bytes |    176    |
+ *              | MD5                       |  32  bytes |    184    |
+ *              | Reserved                  |  296 bytes |    216    |
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|
  */             
 {
+    // Allocate header_buff
     char header_buff[HEADER_SIZE] = "";
 
-    int* header_buff_cast = (int*)(&header_buff[0]);
-
-    *header_buff_cast = MAGIC_TAG;
-
-    *(header_buff_cast + 1) = FORMAT_VERSION_MAJOR;
-
-    *(header_buff_cast + 2) = FORMAT_VERSION_MINOR;
-    
+    // Interpret #defines 
     char message_buff[MESSAGE_SIZE] = MESSAGE;
+    int magic_tag = MAGIC_TAG;
+    int format_version_major = FORMAT_VERSION_MAJOR;
+    int format_version_minor = FORMAT_VERSION_MINOR;
+
+    memcpy(header_buff, &magic_tag, sizeof(magic_tag));
+    memcpy(header_buff + sizeof(magic_tag), &format_version_major, sizeof(format_version_major));
+    memcpy(header_buff + sizeof(magic_tag) + sizeof(format_version_major), &format_version_minor, sizeof(format_version_minor));
 
     memcpy(header_buff + MESSAGE_OFFSET, message_buff, MESSAGE_SIZE);
 
-    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df, DATA_FORMAT_T_SIZE);
+    char* df_buff = serialize_df(df);
+    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df_buff, DATA_FORMAT_T_SIZE);
 
-    long* header_buff_cast_long = (long*)(&header_buff[0] + BLOCKSIZE_OFFSET);
-
-    *header_buff_cast_long = blocksize;
+    memcpy(header_buff + BLOCKSIZE_OFFSET, &blocksize, sizeof(blocksize));
 
     memcpy(header_buff + MD5_OFFSET, md5, MD5_SIZE);
 
     write_to_file(fd, header_buff, HEADER_SIZE);
+
 
 }
 
@@ -186,7 +327,7 @@ get_header_blocksize(void* input_map)
  */
 {
     long* r;
-    r = (long*)(&input_map[0] + BLOCKSIZE_OFFSET);
+    r = (long*)((uint8_t*)input_map + BLOCKSIZE_OFFSET);
     return *r;
 }
 
@@ -195,9 +336,7 @@ get_header_df(void* input_map)
 {
   data_format_t* r;
   
-  r = malloc(sizeof(data_format_t));
-  
-  memcpy(r, input_map + DATA_FORMAT_T_OFFSET, DATA_FORMAT_T_SIZE);
+  r = deserialize_df((char*)((uint8_t*)input_map + DATA_FORMAT_T_OFFSET));
 
   r->populated = 2;
 
@@ -232,7 +371,7 @@ read_footer(void* input_map, long filesize)
 {
     footer_t* footer;
 
-    footer = (footer_t*)(&input_map[0] + filesize - sizeof(footer_t));
+    footer = (footer_t*)((char*)input_map + filesize - sizeof(footer_t));
 
     if (footer->magic_tag != MAGIC_TAG)
         error("read_footer: invalid magic tag.\n");
@@ -241,90 +380,82 @@ read_footer(void* input_map, long filesize)
 }
 
 int
-is_msz(int fd)
+is_msz(void* input_map, size_t input_length)
 /**
- * @brief Determines if file on file descriptor fd is an msz file.
+ * @brief Determines if file mapped in input_map is an msz file.
  *        Reads first 512 bytes of file and looks for MAGIC_TAG.
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return 1 if file is a msz file. 0 otherwise.
  */
 {
-    char buff [512];
+    if (input_length < 4) {  // If there's less than 4 bytes, it can't match the MAGIC_TAG
+        return 0;
+    }
+
+    char* mapped_data = (char*)input_map;
     char magic_buff[4];
     int* magic_buff_cast = (int*)(&magic_buff[0]);
     *magic_buff_cast = MAGIC_TAG;
 
-    ssize_t rv;
-
-    rv = read_from_file(fd, (void*)&buff, 512); /* Read 512 byte header from file*/ 
-
-    lseek(fd, 0, SEEK_SET);
-    
-    if(rv != 512)
-        return 0;
-
-    if(strncmp(buff, magic_buff, 4) == 0)
+    if(strncmp(mapped_data, magic_buff, 4) == 0)
         return 1;
     
     return 0;
-    
 }
 
 int
-is_mzml(int fd)
+is_mzml(void* input_map, size_t input_length)
 /**
- * @brief Determines if file on file descriptor fd is an mzML file.
+ * @brief Determines if file mapped in input_map is an mzML file.
  *        Reads first 512 bytes of file and looks for substring "indexedmzML".
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return 1 if file is a mzML file. 0 otherwise.
  */
 {
-    char buff[512];
-    ssize_t rv;
-
-    rv = read_from_file(fd, (void*)&buff, 512);
-    lseek(fd, 0, SEEK_SET);
+    char buffer[513]; // 512 for data + 1 for null-terminator
+    size_t check_length = (input_length > 512) ? 512 : input_length;
     
-    if(rv != 512)
-        return 0;
+    memcpy(buffer, input_map, check_length);
+    buffer[check_length] = '\0'; // null-terminate
     
-    if(strstr(buff, "indexedmzML") != NULL)
+    if (strstr(buffer, "indexedmzML") != NULL)
         return 1;
 
     return 0;
-        
 }
 
+
 int
-determine_filetype(int fd)
+determine_filetype(void* input_map, size_t input_length)
 /**
- * @brief Determines what file is on file descriptor fd.
+ * @brief Determines what file is in the memory-mapped file.
  * 
- * @param fd File descriptor to read.
+ * @param input_map Pointer to the memory-mapped file.
  * 
  * @return COMPRESS (1) if file is a mzML file.
  *         DECOMPRESS (2) if file is a msz file.
  *         -1 on error.
  */
 {
-  if(is_mzml(fd))
-  {
-    print("\t.mzML file detected.\n");
-    return COMPRESS;
-  }
-  else if(is_msz(fd))
-  {
-    print("\t.msz file detected.\n");
-    return DECOMPRESS;
-  }  
-  else
-    error("Invalid input file.\n");
-  return -1;
-
+    if(is_mzml(input_map, input_length))
+    {
+        print("\t.mzML file detected.\n");
+        return COMPRESS;
+    }
+    else if(is_msz(input_map, input_length))
+    {
+        print("\t.msz file detected.\n");
+        return DECOMPRESS;
+    }  
+    else
+    {
+        warning("Invalid input file.\n");
+    }
+    return -1;
 }
 
 char*
@@ -356,6 +487,55 @@ change_extension(char* input, char* extension)
   strcpy(x, extension);
 
   return r;
+}
+
+int
+open_file(char* path)
+{
+  int fd = -1;
+
+  if (path)
+    #ifdef _WIN32
+      fd = _open(path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
+    #else
+        fd = open(path, O_RDONLY);
+    #endif
+
+  return fd;
+}
+
+int
+open_output_file(char* path)
+{
+  int fd = -1;
+
+  if (path)
+  {
+    #ifdef _WIN32
+        fd = _open(path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_APPEND | _O_BINARY, 0666); // open in binary mode to avoid newline translation in Windows. 
+    #else 
+        fd = open(path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+    #endif
+    if(fd < 0)
+      warning("Error in opening output file descriptor. (%s)\n", strerror(errno));
+    else
+      fds[1] = fd;
+  }
+
+  return fd;
+
+}
+
+int
+close_file(int fd)
+{
+  int ret = close(fd); // expands to _close on Windows
+  if (ret != 0)
+  {
+    perror("close_file");
+    exit(-1);
+  }
+  return ret;
 }
 
 int
@@ -394,8 +574,12 @@ prepare_fds(char* input_path,
   int output_fd;
   int type;
 
-  if(input_path)
-    input_fd = open(input_path, O_RDONLY);
+  if (input_path)
+    #ifdef _WIN32
+      input_fd = _open(input_path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
+    #else
+        input_fd = open(input_path, O_RDONLY);
+    #endif
   else
     error("No input file specified.\n");
   
@@ -409,21 +593,18 @@ prepare_fds(char* input_path,
     print("\tDEBUG OUTPUT: %s\n", debug_output);
   }
 
-  type = determine_filetype(input_fd);
-
-  if(type != COMPRESS && type != DECOMPRESS)
-    error("Cannot determine file type.\n");
-
   fds[0] = input_fd;
   *input_map = get_mapping(input_fd);
   *input_filesize = get_filesize(input_path);
 
+  type = determine_filetype(*input_map, *input_filesize);
+
+  if(type != COMPRESS && type != DECOMPRESS)
+    error("Cannot determine file type.\n");
+
   if(*output_path)
   {
-    output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
-    if(output_fd < 0)
-      error("Error in opening output file descriptor. (%s)\n", strerror(errno));
-    fds[1] = output_fd;
+    output_fd = open_output_file(*output_path);
     return type;
   }
    
@@ -433,7 +614,7 @@ prepare_fds(char* input_path,
   else if(type == DECOMPRESS)
     *output_path = change_extension(input_path, ".mzML\0");
 
-  output_fd = open(*output_path, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+   output_fd = open_output_file(*output_path);
 
   if(output_fd < 0)
     error("Error in opening output file descriptor. (%s)\n", strerror(errno));

@@ -1,11 +1,15 @@
 #include <assert.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <pthread.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include "vendor/zlib/zlib.h"
+#include "../vendor/zlib/zlib.h"
 #include <zstd.h>
+#include <lz4.h>
 #include "mscompress.h"
 
 ZSTD_DCtx *
@@ -50,6 +54,45 @@ zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 }
 
 void*
+lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
+{
+    void* out_buff;
+    int decompressed_size;
+
+    if(src_buff == NULL)
+    {
+        warning("lz4_decompress: src_buff is null.\n");
+        return NULL;
+    }
+    if(src_len < 0)
+    {
+        warning("lz4_decompress: src_len < 0.\n");
+        return NULL;
+    }
+    if(org_len < 0)
+    {
+        warning("lz4_decompress: org_len <0.\n");
+        return NULL;
+    }
+
+    out_buff = malloc(org_len);
+    if(out_buff == NULL)
+    {
+        warning("lz4_decompress: error in malloc()\n");
+        return NULL;
+    }
+
+    decompressed_size = LZ4_decompress_safe(src_buff, out_buff, src_len, org_len);
+    if (decompressed_size < 0) {
+        warning("lz4_decompress: error in LZ4_decompress_safe\n");
+        free(out_buff);
+        return NULL;
+    }
+
+    return out_buff;
+}
+
+void*
 no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len)
 /*
     Same function signature as zstd_decompress, but does not decompress.
@@ -70,7 +113,7 @@ decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, 
 {
     if(blk == NULL) // Empty block, return null.
         return NULL; 
-    return decompress_fun(dctx, input_map+offset, blk->compressed_size, blk->original_size);
+    return decompress_fun(dctx, (uint8_t*)input_map+offset, blk->compressed_size, blk->original_size);
 }
 
 decompress_args_t*
@@ -80,9 +123,9 @@ alloc_decompress_args(char* input_map,
                       block_len_t* mz_binary_blk,
                       block_len_t* inten_binary_blk,
                       division_t* division,
-                      off_t footer_xml_off,
-                      off_t footer_mz_bin_off,
-                      off_t footer_inten_bin_off)
+                      uint64_t footer_xml_off,
+                      uint64_t footer_mz_bin_off,
+                      uint64_t footer_inten_bin_off)
 {
     decompress_args_t* r;
     
@@ -131,6 +174,14 @@ get_lowest(int i_0, int i_1, int i_2)
     return ret;
 }
 
+#ifdef _WIN32
+DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
+    decompress_args_t* args = (decompress_args_t*)lpParam;
+    decompress_routine(args);
+    return 0;
+}
+#endif
+
 
 void
 decompress_routine(void* args)
@@ -151,10 +202,10 @@ decompress_routine(void* args)
         error("decompress_routine: Decompression arguments are null.\n");
 
     // Decompress each block of data
-    void
-        *decmp_xml = decmp_block(db_args->df->xml_decompression_fun, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
-        *decmp_mz_binary = decmp_block(db_args->df->mz_decompression_fun, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
-        *decmp_inten_binary = decmp_block(db_args->df->inten_decompression_fun, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
+    char
+        *decmp_xml = (char*)decmp_block(db_args->df->xml_decompression_fun, dctx, db_args->input_map, db_args->footer_xml_off, db_args->xml_blk),
+        *decmp_mz_binary = (char*)decmp_block(db_args->df->mz_decompression_fun, dctx, db_args->input_map, db_args->footer_mz_bin_off, db_args->mz_binary_blk),
+        *decmp_inten_binary = (char*)decmp_block(db_args->df->inten_decompression_fun, dctx, db_args->input_map, db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
     size_t binary_len = 0;
 
@@ -169,7 +220,8 @@ decompress_routine(void* args)
     if(len <= 0)
         error("decompress_routine: Error determining decompression buffer size.\n");
 
-    char* buff = malloc(len*2); // *2 to be safe TODO: fix this
+    char* buff = malloc(len*2);
+
     if(buff == NULL)
         error("decompress_routine: Failed to allocate buffer for decompression.\n");
 
@@ -273,78 +325,124 @@ decompress_routine(void* args)
 }
 
 void
-decompress_parallel(char* input_map,
-                    block_len_queue_t* xml_block_lens,
-                    block_len_queue_t* mz_binary_block_lens,
-                    block_len_queue_t* inten_binary_block_lens,
-                    divisions_t* divisions,
-                    data_format_t* df,
-                    footer_t* msz_footer,
-                    int threads, int fd)
+decompress_msz(char* input_map,
+    size_t input_filesize,
+    struct Arguments* arguments,
+    int fd)
 {
-    decompress_args_t* args[divisions->n_divisions];
-    pthread_t ptid[divisions->n_divisions];
+    block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
+    footer_t* msz_footer;
 
-    block_len_t *xml_blk, *mz_binary_blk, *inten_binary_blk;
+    int n_divisions = 0;
+    divisions_t* divisions;
+    data_format_t* df;
+    int threads = arguments->threads;
+    
+    print("\tDetected .msz file, reading header and footer...\n");
 
-    off_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_inten_bin_off = 0; // offset within corresponding data_block.
+    df = get_header_df(input_map);
+
+    parse_footer(&msz_footer, input_map, input_filesize,
+            &xml_block_lens, 
+            &mz_binary_block_lens,
+            &inten_binary_block_lens,
+            &divisions,
+            &n_divisions);
+
+    if(n_divisions == 0)
+    {
+        warning("No divisions found in file, aborting...\n");
+        return;
+    }
+
+    set_decompress_runtime_variables(arguments, df, msz_footer);
+    
+    decompress_args_t** args = malloc(sizeof(decompress_args_t*) * divisions->n_divisions);
+
+    #ifdef _WIN32
+    HANDLE* ptid = (HANDLE*)malloc(sizeof(HANDLE) * divisions->n_divisions);
+    #else
+    pthread_t* ptid = (pthread_t*)malloc(sizeof(pthread_t) * divisions->n_divisions);
+    #endif
+
+
+    block_len_t* xml_blk, * mz_binary_blk, * inten_binary_blk;
+
+    uint64_t footer_xml_off = 0, footer_mz_bin_off = 0, footer_inten_bin_off = 0; // offset within corresponding data_block.
 
     int i;
 
     int divisions_used = 0;
     int divisions_left = divisions->n_divisions;
 
-    clock_t start, stop;
+    double start, stop;
 
-    for(i = 0; i < divisions->n_divisions; i++)
+    for (i = 0; i < divisions->n_divisions; i++)
     {
         xml_blk = pop_block_len(xml_block_lens);
         mz_binary_blk = pop_block_len(mz_binary_block_lens);
         inten_binary_blk = pop_block_len(inten_binary_block_lens);
 
         args[i] = alloc_decompress_args(input_map,
-                                        df,
-                                        xml_blk,
-                                        mz_binary_blk,
-                                        inten_binary_blk,
-                                        divisions->divisions[i],
-                                        footer_xml_off + msz_footer->xml_pos,
-                                        footer_mz_bin_off + msz_footer->mz_binary_pos,
-                                        footer_inten_bin_off + msz_footer->inten_binary_pos);
+            df,
+            xml_blk,
+            mz_binary_blk,
+            inten_binary_blk,
+            divisions->divisions[i],
+            footer_xml_off + msz_footer->xml_pos,
+            footer_mz_bin_off + msz_footer->mz_binary_pos,
+            footer_inten_bin_off + msz_footer->inten_binary_pos);
 
-        if(xml_blk != NULL) footer_xml_off += xml_blk->compressed_size;
-        if(mz_binary_blk != NULL) footer_mz_bin_off += mz_binary_blk->compressed_size;
-        if(inten_binary_blk != NULL) footer_inten_bin_off += inten_binary_blk->compressed_size;
+        if (xml_blk != NULL) footer_xml_off += xml_blk->compressed_size;
+        if (mz_binary_blk != NULL) footer_mz_bin_off += mz_binary_blk->compressed_size;
+        if (inten_binary_blk != NULL) footer_inten_bin_off += inten_binary_blk->compressed_size;
     }
-    
-    while(divisions_left > 0)
+
+    while (divisions_left > 0)
     {
-        if(divisions_left < threads)
+        if (divisions_left < threads)
             threads = divisions_left;
-        for(i = divisions_used; i < divisions_used + threads; i++)
+
+        for (i = divisions_used; i < divisions_used + threads; i++)
         {
-            int ret = pthread_create(&ptid[i], NULL, &decompress_routine, (void*)args[i]);
-            if(ret != 0)
+            #ifdef _WIN32
+            ptid[i] = CreateThread(NULL, 0, decompress_routine_win, args[i], 0, NULL);
+            if (ptid[i] == NULL)
+            {
+                perror("CreateThread");
+                exit(-1);
+            }
+            #else
+            int ret = pthread_create(&ptid[i], NULL, decompress_routine, (void*)args[i]);
+            if (ret != 0)
             {
                 perror("pthread_create");
                 exit(-1);
             }
+            #endif
         }
 
-        for(i = divisions_used; i < divisions_used + threads; i++)
+        #ifdef _WIN32
+        WaitForMultipleObjects(threads, ptid + divisions_used, TRUE, INFINITE);
+        #else
+        for (i = divisions_used; i < divisions_used + threads; i++)
         {
             int ret = pthread_join(ptid[i], NULL);
-            if(ret != 0)
+            if (ret != 0)
             {
                 perror("pthread_join");
                 exit(-1);
             }
+        }
+        #endif
 
-            start = clock();
+        for (i = divisions_used; i < divisions_used + threads; i++)
+        {
+            start = get_time();
             write_to_file(fd, args[i]->ret, args[i]->ret_len);
-            stop = clock();
+            stop = get_time();
 
-            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, (float)args[i]->ret_len / (stop - start) * CLOCKS_PER_SEC / 1024 / 1024);
+            print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len, (float)args[i]->ret_len / (stop - start) / 1024 / 1024);
 
             dealloc_decompress_args(args[i]);
         }
@@ -352,6 +450,10 @@ decompress_parallel(char* input_map,
         divisions_left -= threads;
         divisions_used += threads;
     }
+
+    free(args);
+    free(ptid);
+
 }
 
 decompression_fun
@@ -360,6 +462,7 @@ set_decompress_fun(int accession)
     switch(accession)
     {
         case _ZSTD_compression_ :       return zstd_decompress;
+        case _LZ4_compression_ :        return lz4_decompress;
         case _no_comp_ :                return no_decompress;
         default :                       error("Compression type not supported.");
     }
