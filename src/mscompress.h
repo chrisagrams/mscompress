@@ -60,6 +60,8 @@
 #define _vdelta24_transform_ 4700010
 #define _cast_64_to_16_      4700011
 
+#define _LZ4_compression_   4700012
+
 #define ERROR_CHECK 1       /* If defined, runtime error checks will be enabled. */
 
 #define COMPRESS 1
