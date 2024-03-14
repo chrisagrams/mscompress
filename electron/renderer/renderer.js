@@ -475,10 +475,10 @@ const updateFileInfo = async (fh) => {
 
   switch(df['source_mz_fmt']){
       case '_32f_':
-          setElementsTextContentByClass("mz_format", "float32");
+          setElementsTextContentByClass("mz_format", "32f");
           break;
       case '_64d_':
-          setElementsTextContentByClass("mz_format", "double64");
+          setElementsTextContentByClass("mz_format", "64d");
           break;
       default:
           setElementsTextContentByClass("mz_format", "...");
@@ -487,10 +487,10 @@ const updateFileInfo = async (fh) => {
 
   switch(df['source_inten_fmt']){
       case '_32f_':
-          setElementsTextContentByClass("inten_format", "float32");
+          setElementsTextContentByClass("inten_format", "32f");
           break;
       case '_64d_':
-          setElementsTextContentByClass("inten_format", "double64");
+          setElementsTextContentByClass("inten_format", "64d");
           break;
       default:
           setElementsTextContentByClass("inten_format", "unknown");
