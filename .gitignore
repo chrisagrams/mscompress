@@ -36,3 +36,4 @@ mscompress-win32-x64*
 *dist/
 *.csv
 *.pyc
+vendor/zlib/zconf.h
