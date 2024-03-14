@@ -53,6 +53,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Add url to Github repo logo
     document.querySelector("#github_logo").addEventListener("click", () => {
-        ipcRenderer.send("open-browser", "https://github.com/chrisagrams/mscompress_dev");
+        ipcRenderer.send("open-browser", "https://github.com/chrisagrams/mscompress");
     });
 });
