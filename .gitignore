@@ -32,3 +32,7 @@ package-lock.json
 cli/Debug/*
 mscompress-win32-x64*
 *.pdb
+*.zip
+*dist/
+*.csv
+*.pyc

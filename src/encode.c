@@ -228,7 +228,7 @@ encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len, char* dest
     // *src += org_len + ZLIB_SIZE_OFFSET;
 }
 
-encode_fun_ptr
+encode_fun
 set_encode_fun(int compression_method, int algo, int accession)
 {
     if(algo == 0)

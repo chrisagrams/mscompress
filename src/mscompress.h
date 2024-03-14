@@ -102,59 +102,6 @@ struct Arguments {
     int zstd_compression_level;
 };
 
-typedef void (*Algo)(void*);
-typedef Algo (*Algo_ptr)();
-
-typedef void (*decode_fun)(char*, size_t, char**, size_t*);
-typedef decode_fun (*decode_fun_ptr)();
-
-typedef void (*encode_fun)(char**, char*, size_t*);
-typedef encode_fun (*encode_fun_ptr)();
-
-typedef void* (*compression_fun)(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
-typedef compression_fun (*compression_fun_ptr)();
-
-typedef void* (*decompression_fun)(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t* out_len);
-typedef decompression_fun (*decompression_fun_ptr)();
-
-typedef struct
-{
-    /* source information (source mzML) */
-    uint32_t source_mz_fmt;
-    uint32_t source_inten_fmt;
-    uint32_t source_compression;
-    uint32_t source_total_spec;
-
-    /* target information (target msz)*/
-    uint32_t target_xml_format;
-    uint32_t target_mz_format;
-    uint32_t target_inten_format;
-
-    /* algo parameters */
-    float mz_scale_factor; 
-    float int_scale_factor;
-
-    /* runtime variables, not written to disk. */
-    int populated;
-    decode_fun_ptr decode_source_compression_mz_fun;
-    decode_fun_ptr  decode_source_compression_inten_fun;
-    encode_fun_ptr encode_source_compression_mz_fun;
-    encode_fun_ptr encode_source_compression_inten_fun;
-    Algo_ptr target_xml_fun;
-    Algo_ptr target_mz_fun;
-    Algo_ptr target_inten_fun;
-    compression_fun_ptr xml_compression_fun;
-    compression_fun_ptr mz_compression_fun;
-    compression_fun_ptr inten_compression_fun;
-    decompression_fun_ptr xml_decompression_fun;
-    decompression_fun_ptr mz_decompression_fun;
-    decompression_fun_ptr inten_decompression_fun;
-
-    int zstd_compression_level; // no need to write to file since ZSTD_DCtx doesn't need it.
-
-} data_format_t;
-
-
 typedef struct
 {
     uint64_t* start_positions;
@@ -263,6 +210,58 @@ typedef struct
 } zlib_block_t;
 
 
+typedef void (*Algo)(void*);
+typedef Algo (*Algo_ptr)();
+
+typedef void (*decode_fun)(z_stream *, char *, size_t, char **, size_t *, data_block_t *);
+typedef decode_fun (*decode_fun_ptr)();
+
+typedef void (*encode_fun)(z_stream *, char **, size_t, char *, size_t *);
+typedef encode_fun (*encode_fun_ptr)();
+
+typedef void* (*compression_fun)(ZSTD_CCtx* , void* , size_t , size_t* , int );
+typedef compression_fun (*compression_fun_ptr)();
+
+typedef void* (*decompression_fun)(ZSTD_DCtx *, void *, size_t , size_t );
+typedef decompression_fun (*decompression_fun_ptr)();
+
+typedef struct
+{
+    /* source information (source mzML) */
+    uint32_t source_mz_fmt;
+    uint32_t source_inten_fmt;
+    uint32_t source_compression;
+    uint32_t source_total_spec;
+
+    /* target information (target msz)*/
+    uint32_t target_xml_format;
+    uint32_t target_mz_format;
+    uint32_t target_inten_format;
+
+    /* algo parameters */
+    float mz_scale_factor; 
+    float int_scale_factor;
+
+    /* runtime variables, not written to disk. */
+    int populated;
+    decode_fun decode_source_compression_mz_fun;
+    decode_fun  decode_source_compression_inten_fun;
+    encode_fun encode_source_compression_mz_fun;
+    encode_fun encode_source_compression_inten_fun;
+    Algo target_xml_fun;
+    Algo target_mz_fun;
+    Algo target_inten_fun;
+    compression_fun xml_compression_fun;
+    compression_fun mz_compression_fun;
+    compression_fun inten_compression_fun;
+    decompression_fun xml_decompression_fun;
+    decompression_fun mz_decompression_fun;
+    decompression_fun inten_decompression_fun;
+
+    int zstd_compression_level; // no need to write to file since ZSTD_DCtx doesn't need it.
+
+} data_format_t;
+
 /* arguments.c */
 void init_args(struct Arguments* args);
 int set_threads(struct Arguments* args, int threads);
@@ -347,13 +346,13 @@ long parse_blocksize(char* arg);
 /* decode.c */
 
 void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len);
-decode_fun_ptr set_decode_fun(int compression_method, int algo, int accession);
+decode_fun set_decode_fun(int compression_method, int algo, int accession);
 // Bytef* decode_binary(char* input_map, int start_position, int end_position, int compression_method, size_t* out_len);
 
 
 /* encode.c */
 
-encode_fun_ptr set_encode_fun(int compression_method, int algo, int accession);
+encode_fun set_encode_fun(int compression_method, int algo, int accession);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_len);
 
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
@@ -378,7 +377,7 @@ typedef struct
     
 ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
-void compress_routine(void* args);
+void * compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
 void compress_mzml(char* input_map, size_t input_filesize, struct Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
@@ -406,7 +405,7 @@ typedef struct
 
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
-void decompress_routine(void* args);
+void * decompress_routine(void* args);
 void decompress_msz(char* input_map,
     size_t input_filesize,
     struct Arguments* args,
@@ -422,15 +421,15 @@ typedef struct
     char** dest;
     size_t* dest_len;
     int src_format;
-    encode_fun_ptr enc_fun;
-    decode_fun_ptr dec_fun;
+    encode_fun enc_fun;
+    decode_fun dec_fun;
     data_block_t* tmp;
     z_stream* z;
     float scale_factor;
 } algo_args;
 
-Algo_ptr set_compress_algo(int algo, int accession);
-Algo_ptr set_decompress_algo(int algo, int accession);
+Algo set_compress_algo(int algo, int accession);
+Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(char* arg);
 
 /* queue.c */

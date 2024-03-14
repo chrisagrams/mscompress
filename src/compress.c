@@ -9,7 +9,7 @@
 #include <string.h>
 #include "../vendor/zlib/zlib.h"
 #include <zstd.h>
-#include <lz4.h>
+#include "../vendor/lz4/lib/lz4.h"
 #include "mscompress.h"
 
 
@@ -454,7 +454,7 @@ cmp_dump(cmp_blk_queue_t* cmp_buff,
 }
 
 
-typedef void (*cmp_routine_func)(ZSTD_CCtx*, algo_args*, cmp_blk_queue_t*, data_block_t**, data_format_t*, char*, size_t, size_t*, size_t*);
+typedef void (*cmp_routine_func)(compression_fun compression_fun, ZSTD_CCtx*, algo_args*, cmp_blk_queue_t*, data_block_t**, data_format_t*, char*, size_t, size_t*, size_t*);
 typedef cmp_routine_func (*cmp_routine_func_ptr)();
 
 
@@ -544,7 +544,7 @@ DWORD WINAPI compress_routine_win(LPVOID lpParam) {
 }
 #endif
 
-void
+void*
 compress_routine(void* args)
 /**
  * @brief Compress routine. Iterates through data_positions and compresses XML and binary with a single pass.
@@ -567,7 +567,7 @@ compress_routine(void* args)
     if(cb_args == NULL)
         error("compress_routine: Invalid compress_args_t\n");
 
-    if(cb_args->dp->total_spec == 0) return; // No data to compress.
+    if(cb_args->dp->total_spec == 0) return NULL; // No data to compress.
 
     cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
     data_block_t* curr_block = alloc_data_block(cb_args->blocksize); // Allocate a data_block to store data.
@@ -579,7 +579,7 @@ compress_routine(void* args)
 
     int i = 0;
 
-    cmp_routine_func_ptr cmp_fun = NULL;
+    cmp_routine_func cmp_fun = NULL;
     
     if(cb_args->mode == _xml_)
         cmp_fun = cmp_xml_routine;
@@ -631,6 +631,8 @@ compress_routine(void* args)
     dealloc_z_stream(a_args->z);
 
     cb_args->ret = cmp_buff;
+
+    return NULL;
 }
 
 block_len_queue_t*

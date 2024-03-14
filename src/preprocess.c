@@ -280,7 +280,7 @@ pattern_detect(char* input_map)
     
     yxml_t* xml = alloc_yxml();
 
-    char attrbuf[11] = {NULL}, *attrcur = NULL, *tmp = NULL; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
+    char attrbuf[11] = {'\0'}, *attrcur = NULL, *tmp = NULL; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
     
     int in_cvParam = 0;                      /* Boolean representing if currently inside of cvParam tag. */
     int current_type = 0;                    /* A pass-by-reference variable to indicate to map_to_df of current binary data array type (m/z or intensity) */
@@ -1545,7 +1545,7 @@ preprocess_mzml(char* input_map,
     }
     else if(arguments->indices_length == 0 && arguments->scans_length == 0)
     {
-        div = scan_mzml((char*)input_map, *df, input_filesize, NULL); // A division encapsulating the entire file
+        div = scan_mzml((char*)input_map, *df, input_filesize, '\0'); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);

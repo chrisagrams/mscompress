@@ -24,9 +24,9 @@ if(ENABLE_DEBUG_SYMBOLS)
 else()
     # Silence warnings for non-debug builds
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_compile_options("-w")
+        # add_compile_options("-w")
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-        add_compile_options("/W0")
+        # add_compile_options("/W0")
     endif()
 endif()
 
@@ -37,8 +37,16 @@ set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 file(GLOB SOURCES ${SRC_DIR}/*.c mscompress.c)
 add_executable(mscompress ${SOURCES})
 
-target_include_directories(mscompress PUBLIC ${VENDOR_DIR}/zstd/lib ${VENDOR_DIR}/base64/include ${VENDOR_DIR}/base64/lib ${VENDOR_DIR}/yxml ${SRC_DIR})
+target_include_directories(mscompress PUBLIC 
+                            ${VENDOR_DIR}/zstd/lib 
+                            ${VENDOR_DIR}/base64/include
+                            ${VENDOR_DIR}/base64/lib
+                            ${VENDOR_DIR}/yxml 
+                            ${VENDOR_DIR}/lz4/include
+                            ${SRC_DIR})
 
+#lz4
+include (${VENDOR_DIR}/Lz4Include.cmake) # Add lz4 library
 
 #zlib
 include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
@@ -57,5 +65,5 @@ include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 if(WIN32)
     target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64)
 else()
-    target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64 m) # need math library
+    target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64 m lz4) # need math library
 endif()
