@@ -243,12 +243,13 @@ main(int argc, char* argv[])
         print("\tDetected .mzML file, starting compression...\n");
 
         // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
-        preprocess_mzml((char*)input_map,
+        if(preprocess_mzml((char*)input_map,
                         input_filesize,
                         &(arguments.blocksize),
                         &arguments,
                         &df,
-                        &divisions);
+                        &divisions))
+            break;
       
 
         //Start compress routine.

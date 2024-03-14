@@ -355,17 +355,30 @@ pattern_detect(char* input_map)
     return NULL;
 }
 
-void
+int
 validate_positions(uint64_t* arr, int len)
 {
     int i;
     for(i = 0; i < len; i++)
     {
-        if(arr[i] < 0)
-            error("validate_positions: negative position detected.\n");
-        if(i+1 < len && arr[i] > arr[i+1])
-            error("validate_positions: position %d is greater than %d\n", i, i+1);
+        if(arr[i] < 0) 
+        {
+            warning("validate_positions: negative position detected.\n");
+            return 1;
+        }
+        if(i > len)
+        {
+            warning("validate_positions: position %d out of bounds out of %d\n", i, len);
+            return 1;
+        }
+        if((i+1 < len) && arr[i] > arr[i+1])
+        {
+            warning("validate_positions: position %d is greater than %d\n", i, i+1);
+            warning("validate_positions: arr[i] = %d | arr[i+1] = %d\n", arr[i], arr[i+1]);
+            return 1;
+        }
     }
+    return 0;
 }
 
 char*
@@ -567,12 +580,15 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     mz_dp->file_end = inten_dp->file_end = xml_dp->file_end = end;
 
     // Sanity check
-    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
-    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
-    validate_positions(inten_dp->start_positions, inten_dp->total_spec);
-    validate_positions(inten_dp->end_positions, inten_dp->total_spec);
-    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
-    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
+    if(
+        validate_positions(mz_dp->start_positions, mz_dp->total_spec)       ||
+        validate_positions(mz_dp->end_positions, mz_dp->total_spec)         ||
+        validate_positions(inten_dp->start_positions, inten_dp->total_spec) ||
+        validate_positions(inten_dp->end_positions, inten_dp->total_spec)   ||
+        validate_positions(xml_dp->start_positions, xml_dp->total_spec)     ||
+        validate_positions(xml_dp->end_positions, xml_dp->total_spec)
+    )
+        return NULL;
 
     // Create division_t 
 
@@ -1516,21 +1532,21 @@ preprocess_mzml(char* input_map,
     *df = pattern_detect((char*)input_map);
 
     if (*df == NULL)
-        return -1;
+        return 1;
 
     division_t* div = NULL;
     if(arguments->indices_length > 0)
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
+            return 1;
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->scans_length > 0)
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
+            return 1;
         map_scan_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
@@ -1539,7 +1555,7 @@ preprocess_mzml(char* input_map,
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
+            return 1;
         map_ms_level_to_index(arguments, tmp);
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
@@ -1551,7 +1567,7 @@ preprocess_mzml(char* input_map,
         error("Invalid indicies_size: %ld\n", arguments->indices_length);
 
     if (div == NULL)
-        return -1;
+        return 1;
 
     if(arguments->threads == -1) // force divisions to be only 1
     {
@@ -1588,13 +1604,14 @@ preprocess_mzml(char* input_map,
     }
 
     if (*divisions == NULL)
-        return -1;
+        return 1;
 
     end = get_time();
 
     print("Preprocessing time: %1.4fs\n", end - start); 
     print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, arguments->threads);
 
+    return 0;
 }
 
 void

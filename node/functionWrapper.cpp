@@ -33,7 +33,7 @@ namespace mscompress {
         std::string path = pathValue.Utf8Value();
         char* charPath = (char*)path.c_str(); // Convert to char*
 
-        int fs = get_filesize(charPath);
+        size_t fs = get_filesize(charPath);
         return Napi::Number::New(env, fs);
     }
 
@@ -187,6 +187,8 @@ namespace mscompress {
 
         division_t* result = NULL;
 
+        std::cout << "starting getPositions " << std::endl;
+
         if(type == COMPRESS)
             result = scan_mzml((char*)mmap_ptr, df, filesize, MSLEVEL|SCANNUM|RETTIME);
         else if (type == DECOMPRESS)
@@ -199,6 +201,8 @@ namespace mscompress {
             Napi::Error::New(env, "Error in GetPositions").ThrowAsJavaScriptException();
             return env.Null();
         }
+
+        std::cout << "end getPositions " << std::endl;
 
         Napi::Object obj = CreateDivisionObject(env, result);
 
