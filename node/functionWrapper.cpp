@@ -357,7 +357,15 @@ namespace mscompress {
 
         // Run
         std::cout << "Starting compression..." << std::endl;
+        std::cout << "Arguments: " << std::endl;
+        std::cout << "threads: " << args->threads << std::endl;
+        std::cout << "target_xml_format: " << args->target_xml_format << std::endl;
+        std::cout << "target_mz_format: " << args->target_mz_format << std::endl;
+        std::cout << "target_inten_format: " << args->target_inten_format << std::endl;
+        std::cout << "zstd_compression_level: " << args->zstd_compression_level << std::endl;
+
         compress_mzml((char*)input_map, input_filesize, args, df, divisions, output_fd);
+
         std::cout << "Compression finished." << std::endl;
 
         return env.Null();

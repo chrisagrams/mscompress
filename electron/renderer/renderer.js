@@ -1,4 +1,58 @@
-const filehandles = [];
+class Arguments {
+
+  constructor () {
+    this.mode = "default";
+    this.threads = 1;
+    this.setMode(this.mode);
+  }
+
+  setMode(mode) {
+    switch(mode) {
+      case "fastest":
+          this.mode = mode;
+          this.target_xml_format = "_LZ4_compression_";
+          this.target_mz_format = "_LZ4_compression_";
+          this.target_inten_format = "_LZ4_compression_";
+          this.zstd_compression_level = 1;
+          break;
+      case "faster":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 1;
+          break;
+      case "default":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 3;
+          break;
+      case "better":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 6;
+          break;
+    }
+  }
+
+  setThreads(threads) {
+    this.threads = threads;
+  }
+
+  getArguments() {
+    return {
+      "threads":                this.threads,
+      "target_xml_format":      this.target_xml_format ,
+      "target_mz_format":       this.target_mz_format,
+      "target_inten_format":    this.target_inten_format ,
+      "zstd_compression_level": this.zstd_compression_level,
+    }
+  }
+
+}
+
+window.arguments = new Arguments();
 
 class FileHandle {
   static #extractFilename (path) {
@@ -122,7 +176,7 @@ class FileHandle {
     if (this.positions == null)
       await this.get_positions();
 
-    return await systemWorkerPromise({'type': 'prepare_compress', 'fd': this.fd, 'df': this.df, 'div': this.positions});
+    return await systemWorkerPromise({'type': 'prepare_compress', 'fd': this.fd, 'df': this.df, 'div': this.positions, 'args': window.arguments.getArguments()});
   }
 
   async get_spectrum(index) {
@@ -208,7 +262,7 @@ class FileHandle {
         throw new Error("get_output_fd error");
 
       showLoading();
-      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
+      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
       hideLoading();
     }
     else if (this.type == 2) //msz
@@ -222,7 +276,7 @@ class FileHandle {
         throw new Error("get_output_fd error");
 
       showLoading();
-      await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd});
+      await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
       hideLoading();
     }
   }
@@ -232,6 +286,8 @@ class FileHandle {
     return this.type == 1 || this.type == 2;
   }
 }
+
+const filehandles = [];
 
 const getZlibVersion = async () => {
   return await systemWorkerPromise({'type': 'get_zlib_version'});
@@ -417,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+// Create a new system worker.
 const system_worker = new Worker('./system_worker.js');
 
 // Create a promise for the system_worker response
@@ -434,11 +491,28 @@ const systemWorkerPromise = (message) => {
   });
 };
 
-
 console.log("Running system detection...");
 
-system_worker.postMessage({'type': "get_threads"});
-system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System32\\notepad.exe"});
+const getThreads = new Promise((resolve, reject) => {
+  systemWorkerPromise({'type': "get_threads"})
+    .then(threads => {
+      resolve(threads);
+    })
+    .catch(error => {
+      reject(error);
+    });
+});
+
+
+getThreads.then(threads => {
+  arguments.setThreads(threads);
+}).catch(e => {
+  console.error(e.message, e);
+  showError(e.message);
+});
+
+// system_worker.postMessage({'type': "get_threads"});
+// system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System32\\notepad.exe"});
 
 system_worker.onerror = (e) => {
   console.error(e.message, e);
@@ -617,6 +691,17 @@ const getSelectedFileHandle = () => {
   const fd = selectedCard.id.split("_")[1];
   return filehandles.find(fh => fh.fd == fd);
 }
+
+const compressionRadioOptions = document.querySelectorAll('input[name="compression"]');
+
+const handleRadioChange = (e => {
+  window.arguments.setMode(e.target.value);
+  console.log(window.arguments.getArguments());
+});
+
+compressionRadioOptions.forEach(i => {
+  i.addEventListener('change', handleRadioChange);
+})
 
 const showAnalysisWindow = (fh) => {
   const analysis_div = document.querySelector(".analysis");

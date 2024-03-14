@@ -21,6 +21,7 @@ namespace mscompress {
         {"_xml_", 1000513},
         {"_lossless_", 4700000},
         {"_ZSTD_compression_", 4700001},
+        {"_LZ4_compression_",  4700012},
         {"_cast_64_to_32_", 4700002},
         {"_log2_transform_", 4700003},
         {"_delta16_transform_", 4700004},
@@ -303,8 +304,13 @@ namespace mscompress {
 
         // Set arguments
         set_threads(args, getUint32OrDefault(obj, "threads", 1));
-        //TODO: the rest
+        
+        args->target_xml_format = StringToAccession(getStringOrDefault(obj, "target_xml_format", "_ZSTD_compression_"));
+        args->target_mz_format = StringToAccession(getStringOrDefault(obj, "target_mz_format", "_ZSTD_compression_"));
+        args->target_inten_format = StringToAccession(getStringOrDefault(obj, "target_inten_format", "_ZSTD_compression_"));
 
+        args->zstd_compression_level = getUint32OrDefault(obj, "zstd_compression_level", 3);
+    
         return args;
     }
 }

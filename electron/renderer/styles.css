@@ -230,6 +230,30 @@ img {
     margin-top: auto;
 }
 
+#compression_select {
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+}
+
+#compression_select > .selectOption{
+    display: flex;
+    flex-direction: row;
+}
+
+#compression_select > .selectOption > input {
+    margin: 10px;
+}
+
+#compression_select > .selectOption > input:checked + label {
+    font-weight: 500;
+}
+
+#compression_select > .selectOption > label {
+    font-weight: lighter;
+    margin: auto 0;
+}
+
 #right-container > h6 {
     margin: 0;
 }
