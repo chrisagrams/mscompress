@@ -3,16 +3,19 @@ import base64
 import io
 import sys
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning) # ignore FutureWarning from pyarrow
+warnings.simplefilter(action='ignore', category=FutureWarning) # Ignore FutureWarning from pyarrow
 
 import seaborn as sns
 import numpy as np
 import pyarrow as pa
+
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 from preview_gen import read_mzml, table_schema
 
+matplotlib.use('Agg')  # Set the backend to 'Agg' to avoid GUI interaction
 
 def hex_to_rgb(value: str) -> tuple:
     '''

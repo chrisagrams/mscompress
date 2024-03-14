@@ -5,13 +5,18 @@
   "scripts": {
     "start": "electron .",
     "install": "cmake-js compile -d ../node/",
-    "clean": "cmake-js -d ../node/ clean"
+    "clean": "cmake-js -d ../node/ clean",
+    "build": "npx electron-builder"
   },
   "build": {
     "extraResources": [
       {
         "from": "../node/build/Release",
         "to": "node/build/Release"
+      },
+      {
+        "from": "../modules/python/dist",
+        "to": "modules/python/dist"
       }
     ],
     "appId": "gy.lab.mscompress",
