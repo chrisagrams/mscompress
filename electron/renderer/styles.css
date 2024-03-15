@@ -254,6 +254,10 @@ img {
     margin: auto 0;
 }
 
+#right-container {
+    padding: 5px;
+}
+
 #right-container > h6 {
     margin: 0;
 }
