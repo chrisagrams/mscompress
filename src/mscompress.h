@@ -1,4 +1,4 @@
-#include <zstd.h>
+#include "../vendor/zstd/lib/zstd.h"
 #include <stdint.h>
 #include <sys/types.h>
 #include "../vendor/zlib/zlib.h"
@@ -67,6 +67,7 @@
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
+#define EXTRACT_MSZ 4
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -169,6 +170,12 @@ typedef struct block_len_t
     size_t compressed_size;
     struct block_len_t* next;
 
+    char* cache; // During msz extraction, store decompressed block here as a "cache".
+
+    char* encoded_cache;
+    uint64_t encoded_cache_len;
+    size_t* encoded_cache_lens;
+
 } block_len_t;
 
 
@@ -270,7 +277,7 @@ int set_int_lossy(struct Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
 void set_compress_runtime_variables(struct Arguments* args, data_format_t* df);
-void set_decompress_runtime_variables(struct Arguments* args, data_format_t* df, footer_t* msz_footer);
+void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
 extern long fd_pos[3];
@@ -359,6 +366,7 @@ void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_l
 
 /* extract.c */
 void extract_mzml(char* input_map, divisions_t* divisions, int output_fd);
+void extract_msz(char* input_map, size_t input_filesize, long* indicies, long indicies_length, int output_fd);
 
 /* compress.c */
 typedef struct 
@@ -405,6 +413,7 @@ typedef struct
 
 ZSTD_DCtx* alloc_dctx();
 void * zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len, size_t org_len);
+void * decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk);
 void * decompress_routine(void* args);
 void decompress_msz(char* input_map,
     size_t input_filesize,
@@ -442,6 +451,8 @@ void dealloc_block_len(block_len_t* blk);
 block_len_queue_t* alloc_block_len_queue();
 void dealloc_block_len_queue(block_len_queue_t* queue);
 void append_block_len(block_len_queue_t* queue, size_t original_size, size_t compressed_size);
+block_len_t* get_block_by_index(block_len_queue_t* queue, int index);
+long get_block_offset_by_index(block_len_queue_t* queue, int index);
 block_len_t* pop_block_len(block_len_queue_t* queue);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);

@@ -181,19 +181,20 @@ alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
     if(d == NULL)
         error("alloc_division: malloc failure.\n");
 
-    d->spectra = NULL;
+    d->spectra = alloc_dp(n_mz);
     d->xml = alloc_dp(n_xml);
     d->mz = alloc_dp(n_mz);
     d->inten = alloc_dp(n_inten);
     d->size = 0;
 
-    d->scans = NULL;
-    d->ms_levels = NULL;
+    d->scans = alloc_dp(n_mz);
+    d->ms_levels = alloc_dp(n_mz);
     d->ret_times = NULL;
 
-    if(d->xml == NULL || d->mz == NULL || d->inten == NULL)
+    if(d->spectra == NULL || d->xml == NULL || d->mz == NULL || d->inten == NULL)
         error("alloc_division: malloc failure.\n");
 
+    d->spectra->total_spec = 0;
     d->xml->total_spec = 0;
     d->mz->total_spec = 0;
     d->inten->total_spec = 0;
@@ -1115,6 +1116,7 @@ write_division(division_t* div, int fd)
     char* buff, *num_buff;
 
     // Write data_positions_t
+    write_dp(div->spectra, fd);
     write_dp(div->xml, fd);
     write_dp(div->mz, fd);
     write_dp(div->inten, fd);
@@ -1145,6 +1147,7 @@ read_division(void* input_map, long* position)
     r = malloc(sizeof(division_t));
     if(r == NULL) return NULL;
 
+    r->spectra = read_dp(input_map, position);
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
@@ -1234,6 +1237,11 @@ create_divisions(division_t* div, long n_divisions)
 
         for(int j = 0; j < n_spec_per_div; j++)
         {
+            // Copy Spectra
+            r->divisions[i]->spectra->start_positions[j] = div->spectra->start_positions[spec_i];
+            r->divisions[i]->spectra->end_positions[j] = div->spectra->end_positions[spec_i];
+            r->divisions[i]->spectra->total_spec++;
+
             // Copy MZ
             r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
             r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
@@ -1245,6 +1253,10 @@ create_divisions(division_t* div, long n_divisions)
             r->divisions[i]->inten->end_positions[j] = div->inten->end_positions[spec_i];
             r->divisions[i]->inten->total_spec++;
             r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
+
+            // Copy scans, MS levels, etc. 
+            // r->divisions[i]->scans[j] = div->scans[spec_i];
+            // r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
 
             spec_i++;
         }
@@ -1258,6 +1270,7 @@ create_divisions(division_t* div, long n_divisions)
             r->divisions[i]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
             xml_i++;
         }
+
     }
 
     // End case: take the remaining spectra and put them in the last division
@@ -1269,6 +1282,11 @@ create_divisions(division_t* div, long n_divisions)
 
     for(int j = 0; j < n_spec_per_div; j++)
     {
+         // Copy Spectra
+        r->divisions[i]->spectra->start_positions[j] = div->spectra->start_positions[spec_i];
+        r->divisions[i]->spectra->end_positions[j] = div->spectra->end_positions[spec_i];
+        r->divisions[i]->spectra->total_spec++;
+
         // Copy MZ
         r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
         r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
@@ -1281,6 +1299,11 @@ create_divisions(division_t* div, long n_divisions)
         r->divisions[i]->inten->total_spec++;
         r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
 
+
+        // Copy scans, MS levels, etc. 
+        // r->divisions[i]->scans[j] = div->scans[spec_i];
+        // r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+        
         spec_i++;
     }
 

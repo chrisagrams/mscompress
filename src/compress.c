@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../vendor/zlib/zlib.h"
-#include <zstd.h>
+#include "../vendor/zstd/lib/zstd.h"
 #include "../vendor/lz4/lib/lz4.h"
 #include "mscompress.h"
 

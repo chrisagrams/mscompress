@@ -178,7 +178,7 @@ void set_compress_runtime_variables(struct Arguments* args, data_format_t* df)
   return;
 }
 
-void set_decompress_runtime_variables(struct Arguments* args, data_format_t* df, footer_t* msz_footer)
+void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer)
 {
   // Set target encoding and decompression functions.
   df->encode_source_compression_mz_fun    = set_encode_fun(df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);

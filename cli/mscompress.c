@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <zstd.h>
+#include "../vendor/zstd/lib/zstd.h"
 
 #include "libbase64.h"
 #include "yxml.h"
@@ -226,7 +226,10 @@ main(int argc, char* argv[])
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
-    if(arguments.extract_only)
+
+    if(arguments.extract_only && operation == DECOMPRESS) // msz detected, extracting
+      operation = EXTRACT_MSZ;
+    else if(arguments.extract_only) // mzML detected, extracting
       operation = EXTRACT;
 
     // Initialize b64 encoder.
@@ -285,6 +288,10 @@ main(int argc, char* argv[])
                 &divisions);
           
           extract_mzml((char*)input_map, divisions, fds[1]);
+      };
+      case EXTRACT_MSZ:
+      {
+        extract_msz((char*)input_map, input_filesize, arguments.indices, arguments.indices_length, fds[1]);
       };
     }
     print("\nCleaning up...\n");

@@ -129,6 +129,11 @@ alloc_block_len(size_t original_size, size_t compressed_size)
     r->compressed_size = compressed_size;
     r->next = NULL;
 
+    r->cache = NULL; // Set cache as "null"
+    r->encoded_cache = NULL;
+    r->encoded_cache_len = 0;
+    r->encoded_cache_lens = NULL;
+
     return r;
 }
 
@@ -137,6 +142,10 @@ dealloc_block_len(block_len_t* blk)
 {
     if(blk)
     {
+        if(blk->cache)
+        {
+            free(blk->cache);
+        }
         free(blk);
     }
 }
@@ -204,6 +213,46 @@ append_block_len(block_len_queue_t* queue, size_t original_size, size_t compress
     queue->populated++;
 
     return;
+}
+
+block_len_t* 
+get_block_by_index(block_len_queue_t* queue, int index) {
+    block_len_t* current = queue->head;
+    int i = 0;
+
+    while (current != NULL && i < index) {
+        current = current->next;
+        i++;
+    }
+
+    if (current == NULL) {
+        return NULL;
+    }
+
+    return current;
+}
+
+long
+get_block_offset_by_index(block_len_queue_t* queue, int index) 
+/*
+    Note: These offsets are from the start of respective block section.
+*/
+{
+    block_len_t* current = queue->head;
+    int i = 0;
+    long offset = 0;
+
+    while (current != NULL && i < index) {
+        offset += current->compressed_size;
+        current = current->next;
+        i++;
+    }
+
+    if (current == NULL) {
+        return -1;
+    }
+
+    return offset;
 }
 
 block_len_t*
