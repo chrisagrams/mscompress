@@ -9,6 +9,9 @@ endif()
 # Add an option to enable/disable debugging symbols
 option(ENABLE_DEBUG_SYMBOLS "Enable debugging symbols" OFF)
 
+# add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address)
+
 # Set the build type based on the CMAKE_BUILD_TYPE variable
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of build.")
 

@@ -686,7 +686,12 @@ extract_spectra(char* input_map,
 }
 
 void 
-extract_msz(char* input_map, size_t input_filesize, long* indicies, long indicies_length, int output_fd)
+extract_msz(char* input_map,
+            size_t input_filesize,
+            long* indicies,
+            long indicies_length,
+            uint16_t ms_level,
+            int output_fd)
 {
     block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;
     footer_t* msz_footer;
@@ -708,6 +713,11 @@ extract_msz(char* input_map, size_t input_filesize, long* indicies, long indicie
                  &inten_binary_block_lens,
                  &divisions,
                  &n_divisions);
+
+    if (ms_level != 0) // MS level selected
+    {
+        indicies = map_ms_level_to_index_from_divisions(ms_level, divisions, &indicies_length);
+    }
 
     set_decompress_runtime_variables(df, msz_footer);
 

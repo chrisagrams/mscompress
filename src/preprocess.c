@@ -187,8 +187,8 @@ alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
     d->inten = alloc_dp(n_inten);
     d->size = 0;
 
-    d->scans = alloc_dp(n_mz);
-    d->ms_levels = alloc_dp(n_mz);
+    d->scans = malloc(n_mz * sizeof(uint32_t));
+    d->ms_levels = malloc(n_mz * sizeof(uint16_t));
     d->ret_times = NULL;
 
     if(d->spectra == NULL || d->xml == NULL || d->mz == NULL || d->inten == NULL)
@@ -475,8 +475,8 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     mz_dp = alloc_dp(df->source_total_spec);
     inten_dp = alloc_dp(df->source_total_spec);
 
-    long* scans = (long*)calloc(df->source_total_spec, sizeof(long));
-    long* ms_levels = (long*)calloc(df->source_total_spec, sizeof(long));
+    uint32_t* scans = (uint32_t*)calloc(df->source_total_spec, sizeof(uint32_t));
+    uint16_t* ms_levels = (uint16_t*)calloc(df->source_total_spec, sizeof(uint16_t));
     float* ret_times = (float*)calloc(df->source_total_spec, sizeof(float));
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
@@ -1089,6 +1089,44 @@ write_dp(data_positions_t* dp, int fd)
     return;
 }
 
+void
+write_uint32_arr(uint32_t* arr, uint32_t len, int fd)
+{
+    char* buff, *num_buff;
+
+    // Write array length
+    num_buff = malloc(sizeof(uint32_t));
+    *((uint32_t*)num_buff) = len;
+    write_to_file(fd, num_buff, sizeof(uint32_t));
+
+    // Write array
+    buff = (char*)arr;
+    write_to_file(fd, buff, sizeof(uint32_t)*len);
+
+    free(num_buff);
+
+    return;
+}
+
+void
+write_uint16_arr(uint16_t* arr, uint32_t len, int fd)
+{
+    char* buff, *num_buff;
+
+    // Write array length
+    num_buff = malloc(sizeof(uint32_t));
+    *((uint32_t*)num_buff) = len;
+    write_to_file(fd, num_buff, sizeof(uint32_t));
+
+    // Write array
+    buff = (char*)arr;
+    write_to_file(fd, buff, sizeof(uint16_t)*len);
+
+    free(num_buff);
+    
+    return;
+}
+
 data_positions_t*
 read_dp(void* input_map, long* position)
 {
@@ -1110,6 +1148,30 @@ read_dp(void* input_map, long* position)
     return r;
 }
 
+uint32_t*
+read_uint32_arr(void* input_map, long* position)
+{
+    uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint32_t);
+
+    uint32_t* arr = (uint32_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint32_t)*len;
+
+    return arr;
+}
+
+uint16_t*
+read_uint16_arr(void* input_map, long* position)
+{
+    uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint32_t);
+
+    uint16_t* arr = (uint16_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint16_t)*len;
+
+    return arr;
+}
+
 void
 write_division(division_t* div, int fd)
 {
@@ -1126,6 +1188,10 @@ write_division(division_t* div, int fd)
     *((uint64_t*)num_buff) = (uint64_t)div->size;
     write_to_file(fd, num_buff, sizeof(uint64_t));
     free(num_buff);
+
+    // Write scans and MS levels
+    write_uint32_arr(div->scans, div->mz->total_spec, fd);
+    write_uint16_arr(div->ms_levels, div->mz->total_spec, fd);
 
     return;
 }
@@ -1153,6 +1219,9 @@ read_division(void* input_map, long* position)
     r->inten = read_dp(input_map, position);
     r->size = *((uint64_t*)((uint8_t*)input_map + *position));
     *position += sizeof(uint64_t);
+
+    r->scans = read_uint32_arr(input_map, position);
+    r->ms_levels = read_uint16_arr(input_map, position);
 
     return r;
 }
@@ -1255,8 +1324,8 @@ create_divisions(division_t* div, long n_divisions)
             r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
 
             // Copy scans, MS levels, etc. 
-            // r->divisions[i]->scans[j] = div->scans[spec_i];
-            // r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+            r->divisions[i]->scans[j] = div->scans[spec_i];
+            r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
 
             spec_i++;
         }
@@ -1301,8 +1370,8 @@ create_divisions(division_t* div, long n_divisions)
 
 
         // Copy scans, MS levels, etc. 
-        // r->divisions[i]->scans[j] = div->scans[spec_i];
-        // r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+        r->divisions[i]->scans[j] = div->scans[spec_i];
+        r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
         
         spec_i++;
     }
@@ -1504,26 +1573,29 @@ map_scan_to_index(struct Arguments* arguments, division_t* div)
     arguments->indices_length = j;
 }
 
-void
-map_ms_level_to_index(struct Arguments* arguments, division_t* div)
+long*
+map_ms_level_to_index(uint16_t ms_level, division_t* div, long index_offset, long* indices_length)
 {
+    if(div->spectra->total_spec == 0)
+        return NULL;
+
     long* indicies = malloc(div->spectra->total_spec * sizeof(long));
 
     long j = 0;
 
     for(long i = 0; i < div->spectra->total_spec; i++)
     {
-        if(arguments->ms_level == -1)
+        if(ms_level == -1)
         {
             if(div->ms_levels[i] > 2)
             {
-                indicies[j] = i;
+                indicies[j] = i + index_offset;
                 j++;
             }
         }
-        else if(div->ms_levels[i] == arguments->ms_level)
+        else if(div->ms_levels[i] == ms_level)
         {
-            indicies[j] = i;
+            indicies[j] = i + index_offset;
             j++;
         }
     }
@@ -1531,10 +1603,55 @@ map_ms_level_to_index(struct Arguments* arguments, division_t* div)
     if(!is_monotonically_increasing(indicies, j))
         error("map_scan_to_index: Scans must be monotonically increasing.\n");
 
-    arguments->indices = indicies;
-    arguments->indices_length = j-1;
+    *indices_length = j-1;
 
-    print("Found %ld spectra with ms level %ld.\n", j, arguments->ms_level);
+    print("Found %ld spectra with ms level %ld.\n", j, ms_level);
+
+    return indicies;
+}
+
+long* 
+map_ms_level_to_index_from_divisions(uint16_t ms_level, divisions_t* divisions, long* indicies_length)
+{
+
+    long** indicies = malloc(sizeof(long*)* divisions->n_divisions);
+    long* indicies_lens = calloc(divisions->n_divisions, sizeof(long));
+
+    long total_len = 0;
+    long index_offset = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        long curr_len = 0;
+        indicies[i] = map_ms_level_to_index(ms_level, divisions->divisions[i], index_offset, &curr_len);
+        indicies_lens[i] = curr_len;
+        total_len += curr_len;
+        index_offset += divisions->divisions[i]->spectra->total_spec;
+    }
+    
+    long* result = malloc(sizeof(long) * total_len);
+
+    long index = 0;
+    for(int i = 0; i < divisions->n_divisions; i++)
+    {
+        if (indicies[i] == NULL)
+            continue;
+        
+        for(int j = 0; j < indicies_lens[i]; j++)
+        {
+            result[index] = indicies[i][j];
+            index++;
+        }
+    }
+    if(!is_monotonically_increasing(result, total_len))
+    {
+        warning("map_ms_level_to_index_from_divisions: Scans must be monotonically increasing.\n");
+        *indicies_length = 0;
+        return NULL;
+    }
+
+    *indicies_length = total_len;
+    return result;
 }
 
 
@@ -1579,12 +1696,12 @@ preprocess_mzml(char* input_map,
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
             return 1;
-        map_ms_level_to_index(arguments, tmp);
+        arguments->indices = map_ms_level_to_index(arguments->ms_level, tmp, 0, &(arguments->indices_length));
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->indices_length == 0 && arguments->scans_length == 0)
     {
-        div = scan_mzml((char*)input_map, *df, input_filesize, '\0'); // A division encapsulating the entire file
+        div = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);

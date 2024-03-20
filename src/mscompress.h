@@ -92,7 +92,7 @@ struct Arguments {
     float int_scale_factor;
     long* indices;
     long indices_length;
-    long* scans;
+    uint32_t* scans;
     long scans_length;
     long ms_level;
 
@@ -121,8 +121,8 @@ typedef struct
 
     uint64_t size;
 
-    long* scans;
-    long* ms_levels;
+    uint32_t* scans;
+    uint16_t* ms_levels;
     float* ret_times;
 
 } division_t;
@@ -313,6 +313,8 @@ void dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
 
+long* map_ms_level_to_index(uint16_t ms_level, division_t* div, long index_offset, long* indices_length);
+long* map_ms_level_to_index_from_divisions(uint16_t ms_level, divisions_t* divisions, long* indicies_length);
 data_format_t* pattern_detect(char* input_map);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
@@ -366,7 +368,12 @@ void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len, size_t* out_l
 
 /* extract.c */
 void extract_mzml(char* input_map, divisions_t* divisions, int output_fd);
-void extract_msz(char* input_map, size_t input_filesize, long* indicies, long indicies_length, int output_fd);
+void extract_msz(char* input_map,
+            size_t input_filesize,
+            long* indicies,
+            long indicies_length,
+            uint16_t ms_level,
+            int output_fd);
 
 /* compress.c */
 typedef struct 
