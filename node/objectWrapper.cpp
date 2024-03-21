@@ -366,9 +366,35 @@ namespace mscompress {
 
         args->zstd_compression_level = getUint32OrDefault(obj, "zstd_compression_level", 3);
 
-        args->ms_level = getLongOrDefault(obj, "ms_level", -1);
+        args->ms_level = getLongOrDefault(obj, "ms_level", 0);
+
+
+        Napi::Value scans = obj.Get("scans");
+            if (scans.IsArray()) {
+                Napi::Array scansArray = scans.As<Napi::Array>();
+                args->scans_length = scansArray.Length();
+                args->scans = new uint32_t[args->indices_length];
+                for (size_t i = 0; i < args->scans_length; ++i) {
+                    args->scans[i] = scansArray.Get(i).ToNumber().Int64Value();
+                }
+            } else {
+                args->scans_length = 0;
+                args->scans = nullptr;
+        }
         
-    
+        Napi::Value indiciesValue = obj.Get("indices");
+        if (indiciesValue.IsArray()) {
+            Napi::Array indiciesArray = indiciesValue.As<Napi::Array>();
+            args->indices_length = indiciesArray.Length();
+            args->indices = new long[args->indices_length];
+            for (size_t i = 0; i < args->indices_length; ++i) {
+                args->indices[i] = indiciesArray.Get(i).ToNumber().Int64Value();
+            }
+        } else {
+            args->indices_length = 0;
+            args->indices = nullptr;
+        }
+
         return args;
     }
 }

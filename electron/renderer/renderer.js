@@ -4,7 +4,9 @@ class Arguments {
     this.mode = "default";
     this.method = "convert";
     this.threads = 1;
-    this.msLevel = 1;
+    this.msLevel = 0;
+    this.scans = null;
+    this.indices = null;
     this.setMode(this.mode);
   }
 
@@ -58,12 +60,32 @@ class Arguments {
         "target_mz_format":       this.target_mz_format,
         "target_inten_format":    this.target_inten_format ,
         "zstd_compression_level": this.zstd_compression_level,
-        "ms_level": this.msLevel
+        "ms_level":               this.msLevel,
+        "scans":                  this.scans,
+        "indices":                this.indices,
       }
   }
 
   setMSLevel(level) {
     this.msLevel = level;
+  }
+
+  setIndices(start, stop) {
+    let res = []
+    for (let i = start; i <= stop; i++)
+    {
+      res.push(i);
+    }
+    this.indices = res;
+  }
+
+  setScans(start, stop) {
+    let res = []
+    for (let i = start; i <= stop; i++)
+    {
+      res.push(i);
+    }
+    this.scans = res;
   }
 
 }
@@ -475,9 +497,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Replace the extension with .msz or .mzML
     let newFilename = "";
-    if(fh.type == 1)
+    if(fh.type == 1 && window.arguments.method == "convert")
     {
       newFilename = filename.replace(/\.[^\.]+$/, '.msz');
+    }
+    else if(fh.type == 1 && window.arguments.method == "extract")
+    {
+      newFilename = filename.replace(/\.[^\.]+$/, '.mzML');
     }
     else if(fh.type == 2)
     {
@@ -773,21 +799,23 @@ const getSelectedFileHandle = () => {
 const toggleExtractOption = (bool) => {
     const elem = document.querySelector("#modeSelect").querySelector("option[value=Extract]");
     if(bool) {
-      window.arguments.method = "extract";
       elem.removeAttribute("disabled");
     }
     else {
-      window.arguments.method = "convert";
       elem.setAttribute("disabled", "disabled");
     }
 }
 
 const modeSelect = document.querySelector("#modeSelect");
 modeSelect.addEventListener("change", e => {
-  if (modeSelect.value == "Compress")
+  if (modeSelect.value == "Compress") {
     toggleExtractWindow(false);
-  else if (modeSelect.value == "Extract")
+    window.arguments.method = "convert";
+  }
+  else if (modeSelect.value == "Extract") {
     toggleExtractWindow(true);
+    window.arguments.method = "extract";
+  }
 });
 
 const toggleExtractWindow = (bool) => {
@@ -819,21 +847,51 @@ compressionRadioOptions.forEach(i => {
 const extractRadioOptions = document.querySelectorAll('input[name="extract"]');
 const msLevelValue = document.querySelector("#msLevelValue");
 
+const scanMinValue = document.querySelector("#scanMin");
+const scanMaxValue = document.querySelector("#scanMax");
+
+const indexMin = document.querySelector("#indexMin");
+const indexMax = document.querySelector("#indexMax");
+
 const handleExtractRadioChange = (e => {
   let value = e.target.value;
   if (value == 'msLevel')
     window.arguments.setMSLevel(parseInt(msLevelValue.value));
   else
     window.arguments.setMSLevel(null);
+  if (value == "scans")
+    window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+  else
+    window.arguments.scans = null;
+  if (value == "indices")
+    window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
+  else
+    window.arguments.indices = null;
+});
+
+scanMinValue.addEventListener("change", e => {
+  window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+});
+
+scanMaxValue.addEventListener("change", e => {
+  window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+});
+
+indexMin.addEventListener("change", e => {
+  window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
+});
+
+indexMax.addEventListener("change", e => {
+  window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
 });
 
 msLevelValue.addEventListener("change", e => {
     window.arguments.setMSLevel(parseInt(msLevelValue.value));
-})
+});
 
 extractRadioOptions.forEach(i => {
   i.addEventListener('change', handleExtractRadioChange);
-})
+});
 
 const showAnalysisWindow = (fh) => {
   const analysis_div = document.querySelector(".analysis");
