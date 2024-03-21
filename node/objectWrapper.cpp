@@ -77,6 +77,54 @@ namespace mscompress {
         }
     }
 
+    /* C uint32 -> Napi */
+    Napi::Array Uint32ArrayToNapiArray(const Napi::Env & env, uint32_t* arr, uint64_t size) {
+        Napi::Array jsArr = Napi::Array::New(env, size);
+        if(arr == nullptr) return jsArr; // return empty array if arr is null
+        for (uint64_t i = 0; i < size; i++)
+        {
+            jsArr.Set(i, Napi::Number::New(env, arr[i]));
+        }
+        return jsArr;
+    }
+
+    /* Napi -> C uint32 */
+    void NapiArrayToUint32Array(const Napi::Env& env, const Napi::Array& jsArr, uint32_t* arr, uint64_t size) {
+        for (uint64_t i = 0; i < size; i++) {
+            Napi::Value val = jsArr.Get(i);
+            if (val.IsNumber()) {
+                arr[i] = val.As<Napi::Number>().Int64Value();
+            } else {
+                Napi::TypeError::New(env, "Array element is not a number").ThrowAsJavaScriptException();
+                return;
+            }
+        }
+    }
+
+    /* C uint16 -> Napi */
+    Napi::Array Uint16ArrayToNapiArray(const Napi::Env & env, uint16_t* arr, uint64_t size) {
+        Napi::Array jsArr = Napi::Array::New(env, size);
+        if(arr == nullptr) return jsArr; // return empty array if arr is null
+        for (uint64_t i = 0; i < size; i++)
+        {
+            jsArr.Set(i, Napi::Number::New(env, arr[i]));
+        }
+        return jsArr;
+    }
+
+    /* Napi -> C uint16 */
+    void NapiArrayToUint16Array(const Napi::Env& env, const Napi::Array& jsArr, uint16_t* arr, uint64_t size) {
+        for (uint64_t i = 0; i < size; i++) {
+            Napi::Value val = jsArr.Get(i);
+            if (val.IsNumber()) {
+                arr[i] = val.As<Napi::Number>().Int64Value();
+            } else {
+                Napi::TypeError::New(env, "Array element is not a number").ThrowAsJavaScriptException();
+                return;
+            }
+        }
+    }
+
     /* C long -> Napi */
     Napi::Array LongArrayToNapiArray(const Napi::Env& env, long* arr, uint64_t size) {
         Napi::Array jsArr = Napi::Array::New(env, size);
@@ -254,8 +302,8 @@ namespace mscompress {
         obj.Set("mz", CreateDataPositionsObject(env, division->mz));
         obj.Set("inten", CreateDataPositionsObject(env, division->inten));
         obj.Set("size", Napi::Number::New(env, division->size));
-        obj.Set("scans", LongArrayToNapiArray(env, division->scans, division->mz->total_spec));
-        obj.Set("ms_levels", LongArrayToNapiArray(env, division->ms_levels, division->mz->total_spec));
+        obj.Set("scans", Uint32ArrayToNapiArray(env, division->scans, division->mz->total_spec));
+        obj.Set("ms_levels", Uint16ArrayToNapiArray(env, division->ms_levels, division->mz->total_spec));
         obj.Set("retention_times", FloatArrayToNapiArray(env, division->ret_times, division->mz->total_spec));
 
         return obj;
@@ -270,12 +318,12 @@ namespace mscompress {
         division->mz = NapiObjectToDataPositionsT(obj.Get("mz").As<Napi::Object>());
         division->inten = NapiObjectToDataPositionsT(obj.Get("inten").As<Napi::Object>());
         division->size = getUint32OrDefault(obj, "size", 0);
-        division->scans = new long[division->spectra->total_spec];
-        division->ms_levels = new long[division->spectra->total_spec];
+        division->scans = new uint32_t[division->spectra->total_spec];
+        division->ms_levels = new uint16_t[division->spectra->total_spec];
         division->ret_times = new float[division->spectra->total_spec];
 
-        NapiArrayToLongArray(obj.Env(), obj.Get("scans").As<Napi::Array>(), division->scans, division->spectra->total_spec);
-        NapiArrayToLongArray(obj.Env(), obj.Get("ms_levels").As<Napi::Array>(), division->ms_levels, division->spectra->total_spec);
+        NapiArrayToUint32Array(obj.Env(), obj.Get("scans").As<Napi::Array>(), division->scans, division->spectra->total_spec);
+        NapiArrayToUint16Array(obj.Env(), obj.Get("ms_levels").As<Napi::Array>(), division->ms_levels, division->spectra->total_spec);
         NapiArrayToFloatArray(obj.Env(), obj.Get("retention_times").As<Napi::Array>(), division->ret_times, division->spectra->total_spec);
 
         return division;
