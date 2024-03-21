@@ -30,7 +30,7 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, " --mz-scale-factor factor       Set mz scale factors for delta transform or threshold for vbr.\n");
   fprintf(stream, " --int-scale-factor factor      Set int scale factors for log transform or threshold for vbr\n");
   fprintf(stream, " --extract-indices [range]      Extract indices from mzML or msz file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, " --extract-scans [range]        Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, " --extract-scans [range]        Extract scans from mzML or msz file (eg. [1-3,5-6]). (disabled by default)\n");
   fprintf(stream, " --ms-level level               Extract specified ms level (1, 2, n) from mzML or msz file. (disabled by default)\n");
   fprintf(stream, " --extract-only                 Only output extracted mzML, no compression (disabled by default)\n");
   fprintf(stream, " --target-xml-format type       Set target xml compression format (zstd, none). (default: zstd)\n");
@@ -295,6 +295,8 @@ main(int argc, char* argv[])
                     input_filesize,
                     arguments.indices,
                     arguments.indices_length,
+                    arguments.scans,
+                    arguments.scans_length,
                     arguments.ms_level,
                     fds[1]);
       };

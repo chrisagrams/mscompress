@@ -1543,34 +1543,38 @@ string_to_array(char* str, long* size)
     return arr;
 }
 
-void
-map_scan_to_index(struct Arguments* arguments, division_t* div)
+long*
+map_scan_to_index(uint32_t* scans, long scans_length, division_t* div, long index_offset, long* indices_length)
 {
     long i, j, k;
-    long* indicies = malloc(arguments->scans_length * sizeof(long));
+    long* indicies = malloc(scans_length * sizeof(long));
 
     j = 0;
 
-    for(long i = 0; i < arguments->scans_length; i++)
+    for(long i = 0; i < scans_length; i++)
     {
         for(k = 0; k < div->spectra->total_spec; k++)
         {
-            if(arguments->scans[i] == div->scans[k])
+            if(scans[i] == div->scans[k])
             {
-                indicies[j] = k;
+                indicies[j] = k + index_offset;
                 j++;
                 break;
             }
         }
-        if(k == div->spectra->total_spec)
-            error("Scan %ld not found in file.\n", arguments->scans[i]);
+        // if(k == div->spectra->total_spec)
+        //     error("Scan %ld not found in file.\n", scans[i]);
     }
 
     if(!is_monotonically_increasing(indicies, j))
-        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+    {
+        warning("map_scan_to_index: Scans must be monotonically increasing.\n");
+        *indices_length = 0;
+        return NULL;
+    }
 
-    arguments->indices = indicies;
-    arguments->indices_length = j;
+    *indices_length = j;
+    return indicies;
 }
 
 long*
@@ -1601,7 +1605,7 @@ map_ms_level_to_index(uint16_t ms_level, division_t* div, long index_offset, lon
     }
 
     if(!is_monotonically_increasing(indicies, j))
-        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+        error("map_ms_level_to_index: Scans must be monotonically increasing.\n");
 
     *indices_length = j-1;
 
@@ -1654,6 +1658,50 @@ map_ms_level_to_index_from_divisions(uint16_t ms_level, divisions_t* divisions, 
     return result;
 }
 
+long* 
+map_scans_to_index_from_divisions(uint32_t* scans, long scans_length, divisions_t* divisions, long* indicies_length)
+{
+
+    long** indicies = malloc(sizeof(long*)* divisions->n_divisions);
+    long* indicies_lens = calloc(divisions->n_divisions, sizeof(long));
+
+    long total_len = 0;
+    long index_offset = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        long curr_len = 0;
+        indicies[i] = map_scan_to_index(scans, scans_length, divisions->divisions[i], index_offset, &curr_len);
+        indicies_lens[i] = curr_len;
+        total_len += curr_len;
+        index_offset += divisions->divisions[i]->spectra->total_spec;
+    }
+    
+    long* result = malloc(sizeof(long) * total_len);
+
+    long index = 0;
+    for(int i = 0; i < divisions->n_divisions; i++)
+    {
+        if (indicies[i] == NULL)
+            continue;
+        
+        for(int j = 0; j < indicies_lens[i]; j++)
+        {
+            result[index] = indicies[i][j];
+            index++;
+        }
+    }
+    if(!is_monotonically_increasing(result, total_len))
+    {
+        warning("map_scans_to_index_from_divisions: Scans must be monotonically increasing.\n");
+        *indicies_length = 0;
+        return NULL;
+    }
+
+    *indicies_length = total_len;
+    return result;
+}
+
 
 int
 preprocess_mzml(char* input_map,
@@ -1687,7 +1735,7 @@ preprocess_mzml(char* input_map,
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
             return 1;
-        map_scan_to_index(arguments, tmp);
+        arguments->indices = map_scan_to_index(arguments->scans, arguments->scans_length, tmp, 0, &(arguments->indices_length));
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
     }

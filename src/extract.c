@@ -690,6 +690,8 @@ extract_msz(char* input_map,
             size_t input_filesize,
             long* indicies,
             long indicies_length,
+            long* scans,
+            long scans_length,
             uint16_t ms_level,
             int output_fd)
 {
@@ -717,6 +719,11 @@ extract_msz(char* input_map,
     if (ms_level != 0) // MS level selected
     {
         indicies = map_ms_level_to_index_from_divisions(ms_level, divisions, &indicies_length);
+    }
+
+    else if (scans_length > 0) // Scan extraction selected
+    {
+        indicies = map_scans_to_index_from_divisions(scans, scans_length, divisions, &indicies_length);
     }
 
     set_decompress_runtime_variables(df, msz_footer);

@@ -336,7 +336,8 @@ data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 long* string_to_array(char* str, long* size);
-void map_scan_to_index(struct Arguments* arguments, division_t* div);
+long* map_scan_to_index(uint32_t* scans, long scans_length, division_t* div, long index_offset, long* indices_length);
+long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length, divisions_t* divisions, long* indicies_length);
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
@@ -372,6 +373,8 @@ void extract_msz(char* input_map,
             size_t input_filesize,
             long* indicies,
             long indicies_length,
+            long* scans,
+            long scans_length,
             uint16_t ms_level,
             int output_fd);
 
