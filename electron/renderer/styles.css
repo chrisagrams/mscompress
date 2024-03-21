@@ -27,6 +27,14 @@ img {
     -webkit-user-drag: none; /* Don't let images be draggable */
 }
 
+hr {
+    height: 2px;
+    width: 100%;
+    background-color: #00000021;
+    border: 0;
+    border-radius: 2px;
+}
+
 /* Generic classes */
 .hidden {
     display: none !important;
@@ -223,7 +231,8 @@ img {
 }
 
 #center-container > h6 {
-    margin: 0;
+    font-size: 12px;
+    margin: 2px 0;
 }
 
 #center-container > #start {
@@ -259,7 +268,8 @@ img {
 }
 
 #right-container > h6 {
-    margin: 0;
+    font-size: 12px;
+    margin: 2px 0;
 }
 
 #right-container > div {
@@ -318,6 +328,11 @@ img {
     border-color: var(--mscompress-blue); 
 }
 
+.fileCard.selected.external {
+    border-color: grey;
+}
+
+
 /* Filename */
 .fileCard > h1 {
     font-size: 16px;
@@ -361,6 +376,10 @@ img {
 }
 .fileCard h3.msz {
     color: var(--mscompress-blue);
+    font-weight: bold;
+}
+.fileCard h3.external {
+    color: grey;
     font-weight: bold;
 }
 
@@ -435,6 +454,10 @@ img {
 
 .analysis > .top > div > #type.msz {
     color: var(--mscompress-blue);
+}
+
+.analysis > .top > div > #type.external {
+    color: grey;
 }
 
 .analysis > .top > div >h3 {

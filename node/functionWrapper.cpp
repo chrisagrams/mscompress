@@ -160,6 +160,8 @@ namespace mscompress {
             df = pattern_detect((char*)mmap_ptr);
         else if(type == DECOMPRESS) //msz
             df = get_header_df(mmap_ptr);
+        else if(type == EXTERNAL)
+            df = create_external_df();
         else
         {
             Napi::Error::New(env, "GetAccessions: unsupported file provided.").ThrowAsJavaScriptException();
@@ -347,14 +349,34 @@ namespace mscompress {
         // Parse divisions (not working yet)
         // divisions_t* divisions = NapiObjectToDivisionsT(info[4].As<Napi::Object>());
 
-        // For now, recompute divisions
+        // Get input type
+        int fileType = determine_filetype(input_map, input_filesize);
+
         divisions_t* divisions;
-        preprocess_mzml((char*)input_map,
-                        input_filesize,
-                        &(args->blocksize),
-                        args,
-                        &df,
-                        &divisions);
+        if(fileType == COMPRESS)
+        {
+            // For now, recompute divisions
+            
+            preprocess_mzml((char*)input_map,
+                            input_filesize,
+                            &(args->blocksize),
+                            args,
+                            &df,
+                            &divisions);
+        }
+        else if(fileType == EXTERNAL)
+        {
+            preprocess_external((char*)input_map,
+                            input_filesize,
+                            &(args->blocksize),
+                            args,
+                            &df,
+                            &divisions);
+        }
+        else {
+             Napi::TypeError::New(env, "Compress Invalid filetype").ThrowAsJavaScriptException();
+            return env.Null();
+        }
         
         // Parse output_fd
         int output_fd = info[5].As<Napi::Number>().Int32Value();

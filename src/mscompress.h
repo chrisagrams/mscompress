@@ -343,6 +343,8 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
 int preprocess_external(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
+data_format_t* create_external_df();
+
 /* sys.c */
 
 int get_num_threads();

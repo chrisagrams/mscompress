@@ -33,6 +33,12 @@
           <!-- <input type="file" id="test-file-input" /> -->
         </div>
         <div class="container" id="center-container">
+          <h6>Mode:</h6>
+          <select name="mode" id="modeSelect">
+            <option value="Compress">Compress / Decompress</option>
+            <option disabled value="Extract">Extract</option>
+          </select>
+          <hr>
           <h6>Source:</h6>
           <div class="fileStats blur">
             <div>
@@ -53,7 +59,7 @@
             </div>
           </div>
           <button id="analyze">Analyze</button>
-
+          <hr>
           <h6>Compression: </h6>
           <div id="compression_select">
             <div class="selectOption">

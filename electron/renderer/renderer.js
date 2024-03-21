@@ -139,6 +139,8 @@ class FileHandle {
     if (this.fd <= 0) {
       throw new Error("File not open");
     }
+    // if(this.type != 1 && this.type != 2)
+    //   return null;
 
     this.df = await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd, 'size': this.filesize});
     return this.df;
@@ -279,11 +281,27 @@ class FileHandle {
       await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
       hideLoading();
     }
+    else if (this.type == 5) // external
+    {
+      if (output_path == null)
+        throw new Error ("Output path not specified");
+      if(this.fd <= 0)
+        this.open();
+      if(this.df == null)
+        await this.get_accessions();
+      const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+      if(output_fd <= 0)
+        throw new Error("get_output_fd error");
+
+      showLoading();
+      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
+      hideLoading();
+    }
   }
 
 
   isValid() {
-    return this.type == 1 || this.type == 2;
+    return this.type == 1 || this.type == 2 || this.type == 5;
   }
 }
 
@@ -424,7 +442,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if(fh.type == 1)
       newFilename = filename.replace(/\.[^\.]+$/, '.msz');
     else if(fh.type == 2)
-      newFilename = filename.replace(/\.[^\.]+$/, '.mzML');
+    {
+      let dotCount = (filename.match(/\./g) || []).length;
+      newFilename = dotCount > 1 ? filename.replace(".msz", "") : filename.replace(".msz", ".mzML");
+    }
+    else if(fh.type == 5)
+      newFilename = filename.concat(".msz");
+
 
     // Construct the new output path in a platform-independent way
     const newOutputPath = [output_path, newFilename].join('/').replace(/\\/g, '/');
@@ -539,7 +563,10 @@ const removeFileCard = (fd) => {
 }
 
 const updateFileInfo = async (fh) => {
-  const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd, 'size': fh.filesize});
+  await fh.get_accessions();
+  const df = fh.df;
+  if(df == null)
+    return;
   console.log(df);
   
   const setElementsTextContentByClass = (className, value) => {
@@ -643,6 +670,12 @@ const createFileCard = async (path) => {
       type.classList.add("msz");
       type.innerText = "msz";
     }
+    else if (fh.type == 5)
+    {
+      card.classList.add("external");
+      type.classList.add("external");
+      type.innerText = "External";
+    }
     else
     {
       filehandles.splice(filehandles.findIndex(h => h.fd == fh.fd), 1);
@@ -721,6 +754,11 @@ const showAnalysisWindow = (fh) => {
     {
       type_text.classList.add("msz");
       type_text.textContent = "msz";
+    }
+    else if (type == 5) // external
+    {
+      type_text.classList.add("external");
+      type_text.textContent = "External";
     }
   });
 }

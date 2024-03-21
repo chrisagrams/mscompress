@@ -1831,6 +1831,21 @@ divide_external(long input_filesize, int n_divisions)
     return r;
 }
 
+data_format_t*
+create_external_df()
+{
+    data_format_t* df = calloc(1, sizeof(data_format_t));
+
+    df->target_xml_format = _ZSTD_compression_;
+
+    /* The following are not actually used, required for valid msz file. */
+    df->source_compression = _no_comp_;
+    df->target_mz_format = _ZSTD_compression_; 
+    df->target_inten_format = _ZSTD_compression_; 
+
+    return df;
+}
+
 int
 preprocess_external(char* input_map,
                     long  input_filesize,
@@ -1845,16 +1860,9 @@ preprocess_external(char* input_map,
 
     print("\nPreprocessing...\n");
 
-    *df = calloc(1, sizeof(data_format_t));
+    *df = create_external_df();
 
     divisions_t* div = divide_external(input_filesize, arguments->threads);
-
-    (*df)->target_xml_format = arguments->target_xml_format;
-
-    /* The following are not actually used, required for valid msz file. */
-    (*df)->source_compression = _no_comp_;
-    (*df)->target_mz_format = arguments->target_mz_format; 
-    (*df)->target_inten_format = arguments->target_inten_format; 
     
     set_compress_runtime_variables(arguments, *df);
 
