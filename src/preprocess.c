@@ -1802,6 +1802,67 @@ preprocess_mzml(char* input_map,
     return 0;
 }
 
+divisions_t*
+divide_external(long input_filesize, int n_divisions)
+{
+    divisions_t* r = malloc(sizeof(divisions_t));
+
+    r->divisions = malloc(sizeof(division_t) * n_divisions);
+    r->n_divisions = n_divisions;
+
+    uint64_t division_size = input_filesize / n_divisions;
+
+    for (int i = 0; i < n_divisions; i++)
+    {
+        division_t* curr;
+        r->divisions[i] = alloc_division(1, 0, 0); // One "XML" section for each division
+        curr = r->divisions[i];
+
+        curr->xml->start_positions[0] = i * division_size;
+        curr->xml->end_positions[0] = (i + 1) * division_size;
+        curr->xml->total_spec = 1;
+
+        if (i == n_divisions - 1)
+            curr->xml->end_positions[0] = input_filesize;
+
+        curr->size = curr->xml->end_positions[0] - curr->xml->start_positions[0];
+    }
+
+    return r;
+}
+
+int
+preprocess_external(char* input_map,
+                    long  input_filesize,
+                    long* blocksize,
+                    struct Arguments* arguments,
+                    data_format_t** df,
+                    divisions_t** divisions)
+{
+    double start, end;
+
+    start = get_time();
+
+    print("\nPreprocessing...\n");
+
+    *df = calloc(1, sizeof(data_format_t));
+
+    divisions_t* div = divide_external(input_filesize, arguments->threads);
+
+    (*df)->target_xml_format = arguments->target_xml_format;
+
+    /* The following are not actually used, required for valid msz file. */
+    (*df)->source_compression = _no_comp_;
+    (*df)->target_mz_format = arguments->target_mz_format; 
+    (*df)->target_inten_format = arguments->target_inten_format; 
+    
+    set_compress_runtime_variables(arguments, *df);
+
+    *divisions = div;
+
+    return 0;
+}
+
 void
 parse_footer(footer_t** footer, void* input_map, long input_filesize,
             block_len_queue_t**xml_block_lens,

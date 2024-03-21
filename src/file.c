@@ -438,6 +438,7 @@ determine_filetype(void* input_map, size_t input_length)
  * 
  * @return COMPRESS (1) if file is a mzML file.
  *         DECOMPRESS (2) if file is a msz file.
+ *         EXTERNAL (5) if file is not mzML or msz.
  *         -1 on error.
  */
 {
@@ -453,7 +454,9 @@ determine_filetype(void* input_map, size_t input_length)
     }  
     else
     {
-        warning("Invalid input file.\n");
+        // warning("Invalid input file.\n");
+        print("\tExternal file detected.\n");
+        return EXTERNAL;
     }
     return -1;
 }
@@ -487,6 +490,51 @@ change_extension(char* input, char* extension)
   strcpy(x, extension);
 
   return r;
+}
+
+char*
+append_extension(char* input, char* extension)
+{
+  if(input == NULL)
+    error("change_extension: input is NULL.\n");
+  if(extension == NULL)
+    error("change_extension: extension is NULL.\n");
+
+  char* x;
+  char* r;
+
+  r = malloc(sizeof(char) * (strlen(input) + strlen(".msz")));
+  if(r == NULL)
+    error("change_extension: malloc failed.\n");
+
+  strcpy(r, input);
+  x = strrchr(r, '\0');
+  strcpy(x, extension);
+
+  return r;
+}
+
+char* 
+strip_or_append_extension(char* input) 
+{
+    if (input == NULL)
+        error("strip_or_append_extension: input is NULL.\n");
+
+    char* r;
+    char* x;
+
+    r = malloc(sizeof(char) * (strlen(input) + 1));
+    if (r == NULL)
+        error("strip_or_append_extension: malloc failed.\n");
+
+    strcpy(r, input);
+    x = strrchr(r, '.');
+    if (x != NULL && strcmp(x, ".msz") == 0) // If .msz found, strip it
+        *x = '\0';
+    else // Otherwise, append .mzML
+        strcat(r, ".mzML");
+
+    return r;
 }
 
 int
@@ -599,20 +647,22 @@ prepare_fds(char* input_path,
 
   type = determine_filetype(*input_map, *input_filesize);
 
-  if(type != COMPRESS && type != DECOMPRESS)
+  if(type != COMPRESS && type != DECOMPRESS && type != EXTERNAL)
     error("Cannot determine file type.\n");
+
 
   if(*output_path)
   {
     output_fd = open_output_file(*output_path);
     return type;
   }
-   
 
   if(type == COMPRESS)
-    *output_path = change_extension(input_path, ".msz\0");
+      *output_path = change_extension(input_path, ".msz\0");
+  else if(type == EXTERNAL)
+      *output_path = append_extension(input_path, ".msz\0");
   else if(type == DECOMPRESS)
-    *output_path = change_extension(input_path, ".mzML\0");
+    *output_path = strip_or_append_extension(input_path);
 
    output_fd = open_output_file(*output_path);
 

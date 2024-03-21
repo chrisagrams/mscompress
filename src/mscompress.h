@@ -68,6 +68,7 @@
 #define DECOMPRESS 2
 #define EXTRACT 3
 #define EXTRACT_MSZ 4
+#define EXTERNAL 5
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -341,7 +342,7 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length, divi
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
-
+int preprocess_external(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
 /* sys.c */
 
 int get_num_threads();
