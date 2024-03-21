@@ -21,7 +21,8 @@
     ],
     "appId": "gy.lab.mscompress",
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "../assets/icons/icon.png"
     },
     "mac": {
       "category": "public.app-category.utilities",
