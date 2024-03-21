@@ -376,7 +376,7 @@ void extract_msz(char* input_map,
             size_t input_filesize,
             long* indicies,
             long indicies_length,
-            long* scans,
+            uint32_t* scans,
             long scans_length,
             uint16_t ms_level,
             int output_fd);

@@ -122,6 +122,14 @@ onmessage = (e) => {
             'value': mscompress.decompress(pointer, e.data.filesize, e.data.args, e.data.output_fd)
         });
     }
+    else if (e.data.type == "extract") {
+        let pointer = mmapStore.get(e.data.fd);
+        postMessage({
+            'type': "extract",
+            'fd': e.data.fd,
+            'value': mscompress.extract(pointer, e.data.filesize, e.data.args, e.data.output_fd)
+        });
+    }
 }
 
 onerror = (e) => {

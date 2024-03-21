@@ -2,7 +2,9 @@ class Arguments {
 
   constructor () {
     this.mode = "default";
+    this.method = "convert";
     this.threads = 1;
+    this.msLevel = 1;
     this.setMode(this.mode);
   }
 
@@ -41,13 +43,27 @@ class Arguments {
   }
 
   getArguments() {
-    return {
-      "threads":                this.threads,
-      "target_xml_format":      this.target_xml_format ,
-      "target_mz_format":       this.target_mz_format,
-      "target_inten_format":    this.target_inten_format ,
-      "zstd_compression_level": this.zstd_compression_level,
-    }
+    if (this.method == "convert")
+      return {
+        "threads":                this.threads,
+        "target_xml_format":      this.target_xml_format ,
+        "target_mz_format":       this.target_mz_format,
+        "target_inten_format":    this.target_inten_format ,
+        "zstd_compression_level": this.zstd_compression_level,
+      }
+    else if (this.method == "extract")
+      return {
+        "threads":                this.threads,
+        "target_xml_format":      this.target_xml_format ,
+        "target_mz_format":       this.target_mz_format,
+        "target_inten_format":    this.target_inten_format ,
+        "zstd_compression_level": this.zstd_compression_level,
+        "ms_level": this.msLevel
+      }
+  }
+
+  setMSLevel(level) {
+    this.msLevel = level;
   }
 
 }
@@ -299,6 +315,21 @@ class FileHandle {
     }
   }
 
+  async extract(output_path) {
+    if(this.type != 1 && this.type != 2)
+      return;
+    if (output_path == null)
+      throw new Error("Output path not specified");
+    if(this.fd <= 0)
+      this.open();
+    const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+    if(output_fd <= 0)
+      throw new Error("get_output_fd error");
+    showLoading();
+    await systemWorkerPromise({'type': "extract", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
+    hideLoading();
+  }
+
 
   isValid() {
     return this.type == 1 || this.type == 2 || this.type == 5;
@@ -435,12 +466,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Extract just the filename
     const pathParts = fh.path.split(/[/\\]/); // Split on both forward and backward slashes
-    const filename = pathParts.pop(); // Get the last part of the path, which should be the filename
+    let filename = pathParts.pop(); // Get the last part of the path, which should be the filename
+
+
+    // Append "extract" if current mode is "extract"
+    if (window.arguments.method == "extract")
+      filename = "extract_".concat(filename);
 
     // Replace the extension with .msz or .mzML
     let newFilename = "";
     if(fh.type == 1)
+    {
       newFilename = filename.replace(/\.[^\.]+$/, '.msz');
+    }
     else if(fh.type == 2)
     {
       let dotCount = (filename.match(/\./g) || []).length;
@@ -455,7 +493,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log(newOutputPath);
 
-    fh.convert(newOutputPath);
+    if (window.arguments.method == "convert")
+      fh.convert(newOutputPath);
+    else if (window.arguments.method == "extract")
+      fh.extract(newOutputPath);
 
   });
 
@@ -567,6 +608,7 @@ const updateFileInfo = async (fh) => {
   const df = fh.df;
   if(df == null)
     return;
+
   console.log(df);
   
   const setElementsTextContentByClass = (className, value) => {
@@ -594,7 +636,7 @@ const updateFileInfo = async (fh) => {
           setElementsTextContentByClass("inten_format", "64d");
           break;
       default:
-          setElementsTextContentByClass("inten_format", "unknown");
+          setElementsTextContentByClass("inten_format", "...");
           break;
   }
 
@@ -606,7 +648,7 @@ const updateFileInfo = async (fh) => {
           setElementsTextContentByClass("source_format", "none");
           break;
       default:
-          setElementsTextContentByClass("source_format", "unknown");
+          setElementsTextContentByClass("source_format", "...");
           break;
   }
 
@@ -663,18 +705,21 @@ const createFileCard = async (path) => {
       card.classList.add("mzml");
       type.classList.add("mzml");
       type.innerText = "mzML";
+      toggleExtractOption(true);
     }
     else if (fh.type == 2)
     {
       card.classList.add("msz");
       type.classList.add("msz");
       type.innerText = "msz";
+      toggleExtractOption(true);
     }
     else if (fh.type == 5)
     {
       card.classList.add("external");
       type.classList.add("external");
       type.innerText = "External";
+      toggleExtractOption(false);
     }
     else
     {
@@ -725,6 +770,41 @@ const getSelectedFileHandle = () => {
   return filehandles.find(fh => fh.fd == fd);
 }
 
+const toggleExtractOption = (bool) => {
+    const elem = document.querySelector("#modeSelect").querySelector("option[value=Extract]");
+    if(bool) {
+      window.arguments.method = "extract";
+      elem.removeAttribute("disabled");
+    }
+    else {
+      window.arguments.method = "convert";
+      elem.setAttribute("disabled", "disabled");
+    }
+}
+
+const modeSelect = document.querySelector("#modeSelect");
+modeSelect.addEventListener("change", e => {
+  if (modeSelect.value == "Compress")
+    toggleExtractWindow(false);
+  else if (modeSelect.value == "Extract")
+    toggleExtractWindow(true);
+});
+
+const toggleExtractWindow = (bool) => {
+  const compressWindow = document.querySelector("#compressWindow");
+  const extractWindow = document.querySelector("#extractWindow");
+
+  if (bool)
+  {
+    compressWindow.classList.add("disabled");
+    extractWindow.classList.remove("disabled");
+  }
+  else {
+    compressWindow.classList.remove("disabled");
+    extractWindow.classList.add("disabled");
+  }
+}
+
 const compressionRadioOptions = document.querySelectorAll('input[name="compression"]');
 
 const handleRadioChange = (e => {
@@ -734,6 +814,25 @@ const handleRadioChange = (e => {
 
 compressionRadioOptions.forEach(i => {
   i.addEventListener('change', handleRadioChange);
+})
+
+const extractRadioOptions = document.querySelectorAll('input[name="extract"]');
+const msLevelValue = document.querySelector("#msLevelValue");
+
+const handleExtractRadioChange = (e => {
+  let value = e.target.value;
+  if (value == 'msLevel')
+    window.arguments.setMSLevel(parseInt(msLevelValue.value));
+  else
+    window.arguments.setMSLevel(null);
+});
+
+msLevelValue.addEventListener("change", e => {
+    window.arguments.setMSLevel(parseInt(msLevelValue.value));
+})
+
+extractRadioOptions.forEach(i => {
+  i.addEventListener('change', handleExtractRadioChange);
 })
 
 const showAnalysisWindow = (fh) => {

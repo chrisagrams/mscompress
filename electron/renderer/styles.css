@@ -35,6 +35,26 @@ hr {
     border-radius: 2px;
 }
 
+select {
+    border-color: lightgrey;
+    border-radius: 5px;
+    height: 35px;
+    text-align: center;
+}
+
+button {
+    background-color: white;
+    border-color: lightgray;
+    border: solid 1px lightgrey;
+    height: 25px;
+    border-radius: 5px;
+}
+
+input {
+    border: solid 1px lightgrey;
+    border-radius: 5px;
+}
+
 /* Generic classes */
 .hidden {
     display: none !important;
@@ -230,9 +250,27 @@ hr {
     transition: filter 0.3s;
 }
 
-#center-container > h6 {
+h6 {
     font-size: 12px;
     margin: 2px 0;
+}
+
+#compressWindow {
+    display: flex;
+    flex-direction: column;
+}
+
+#compressWindow.disabled {
+    display: none;
+}
+
+#extractWindow {
+    display: flex;
+    flex-direction: column;
+}
+
+#extractWindow.disabled {
+    display: none;
 }
 
 #center-container > #start {
@@ -259,6 +297,39 @@ hr {
 }
 
 #compression_select > .selectOption > label {
+    font-weight: lighter;
+    margin: auto 0;
+}
+
+#extractSelect {
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+}
+
+#extractSelect > .selectOption{
+    display: flex;
+    flex-direction: row;
+}
+
+#extractSelect > .selectOption > input {
+    margin: 10px;
+}
+
+#extractSelect > .selectOption > .inputValue {
+    width: 30px;
+}
+
+#extractSelect > .selectOption > span {
+    text-align: center;
+    margin: auto 0;
+}
+
+#extractSelect > .selectOption > input:checked + label {
+    font-weight: 500;
+}
+
+#extractSelect > .selectOption > label {
     font-weight: lighter;
     margin: auto 0;
 }
@@ -356,6 +427,7 @@ hr {
     background: none;
     border: none;
     font-weight: bold;
+    height: inherit;
 }
 
 .fileCard > div > button:hover {

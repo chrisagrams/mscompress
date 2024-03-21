@@ -205,6 +205,13 @@ namespace mscompress {
         return defaultValue;
     }
 
+    long getLongOrDefault(const Napi::Object& obj, const std::string& key, long defaultValue) {
+        if (obj.Has(key) && obj.Get(key).IsNumber()) {
+           return obj.Get(key).As<Napi::Number>().Int64Value();
+        }
+        return defaultValue;
+    }
+
     // Function to get a float value from a Napi::Object with a default
     float getFloatOrDefault(const Napi::Object& obj, const std::string& key, float defaultValue) {
         if (obj.Has(key) && obj.Get(key).IsNumber()) {
@@ -358,6 +365,9 @@ namespace mscompress {
         args->target_inten_format = StringToAccession(getStringOrDefault(obj, "target_inten_format", "_ZSTD_compression_"));
 
         args->zstd_compression_level = getUint32OrDefault(obj, "zstd_compression_level", 3);
+
+        args->ms_level = getLongOrDefault(obj, "ms_level", -1);
+        
     
         return args;
     }

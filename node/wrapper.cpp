@@ -22,6 +22,7 @@ namespace mscompress {
         exports.Set("prepareCompression", Napi::Function::New(env, PrepareCompression));
         exports.Set("compress", Napi::Function::New(env, Compress));
         exports.Set("decompress", Napi::Function::New(env, Decompress));
+        exports.Set("extract", Napi::Function::New(env, Extract));
         return exports;
     }
 
