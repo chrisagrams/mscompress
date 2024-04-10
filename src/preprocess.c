@@ -181,19 +181,20 @@ alloc_division(size_t n_xml, size_t n_mz, size_t n_inten)
     if(d == NULL)
         error("alloc_division: malloc failure.\n");
 
-    d->spectra = NULL;
+    d->spectra = alloc_dp(n_mz);
     d->xml = alloc_dp(n_xml);
     d->mz = alloc_dp(n_mz);
     d->inten = alloc_dp(n_inten);
     d->size = 0;
 
-    d->scans = NULL;
-    d->ms_levels = NULL;
+    d->scans = malloc(n_mz * sizeof(uint32_t));
+    d->ms_levels = malloc(n_mz * sizeof(uint16_t));
     d->ret_times = NULL;
 
-    if(d->xml == NULL || d->mz == NULL || d->inten == NULL)
+    if(d->spectra == NULL || d->xml == NULL || d->mz == NULL || d->inten == NULL)
         error("alloc_division: malloc failure.\n");
 
+    d->spectra->total_spec = 0;
     d->xml->total_spec = 0;
     d->mz->total_spec = 0;
     d->inten->total_spec = 0;
@@ -280,7 +281,7 @@ pattern_detect(char* input_map)
     
     yxml_t* xml = alloc_yxml();
 
-    char attrbuf[11] = {NULL}, *attrcur = NULL, *tmp = NULL; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
+    char attrbuf[11] = {'\0'}, *attrcur = NULL, *tmp = NULL; /* Length of a accession tag is at most 10 characters, leave room for null terminator. */
     
     int in_cvParam = 0;                      /* Boolean representing if currently inside of cvParam tag. */
     int current_type = 0;                    /* A pass-by-reference variable to indicate to map_to_df of current binary data array type (m/z or intensity) */
@@ -355,17 +356,30 @@ pattern_detect(char* input_map)
     return NULL;
 }
 
-void
+int
 validate_positions(uint64_t* arr, int len)
 {
     int i;
     for(i = 0; i < len; i++)
     {
-        if(arr[i] < 0)
-            error("validate_positions: negative position detected.\n");
-        if(i+1 < len && arr[i] > arr[i+1])
-            error("validate_positions: position %d is greater than %d\n", i, i+1);
+        if(arr[i] < 0) 
+        {
+            warning("validate_positions: negative position detected.\n");
+            return 1;
+        }
+        if(i > len)
+        {
+            warning("validate_positions: position %d out of bounds out of %d\n", i, len);
+            return 1;
+        }
+        if((i+1 < len) && arr[i] > arr[i+1])
+        {
+            warning("validate_positions: position %d is greater than %d\n", i, i+1);
+            warning("validate_positions: arr[i] = %d | arr[i+1] = %d\n", arr[i], arr[i+1]);
+            return 1;
+        }
     }
+    return 0;
 }
 
 char*
@@ -461,8 +475,8 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     mz_dp = alloc_dp(df->source_total_spec);
     inten_dp = alloc_dp(df->source_total_spec);
 
-    long* scans = (long*)calloc(df->source_total_spec, sizeof(long));
-    long* ms_levels = (long*)calloc(df->source_total_spec, sizeof(long));
+    uint32_t* scans = (uint32_t*)calloc(df->source_total_spec, sizeof(uint32_t));
+    uint16_t* ms_levels = (uint16_t*)calloc(df->source_total_spec, sizeof(uint16_t));
     float* ret_times = (float*)calloc(df->source_total_spec, sizeof(float));
 
     if(xml_dp == NULL || mz_dp == NULL || inten_dp == NULL)
@@ -567,12 +581,15 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     mz_dp->file_end = inten_dp->file_end = xml_dp->file_end = end;
 
     // Sanity check
-    validate_positions(mz_dp->start_positions, mz_dp->total_spec);
-    validate_positions(mz_dp->end_positions, mz_dp->total_spec);
-    validate_positions(inten_dp->start_positions, inten_dp->total_spec);
-    validate_positions(inten_dp->end_positions, inten_dp->total_spec);
-    validate_positions(xml_dp->start_positions, xml_dp->total_spec);
-    validate_positions(xml_dp->end_positions, xml_dp->total_spec);
+    if(
+        validate_positions(mz_dp->start_positions, mz_dp->total_spec)       ||
+        validate_positions(mz_dp->end_positions, mz_dp->total_spec)         ||
+        validate_positions(inten_dp->start_positions, inten_dp->total_spec) ||
+        validate_positions(inten_dp->end_positions, inten_dp->total_spec)   ||
+        validate_positions(xml_dp->start_positions, xml_dp->total_spec)     ||
+        validate_positions(xml_dp->end_positions, xml_dp->total_spec)
+    )
+        return NULL;
 
     // Create division_t 
 
@@ -1072,6 +1089,44 @@ write_dp(data_positions_t* dp, int fd)
     return;
 }
 
+void
+write_uint32_arr(uint32_t* arr, uint32_t len, int fd)
+{
+    char* buff, *num_buff;
+
+    // Write array length
+    num_buff = malloc(sizeof(uint32_t));
+    *((uint32_t*)num_buff) = len;
+    write_to_file(fd, num_buff, sizeof(uint32_t));
+
+    // Write array
+    buff = (char*)arr;
+    write_to_file(fd, buff, sizeof(uint32_t)*len);
+
+    free(num_buff);
+
+    return;
+}
+
+void
+write_uint16_arr(uint16_t* arr, uint32_t len, int fd)
+{
+    char* buff, *num_buff;
+
+    // Write array length
+    num_buff = malloc(sizeof(uint32_t));
+    *((uint32_t*)num_buff) = len;
+    write_to_file(fd, num_buff, sizeof(uint32_t));
+
+    // Write array
+    buff = (char*)arr;
+    write_to_file(fd, buff, sizeof(uint16_t)*len);
+
+    free(num_buff);
+    
+    return;
+}
+
 data_positions_t*
 read_dp(void* input_map, long* position)
 {
@@ -1093,12 +1148,37 @@ read_dp(void* input_map, long* position)
     return r;
 }
 
+uint32_t*
+read_uint32_arr(void* input_map, long* position)
+{
+    uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint32_t);
+
+    uint32_t* arr = (uint32_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint32_t)*len;
+
+    return arr;
+}
+
+uint16_t*
+read_uint16_arr(void* input_map, long* position)
+{
+    uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
+    *position += sizeof(uint32_t);
+
+    uint16_t* arr = (uint16_t*)((uint8_t*)input_map + *position);
+    *position += sizeof(uint16_t)*len;
+
+    return arr;
+}
+
 void
 write_division(division_t* div, int fd)
 {
     char* buff, *num_buff;
 
     // Write data_positions_t
+    write_dp(div->spectra, fd);
     write_dp(div->xml, fd);
     write_dp(div->mz, fd);
     write_dp(div->inten, fd);
@@ -1108,6 +1188,10 @@ write_division(division_t* div, int fd)
     *((uint64_t*)num_buff) = (uint64_t)div->size;
     write_to_file(fd, num_buff, sizeof(uint64_t));
     free(num_buff);
+
+    // Write scans and MS levels
+    write_uint32_arr(div->scans, div->mz->total_spec, fd);
+    write_uint16_arr(div->ms_levels, div->mz->total_spec, fd);
 
     return;
 }
@@ -1129,11 +1213,15 @@ read_division(void* input_map, long* position)
     r = malloc(sizeof(division_t));
     if(r == NULL) return NULL;
 
+    r->spectra = read_dp(input_map, position);
     r->xml = read_dp(input_map, position);
     r->mz = read_dp(input_map, position);
     r->inten = read_dp(input_map, position);
     r->size = *((uint64_t*)((uint8_t*)input_map + *position));
     *position += sizeof(uint64_t);
+
+    r->scans = read_uint32_arr(input_map, position);
+    r->ms_levels = read_uint16_arr(input_map, position);
 
     return r;
 }
@@ -1218,6 +1306,11 @@ create_divisions(division_t* div, long n_divisions)
 
         for(int j = 0; j < n_spec_per_div; j++)
         {
+            // Copy Spectra
+            r->divisions[i]->spectra->start_positions[j] = div->spectra->start_positions[spec_i];
+            r->divisions[i]->spectra->end_positions[j] = div->spectra->end_positions[spec_i];
+            r->divisions[i]->spectra->total_spec++;
+
             // Copy MZ
             r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
             r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
@@ -1229,6 +1322,10 @@ create_divisions(division_t* div, long n_divisions)
             r->divisions[i]->inten->end_positions[j] = div->inten->end_positions[spec_i];
             r->divisions[i]->inten->total_spec++;
             r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
+
+            // Copy scans, MS levels, etc. 
+            r->divisions[i]->scans[j] = div->scans[spec_i];
+            r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
 
             spec_i++;
         }
@@ -1242,6 +1339,7 @@ create_divisions(division_t* div, long n_divisions)
             r->divisions[i]->size += div->xml->end_positions[xml_i] - div->xml->start_positions[xml_i];
             xml_i++;
         }
+
     }
 
     // End case: take the remaining spectra and put them in the last division
@@ -1253,6 +1351,11 @@ create_divisions(division_t* div, long n_divisions)
 
     for(int j = 0; j < n_spec_per_div; j++)
     {
+         // Copy Spectra
+        r->divisions[i]->spectra->start_positions[j] = div->spectra->start_positions[spec_i];
+        r->divisions[i]->spectra->end_positions[j] = div->spectra->end_positions[spec_i];
+        r->divisions[i]->spectra->total_spec++;
+
         // Copy MZ
         r->divisions[i]->mz->start_positions[j] = div->mz->start_positions[spec_i];
         r->divisions[i]->mz->end_positions[j] = div->mz->end_positions[spec_i];
@@ -1265,6 +1368,11 @@ create_divisions(division_t* div, long n_divisions)
         r->divisions[i]->inten->total_spec++;
         r->divisions[i]->size += div->inten->end_positions[spec_i] - div->inten->start_positions[spec_i];
 
+
+        // Copy scans, MS levels, etc. 
+        r->divisions[i]->scans[j] = div->scans[spec_i];
+        r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+        
         spec_i++;
     }
 
@@ -1435,67 +1543,163 @@ string_to_array(char* str, long* size)
     return arr;
 }
 
-void
-map_scan_to_index(struct Arguments* arguments, division_t* div)
+long*
+map_scan_to_index(uint32_t* scans, long scans_length, division_t* div, long index_offset, long* indices_length)
 {
     long i, j, k;
-    long* indicies = malloc(arguments->scans_length * sizeof(long));
+    long* indicies = malloc(scans_length * sizeof(long));
 
     j = 0;
 
-    for(long i = 0; i < arguments->scans_length; i++)
+    for(long i = 0; i < scans_length; i++)
     {
         for(k = 0; k < div->spectra->total_spec; k++)
         {
-            if(arguments->scans[i] == div->scans[k])
+            if(scans[i] == div->scans[k])
             {
-                indicies[j] = k;
+                indicies[j] = k + index_offset;
                 j++;
                 break;
             }
         }
-        if(k == div->spectra->total_spec)
-            error("Scan %ld not found in file.\n", arguments->scans[i]);
+        // if(k == div->spectra->total_spec)
+        //     error("Scan %ld not found in file.\n", scans[i]);
     }
 
     if(!is_monotonically_increasing(indicies, j))
-        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+    {
+        warning("map_scan_to_index: Scans must be monotonically increasing.\n");
+        *indices_length = 0;
+        return NULL;
+    }
 
-    arguments->indices = indicies;
-    arguments->indices_length = j;
+    *indices_length = j;
+    return indicies;
 }
 
-void
-map_ms_level_to_index(struct Arguments* arguments, division_t* div)
+long*
+map_ms_level_to_index(uint16_t ms_level, division_t* div, long index_offset, long* indices_length)
 {
+    if(div->spectra->total_spec == 0)
+        return NULL;
+
     long* indicies = malloc(div->spectra->total_spec * sizeof(long));
 
     long j = 0;
 
     for(long i = 0; i < div->spectra->total_spec; i++)
     {
-        if(arguments->ms_level == -1)
+        if(ms_level == -1)
         {
             if(div->ms_levels[i] > 2)
             {
-                indicies[j] = i;
+                indicies[j] = i + index_offset;
                 j++;
             }
         }
-        else if(div->ms_levels[i] == arguments->ms_level)
+        else if(div->ms_levels[i] == ms_level)
         {
-            indicies[j] = i;
+            indicies[j] = i + index_offset;
             j++;
         }
     }
 
     if(!is_monotonically_increasing(indicies, j))
-        error("map_scan_to_index: Scans must be monotonically increasing.\n");
+        error("map_ms_level_to_index: Scans must be monotonically increasing.\n");
 
-    arguments->indices = indicies;
-    arguments->indices_length = j-1;
+    *indices_length = j-1;
 
-    print("Found %ld spectra with ms level %ld.\n", j, arguments->ms_level);
+    print("Found %ld spectra with ms level %ld.\n", j, ms_level);
+
+    return indicies;
+}
+
+long* 
+map_ms_level_to_index_from_divisions(uint16_t ms_level, divisions_t* divisions, long* indicies_length)
+{
+
+    long** indicies = malloc(sizeof(long*)* divisions->n_divisions);
+    long* indicies_lens = calloc(divisions->n_divisions, sizeof(long));
+
+    long total_len = 0;
+    long index_offset = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        long curr_len = 0;
+        indicies[i] = map_ms_level_to_index(ms_level, divisions->divisions[i], index_offset, &curr_len);
+        indicies_lens[i] = curr_len;
+        total_len += curr_len;
+        index_offset += divisions->divisions[i]->spectra->total_spec;
+    }
+    
+    long* result = malloc(sizeof(long) * total_len);
+
+    long index = 0;
+    for(int i = 0; i < divisions->n_divisions; i++)
+    {
+        if (indicies[i] == NULL)
+            continue;
+        
+        for(int j = 0; j < indicies_lens[i]; j++)
+        {
+            result[index] = indicies[i][j];
+            index++;
+        }
+    }
+    if(!is_monotonically_increasing(result, total_len))
+    {
+        warning("map_ms_level_to_index_from_divisions: Scans must be monotonically increasing.\n");
+        *indicies_length = 0;
+        return NULL;
+    }
+
+    *indicies_length = total_len;
+    return result;
+}
+
+long* 
+map_scans_to_index_from_divisions(uint32_t* scans, long scans_length, divisions_t* divisions, long* indicies_length)
+{
+
+    long** indicies = malloc(sizeof(long*)* divisions->n_divisions);
+    long* indicies_lens = calloc(divisions->n_divisions, sizeof(long));
+
+    long total_len = 0;
+    long index_offset = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        long curr_len = 0;
+        indicies[i] = map_scan_to_index(scans, scans_length, divisions->divisions[i], index_offset, &curr_len);
+        indicies_lens[i] = curr_len;
+        total_len += curr_len;
+        index_offset += divisions->divisions[i]->spectra->total_spec;
+    }
+    
+    long* result = malloc(sizeof(long) * total_len);
+
+    long index = 0;
+    for(int i = 0; i < divisions->n_divisions; i++)
+    {
+        if (indicies[i] == NULL)
+            continue;
+        
+        for(int j = 0; j < indicies_lens[i]; j++)
+        {
+            result[index] = indicies[i][j];
+            index++;
+        }
+    }
+    if(!is_monotonically_increasing(result, total_len))
+    {
+        warning("map_scans_to_index_from_divisions: Scans must be monotonically increasing.\n");
+        *indicies_length = 0;
+        return NULL;
+    }
+
+    *indicies_length = total_len;
+    return result;
 }
 
 
@@ -1516,22 +1720,22 @@ preprocess_mzml(char* input_map,
     *df = pattern_detect((char*)input_map);
 
     if (*df == NULL)
-        return -1;
+        return 1;
 
     division_t* div = NULL;
     if(arguments->indices_length > 0)
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
+            return 1;
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->scans_length > 0)
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
-        map_scan_to_index(arguments, tmp);
+            return 1;
+        arguments->indices = map_scan_to_index(arguments->scans, arguments->scans_length, tmp, 0, &(arguments->indices_length));
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
 
     }
@@ -1539,19 +1743,19 @@ preprocess_mzml(char* input_map,
     {
         division_t* tmp = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
         if (tmp == NULL)
-            return -1;
-        map_ms_level_to_index(arguments, tmp);
+            return 1;
+        arguments->indices = map_ms_level_to_index(arguments->ms_level, tmp, 0, &(arguments->indices_length));
         div = extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
     }
     else if(arguments->indices_length == 0 && arguments->scans_length == 0)
     {
-        div = scan_mzml((char*)input_map, *df, input_filesize, NULL); // A division encapsulating the entire file
+        div = scan_mzml((char*)input_map, *df, input_filesize, MSLEVEL|SCANNUM); // A division encapsulating the entire file
     }
     else
         error("Invalid indicies_size: %ld\n", arguments->indices_length);
 
     if (div == NULL)
-        return -1;
+        return 1;
 
     if(arguments->threads == -1) // force divisions to be only 1
     {
@@ -1588,13 +1792,83 @@ preprocess_mzml(char* input_map,
     }
 
     if (*divisions == NULL)
-        return -1;
+        return 1;
 
     end = get_time();
 
     print("Preprocessing time: %1.4fs\n", end - start); 
     print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions, arguments->threads);
 
+    return 0;
+}
+
+divisions_t*
+divide_external(long input_filesize, int n_divisions)
+{
+    divisions_t* r = malloc(sizeof(divisions_t));
+
+    r->divisions = malloc(sizeof(division_t) * n_divisions);
+    r->n_divisions = n_divisions;
+
+    uint64_t division_size = input_filesize / n_divisions;
+
+    for (int i = 0; i < n_divisions; i++)
+    {
+        division_t* curr;
+        r->divisions[i] = alloc_division(1, 0, 0); // One "XML" section for each division
+        curr = r->divisions[i];
+
+        curr->xml->start_positions[0] = i * division_size;
+        curr->xml->end_positions[0] = (i + 1) * division_size;
+        curr->xml->total_spec = 1;
+
+        if (i == n_divisions - 1)
+            curr->xml->end_positions[0] = input_filesize;
+
+        curr->size = curr->xml->end_positions[0] - curr->xml->start_positions[0];
+    }
+
+    return r;
+}
+
+data_format_t*
+create_external_df()
+{
+    data_format_t* df = calloc(1, sizeof(data_format_t));
+
+    df->target_xml_format = _ZSTD_compression_;
+
+    /* The following are not actually used, required for valid msz file. */
+    df->source_compression = _no_comp_;
+    df->target_mz_format = _ZSTD_compression_; 
+    df->target_inten_format = _ZSTD_compression_; 
+
+    return df;
+}
+
+int
+preprocess_external(char* input_map,
+                    long  input_filesize,
+                    long* blocksize,
+                    struct Arguments* arguments,
+                    data_format_t** df,
+                    divisions_t** divisions)
+{
+    double start, end;
+
+    start = get_time();
+
+    print("\nPreprocessing...\n");
+
+    *df = create_external_df();
+
+    divisions_t* div = divide_external(input_filesize, arguments->threads);
+    
+    set_compress_runtime_variables(arguments, *df);
+
+    *divisions = div;
+
+    return 0;
 }
 
 void

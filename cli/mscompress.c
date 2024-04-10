@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <zstd.h>
+#include "../vendor/zstd/lib/zstd.h"
 
 #include "libbase64.h"
 #include "yxml.h"
@@ -29,10 +29,10 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, "  -i, --int-lossy type          Enable int lossy compression (cast, log, delta(16, 32), vbr). (disabled by default)\n");
   fprintf(stream, " --mz-scale-factor factor       Set mz scale factors for delta transform or threshold for vbr.\n");
   fprintf(stream, " --int-scale-factor factor      Set int scale factors for log transform or threshold for vbr\n");
-  fprintf(stream, " --extract-indices [range]      Extract indices from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, " --extract-scans [range]        Extract scans from mzML file (eg. [1-3,5-6]). (disabled by default)\n");
-  fprintf(stream, " --ms-level level               Extract specified ms level (1, 2, n). (disabled by default)\n");
-  fprintf(stream, " --extract-only                 Only output extracted mzML, no compression (disabled by default)\n");
+  fprintf(stream, " --extract-indices [range]      Extract indices from mzML or msz file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, " --extract-scans [range]        Extract scans from mzML or msz file (eg. [1-3,5-6]). (disabled by default)\n");
+  fprintf(stream, " --ms-level level               Extract specified ms level (1, 2, n) from mzML or msz file. (disabled by default)\n");
+  fprintf(stream, " --extract                      Enables extraction mode for either mzML or msz files. (disabled by default)\n");
   fprintf(stream, " --target-xml-format type       Set target xml compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, " --target-mz-format type        Set target mz compression format (zstd, none). (default: zstd)\n");
   fprintf(stream, " --target-inten-format type     Set target inten compression format (zstd, none). (default: zstd)\n");
@@ -138,7 +138,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
         }
       }
     }
-    else if (strcmp(argv[i], "--extract-only") == 0) {
+    else if (strcmp(argv[i], "--extract") == 0) {
       arguments->extract_only = 1;
     }
     else if (strcmp(argv[i], "--target-xml-format") == 0) {
@@ -226,7 +226,10 @@ main(int argc, char* argv[])
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
-    if(arguments.extract_only)
+
+    if(arguments.extract_only && operation == DECOMPRESS) // msz detected, extracting
+      operation = EXTRACT_MSZ;
+    else if(arguments.extract_only) // mzML detected, extracting
       operation = EXTRACT;
 
     // Initialize b64 encoder.
@@ -243,12 +246,13 @@ main(int argc, char* argv[])
         print("\tDetected .mzML file, starting compression...\n");
 
         // Scan mzML for position of all binary data. Divide the m/z, intensity, and XML data over threads.
-        preprocess_mzml((char*)input_map,
+        if(preprocess_mzml((char*)input_map,
                         input_filesize,
                         &(arguments.blocksize),
                         &arguments,
                         &df,
-                        &divisions);
+                        &divisions))
+            break;
       
 
         //Start compress routine.
@@ -285,6 +289,32 @@ main(int argc, char* argv[])
           
           extract_mzml((char*)input_map, divisions, fds[1]);
       };
+      case EXTRACT_MSZ:
+      {
+        extract_msz((char*)input_map,
+                    input_filesize,
+                    arguments.indices,
+                    arguments.indices_length,
+                    arguments.scans,
+                    arguments.scans_length,
+                    arguments.ms_level,
+                    fds[1]);
+      };
+      case EXTERNAL:
+      {
+        preprocess_external((char*) input_map,
+                            input_filesize,
+                            &(arguments.blocksize),
+                            &arguments,
+                            &df,
+                            &divisions);
+        compress_mzml((char*)input_map,
+                      input_filesize,
+                      &arguments,
+                      df,
+                      divisions,
+                      fds[1]);
+      }
     }
     print("\nCleaning up...\n");
 

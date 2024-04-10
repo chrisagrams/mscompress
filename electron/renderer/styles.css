@@ -27,6 +27,34 @@ img {
     -webkit-user-drag: none; /* Don't let images be draggable */
 }
 
+hr {
+    height: 2px;
+    width: 100%;
+    background-color: #00000021;
+    border: 0;
+    border-radius: 2px;
+}
+
+select {
+    border-color: lightgrey;
+    border-radius: 5px;
+    height: 35px;
+    text-align: center;
+}
+
+button {
+    background-color: white;
+    border-color: lightgray;
+    border: solid 1px lightgrey;
+    height: 25px;
+    border-radius: 5px;
+}
+
+input {
+    border: solid 1px lightgrey;
+    border-radius: 5px;
+}
+
 /* Generic classes */
 .hidden {
     display: none !important;
@@ -222,16 +250,97 @@ img {
     transition: filter 0.3s;
 }
 
-#center-container > h6 {
-    margin: 0;
+h6 {
+    font-size: 12px;
+    margin: 2px 0;
+}
+
+#compressWindow {
+    display: flex;
+    flex-direction: column;
+}
+
+#compressWindow.disabled {
+    display: none;
+}
+
+#extractWindow {
+    display: flex;
+    flex-direction: column;
+}
+
+#extractWindow.disabled {
+    display: none;
 }
 
 #center-container > #start {
     margin-top: auto;
 }
 
+#compression_select {
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+}
+
+#compression_select > .selectOption{
+    display: flex;
+    flex-direction: row;
+}
+
+#compression_select > .selectOption > input {
+    margin: 10px;
+}
+
+#compression_select > .selectOption > input:checked + label {
+    font-weight: 500;
+}
+
+#compression_select > .selectOption > label {
+    font-weight: lighter;
+    margin: auto 0;
+}
+
+#extractSelect {
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+}
+
+#extractSelect > .selectOption{
+    display: flex;
+    flex-direction: row;
+}
+
+#extractSelect > .selectOption > input {
+    margin: 10px;
+}
+
+#extractSelect > .selectOption > .inputValue {
+    width: 30px;
+}
+
+#extractSelect > .selectOption > span {
+    text-align: center;
+    margin: auto 0;
+}
+
+#extractSelect > .selectOption > input:checked + label {
+    font-weight: 500;
+}
+
+#extractSelect > .selectOption > label {
+    font-weight: lighter;
+    margin: auto 0;
+}
+
+#right-container {
+    padding: 5px;
+}
+
 #right-container > h6 {
-    margin: 0;
+    font-size: 12px;
+    margin: 2px 0;
 }
 
 #right-container > div {
@@ -290,6 +399,11 @@ img {
     border-color: var(--mscompress-blue); 
 }
 
+.fileCard.selected.external {
+    border-color: grey;
+}
+
+
 /* Filename */
 .fileCard > h1 {
     font-size: 16px;
@@ -313,6 +427,7 @@ img {
     background: none;
     border: none;
     font-weight: bold;
+    height: inherit;
 }
 
 .fileCard > div > button:hover {
@@ -333,6 +448,10 @@ img {
 }
 .fileCard h3.msz {
     color: var(--mscompress-blue);
+    font-weight: bold;
+}
+.fileCard h3.external {
+    color: grey;
     font-weight: bold;
 }
 
@@ -407,6 +526,10 @@ img {
 
 .analysis > .top > div > #type.msz {
     color: var(--mscompress-blue);
+}
+
+.analysis > .top > div > #type.external {
+    color: grey;
 }
 
 .analysis > .top > div >h3 {

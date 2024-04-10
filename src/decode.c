@@ -236,7 +236,7 @@ decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len, char** dest
     *dest = b64_out_buff;
 }
 
-decode_fun_ptr
+decode_fun
 set_decode_fun(int compression_method, int algo, int accession)
 /**
  * @brief Returns appropriate decode function based on mzML file binary compression method.

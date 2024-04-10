@@ -6,6 +6,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(APPLE)
+    # Set the compiler to Clang
+    set(CMAKE_C_COMPILER "/usr/bin/clang")
+    set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+endif()
+
+
 # Set directories
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
@@ -18,6 +25,7 @@ include_directories(
   ${VENDOR_DIR}/base64/include
   ${VENDOR_DIR}/base64/lib
   ${VENDOR_DIR}/yxml
+  ${VENDOR_DIR}/lz4/include
   ${SRC_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -30,6 +38,10 @@ message("Include dirs are: ${dirs}")
 file(GLOB SOURCE_FILES ${SRC_DIR}/*.c *.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+
+
+#lz4
+include (${VENDOR_DIR}/Lz4Include.cmake) # Add lz4 library
 
 #zlib
 # include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
@@ -72,9 +84,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 # Linking stage
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 my_zlib)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 my_zlib)
 else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 ${ZLIB_LIBRARY})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
 endif()
 
 get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)

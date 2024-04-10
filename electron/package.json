@@ -1,11 +1,34 @@
 {
-  "name": "mscompress",
+  "name": "MScompress",
   "version": "1.0.0",
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",
     "install": "cmake-js compile -d ../node/",
-    "clean": "cmake-js -d ../node/ clean"
+    "clean": "cmake-js -d ../node/ clean",
+    "build": "npx electron-builder"
+  },
+  "build": {
+    "extraResources": [
+      {
+        "from": "../node/build/Release",
+        "to": "node/build/Release"
+      },
+      {
+        "from": "../modules/python/dist",
+        "to": "modules/python/dist"
+      }
+    ],
+    "appId": "gy.lab.mscompress",
+    "win": {
+      "target": "portable",
+      "icon": "../assets/icons/icon.png"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "default",
+      "icon": "../assets/icons/icon.icns"
+    }
   },
   "keywords": [],
   "author": "",
@@ -16,6 +39,7 @@
   "devDependencies": {
     "cmake-js": "^7.2.1",
     "electron": "^25.4.0",
+    "electron-builder": "^24.13.3",
     "electron-packager": "^17.1.2"
   },
   "description": ""

@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../vendor/zlib/zlib.h"
-#include <zstd.h>
-#include <lz4.h>
+#include "../vendor/zstd/lib/zstd.h"
+#include "../vendor/lz4/lib/lz4.h"
 #include "mscompress.h"
 
 ZSTD_DCtx *
@@ -183,7 +183,7 @@ DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
 #endif
 
 
-void
+void *
 decompress_routine(void* args)
 {
     // Get thread ID
@@ -321,7 +321,7 @@ decompress_routine(void* args)
 
     dealloc_z_stream(a_args->z);
 
-    return;
+    return NULL;
 }
 
 void
@@ -355,7 +355,7 @@ decompress_msz(char* input_map,
         return;
     }
 
-    set_decompress_runtime_variables(arguments, df, msz_footer);
+    set_decompress_runtime_variables(df, msz_footer);
     
     decompress_args_t** args = malloc(sizeof(decompress_args_t*) * divisions->n_divisions);
 

@@ -1,4 +1,96 @@
-const filehandles = [];
+class Arguments {
+
+  constructor () {
+    this.mode = "default";
+    this.method = "convert";
+    this.threads = 1;
+    this.msLevel = 0;
+    this.scans = null;
+    this.indices = null;
+    this.setMode(this.mode);
+  }
+
+  setMode(mode) {
+    switch(mode) {
+      case "fastest":
+          this.mode = mode;
+          this.target_xml_format = "_LZ4_compression_";
+          this.target_mz_format = "_LZ4_compression_";
+          this.target_inten_format = "_LZ4_compression_";
+          this.zstd_compression_level = 1;
+          break;
+      case "faster":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 1;
+          break;
+      case "default":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 3;
+          break;
+      case "better":
+          this.target_xml_format = "_ZSTD_compression_";
+          this.target_mz_format = "_ZSTD_compression_";
+          this.target_inten_format = "_ZSTD_compression_";
+          this.zstd_compression_level = 6;
+          break;
+    }
+  }
+
+  setThreads(threads) {
+    this.threads = threads;
+  }
+
+  getArguments() {
+    if (this.method == "convert")
+      return {
+        "threads":                this.threads,
+        "target_xml_format":      this.target_xml_format ,
+        "target_mz_format":       this.target_mz_format,
+        "target_inten_format":    this.target_inten_format ,
+        "zstd_compression_level": this.zstd_compression_level,
+      }
+    else if (this.method == "extract")
+      return {
+        "threads":                this.threads,
+        "target_xml_format":      this.target_xml_format ,
+        "target_mz_format":       this.target_mz_format,
+        "target_inten_format":    this.target_inten_format ,
+        "zstd_compression_level": this.zstd_compression_level,
+        "ms_level":               this.msLevel,
+        "scans":                  this.scans,
+        "indices":                this.indices,
+      }
+  }
+
+  setMSLevel(level) {
+    this.msLevel = level;
+  }
+
+  setIndices(start, stop) {
+    let res = []
+    for (let i = start; i <= stop; i++)
+    {
+      res.push(i);
+    }
+    this.indices = res;
+  }
+
+  setScans(start, stop) {
+    let res = []
+    for (let i = start; i <= stop; i++)
+    {
+      res.push(i);
+    }
+    this.scans = res;
+  }
+
+}
+
+window.arguments = new Arguments();
 
 class FileHandle {
   static #extractFilename (path) {
@@ -85,6 +177,8 @@ class FileHandle {
     if (this.fd <= 0) {
       throw new Error("File not open");
     }
+    // if(this.type != 1 && this.type != 2)
+    //   return null;
 
     this.df = await systemWorkerPromise({'type': 'get_accessions', 'fd': this.fd, 'size': this.filesize});
     return this.df;
@@ -122,7 +216,7 @@ class FileHandle {
     if (this.positions == null)
       await this.get_positions();
 
-    return await systemWorkerPromise({'type': 'prepare_compress', 'fd': this.fd, 'df': this.df, 'div': this.positions});
+    return await systemWorkerPromise({'type': 'prepare_compress', 'fd': this.fd, 'df': this.df, 'div': this.positions, 'args': window.arguments.getArguments()});
   }
 
   async get_spectrum(index) {
@@ -208,7 +302,7 @@ class FileHandle {
         throw new Error("get_output_fd error");
 
       showLoading();
-      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd});
+      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
       hideLoading();
     }
     else if (this.type == 2) //msz
@@ -222,16 +316,49 @@ class FileHandle {
         throw new Error("get_output_fd error");
 
       showLoading();
-      await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd});
+      await systemWorkerPromise({'type': "decompress", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
+      hideLoading();
+    }
+    else if (this.type == 5) // external
+    {
+      if (output_path == null)
+        throw new Error ("Output path not specified");
+      if(this.fd <= 0)
+        this.open();
+      if(this.df == null)
+        await this.get_accessions();
+      const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+      if(output_fd <= 0)
+        throw new Error("get_output_fd error");
+
+      showLoading();
+      await systemWorkerPromise({'type': "compress", 'fd': this.fd, 'filesize': this.filesize, 'df': this.df, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
       hideLoading();
     }
   }
 
+  async extract(output_path) {
+    if(this.type != 1 && this.type != 2)
+      return;
+    if (output_path == null)
+      throw new Error("Output path not specified");
+    if(this.fd <= 0)
+      this.open();
+    const output_fd = await systemWorkerPromise({'type': "get_output_fd", 'path': output_path});
+    if(output_fd <= 0)
+      throw new Error("get_output_fd error");
+    showLoading();
+    await systemWorkerPromise({'type': "extract", 'fd': this.fd, 'filesize': this.filesize, 'output_fd': output_fd, 'args': window.arguments.getArguments()});
+    hideLoading();
+  }
+
 
   isValid() {
-    return this.type == 1 || this.type == 2;
+    return this.type == 1 || this.type == 2 || this.type == 5;
   }
 }
+
+const filehandles = [];
 
 const getZlibVersion = async () => {
   return await systemWorkerPromise({'type': 'get_zlib_version'});
@@ -361,21 +488,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Extract just the filename
     const pathParts = fh.path.split(/[/\\]/); // Split on both forward and backward slashes
-    const filename = pathParts.pop(); // Get the last part of the path, which should be the filename
+    let filename = pathParts.pop(); // Get the last part of the path, which should be the filename
+
+
+    // Append "extract" if current mode is "extract"
+    if (window.arguments.method == "extract")
+      filename = "extract_".concat(filename);
 
     // Replace the extension with .msz or .mzML
     let newFilename = "";
-    if(fh.type == 1)
+    if(fh.type == 1 && window.arguments.method == "convert")
+    {
       newFilename = filename.replace(/\.[^\.]+$/, '.msz');
-    else if(fh.type == 2)
+    }
+    else if(fh.type == 1 && window.arguments.method == "extract")
+    {
       newFilename = filename.replace(/\.[^\.]+$/, '.mzML');
+    }
+    else if(fh.type == 2)
+    {
+      let dotCount = (filename.match(/\./g) || []).length;
+      newFilename = dotCount > 1 ? filename.replace(".msz", "") : filename.replace(".msz", ".mzML");
+    }
+    else if(fh.type == 5)
+      newFilename = filename.concat(".msz");
+
 
     // Construct the new output path in a platform-independent way
     const newOutputPath = [output_path, newFilename].join('/').replace(/\\/g, '/');
 
     console.log(newOutputPath);
 
-    fh.convert(newOutputPath);
+    if (window.arguments.method == "convert")
+      fh.convert(newOutputPath);
+    else if (window.arguments.method == "extract")
+      fh.extract(newOutputPath);
 
   });
 
@@ -417,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+// Create a new system worker.
 const system_worker = new Worker('./system_worker.js');
 
 // Create a promise for the system_worker response
@@ -434,11 +582,28 @@ const systemWorkerPromise = (message) => {
   });
 };
 
-
 console.log("Running system detection...");
 
-system_worker.postMessage({'type': "get_threads"});
-system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System32\\notepad.exe"});
+const getThreads = new Promise((resolve, reject) => {
+  systemWorkerPromise({'type': "get_threads"})
+    .then(threads => {
+      resolve(threads);
+    })
+    .catch(error => {
+      reject(error);
+    });
+});
+
+
+getThreads.then(threads => {
+  arguments.setThreads(threads);
+}).catch(e => {
+  console.error(e.message, e);
+  showError(e.message);
+});
+
+// system_worker.postMessage({'type': "get_threads"});
+// system_worker.postMessage({'type': "get_filesize", 'path': "C:\\Windows\\System32\\notepad.exe"});
 
 system_worker.onerror = (e) => {
   console.error(e.message, e);
@@ -465,7 +630,11 @@ const removeFileCard = (fd) => {
 }
 
 const updateFileInfo = async (fh) => {
-  const df = await systemWorkerPromise({'type': "get_accessions", 'fd': fh.fd, 'size': fh.filesize});
+  await fh.get_accessions();
+  const df = fh.df;
+  if(df == null)
+    return;
+
   console.log(df);
   
   const setElementsTextContentByClass = (className, value) => {
@@ -475,10 +644,10 @@ const updateFileInfo = async (fh) => {
 
   switch(df['source_mz_fmt']){
       case '_32f_':
-          setElementsTextContentByClass("mz_format", "float32");
+          setElementsTextContentByClass("mz_format", "32f");
           break;
       case '_64d_':
-          setElementsTextContentByClass("mz_format", "double64");
+          setElementsTextContentByClass("mz_format", "64d");
           break;
       default:
           setElementsTextContentByClass("mz_format", "...");
@@ -487,13 +656,13 @@ const updateFileInfo = async (fh) => {
 
   switch(df['source_inten_fmt']){
       case '_32f_':
-          setElementsTextContentByClass("inten_format", "float32");
+          setElementsTextContentByClass("inten_format", "32f");
           break;
       case '_64d_':
-          setElementsTextContentByClass("inten_format", "double64");
+          setElementsTextContentByClass("inten_format", "64d");
           break;
       default:
-          setElementsTextContentByClass("inten_format", "unknown");
+          setElementsTextContentByClass("inten_format", "...");
           break;
   }
 
@@ -505,7 +674,7 @@ const updateFileInfo = async (fh) => {
           setElementsTextContentByClass("source_format", "none");
           break;
       default:
-          setElementsTextContentByClass("source_format", "unknown");
+          setElementsTextContentByClass("source_format", "...");
           break;
   }
 
@@ -562,12 +731,21 @@ const createFileCard = async (path) => {
       card.classList.add("mzml");
       type.classList.add("mzml");
       type.innerText = "mzML";
+      toggleExtractOption(true);
     }
     else if (fh.type == 2)
     {
       card.classList.add("msz");
       type.classList.add("msz");
       type.innerText = "msz";
+      toggleExtractOption(true);
+    }
+    else if (fh.type == 5)
+    {
+      card.classList.add("external");
+      type.classList.add("external");
+      type.innerText = "External";
+      toggleExtractOption(false);
     }
     else
     {
@@ -618,6 +796,103 @@ const getSelectedFileHandle = () => {
   return filehandles.find(fh => fh.fd == fd);
 }
 
+const toggleExtractOption = (bool) => {
+    const elem = document.querySelector("#modeSelect").querySelector("option[value=Extract]");
+    if(bool) {
+      elem.removeAttribute("disabled");
+    }
+    else {
+      elem.setAttribute("disabled", "disabled");
+    }
+}
+
+const modeSelect = document.querySelector("#modeSelect");
+modeSelect.addEventListener("change", e => {
+  if (modeSelect.value == "Compress") {
+    toggleExtractWindow(false);
+    window.arguments.method = "convert";
+  }
+  else if (modeSelect.value == "Extract") {
+    toggleExtractWindow(true);
+    window.arguments.method = "extract";
+  }
+});
+
+const toggleExtractWindow = (bool) => {
+  const compressWindow = document.querySelector("#compressWindow");
+  const extractWindow = document.querySelector("#extractWindow");
+
+  if (bool)
+  {
+    compressWindow.classList.add("disabled");
+    extractWindow.classList.remove("disabled");
+  }
+  else {
+    compressWindow.classList.remove("disabled");
+    extractWindow.classList.add("disabled");
+  }
+}
+
+const compressionRadioOptions = document.querySelectorAll('input[name="compression"]');
+
+const handleRadioChange = (e => {
+  window.arguments.setMode(e.target.value);
+  console.log(window.arguments.getArguments());
+});
+
+compressionRadioOptions.forEach(i => {
+  i.addEventListener('change', handleRadioChange);
+})
+
+const extractRadioOptions = document.querySelectorAll('input[name="extract"]');
+const msLevelValue = document.querySelector("#msLevelValue");
+
+const scanMinValue = document.querySelector("#scanMin");
+const scanMaxValue = document.querySelector("#scanMax");
+
+const indexMin = document.querySelector("#indexMin");
+const indexMax = document.querySelector("#indexMax");
+
+const handleExtractRadioChange = (e => {
+  let value = e.target.value;
+  if (value == 'msLevel')
+    window.arguments.setMSLevel(parseInt(msLevelValue.value));
+  else
+    window.arguments.setMSLevel(null);
+  if (value == "scans")
+    window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+  else
+    window.arguments.scans = null;
+  if (value == "indices")
+    window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
+  else
+    window.arguments.indices = null;
+});
+
+scanMinValue.addEventListener("change", e => {
+  window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+});
+
+scanMaxValue.addEventListener("change", e => {
+  window.arguments.setScans(parseInt(scanMinValue.value), parseInt(scanMaxValue.value));
+});
+
+indexMin.addEventListener("change", e => {
+  window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
+});
+
+indexMax.addEventListener("change", e => {
+  window.arguments.setIndices(parseInt(indexMin.value), parseInt(indexMax.value));
+});
+
+msLevelValue.addEventListener("change", e => {
+    window.arguments.setMSLevel(parseInt(msLevelValue.value));
+});
+
+extractRadioOptions.forEach(i => {
+  i.addEventListener('change', handleExtractRadioChange);
+});
+
 const showAnalysisWindow = (fh) => {
   const analysis_div = document.querySelector(".analysis");
   analysis_div.classList.remove("hidden");
@@ -636,6 +911,11 @@ const showAnalysisWindow = (fh) => {
     {
       type_text.classList.add("msz");
       type_text.textContent = "msz";
+    }
+    else if (type == 5) // external
+    {
+      type_text.classList.add("external");
+      type_text.textContent = "External";
     }
   });
 }

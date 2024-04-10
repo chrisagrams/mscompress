@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zstd.h>
+#include "../vendor/zstd/lib/zstd.h"
 #include "mscompress.h"
 
 /* 
@@ -2781,7 +2781,7 @@ algo_encode_bitpack_64d (void* args)
     @section Algo switch
 */
 
-Algo_ptr
+Algo
 set_compress_algo(int algo, int accession)
 {
     switch(algo)
@@ -2871,7 +2871,7 @@ set_compress_algo(int algo, int accession)
     }
 }
 
-Algo_ptr
+Algo
 set_decompress_algo(int algo, int accession)
 {   
     switch(algo)

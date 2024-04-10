@@ -51,6 +51,7 @@ namespace mscompress
     Napi::Value PrepareCompression(const Napi::CallbackInfo& info);
     Napi::Value Compress(const Napi::CallbackInfo& info);
     Napi::Value Decompress(const Napi::CallbackInfo& info);
+    Napi::Value Extract(const Napi::CallbackInfo& info);
 
     //Export API
     Napi::Object Init(Napi::Env env, Napi::Object exports);

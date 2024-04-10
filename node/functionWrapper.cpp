@@ -33,7 +33,7 @@ namespace mscompress {
         std::string path = pathValue.Utf8Value();
         char* charPath = (char*)path.c_str(); // Convert to char*
 
-        int fs = get_filesize(charPath);
+        size_t fs = get_filesize(charPath);
         return Napi::Number::New(env, fs);
     }
 
@@ -160,6 +160,8 @@ namespace mscompress {
             df = pattern_detect((char*)mmap_ptr);
         else if(type == DECOMPRESS) //msz
             df = get_header_df(mmap_ptr);
+        else if(type == EXTERNAL)
+            df = create_external_df();
         else
         {
             Napi::Error::New(env, "GetAccessions: unsupported file provided.").ThrowAsJavaScriptException();
@@ -187,6 +189,8 @@ namespace mscompress {
 
         division_t* result = NULL;
 
+        std::cout << "starting getPositions " << std::endl;
+
         if(type == COMPRESS)
             result = scan_mzml((char*)mmap_ptr, df, filesize, MSLEVEL|SCANNUM|RETTIME);
         else if (type == DECOMPRESS)
@@ -199,6 +203,8 @@ namespace mscompress {
             Napi::Error::New(env, "Error in GetPositions").ThrowAsJavaScriptException();
             return env.Null();
         }
+
+        std::cout << "end getPositions " << std::endl;
 
         Napi::Object obj = CreateDivisionObject(env, result);
 
@@ -343,21 +349,49 @@ namespace mscompress {
         // Parse divisions (not working yet)
         // divisions_t* divisions = NapiObjectToDivisionsT(info[4].As<Napi::Object>());
 
-        // For now, recompute divisions
+        // Get input type
+        int fileType = determine_filetype(input_map, input_filesize);
+
         divisions_t* divisions;
-        preprocess_mzml((char*)input_map,
-                        input_filesize,
-                        &(args->blocksize),
-                        args,
-                        &df,
-                        &divisions);
+        if(fileType == COMPRESS)
+        {
+            // For now, recompute divisions
+            
+            preprocess_mzml((char*)input_map,
+                            input_filesize,
+                            &(args->blocksize),
+                            args,
+                            &df,
+                            &divisions);
+        }
+        else if(fileType == EXTERNAL)
+        {
+            preprocess_external((char*)input_map,
+                            input_filesize,
+                            &(args->blocksize),
+                            args,
+                            &df,
+                            &divisions);
+        }
+        else {
+             Napi::TypeError::New(env, "Compress Invalid filetype").ThrowAsJavaScriptException();
+            return env.Null();
+        }
         
         // Parse output_fd
         int output_fd = info[5].As<Napi::Number>().Int32Value();
 
         // Run
         std::cout << "Starting compression..." << std::endl;
+        std::cout << "Arguments: " << std::endl;
+        std::cout << "threads: " << args->threads << std::endl;
+        std::cout << "target_xml_format: " << args->target_xml_format << std::endl;
+        std::cout << "target_mz_format: " << args->target_mz_format << std::endl;
+        std::cout << "target_inten_format: " << args->target_inten_format << std::endl;
+        std::cout << "zstd_compression_level: " << args->zstd_compression_level << std::endl;
+
         compress_mzml((char*)input_map, input_filesize, args, df, divisions, output_fd);
+
         std::cout << "Compression finished." << std::endl;
 
         return env.Null();
@@ -396,6 +430,69 @@ namespace mscompress {
         std::cout << "Starting decompression..." << std::endl;
         decompress_msz((char*)input_map, input_filesize, args, output_fd);
         std::cout << "Decompression finished." << std::endl;
+
+        return env.Null();
+    }
+
+    Napi::Value Extract(const Napi::CallbackInfo& info)
+    {
+        /*
+            Need to receive:
+            input_map
+            input_filesize
+            arguments
+            output_fd
+        */
+    
+         Napi::Env env = info.Env();
+
+        if(info.Length() < 4 || !info[0].IsExternal() || !info[1].IsNumber() || !info[2].IsObject() || !info[3].IsNumber())
+        {
+            Napi::TypeError::New(env, "Decompress expected arguments: (External<void>, Number, Object, Number)").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+        // Parse input_map
+        void* input_map = info[0].As<Napi::External<void>>().Data();
+
+        // Parse input_filesize
+        size_t input_filesize = info[1].As<Napi::Number>().Int64Value();
+
+        // Parse arguments
+        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+
+        // Parse output_fd
+        int output_fd = info[3].As<Napi::Number>().Int32Value();
+
+        // Determine filetype
+        int fileType = determine_filetype(input_map, input_filesize);
+
+        switch(fileType) {
+            case COMPRESS: { // mzML
+                data_format_t* df;
+                divisions_t *divisions;
+                args->threads = -1, //force single threaded
+                preprocess_mzml((char*)input_map,
+                                input_filesize,
+                                &(args->blocksize),
+                                args,
+                                &df,
+                                &divisions);
+                extract_mzml((char*)input_map, divisions, fds[1]);
+                break;
+            }
+
+            case DECOMPRESS: { // msz
+                extract_msz((char*)input_map,
+                    input_filesize,
+                    args->indices,
+                    args->indices_length,
+                    args->scans,
+                    args->scans_length,
+                    args->ms_level,
+                    fds[1]);
+                break;
+            }
+        }
 
         return env.Null();
     }

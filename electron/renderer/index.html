@@ -5,7 +5,7 @@
     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'">
     <link href="./styles.css" rel="stylesheet">
-    <title>mscompress</title>
+    <title>MScompress</title>
   </head>
   <body>
     <!-- <div class="titlebar">
@@ -33,6 +33,12 @@
           <!-- <input type="file" id="test-file-input" /> -->
         </div>
         <div class="container" id="center-container">
+          <h6>Mode:</h6>
+          <select name="mode" id="modeSelect">
+            <option value="Compress">Compress / Decompress</option>
+            <option disabled value="Extract">Extract</option>
+          </select>
+          <hr>
           <h6>Source:</h6>
           <div class="fileStats blur">
             <div>
@@ -53,7 +59,55 @@
             </div>
           </div>
           <button id="analyze">Analyze</button>
+          <hr>
+          <div id="compressWindow">
+          <h6>Compression: </h6>
+          <div id="compression_select">
+            <div class="selectOption">
+              <input type="radio" id="fastest" name="compression" value="fastest">
+              <label for="fastest">Fastest</label>
+            </div>
+            <div class="selectOption">
+              <input type="radio" id="fast" name="compression" value="fast">
+              <label for="fast">Fast</label>
+            </div>
+            <div class="selectOption">
+              <input type="radio" id="default" name="compression" value="default" checked>
+              <label for="default">Default</label>
+            </div>
+            <div class="selectOption">
+              <input type="radio" id="better" name="compression" value="better" >
+              <label for="better">Better</label>
+            </div>
+          </div>
+        </div>
+        <div id="extractWindow" class="disabled">
+          <h6>Extract Selection: </h6>
+          <div id="extractSelect">
+            <div class="selectOption">
+              <input type="radio" id="msLevel" name="extract" value="msLevel">
+              <label for="msLevel">MS Level</label>
+              <input type="number" class="inputValue" min="1" id="msLevelValue" name="msLevelValue" value="1">
+            </div>
+            <div class="selectOption">
+              <input type="radio" id="scans" name="extract" value="scans">
+              <label for="scans">Scans</label>
+              <input type="number" class="inputValue" min="1" id="scanMin" name="scanMin" value="1">
+              <span>-</span>
+              <input type="number" class="inputValue" min="1" id="scanMax" name="scanMax" value="1">
+            </div>
+            <div class="selectOption">
+              <input type="radio" id="indices" name="extract" value="indices">
+              <label for="indices">Indices</label>
+              <input type="number" class="inputValue" min="0" id="indexMin" name="indexMin" value="0">
+              <span>-</span>
+              <input type="number" class="inputValue" min="0" id="indexMax" name="indexMax" value="0">
+            </div>
+          </div>
+        </div>
+
           <button id="start">Convert</button>
+          
 
         </div>
         <div class="container" id="right-container">

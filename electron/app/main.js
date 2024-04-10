@@ -96,7 +96,10 @@ ipcMain.on('output-directory-dialog', e => {
 
 ipcMain.on('render-tic-plot', (e, file) => {
   let completeData = "";
-  const ticPlot = spawn('python3', ['../modules/python/mzml_to_tic.py', file], {
+
+  const directoryPath = path.join(__dirname, "../../modules/python/dist");
+
+  const ticPlot = spawn(path.join(directoryPath, 'mzml_to_tic'), [file], {
     stdio: ['pipe', 'pipe', 'pipe', 'pipe'] // stdin, stdout, stderr, and progress
   });
   ticPlot.stdout.on('data', data => {
