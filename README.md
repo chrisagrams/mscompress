@@ -1,6 +1,7 @@
 # MScompress
 <img src="electron/assets/logos/msc_logo.svg" width=200px>
 
+
 MScompress is a multi-threaded lossless and lossy compression tool for Mass Spectrometry data. We introduce a novel compressed file format, *.msz*, which enables random-access to the compressed file without a full decompression.
 
 <p align="center">
@@ -81,4 +82,34 @@ cmake ..
 ```
 cmake --build ..
 ```
+### NodeJS Native-API (NAPI) Library
+To compile NAPI library:
 
+1. Once cloned, navigate to `node/`
+
+```
+cd node/
+```
+
+2. Fetch dependencies and compile
+```
+npm install
+```
+
+### Electron GUI Application
+To run/build Electron application:
+
+1 . Navigate to `electron/`
+```
+cd electron/
+```
+
+2. To run in dev mode:
+```
+npm run start
+```
+
+3. To compile:
+```
+npm run build
+```
