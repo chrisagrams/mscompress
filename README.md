@@ -3,6 +3,10 @@
 
 MScompress is a multi-threaded lossless and lossy compression tool for Mass Spectrometry data. We introduce a novel compressed file format, *.msz*, which enables random-access to the compressed file without a full decompression.
 
+<p align="center">
+    <img src="assets/figures/GUI-Screenshot.png" width=400px>
+</p>
+
 ### Features
 🌟 A graphical user interface supported on all platforms (Windows, macOS, Linux) (x86, Apple Silicon).
 
@@ -18,8 +22,10 @@ MScompress's multi-threaded implementation achieves state-of-the-art compression
 
 Tests conducted on an Intel Core i9-12900K paired with a Samsung 980 Pro NVMe:
 
-<img src="assets/figures/all_hek_compress.png" width=400px;>
-<img src="assets/figures/all_hek_decompress.png" width=400px;>
+<p align="center">
+    <img src="assets/figures/all_hek_compress.png" width=400px;>
+    <img src="assets/figures/all_hek_decompress.png" width=400px;>
+</p>
 
 MScompress can be utilized as a standalone GUI application or through the command line interface. Additionally, we provide a NodeJS library to utilize our preprocessing, compression, and decompression functions in a node environment.
 
