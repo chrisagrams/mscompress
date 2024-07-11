@@ -18,7 +18,7 @@ def get_tree(path):
 
 def get_encoding(tree):
     root = tree.getroot()
-    nodes = tree.findall('//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
+    nodes = tree.findall('.//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
                          namespaces=root.nsmap)
     for node in nodes:
         accession = node.attrib['accession']
@@ -29,7 +29,7 @@ def get_encoding(tree):
 
 def get_datatype(tree):
     root = tree.getroot()
-    nodes = tree.findall('//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
+    nodes = tree.findall('.//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
                          namespaces=root.nsmap)
     for node in nodes:
         accession = node.attrib['accession']
@@ -43,7 +43,7 @@ def get_binaries(tree):
     root = tree.getroot()
     binaries = []
     for binary in tree.findall(
-            '//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/binary',
+            './/mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/binary',
             namespaces=root.nsmap):
         binaries.append(base64.b64decode(binary.text))
     return binaries
@@ -103,12 +103,15 @@ if __name__ == "__main__":
     org_tree = get_tree(org)
 
     test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree), get_datatype(test_tree))
+    print(f"Test binaries: {len(test_binaries['mz'])}, {len(test_binaries['int'])}")
+
     org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree), get_datatype(org_tree))
+    print(f"Original binaries: {len(org_binaries['mz'])}, {len(org_binaries['int'])}")
 
     # number of binaries should be the same
     if len(test_binaries) != len(org_binaries):
         print("mismatched number of binaries. org {}, test {}".format(len(test_binaries), len(org_binaries)))
-        exit(-1)
+        exit(1)
 
     test_df = pd.DataFrame(test_binaries, columns=['mz', 'int'])
     org_df = pd.DataFrame(org_binaries, columns=['mz', 'int'])
@@ -120,18 +123,18 @@ if __name__ == "__main__":
     # check if the count of mz and int is consistent between test and original
     if df['test_mz'].count() != df['org_mz'].count():
         print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(-1)
+        exit(2)
     if df['test_int'].count() != df['org_int'].count():
         print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(-1)
+        exit(2)
 
     # check for invalid values
     if df.isnull().values.any():
         print("null values found.")
-        exit(-1)
+        exit(3)
     if np.isinf(df).values.sum() > 0:
         print("inf values found.")
-        exit(-1)
+        exit(3)
 
     df['%mz_diff'] = abs(df['test_mz'] - df['org_mz']) / df['org_mz']
     df['%int_diff'] = abs(df['test_int'] - df['org_int']) / df['org_mz']
