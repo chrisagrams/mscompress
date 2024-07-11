@@ -69,6 +69,7 @@
 #define EXTRACT 3
 #define EXTRACT_MSZ 4
 #define EXTERNAL 5
+#define DESCRIBE 6
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -84,6 +85,7 @@ struct Arguments {
     int verbose;
     int threads;
     int extract_only;
+    int describe_only;
     char* mz_lossy;
     char* int_lossy;
     long blocksize;
@@ -295,6 +297,7 @@ long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 void write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
+void print_footer_csv(footer_t* footer);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
