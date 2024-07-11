@@ -28,6 +28,7 @@ void init_args(struct Arguments* args)
     args->verbose          = 0;
     args->threads          = 0;
     args->extract_only     = 0;
+    args->describe_only    = 0;
     args->mz_lossy         = "lossless"; // default
     args->int_lossy        = "lossless"; // default
     args->blocksize        = 1e+8;

@@ -379,6 +379,26 @@ read_footer(void* input_map, long filesize)
     return footer;
 }
 
+void
+print_footer_csv(footer_t* footer)
+{
+  printf("xml_pos,mz_binary_pos,inten_binary_pos,xml_blk_pos,mz_binary_blk_pos,inten_binary_blk_pos,divisions_t_pos,num_spectra,original_filesize,n_divisions,magic_tag,mz_fmt,inten_fmt\n");
+  printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d\n",
+           footer->xml_pos,
+           footer->mz_binary_pos,
+           footer->inten_binary_pos,
+           footer->xml_blk_pos,
+           footer->mz_binary_blk_pos,
+           footer->inten_binary_blk_pos,
+           footer->divisions_t_pos,
+           footer->num_spectra,
+           footer->original_filesize,
+           footer->n_divisions,
+           footer->magic_tag,
+           footer->mz_fmt,
+           footer->inten_fmt);
+}
+
 int
 is_msz(void* input_map, size_t input_length)
 /**

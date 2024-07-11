@@ -39,6 +39,7 @@ print_usage(FILE* stream, int exit_code) {
   fprintf(stream, " --zstd-compression-level level Set zstd compression level (1-22). (default: 3)\n");
   fprintf(stream, "  -b, --blocksize size          Set maximum blocksize (xKB, xMB, xGB). (default: 100MB)\n");
   fprintf(stream, "  -c, --checksum                Enable checksum generation. (disabled by default)\n");
+  fprintf(stream, "  -d, --describe                Print header/footer in CSV format\n");
   fprintf(stream, "  -h, --help                    Show this help message.\n");
   fprintf(stream, "  -V, --version                 Show version information.\n\n");
   fprintf(stream, "Arguments:\n");
@@ -93,6 +94,8 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
       arguments->blocksize = blksize;
     } else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
       // enable checksum generation (not implemented)
+    } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--describe") == 0) {
+      arguments->describe_only = 1;
     } else if (strcmp(argv[i], "--mz-scale-factor") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "%s\n", "Missing scale factor for mz compression.");
@@ -226,7 +229,8 @@ main(int argc, char* argv[])
     // Open file descriptors and mmap.
     operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
-
+    if (arguments.describe_only)
+      operation = DESCRIBE;
     if(arguments.extract_only && operation == DECOMPRESS) // msz detected, extracting
       operation = EXTRACT_MSZ;
     else if(arguments.extract_only) // mzML detected, extracting
@@ -315,6 +319,10 @@ main(int argc, char* argv[])
                       divisions,
                       fds[1]);
       }
+      case DESCRIBE:
+      {
+        print_footer_csv(read_footer((char*)input_map, input_filesize));
+      };
     }
     print("\nCleaning up...\n");
 
