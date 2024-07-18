@@ -332,7 +332,10 @@ main(int argc, char* argv[])
       }
       case DESCRIBE:
       {
-        print_footer_csv(read_footer((char*)input_map, input_filesize));
+        footer_t* footer = read_footer((char*)input_map, input_filesize);
+        if (!footer)
+          exit(1);
+        print_footer_csv(footer);
       };
     }
     print("\nCleaning up...\n");
