@@ -227,7 +227,14 @@ main(int argc, char* argv[])
     prepare_threads(&arguments); // Populate threads variable if not set.
 
     // Open file descriptors and mmap.
-    operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
+    if (arguments.describe_only)
+    {
+      fds[0] = open_input_file(arguments.input_file);
+      input_map = get_mapping(fds[0]);
+      input_filesize = get_filesize(arguments.input_file);
+    }
+    else
+      operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);
 
     if (arguments.describe_only)
       operation = DESCRIBE;

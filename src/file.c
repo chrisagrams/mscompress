@@ -371,6 +371,11 @@ read_footer(void* input_map, long filesize)
 {
     footer_t* footer;
 
+    if (filesize <= 0) {
+      warning("read_footer: Filesize <= 0.\n");
+      return NULL;
+    }
+
     footer = (footer_t*)((char*)input_map + filesize - sizeof(footer_t));
 
     if (footer->magic_tag != MAGIC_TAG)
@@ -382,6 +387,12 @@ read_footer(void* input_map, long filesize)
 void
 print_footer_csv(footer_t* footer)
 {
+  if (!footer)
+  {
+    warning("print_footer_csv: footer is NULL.\n");
+    return;
+  }
+
   printf("xml_pos,mz_binary_pos,inten_binary_pos,xml_blk_pos,mz_binary_blk_pos,inten_binary_blk_pos,divisions_t_pos,num_spectra,original_filesize,n_divisions,magic_tag,mz_fmt,inten_fmt\n");
   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d\n",
            footer->xml_pos,
@@ -558,21 +569,6 @@ strip_or_append_extension(char* input)
 }
 
 int
-open_file(char* path)
-{
-  int fd = -1;
-
-  if (path)
-    #ifdef _WIN32
-      fd = _open(path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
-    #else
-        fd = open(path, O_RDONLY);
-    #endif
-
-  return fd;
-}
-
-int
 open_output_file(char* path)
 {
   int fd = -1;
@@ -597,6 +593,8 @@ open_output_file(char* path)
 int
 close_file(int fd)
 {
+  if (fd == -1) // File never opened, don't close
+    return 0;
   int ret = close(fd); // expands to _close on Windows
   if (ret != 0)
   {
@@ -604,6 +602,35 @@ close_file(int fd)
     exit(-1);
   }
   return ret;
+}
+
+int
+open_input_file(char* input_path)
+/** 
+ *  @brief Opens input_path read-only to provide file descriptor for input mzML or msz.
+ *         Sets correct flags when opening in Windows to avoid newline translation.
+ * 
+ *  @param input_path Path of input file.
+ * 
+ *  @return File descriptor (integer) on success. Value < 0 on error.
+*/
+{
+  int input_fd = -1;
+
+  if (input_path) {
+    #ifdef _WIN32
+      input_fd = _open(input_path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
+    #else
+      input_fd = open(input_path, O_RDONLY);
+    #endif
+
+    if(input_fd < 0)
+      warning("Error in opening input file descriptor. (%s)\n", strerror(errno));
+  }
+  else {
+    warning("No input file specified.\n");
+  }
+  return input_fd;
 }
 
 int
@@ -642,18 +669,7 @@ prepare_fds(char* input_path,
   int output_fd;
   int type;
 
-  if (input_path)
-    #ifdef _WIN32
-      input_fd = _open(input_path, _O_RDONLY | _O_BINARY); // open in binary mode to avoid newline translation in Windows.
-    #else
-        input_fd = open(input_path, O_RDONLY);
-    #endif
-  else
-    error("No input file specified.\n");
-  
-  if(input_fd < 0)
-    error("Error in opening input file descriptor. (%s)\n", strerror(errno));
-
+  input_fd = open_input_file(input_path);
 
   if(debug_output)
   {

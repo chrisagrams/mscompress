@@ -301,7 +301,7 @@ void print_footer_csv(footer_t* footer);
 int prepare_fds(char* input_path, char** output_path, char* debug_output, char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
-int open_file(char* path);
+int open_input_file(char* input_path);
 int open_output_file(char* path);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
