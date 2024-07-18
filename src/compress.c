@@ -780,7 +780,8 @@ compress_mzml(char* input_map,
     // Write footer to file.
     footer->original_filesize = input_filesize;
     footer->n_divisions = divisions->n_divisions; // Set number of divisions in footer.                
-
+    footer->num_spectra = df->source_total_spec; // Set number of spectra in footer.
+    
     write_footer(footer, fds[1]);
 
     free(footer);

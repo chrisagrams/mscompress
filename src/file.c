@@ -346,7 +346,7 @@ get_header_df(void* input_map)
 void
 write_footer(footer_t* footer, int fd)
 /**
- * @brief Writes a footer_t struct to file descritor.
+ * @brief Writes a footer_t struct to file descriptor.
  * 
  * @param footer A populated footer_t struct.
  * 
