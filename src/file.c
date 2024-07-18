@@ -90,6 +90,23 @@ remove_mapping(void* addr, int fd)
     return result;
 }
 
+int 
+remove_file(char* path)
+{
+  if (!path)
+  {
+    warning("remove_file: Path is NULL\n;");
+    return 1;
+  }
+
+  int ret = remove(path);
+
+  if (ret != 0)
+    perror("remove_file");
+
+  return ret;
+}
+
 size_t
 get_filesize(char* path)
 {

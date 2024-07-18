@@ -212,6 +212,7 @@ main(int argc, char* argv[])
     void* input_map = NULL;
     size_t input_filesize = 0;
     int operation = -1;
+    int error_status = 0; // If error occurred, indicate cleanup and non-zero exit code on exit.
     
     if (parse_arguments(argc, argv, &arguments))
       print_usage(stderr, 1);
@@ -263,7 +264,10 @@ main(int argc, char* argv[])
                         &arguments,
                         &df,
                         &divisions))
-            break;
+        {
+          error_status = 1;
+          break;
+        }
       
 
         //Start compress routine.
@@ -348,6 +352,12 @@ main(int argc, char* argv[])
     abs_stop = get_time();
 
     print("\n=== Operation finished in %1.4fs ===\n", abs_stop-abs_start);
+
+    if (error_status) 
+    {
+      remove_file(arguments.output_file);
+      exit(1);
+    }
 
     exit(0);
 }

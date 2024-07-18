@@ -288,6 +288,7 @@ extern int fds[3];
 
 void* get_mapping(int fd);
 int remove_mapping(void* addr, int fd);
+int remove_file(char* path);
 size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
