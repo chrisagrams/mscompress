@@ -510,8 +510,8 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
             return NULL;
         }
             
-        ptr = get_spectrum_start(ptr); // Ptr now points to start of spectrum on successs.
-        if(ptr == NULL) return NULL;
+        ptr = get_spectrum_start(ptr); // Ptr now points to start of spectrum on success.
+        if(ptr == NULL) break; // We can't find the next spectrum, most likely an incomplete mzML file. Break and handle accordingly.
         
         spectra_dp->start_positions[spec_curr] = ptr - input_map;
 
@@ -565,10 +565,11 @@ scan_mzml(char* input_map, data_format_t* df, long end, int flags)
     
     }
 
-    if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have a problem
+    if(xml_curr != bound || mz_curr != df->source_total_spec || inten_curr != df->source_total_spec) // If we haven't found all the binary data, we have an incomplete mzML file. Treat the rest as text.
     {
         warning("scan_mzml: did not find all binary data. xml_curr: %d, mz_curr: %d, inten_curr: %d\n", xml_curr, mz_curr, inten_curr);
-        return NULL;
+        warning("Expected %d spectra, found %d. Continuing...\n", df->source_total_spec, spec_curr);
+        df->source_total_spec = spec_curr; // Reset source_total_spec to the value actually found.
     }
     // xml base case
     xml_dp->end_positions[xml_curr] = end;
