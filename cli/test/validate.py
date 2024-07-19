@@ -102,11 +102,27 @@ if __name__ == "__main__":
     test_tree = get_tree(test)
     org_tree = get_tree(org)
 
-    test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree), get_datatype(test_tree))
-    print(f"Test binaries: {len(test_binaries['mz'])}, {len(test_binaries['int'])}")
+    if test_tree is None:
+        print("Error: Failed to parse test mzML.")
+        exit(1)
+    
+    if org_tree is None:
+        print("Error: Failed to parse original mzML.")
+        exit(1)
 
-    org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree), get_datatype(org_tree))
-    print(f"Original binaries: {len(org_binaries['mz'])}, {len(org_binaries['int'])}")
+    try:
+        test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree), get_datatype(test_tree))
+        print(f"Test binaries: {len(test_binaries['mz'])}, {len(test_binaries['int'])}")
+    except Exception as e:
+        print(f"Error in unpacking test mzML binaries: {e}")
+        exit(1)
+
+    try:
+        org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree), get_datatype(org_tree))
+        print(f"Original binaries: {len(org_binaries['mz'])}, {len(org_binaries['int'])}")
+    except Exception as e:
+        print(f"Error in unpacking original mzML binaries: {e}")
+        exit(1)
 
     # number of binaries should be the same
     if len(test_binaries) != len(org_binaries):
@@ -123,18 +139,18 @@ if __name__ == "__main__":
     # check if the count of mz and int is consistent between test and original
     if df['test_mz'].count() != df['org_mz'].count():
         print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(2)
+        exit(1)
     if df['test_int'].count() != df['org_int'].count():
         print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(2)
+        exit(1)
 
     # check for invalid values
     if df.isnull().values.any():
         print("null values found.")
-        exit(3)
+        exit(1)
     if np.isinf(df).values.sum() > 0:
         print("inf values found.")
-        exit(3)
+        exit(1)
 
     df['%mz_diff'] = abs(df['test_mz'] - df['org_mz']) / df['org_mz']
     df['%int_diff'] = abs(df['test_int'] - df['org_int']) / df['org_mz']
