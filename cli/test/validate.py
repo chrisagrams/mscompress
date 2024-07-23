@@ -1,96 +1,159 @@
+import base64
 import struct
 import sys
-
-from lxml import etree
-import base64
 import zlib
-import struct
-import pandas as pd
-import numpy as np
-import traceback
+
+from lxml.etree import XMLSyntaxError
+from tqdm import tqdm
+from lxml import etree
 
 
-def get_tree(path):
-    mzml_file = open(path)
-    tree = etree.parse(mzml_file)
-    return tree
+def get_iterator(path):
+    # Parse the file to get the root and extract the namespace
+    context = etree.iterparse(path, events=('start', 'end'))
+    _, root = next(context)  # Get the root element
+    nsmap = root.nsmap
+    namespace = nsmap.get(None)  # Get the default namespace
+    root.clear()
+    return context, namespace
 
 
-def get_encoding(tree):
-    root = tree.getroot()
-    nodes = tree.findall('.//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
-                         namespaces=root.nsmap)
-    for node in nodes:
-        accession = node.attrib['accession']
-        if accession == 'MS:1000574':
-            return 'zlib'
-        elif accession == 'MS:1000576':
-            return 'nocomp'
-
-def get_datatype(tree):
-    root = tree.getroot()
-    nodes = tree.findall('.//mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/cvParam',
-                         namespaces=root.nsmap)
-    for node in nodes:
-        accession = node.attrib['accession']
-        if accession == 'MS:1000523':
-            return 8 # 64 bit (double)
-        elif accession == 'MS:1000521':
-            return 4 # 32 bit (float)
+def get_encoding(iterator, namespace):
+    for event, elem in iterator:
+        if event == 'start' and elem.tag == f"{{{namespace}}}cvParam":
+            accession = elem.attrib.get('accession')
+            if accession == 'MS:1000574':
+                return 'zlib'
+            elif accession == 'MS:1000576':
+                return 'nocomp'
+        elem.clear()  # Clear element to free memory
 
 
-def get_binaries(tree):
-    root = tree.getroot()
-    binaries = []
-    for binary in tree.findall(
-            './/mzML/run/spectrumList/spectrum/binaryDataArrayList/binaryDataArray/binary',
-            namespaces=root.nsmap):
-        binaries.append(base64.b64decode(binary.text))
-    return binaries
+def get_datatype(iterator, namespace):
+    for event, elem in iterator:
+        if event == 'start' and elem.tag == f"{{{namespace}}}cvParam":
+            accession = elem.attrib.get('accession')
+            if accession == 'MS:1000523':
+                return 8  # 64 bit (double)
+            elif accession == 'MS:1000521':
+                return 4  # 32 bit (float)
+        elem.clear()  # Clear element to free memory
 
 
 def unpack_floats(data, sizeof_):
-    res = []
-    fun = None
+    if sizeof_ not in (4, 8):
+        raise ValueError('invalid encoding size')
 
-    def f(i):
-        res.append(struct.unpack('f', i)[0])
-    def d(i):
-        res.append(struct.unpack('<d', i)[0])
-
-    if sizeof_ == 8:
-        fun = d
-    elif sizeof_ == 4:
-        fun = f
-    else:
-        print('invalid encoding size')
-        exit(-1)
-
-    for i in range(0, int(len(data)), sizeof_):
-        fun(data[i:i + sizeof_])
-    return res
+    unpack_format = 'f' if sizeof_ == 4 else 'd'
+    return [struct.unpack(unpack_format, data[i:i + sizeof_])[0] for i in range(0, len(data), sizeof_)]
 
 
-def unpack_all(l, encoding_type, sizeof_):
-    mz = []
-    intensity = []
-    fun = None
-
+def unpack_all(data, encoding_type, sizeof_):
     if encoding_type == 'zlib':
-        fun = zlib.decompress
-    elif encoding_type == 'nocomp':
-        def fun(arr): return arr
-    else:
-        print('invalid encoding_type')
-        exit(-1)
+        data = zlib.decompress(data)
+    elif encoding_type != 'nocomp':
+        raise ValueError('invalid encoding_type')
 
-    for i in range(0, len(l), 2):
-        for b in unpack_floats(fun(l[i]), sizeof_):
-            mz.append(b)
-        for b in unpack_floats(fun(l[i + 1]), sizeof_):
-            intensity.append(b)
+    return unpack_floats(data, sizeof_)
 
-    return {'mz': mz, 'int': intensity}
+
+def compare_binary_data(test_binary_data, org_binary_data, encoding, datatype, delta):
+    test_binary = unpack_all(base64.b64decode(test_binary_data), encoding, datatype)
+    org_binary = unpack_all(base64.b64decode(org_binary_data), encoding, datatype)
+
+    if len(test_binary) != len(org_binary):
+        raise ValueError("Binary data lengths do not match")
+
+    for i, j in zip(test_binary, org_binary):
+        if abs(i - j) > delta:
+            raise ValueError("Binary data exceeded delta tolerance.")
+
+
+def traverse_and_compare(test_iterator, org_iterator, namespace, encoding, datatype, mz_tolerance, int_tolerance, sync_tag='spectrum'):
+    sync_tag_with_ns = f"{{{namespace}}}{sync_tag}"
+
+    curr_tolerance = mz_tolerance
+
+    for (test_event, test_elem), (org_event, org_elem) in tqdm(zip(test_iterator, org_iterator)):
+        if test_event != org_event or test_elem.tag != org_elem.tag:
+            raise ValueError("Tree shapes do not match")
+
+        elif test_event == 'start' and test_elem.tag == f"{{{namespace}}}cvParam":
+            accession = test_elem.attrib.get('accession')
+            if accession == 'MS:1000514':   # currently m/z array
+                curr_tolerance = mz_tolerance
+            elif accession == 'MS:1000515':     # currently intensity array
+                curr_tolerance = int_tolerance
+
+        elif test_event == 'end' and test_elem.tag == sync_tag_with_ns:
+            test_binary_data = test_elem.find(f'.//{{{namespace}}}binary')
+            org_binary_data = org_elem.find(f'.//{{{namespace}}}binary')
+
+            if test_binary_data is None or org_binary_data is None:
+                raise ValueError("Binary data arrays do not match")
+
+            compare_binary_data(test_binary_data.text, org_binary_data.text, encoding, datatype, delta=curr_tolerance)
+
+            test_elem.clear()  # Remove from memory once done
+            org_elem.clear()
+
+
+def compare_mzml(test_mzml, org_mzml, mz_tolerance, int_tolerance):
+    try:
+        test_tree, test_namespace = get_iterator(test_mzml)
+        org_tree, org_namespace = get_iterator(org_mzml)
+    except XMLSyntaxError:
+        print("XML syntax error.")
+        return False
+
+    if test_namespace != org_namespace:
+        print("Namespaces do not match.")
+        sys.exit(1)
+
+    test_encoding = get_encoding(test_tree, test_namespace)
+    org_encoding = get_encoding(org_tree, org_namespace)
+
+    # Reset iterators before new traversal
+    try:
+        test_tree, test_namespace = get_iterator(test_mzml)
+        org_tree, org_namespace = get_iterator(org_mzml)
+    except XMLSyntaxError:
+        print("XML syntax error.")
+        return False
+
+    test_datatype = get_datatype(test_tree, test_namespace)
+    org_datatype = get_datatype(org_tree, org_namespace)
+
+    if test_encoding != org_encoding:
+        print("Encodings do not match.")
+        return False
+
+    if test_datatype != org_datatype:
+        print("Datatypes do not match.")
+        return False
+
+    print(f"Encoding: {test_encoding}")
+    print(f"Datatype size: {test_datatype}")
+
+    # Reset iterators before new traversal
+    try:
+        test_tree, test_namespace = get_iterator(test_mzml)
+        org_tree, org_namespace = get_iterator(org_mzml)
+    except XMLSyntaxError:
+        print("XML syntax error.")
+        return False
+
+    try:
+        traverse_and_compare(test_tree, org_tree, test_namespace, test_encoding, test_datatype, mz_tolerance,
+                             int_tolerance)
+    except ValueError as e:
+        print(e)
+        return False
+    except Exception as e:
+        print(f"Generic exception: {e}")
+        return False
+
+    return True
 
 
 if __name__ == "__main__":
@@ -99,68 +162,14 @@ if __name__ == "__main__":
     mz_tolerance = float(sys.argv[3])
     int_tolerance = float(sys.argv[4])
 
-    test_tree = get_tree(test)
-    org_tree = get_tree(org)
+    if len(sys.argv) < 5:
+        print("Usage: python validate.py <test> <org> <mz_tolerance> <int_tolerance>")
+        sys.exit(1)
 
-    if test_tree is None:
-        print("Error: Failed to parse test mzML.")
-        exit(1)
-    
-    if org_tree is None:
-        print("Error: Failed to parse original mzML.")
-        exit(1)
+    print(f"Test file: {test}")
+    print(f"Original file: {org}")
 
-    try:
-        test_binaries = unpack_all(get_binaries(test_tree), get_encoding(test_tree), get_datatype(test_tree))
-        print(f"Test binaries: {len(test_binaries['mz'])}, {len(test_binaries['int'])}")
-    except Exception as e:
-        print(f"Error in unpacking test mzML binaries: {e}")
-        exit(1)
+    if not compare_mzml(test, org, mz_tolerance, int_tolerance):
+        sys.exit(1)
+    sys.exit(0)
 
-    try:
-        org_binaries = unpack_all(get_binaries(org_tree), get_encoding(org_tree), get_datatype(org_tree))
-        print(f"Original binaries: {len(org_binaries['mz'])}, {len(org_binaries['int'])}")
-    except Exception as e:
-        print(f"Error in unpacking original mzML binaries: {e}")
-        exit(1)
-
-    # number of binaries should be the same
-    if len(test_binaries) != len(org_binaries):
-        print("mismatched number of binaries. org {}, test {}".format(len(test_binaries), len(org_binaries)))
-        exit(1)
-
-    test_df = pd.DataFrame(test_binaries, columns=['mz', 'int'])
-    org_df = pd.DataFrame(org_binaries, columns=['mz', 'int'])
-    test_df = test_df.rename({'mz': 'test_mz', 'int': 'test_int'}, axis='columns')
-    org_df = org_df.rename({'mz': 'org_mz', 'int': 'org_int'}, axis='columns')
-
-    df = test_df.join(org_df)
-
-    # check if the count of mz and int is consistent between test and original
-    if df['test_mz'].count() != df['org_mz'].count():
-        print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(1)
-    if df['test_int'].count() != df['org_int'].count():
-        print("mismatched mz count. org {}, test {}".format(df['test_mz'].count(), df['org_mz'].count()))
-        exit(1)
-
-    # check for invalid values
-    if df.isnull().values.any():
-        print("null values found.")
-        exit(1)
-    if np.isinf(df).values.sum() > 0:
-        print("inf values found.")
-        exit(1)
-
-    df['%mz_diff'] = abs(df['test_mz'] - df['org_mz']) / df['org_mz']
-    df['%int_diff'] = abs(df['test_int'] - df['org_int']) / df['org_mz']
-
-    mz_diff_max = df['%mz_diff'].describe()['max']
-    if mz_diff_max > mz_tolerance:
-        print('mz tolerance of {} surpassed. (mz max diff: {})'.format(mz_tolerance, mz_diff_max))
-
-    int_diff_max = df['%int_diff'].describe()['max']
-    if int_diff_max > int_tolerance:
-        print('int tolerance of {} surpassed. (int max diff: {})'.format(int_tolerance, int_diff_max))
-
-    exit(0)
