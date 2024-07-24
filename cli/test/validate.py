@@ -2,6 +2,7 @@ import base64
 import struct
 import sys
 import zlib
+import traceback
 
 from lxml.etree import XMLSyntaxError
 from tqdm import tqdm
@@ -58,6 +59,9 @@ def unpack_all(data, encoding_type, sizeof_):
 
 
 def compare_binary_data(test_binary_data, org_binary_data, encoding, datatype, delta):
+    if test_binary_data is None and org_binary_data is None:
+        print("Empty spectrum. Skipping...")
+        return
     test_binary = unpack_all(base64.b64decode(test_binary_data), encoding, datatype)
     org_binary = unpack_all(base64.b64decode(org_binary_data), encoding, datatype)
 
@@ -91,7 +95,7 @@ def traverse_and_compare(test_iterator, org_iterator, namespace, encoding, datat
 
             if test_binary_data is None or org_binary_data is None:
                 raise ValueError("Binary data arrays do not match")
-
+            
             compare_binary_data(test_binary_data.text, org_binary_data.text, encoding, datatype, delta=curr_tolerance)
 
             test_elem.clear()  # Remove from memory once done
@@ -151,6 +155,7 @@ def compare_mzml(test_mzml, org_mzml, mz_tolerance, int_tolerance):
         return False
     except Exception as e:
         print(f"Generic exception: {e}")
+        print(traceback.format_exc())
         return False
 
     return True
