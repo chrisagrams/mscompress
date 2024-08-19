@@ -49,7 +49,7 @@ print_usage(FILE* stream, int exit_code) {
 }
 
 static int 
-parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
+parse_arguments(int argc, char* argv[], Arguments* arguments) {
   int i;
 
   init_args(arguments);
@@ -201,7 +201,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
 int 
 main(int argc, char* argv[]) 
 {
-    struct Arguments arguments;
+    Arguments arguments;
 
     double abs_start, abs_stop;
     struct base64_state state;

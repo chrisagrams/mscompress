@@ -1708,7 +1708,7 @@ int
 preprocess_mzml(char* input_map,
                 long  input_filesize,
                 long* blocksize,
-                struct Arguments* arguments,
+                Arguments* arguments,
                 data_format_t** df,
                 divisions_t** divisions)
 {
@@ -1851,7 +1851,7 @@ int
 preprocess_external(char* input_map,
                     long  input_filesize,
                     long* blocksize,
-                    struct Arguments* arguments,
+                    Arguments* arguments,
                     data_format_t** df,
                     divisions_t** divisions)
 {

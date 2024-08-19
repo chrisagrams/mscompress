@@ -327,7 +327,7 @@ decompress_routine(void* args)
 void
 decompress_msz(char* input_map,
     size_t input_filesize,
-    struct Arguments* arguments,
+    Arguments* arguments,
     int fd)
 {
     block_len_queue_t *xml_block_lens, *mz_binary_block_lens, *inten_binary_block_lens;

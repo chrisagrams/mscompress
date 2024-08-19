@@ -714,7 +714,7 @@ compress_parallel(char* input_map,
 void 
 compress_mzml(char* input_map,
               size_t input_filesize,
-              struct Arguments* arguments,
+              Arguments* arguments,
               data_format_t* df,
               divisions_t* divisions,
               int output_fd)

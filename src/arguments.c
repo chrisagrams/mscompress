@@ -23,7 +23,7 @@ static int validate_algo_name(const char* name) {
   return 0; // Indicate success
 }
 
-void init_args(struct Arguments* args)
+void init_args(Arguments* args)
 {
     args->verbose          = 0;
     args->threads          = 0;
@@ -49,7 +49,7 @@ void init_args(struct Arguments* args)
     args->zstd_compression_level = 3; // default
 }
 
-int set_threads(struct Arguments* args, int threads)
+int set_threads(Arguments* args, int threads)
 {
     if(threads < 0)
     {
@@ -63,7 +63,7 @@ int set_threads(struct Arguments* args, int threads)
     return 0; // Indicate success
 }
 
-int set_mz_lossy(struct Arguments* args, const char* mz_lossy) {
+int set_mz_lossy(Arguments* args, const char* mz_lossy) {
   // Validate the algorithm name
   if(validate_algo_name(mz_lossy)) return 1;
 
@@ -90,7 +90,7 @@ int set_mz_lossy(struct Arguments* args, const char* mz_lossy) {
   return 0;  // Indicate success
 }
 
-int set_int_lossy(struct Arguments* args, const char* int_lossy) {
+int set_int_lossy(Arguments* args, const char* int_lossy) {
   //Validate the algorithm name
   if(validate_algo_name(int_lossy)) return 1;
 
@@ -125,7 +125,7 @@ double parse_scale_factor(const char* scale_factor_str) {
 }
 
 
-int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str) {
+int set_mz_scale_factor(Arguments* args, const char* scale_factor_str) {
   if(scale_factor_str == NULL) {
     fprintf(stderr, "%s\n", "Missing scale factor for mz compression.");
     return 1;
@@ -135,7 +135,7 @@ int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str) {
   return 0;
 }
 
-int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str) {
+int set_int_scale_factor(Arguments* args, const char* scale_factor_str) {
   if(scale_factor_str == NULL) {
     fprintf(stderr, "%s\n", "Missing scale factor for inten compression.");
     return 1;
@@ -145,7 +145,7 @@ int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str) {
   return 0;
 }
 
-void set_compress_runtime_variables(struct Arguments* args, data_format_t* df)
+void set_compress_runtime_variables(Arguments* args, data_format_t* df)
 {
   int mz_fmt = get_algo_type(args->mz_lossy);
   int inten_fmt = get_algo_type(args->int_lossy);

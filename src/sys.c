@@ -70,7 +70,7 @@ get_num_threads()
 // }
 
 void
-prepare_threads(struct Arguments* args)
+prepare_threads(Arguments* args)
 {
     int np;
 
