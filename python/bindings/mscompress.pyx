@@ -4,6 +4,7 @@ import warnings
 cimport numpy as np
 cimport bindings
 from typing import Union
+from xml.etree.ElementTree import fromstring, Element
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy
 from libc.math cimport nan
@@ -162,7 +163,7 @@ cdef extern from "../src/mscompress.h":
 
     char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
     char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
-
+    char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
     void _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
     void _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
 
@@ -503,6 +504,33 @@ cdef class MZMLFile(BaseFile):
         _dealloc_data_block(tmp)
         return inten_array
 
+    
+    def get_xml(self, size_t index):
+        cdef char* res
+        cdef char* mapping_ptr
+
+        start = self._positions.spectra.start_positions[index]
+        end = self._positions.spectra.end_positions[index]
+
+        size = end-start
+
+        mapping_ptr = <char*>self._mapping
+        mapping_ptr += start
+
+        res = <char*>malloc(size + 1)
+
+        memcpy(res, <const void*> mapping_ptr, size)
+
+        res[size] = '\0'
+
+        result_str = res.decode('utf-8')
+
+        free(res)
+
+        element = fromstring(result_str)
+
+        return element
+
 
 cdef class MSZFile(BaseFile):
     cdef footer_t* _footer
@@ -582,6 +610,35 @@ cdef class MSZFile(BaseFile):
                 inten_array = np.array([], dtype=np.float32)
         
         return inten_array
+
+    
+    def get_xml(self, size_t index):
+        cdef char* res = NULL
+        cdef size_t out_len = 0
+        cdef long xml_pos, mz_pos, inten_pos
+        cdef int mz_fmt, inten_fmt
+
+        xml_pos = <long>self._footer.xml_pos
+        mz_pos = <long>self._footer.mz_binary_pos
+        inten_pos = <long>self._footer.inten_binary_pos
+        mz_fmt = <int>self._footer.mz_fmt
+        inten_fmt = <int>self._footer.inten_fmt
+
+        res = _extract_spectra(
+            <char*>self._mapping, self._dctx, self._df,
+            self._xml_block_lens, self._mz_binary_block_lens,
+            self._inten_binary_block_lens, xml_pos, mz_pos,
+            inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
+        )
+
+        result_str = res.decode('utf-8')
+
+        print(out_len)
+        print(len(result_str))
+
+        element = fromstring(result_str)
+
+        return element
     
 
 cdef class BaseFile:
@@ -736,6 +793,7 @@ cdef class Spectrum:
         BaseFile _file
         object _mz
         object _intensity
+        object _xml
 
     def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file):
         self.index = index
@@ -745,9 +803,16 @@ cdef class Spectrum:
         self._file = file
         self._mz = None
         self._intensity = None
-    
+        self._xml = None
+        
     def __repr__(self):
         return f"Spectrum(index={self.index}, scan={self.scan}, ms_level={self.ms_level}, retention_time={self.retention_time})"
+
+    property xml:
+        def __get__(self):
+            if self._xml is None:
+                self._xml = self._file.get_xml(self.index)
+            return self._xml
 
     property size: 
         def __get__(self):

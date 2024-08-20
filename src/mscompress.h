@@ -410,6 +410,22 @@ char* extract_spectrum_inten(char* input_map,
                           long index,
                           size_t* out_len, int encode);
 
+char* 
+extract_spectra(char* input_map,
+                ZSTD_DCtx* dctx,
+                data_format_t* df,
+                block_len_queue_t *xml_block_lens,
+                block_len_queue_t *mz_binary_block_lens,
+                block_len_queue_t *inten_binary_block_lens,
+                long xml_pos,
+                long mz_pos,
+                long inten_pos,
+                int mz_fmt,
+                int inten_fmt,
+                divisions_t* divisions,
+                long index,
+                size_t* out_len);
+
 /* compress.c */
 typedef struct 
 {
