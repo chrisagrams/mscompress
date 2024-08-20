@@ -3,6 +3,9 @@ import numpy as np
 cimport numpy as np
 cimport bindings
 from typing import Union
+from libc.stdlib cimport malloc, free
+from libc.string cimport memcpy
+from libc.math cimport nan
 
 np.import_array()
 
@@ -12,9 +15,44 @@ cdef extern from "stdint.h":
     ctypedef unsigned int uint32_t
     ctypedef unsigned int uint16_t
 
+cdef extern from "../vendor/zlib/zlib.h":
+    ctypedef struct z_stream:
+        pass
+
+cdef extern from "../vendor/zstd/lib/zstd.h":
+    ctypedef struct ZSTD_CCtx:
+        pass
+
+    ctypedef struct ZSTD_DCtx:
+        pass
+
 cdef extern from "../src/mscompress.h":
+    int TRUE
+    int FALSE
+    int _ZSTD_compression_
+    int ZLIB_SIZE_OFFSET
+    int _32f_
+    int _64d_
+    
+    ctypedef void (*Algo)(void*)
+    ctypedef Algo (*Algo_ptr)()
+
+    ctypedef void (*decode_fun)(z_stream *, char *, size_t, char **, size_t *, data_block_t *)
+    ctypedef decode_fun (*decode_fun_ptr)()
+
+    ctypedef void (*encode_fun)(z_stream *, char **, size_t, char *, size_t *)
+    ctypedef encode_fun (*encode_fun_ptr)()
+
+    ctypedef void* (*compression_fun)(ZSTD_CCtx* , void* , size_t , size_t* , int )
+    ctypedef compression_fun (*compression_fun_ptr)()
+
+    ctypedef void* (*decompression_fun)(ZSTD_DCtx *, void *, size_t , size_t )
+    ctypedef decompression_fun (*decompression_fun_ptr)()
+
     ctypedef struct Arguments:
         int threads
+        char* mz_lossy
+        char* int_lossy
         long blocksize
         float mz_scale_factor
         float int_scale_factor
@@ -28,11 +66,33 @@ cdef extern from "../src/mscompress.h":
         size_t size
         size_t max_size
     
+    ctypedef struct block_len_t:
+        size_t original_size
+        size_t compressed_size
+        block_len_t* next
+
+        char* cache
+
+        char* encoded_cache
+        uint64_t encoded_cache_len
+        size_t* encoded_cache_lens
+
+    ctypedef struct block_len_queue_t:
+        block_len_t* head
+        block_len_t* tail
+
+        int populated
+    
     ctypedef struct data_format_t:
         uint32_t source_mz_fmt
         uint32_t source_inten_fmt
         uint32_t source_compression
         uint32_t source_total_spec
+
+        decode_fun decode_source_compression_mz_fun
+        decode_fun decode_source_compression_inten_fun
+        encode_fun encode_source_compression_mz_fun
+        encode_fun encode_source_compression_inten_fun
 
     ctypedef struct data_positions_t:
         uint64_t* start_positions
@@ -51,6 +111,25 @@ cdef extern from "../src/mscompress.h":
         uint16_t* ms_levels
         float* ret_times
 
+    ctypedef struct divisions_t:
+        division_t** divisions
+        int n_divisions
+    
+    ctypedef struct footer_t:
+        uint64_t xml_pos
+        uint64_t mz_binary_pos
+        uint64_t inten_binary_pos
+        uint64_t xml_blk_pos
+        uint64_t mz_binary_blk_pos
+        uint64_t inten_binary_blk_pos
+        uint64_t divisions_t_pos
+        size_t num_spectra
+        uint64_t original_filesize
+        int n_divisions
+        int magic_tag
+        int mz_fmt
+        int inten_fmt
+
     int verbose
     int _get_num_threads "get_num_threads"()
     int _open_input_file "open_input_file"(char* input_path)
@@ -63,8 +142,39 @@ cdef extern from "../src/mscompress.h":
 
     division_t* _scan_mzml "scan_mzml"(char* input_map, data_format_t* df, long end, int flags)
 
+    void _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
+    void _set_decompress_runtime_variables "set_decompress_runtime_variables"(data_format_t* df, footer_t* msz_footer)
+    data_block_t* _alloc_data_block "alloc_data_block"(size_t max_size)
+    void _dealloc_data_block "dealloc_data_block"(data_block_t* db)
+    z_stream* _alloc_z_stream "alloc_z_stream"()
+    ZSTD_CCtx* _alloc_cctx "alloc_cctx"()
+    ZSTD_DCtx* _alloc_dctx "alloc_dctx"()
+
+    footer_t* _read_footer "read_footer"(void* input_map, long filesize)
+    divisions_t* _read_divisions "read_divisions"(void* input_map, long position, int n_divisions)
+    division_t* _flatten_divisions "flatten_divisions"(divisions_t* divisions)
+    block_len_queue_t* _read_block_len_queue "read_block_len_queue"(void* input_map, long offset, long end)
+
+    char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
+    char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
+
 cdef class RuntimeArguments:
     cdef Arguments _arguments
+
+    def __init__(self):
+        self._arguments.threads = _get_num_threads()
+        self._arguments.mz_lossy = "lossless"
+        self._arguments.int_lossy = "lossless"
+        self._arguments.blocksize = <long>1e+8
+        self._arguments.mz_scale_factor = 1000
+        self._arguments.int_scale_factor = 0
+        self._arguments.target_xml_format = _ZSTD_compression_
+        self._arguments.target_mz_format = _ZSTD_compression_
+        self._arguments.target_inten_format = _ZSTD_compression_
+        self._arguments.zstd_compression_level = 3
+
+    cdef Arguments* get_ptr(self):
+        return &self._arguments
 
     @staticmethod
     cdef RuntimeArguments from_ptr(Arguments* ptr):
@@ -225,19 +335,21 @@ cdef class Division:
     property scans:
         def __get__(self):
             cdef np.npy_intp shape[1]
-            shape[0] = <np.npy_intp>self._division.size
+            shape[0] = <np.npy_intp>self._division.mz.total_spec
             return np.asarray(<uint32_t[:shape[0]]>self._division.scans)
 
     property ms_levels:
         def __get__(self):
             cdef np.npy_intp shape[1]
-            shape[0] = <np.npy_intp>self._division.size
+            shape[0] = <np.npy_intp>self._division.mz.total_spec
             return np.asarray(<uint16_t[:shape[0]]>self._division.ms_levels)
 
     property ret_times:
         def __get__(self):
+            if self._division.ret_times is NULL:
+                return None
             cdef np.npy_intp shape[1]
-            shape[0] = <np.npy_intp>self._division.size
+            shape[0] = <np.npy_intp>self._division.mz.total_spec
             return np.asarray(<float[:shape[0]]>self._division.ret_times)
 
 
@@ -271,13 +383,175 @@ cdef class MZMLFile(BaseFile):
         super(MZMLFile, self).__init__(path, filesize, fd)
         self._df = _pattern_detect(<char*> self._mapping)
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
+        _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)    
+    
+    def get_mz_binary(self, size_t index):
+        cdef char* dest = NULL
+        cdef size_t out_len = 0
+        cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
+        cdef char* mapping_ptr
+        cdef size_t start, end
+        cdef np.ndarray[np.float64_t, ndim=1] mz_array
+        cdef double* double_ptr
+        cdef float* float_ptr
+
+        start = self._positions.mz.start_positions[index]
+        end = self._positions.mz.end_positions[index]
+
+        dest = <char*>malloc((end - start) * 2)
+        if not dest:
+            raise MemoryError("Failed to allocate memory for dest")
+
+        mapping_ptr = <char*>self._mapping
+        mapping_ptr += start
+
+        self._df.decode_source_compression_mz_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+
+        dest += ZLIB_SIZE_OFFSET # Skip zlib header
+
+        if self._df.source_mz_fmt == _64d_:
+            count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
+            double_ptr = <double*>dest
+
+            if out_len > 0:
+                mz_array = np.asarray(<np.float64_t[:count]>double_ptr)
+            else:
+                mz_array = np.array([], dtype=np.float64)
+        elif self._df.source_mz_fmt == _32f_:
+            count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
+            float_ptr = <float*>dest
+
+            if out_len > 0:
+                mz_array = np.asarray(<np.float32_t[:count]>float_ptr)
+            else:
+                mz_array = np.array([], dtype=np.float32)
+        else:
+            raise NotImplementedError("Data format not implemented.")
+     
+        _dealloc_data_block(tmp)
+        return mz_array
+
+    def get_inten_binary(self, size_t index):
+        cdef char* dest = NULL
+        cdef size_t out_len = 0
+        cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
+        cdef char* mapping_ptr
+        cdef size_t start, end
+        cdef np.ndarray[np.float64_t, ndim=1] inten_array
+        cdef double* double_ptr
+        cdef float* float_ptr
+
+        start = self._positions.inten.start_positions[index]
+        end = self._positions.inten.end_positions[index]
+
+        dest = <char*>malloc((end - start) * 2)
+        if not dest:
+            raise MemoryError("Failed to allocate memory for dest")
+
+        mapping_ptr = <char*>self._mapping
+        mapping_ptr += start
+
+        self._df.decode_source_compression_inten_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+
+        dest += ZLIB_SIZE_OFFSET # Skip zlib header
+
+        if self._df.source_inten_fmt == _64d_:
+            count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
+            double_ptr = <double*>dest
+
+            if out_len > 0:
+                inten_array = np.asarray(<np.float64_t[:count]>double_ptr)
+            else:
+                inten_array = np.array([], dtype=np.float64)
+        elif self._df.source_inten_fmt == _32f_:
+            count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
+            float_ptr = <float*>dest
+
+            if out_len > 0:
+                inten_array = np.asarray(<np.float32_t[:count]>float_ptr)
+            else:
+                inten_array = np.array([], dtype=np.float32)
+        else:
+            raise NotImplementedError("Data format not implemented.")
+     
+        _dealloc_data_block(tmp)
+        return inten_array
 
 
 cdef class MSZFile(BaseFile):
+    cdef footer_t* _footer
+    cdef divisions_t* _divisions
+    cdef ZSTD_DCtx* _dctx
+    cdef block_len_queue_t* _xml_block_lens
+    cdef block_len_queue_t* _mz_binary_block_lens
+    cdef block_len_queue_t* _inten_binary_block_lens
+
     def __init__(self, bytes path, size_t filesize, int fd):
         super(MSZFile, self).__init__(path, filesize, fd)
         self._df = _get_header_df(self._mapping)
+        self._footer = _read_footer(self._mapping, self.filesize)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
+        self._positions = _flatten_divisions(self._divisions)
+        self._dctx = _alloc_dctx()
+        self._xml_block_lens = _read_block_len_queue(self._mapping, self._footer.xml_blk_pos, self._footer.mz_binary_blk_pos)
+        self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
+        self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
+        _set_decompress_runtime_variables(self._df, self._footer)
 
+
+    def get_mz_binary(self, size_t index):
+        cdef char* res = NULL
+        cdef size_t out_len = 0
+        cdef np.ndarray[np.float64_t, ndim=1] mz_array
+        cdef double* double_ptr
+        cdef float* float_ptr
+        
+        res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE)
+        
+        if self._df.source_mz_fmt == _64d_:
+            count = int((out_len) / 8)
+            double_ptr = <double*>res
+            if out_len > 0:
+                mz_array = np.asarray(<np.float64_t[:count]>double_ptr)
+            else:
+                mz_array = np.array([], dtype=np.float64)
+        elif self._df.source_mz_fmt == _32f_:
+            count = int((out_len) / 4)
+            float_ptr = <float*>res
+            if out_len > 0:
+                mz_array = np.asarray(<np.float32_t[:count]>float_ptr)
+            else:
+                mz_array = np.array([], dtype=np.float32)
+        
+        return mz_array
+    
+    
+    def get_inten_binary(self, size_t index):
+        cdef char* res = NULL
+        cdef size_t out_len = 0
+        cdef np.ndarray[np.float64_t, ndim=1] inten_array
+        cdef double* double_ptr
+        cdef float* float_ptr
+        
+        res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE)
+        
+        if self._df.source_inten_fmt == _64d_:
+            count = int((out_len) / 8)
+            double_ptr = <double*>res
+            if out_len > 0:
+                inten_array = np.asarray(<np.float64_t[:count]>double_ptr)
+            else:
+                inten_array = np.array([], dtype=np.float64)
+        elif self._df.source_inten_fmt == _32f_:
+            count = int((out_len) / 4)
+            float_ptr = <float*>res
+            if out_len > 0:
+                inten_array = np.asarray(<np.float32_t[:count]>float_ptr)
+            else:
+                inten_array = np.array([], dtype=np.float32)
+        
+        return inten_array
+    
 
 cdef class BaseFile:
     cdef bytes path
@@ -287,6 +561,8 @@ cdef class BaseFile:
     cdef data_format_t* _df
     cdef division_t* _positions
     cdef Spectra _spectra
+    cdef RuntimeArguments _arguments
+    cdef z_stream* _z
 
     def __init__(self, bytes path, size_t filesize, int fd):
         self.path = path
@@ -294,13 +570,24 @@ cdef class BaseFile:
         self._fd = fd
         self._mapping = _get_mapping(self._fd)
         self._spectra = None
+        self._arguments = RuntimeArguments()
+        self._z = _alloc_z_stream()
     
     @property
     def spectra(self):
         if self._spectra is None:
-            self._spectra = Spectra(DataFormat.from_ptr(self._df), Division.from_ptr(self._positions))
+            self._spectra = Spectra(self, DataFormat.from_ptr(self._df), Division.from_ptr(self._positions))
         return self._spectra
+    
+    @property
+    def positions(self):
+        return Division.from_ptr(self._positions)
 
+    def get_mz_binary(self, size_t index):
+        raise NotImplementedError("This method should be overridden in subclasses")
+    
+    def get_inten_binary(self, size_t index):
+        raise NotImplementedError("This method should be overridden in subclasses")
     
     def describe(self):
         return {
@@ -332,13 +619,15 @@ cdef class Spectra:
     __len__(self) -> int:
         Returns the total number of spectra.
     """
+    cdef BaseFile _f
     cdef object _df
     cdef object _positions
     cdef object _cache  # Store computed spectra
     cdef int _index
     cdef size_t length
 
-    def __init__(self, DataFormat df, Division positions):
+    def __init__(self, BaseFile f, DataFormat df, Division positions):
+        self._f = f
         self._df = df
         self._positions = positions
         self.length = self._df.source_total_spec
@@ -367,15 +656,16 @@ cdef class Spectra:
         return self._cache[index]
     
     cdef Spectrum _compute_spectrum(self, size_t index):
-        # Example computation using the positions
+        if self._positions.ret_times is not None:
+            retention_time = self._positions.ret_times[index]
+        else:
+            retention_time = nan("1")
         return Spectrum(
             index=index,
             scan=self._positions.scans[index],
-            size=0,
             ms_level=self._positions.ms_levels[index],
-            retention_time=self._positions.ret_times[index],
-            mz=np.zeros(0, dtype=np.float64),
-            intensity=np.zeros(0, dtype=np.float64)
+            retention_time=retention_time,
+            file=self._f
         )
 
     def __len__(self) -> int:
@@ -392,34 +682,49 @@ cdef class Spectrum:
     size (int): Number of m/z - intensity pairs.
     ms_level (int): MS level of spectrum.
     retention_time (float): Retention time of spectrum.
-    mz (np.ndarray[np.float64_t, ndim=1]): A numpy array of m/z values.
-    intensity (np.ndarray[np.float64_t, ndim=1]): A numpy array of intensity values.
     """
     cdef:
         uint64_t index
         uint32_t scan
-        uint64_t size
         uint16_t ms_level
         float retention_time
-        object mz
-        object intensity
+        BaseFile _file
+        object _mz
+        object _intensity
 
-    def __init__(self, uint64_t index, uint32_t scan, uint64_t size, uint16_t ms_level, float retention_time,
-                 np.ndarray[np.float64_t, ndim=1] mz, np.ndarray[np.float64_t, ndim=1] intensity):
-        assert mz.shape[0] == size, "mz array size must match 'size'"
-        assert intensity.shape[0] == size, "intensity array size must match 'size'"
-        
+    def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file):
         self.index = index
         self.scan = scan
-        self.size = size
         self.ms_level = ms_level
         self.retention_time = retention_time
-        self.mz = mz
-        self.intensity = intensity
-
+        self._file = file
+        self._mz = None
+        self._intensity = None
+    
     def __repr__(self):
-        return f"Spectrum(index={self.index}, scan={self.scan}, size={self.size}, ms_level={self.ms_level}, retention_time={self.retention_time})"
+        return f"Spectrum(index={self.index}, scan={self.scan}, ms_level={self.ms_level}, retention_time={self.retention_time})"
 
+    property size: 
+        def __get__(self):
+            if self._mz is None:
+                self._mz = self._file.get_mz_binary(self.index)
+            return len(self._mz)
+    
+    property mz:
+        def __get__(self):
+            if self._mz is None:
+                self._mz = self._file.get_mz_binary(self.index)
+            return self._mz
+
+    property intensity:
+        def __get__(self):
+            if self._intensity is None:
+                self._intensity = self._file.get_inten_binary(self.index)
+            return self._intensity
+
+    property peaks:
+        def __get__(self):
+            return np.column_stack((self.mz, self.intensity))
 
 def get_num_threads() -> int:
     """
