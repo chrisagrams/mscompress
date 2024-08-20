@@ -1,5 +1,6 @@
 import os 
 import numpy as np
+import warnings
 cimport numpy as np
 cimport bindings
 from typing import Union
@@ -133,6 +134,8 @@ cdef extern from "../src/mscompress.h":
     int verbose
     int _get_num_threads "get_num_threads"()
     int _open_input_file "open_input_file"(char* input_path)
+    int _open_output_file "open_output_file"(char* path)
+    int _close_file "close_file"(int fd)
     size_t _get_filesize "get_filesize"(char* path)
     void* _get_mapping "get_mapping"(int fd)
     int _determine_filetype "determine_filetype"(void* input_map, size_t input_length)
@@ -141,7 +144,9 @@ cdef extern from "../src/mscompress.h":
     data_format_t* _get_header_df "get_header_df"(void* input_map)
 
     division_t* _scan_mzml "scan_mzml"(char* input_map, data_format_t* df, long end, int flags)
-
+    long _determine_n_divisions "determine_n_divisions"(long filesize, long blocksize)
+    divisions_t* _create_divisions "create_divisions"(division_t* div, long n_divisions)
+    long _get_division_size_max "get_division_size_max"(divisions_t* divisions)
     void _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
     void _set_decompress_runtime_variables "set_decompress_runtime_variables"(data_format_t* df, footer_t* msz_footer)
     data_block_t* _alloc_data_block "alloc_data_block"(size_t max_size)
@@ -157,6 +162,10 @@ cdef extern from "../src/mscompress.h":
 
     char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
     char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
+
+    void _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
+    void _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
+
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
@@ -384,7 +393,24 @@ cdef class MZMLFile(BaseFile):
         self._df = _pattern_detect(<char*> self._mapping)
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
         _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)    
-    
+
+
+    def _prepare_divisions(self):
+        cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
+        if (n_divisions > self._positions.mz.total_spec): # If we have more divisions than spectra, decrease number of divisions
+            warnings.warn(f"n_divisions ({n_divisions}) > total_spec ({self._positions.mz.total_spec}). Setting n_divisions to {self._positions.mz.total_spec)}")
+        elif (n_divisions >= self._arguments.threads):
+            self._divisions = _create_divisions(self._positions, n_divisions)
+        else:
+            self._divisions = _create_divisions(self._positions, self._arguments.threads)
+            self._arguments.blocksize = _get_division_size_max(self._divisions) # If we have more threads than divisions, increase the blocksize to max division size
+
+    def compress(self, output: Union[str, bytes]):
+        self._prepare_divisions()
+        output_fd = self._prepare_output_fd(output) 
+        _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, output_fd)
+        _close_file(output_fd)
+
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
         cdef size_t out_len = 0
@@ -480,7 +506,6 @@ cdef class MZMLFile(BaseFile):
 
 cdef class MSZFile(BaseFile):
     cdef footer_t* _footer
-    cdef divisions_t* _divisions
     cdef ZSTD_DCtx* _dctx
     cdef block_len_queue_t* _xml_block_lens
     cdef block_len_queue_t* _mz_binary_block_lens
@@ -497,6 +522,12 @@ cdef class MSZFile(BaseFile):
         self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
         self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
         _set_decompress_runtime_variables(self._df, self._footer)
+
+    
+    def decompress(self, output: Union[str, bytes]):
+        output_fd = self._prepare_output_fd(output)
+        _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), output_fd)
+        _close_file(output_fd)
 
 
     def get_mz_binary(self, size_t index):
@@ -558,7 +589,8 @@ cdef class BaseFile:
     cdef size_t filesize
     cdef int _fd
     cdef void* _mapping
-    cdef data_format_t* _df
+    cdef data_format_t* _df 
+    cdef divisions_t* _divisions
     cdef division_t* _positions
     cdef Spectra _spectra
     cdef RuntimeArguments _arguments
@@ -583,6 +615,13 @@ cdef class BaseFile:
     def positions(self):
         return Division.from_ptr(self._positions)
 
+
+    def _prepare_output_fd(self, path: Union[str, bytes]):
+        if isinstance(path, str):
+            path = path.encode('utf-8')
+        cdef int output_fd = _open_output_file(path)
+        return output_fd 
+
     def get_mz_binary(self, size_t index):
         raise NotImplementedError("This method should be overridden in subclasses")
     
@@ -596,6 +635,12 @@ cdef class BaseFile:
             "format": DataFormat.from_ptr(self._df),
             "positions": Division.from_ptr(self._positions)
         }
+
+    def compress(self, output):
+        raise NotImplementedError("Cannot compress this file type.")
+    
+    def decompress(self, output):
+        raise NotImplementedError("Cannot decompress this file type.")
 
 
 cdef class Spectra:

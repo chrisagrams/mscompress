@@ -342,6 +342,8 @@ void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
 division_t* flatten_divisions(divisions_t* divisions);
 divisions_t* create_divisions(division_t* div, long n_divisions);
+long determine_n_divisions(long filesize, long blocksize);
+long get_division_size_max(divisions_t* divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
