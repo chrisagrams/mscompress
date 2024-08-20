@@ -1245,6 +1245,90 @@ read_divisions(void* input_map, long position, int n_divisions)
     return r;
 }
 
+division_t*
+flatten_divisions(divisions_t* divisions)
+{
+    size_t spectra_size = 0;
+    size_t xml_size = 0;
+    size_t mz_size = 0;
+    size_t inten_size = 0;
+    size_t total_size = 0;
+
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        spectra_size += divisions->divisions[i]->spectra->total_spec;
+        xml_size     += divisions->divisions[i]->xml->total_spec;
+        mz_size      += divisions->divisions[i]->mz->total_spec;
+        inten_size   += divisions->divisions[i]->inten->total_spec;
+        total_size   += divisions->divisions[i]->size;
+    }
+
+    division_t* r = alloc_division(xml_size, mz_size, inten_size);
+
+    size_t index = 0;
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        for (int j = 0; j < divisions->divisions[i]->spectra->total_spec; j++)
+        {
+            r->spectra->start_positions[index] = divisions->divisions[i]->spectra->start_positions[j];
+            r->spectra->end_positions[index]   = divisions->divisions[i]->spectra->end_positions[j];
+            index++;
+        }
+    }
+    r->spectra->total_spec = spectra_size;
+    index = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        for (int j = 0; j < divisions->divisions[i]->xml->total_spec; j++)
+        {
+            r->xml->start_positions[index] = divisions->divisions[i]->xml->start_positions[j];
+            r->xml->end_positions[index]   = divisions->divisions[i]->xml->end_positions[j];
+            index++;
+        }
+    }
+    r->xml->total_spec = xml_size;
+    index = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        for (int j = 0; j < divisions->divisions[i]->mz->total_spec; j++)
+        {
+            r->mz->start_positions[index] = divisions->divisions[i]->mz->start_positions[j];
+            r->mz->end_positions[index]   = divisions->divisions[i]->mz->end_positions[j];
+            index++;
+        }
+    }
+    r->mz->total_spec = mz_size;
+    index = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        for (int j = 0; j < divisions->divisions[i]->inten->total_spec; j++)
+        {
+            r->inten->start_positions[index] = divisions->divisions[i]->inten->start_positions[j];
+            r->inten->end_positions[index]   = divisions->divisions[i]->inten->end_positions[j];
+            index++;
+        }
+    }
+    r->inten->total_spec = inten_size;
+    index = 0;
+
+    for (int i = 0; i < divisions->n_divisions; i++)
+    {
+        for (int j = 0; j < divisions->divisions[i]->mz->total_spec; j++)
+        {
+            r->scans[index]     = divisions->divisions[i]->scans[j];
+            r->ms_levels[index] = divisions->divisions[i]->ms_levels[j];
+            index++;
+        }
+    }
+    r->size = total_size;
+
+    return r;
+}
+
 
 data_positions_t**
 join_xml(divisions_t* divisions)

@@ -511,7 +511,7 @@ extract_spectrum_mz(char* input_map,
                           long mz_binary_blk_pos,
                           divisions_t* divisions,
                           long index,
-                          size_t* out_len)
+                          size_t* out_len, int encode)
 {
     data_positions_t* mz;
     long mz_off = 0;
@@ -523,6 +523,7 @@ extract_spectrum_mz(char* input_map,
     block_len_t* mz_blk_len;
     long mz_blk_offset;
     char* decmp_mz;
+    char* res;
 
     // Determine what division contains mz and in which position
     for (division_index; division_index < divisions->n_divisions; division_index++)
@@ -551,6 +552,9 @@ extract_spectrum_mz(char* input_map,
     else
         decmp_mz = mz_blk_len->cache;
 
+    if(!encode) /* Disables encoding for python library*/
+        df->encode_source_compression_mz_fun = set_encode_fun(_no_encode_, _lossless_, _64d_); 
+
     encode_binary_block(mz_blk_len,
                         mz,
                         df->source_mz_fmt,
@@ -558,7 +562,7 @@ extract_spectrum_mz(char* input_map,
                         df->mz_scale_factor,
                         df->target_mz_fun);
 
-    char* res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
+    res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
 
     return res;
 }
@@ -571,7 +575,7 @@ extract_spectrum_inten(char* input_map,
                           long inten_binary_blk_pos,
                           divisions_t* divisions,
                           long index,
-                          size_t* out_len)
+                          size_t* out_len, int encode)
 {
     data_positions_t* inten;
     long inten_off = 0;
@@ -583,6 +587,7 @@ extract_spectrum_inten(char* input_map,
     block_len_t* inten_blk_len;
     long inten_blk_offset;
     char* decmp_inten;
+    char* res;
 
     // Determine what division contains iten and in which position
     for (division_index; division_index < divisions->n_divisions; division_index++)
@@ -611,6 +616,9 @@ extract_spectrum_inten(char* input_map,
     else
         decmp_inten = inten_blk_len->cache;
 
+    if(!encode) /* Disables encoding for python library*/
+        df->encode_source_compression_inten_fun = set_encode_fun(_no_encode_, _lossless_, _64d_); 
+
     encode_binary_block(inten_blk_len,
                         inten,
                         df->source_inten_fmt,
@@ -618,7 +626,7 @@ extract_spectrum_inten(char* input_map,
                         df->int_scale_factor,
                         df->target_inten_fun);
 
-    char* res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
+    res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
 
     return res;
 }
@@ -660,7 +668,7 @@ extract_spectra(char* input_map,
     *out_len += start_xml_len;
 
     size_t mz_len = 0;
-    char* spectrum_mz = extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos, divisions, index, &mz_len);
+    char* spectrum_mz = extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos, divisions, index, &mz_len, TRUE);
     memcpy(res+*out_len, spectrum_mz, mz_len);
     *out_len += mz_len;
 
@@ -670,7 +678,7 @@ extract_spectra(char* input_map,
     *out_len += inner_xml_len;
 
     size_t inten_len = 0;
-    char* spectrum_inten = extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens, inten_pos, divisions, index, &inten_len);
+    char* spectrum_inten = extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens, inten_pos, divisions, index, &inten_len, TRUE);
     memcpy(res+*out_len, spectrum_inten, inten_len);
     *out_len += inten_len;
 

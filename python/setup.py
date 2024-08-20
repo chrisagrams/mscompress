@@ -55,8 +55,8 @@ extensions = [
         include_dirs=include_dirs,  
         libraries=[],
         library_dirs=[],
-        extra_compile_args=[],
-        extra_link_args=[],
+        extra_compile_args=["-g"], # Enables debugging flags
+        extra_link_args=["-g"], # Enables debugging flags
     )
 ]
 

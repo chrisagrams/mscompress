@@ -147,6 +147,11 @@ int set_int_scale_factor(Arguments* args, const char* scale_factor_str) {
 
 void set_compress_runtime_variables(Arguments* args, data_format_t* df)
 {
+  if (args == NULL || df == NULL)
+  {
+    warning("NULL passed to set_compress_runtime_variables\n");
+    return;
+  }
   int mz_fmt = get_algo_type(args->mz_lossy);
   int inten_fmt = get_algo_type(args->int_lossy);
 

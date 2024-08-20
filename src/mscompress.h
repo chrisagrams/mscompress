@@ -34,6 +34,9 @@
 
 #define DEBUG 0
 
+#define TRUE 1
+#define FALSE 0
+
 #define _32i_ 1000519
 #define _16e_ 1000520
 #define _32f_ 1000521
@@ -59,6 +62,7 @@
 #define _vdelta16_transform_ 4700009 //TODO fix these
 #define _vdelta24_transform_ 4700010
 #define _cast_64_to_16_      4700011
+#define _no_encode_         4700012
 
 #define _LZ4_compression_   4700012
 
@@ -336,6 +340,7 @@ void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
 void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+division_t* flatten_divisions(divisions_t* divisions);
 divisions_t* create_divisions(division_t* div, long n_divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
@@ -384,6 +389,24 @@ void extract_msz(char* input_map,
             long scans_length,
             uint16_t ms_level,
             int output_fd);
+
+char* extract_spectrum_mz(char* input_map,
+                          ZSTD_DCtx* dctx,
+                          data_format_t* df,
+                          block_len_queue_t *mz_binary_block_lens,
+                          long mz_binary_blk_pos,
+                          divisions_t* divisions,
+                          long index,
+                          size_t* out_len, int encode);
+
+char* extract_spectrum_inten(char* input_map,
+                          ZSTD_DCtx* dctx,
+                          data_format_t* df,
+                          block_len_queue_t *inten_binary_block_lens,
+                          long inten_binary_blk_pos,
+                          divisions_t* divisions,
+                          long index,
+                          size_t* out_len, int encode);
 
 /* compress.c */
 typedef struct 
