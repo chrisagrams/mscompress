@@ -616,15 +616,22 @@ extract_spectrum_inten(char* input_map,
     else
         decmp_inten = inten_blk_len->cache;
 
-    if(!encode) /* Disables encoding for python library*/
-        df->encode_source_compression_inten_fun = set_encode_fun(_no_encode_, _lossless_, _64d_); 
-
-    encode_binary_block(inten_blk_len,
-                        inten,
-                        df->source_inten_fmt,
-                        df->encode_source_compression_inten_fun,
-                        df->int_scale_factor,
-                        df->target_inten_fun);
+    if(!encode) 
+    {
+        encode_binary_block(inten_blk_len,
+                            inten,
+                            df->source_inten_fmt,
+                            set_encode_fun(_no_encode_, _lossless_, _64d_), /* Disables encoding for python library*/
+                            df->int_scale_factor,
+                            df->target_inten_fun);
+    } else {
+        encode_binary_block(inten_blk_len,
+                            inten,
+                            df->source_inten_fmt,
+                            df->encode_source_compression_inten_fun,
+                            df->int_scale_factor,
+                            df->target_inten_fun);
+    }
 
     res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
 
