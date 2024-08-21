@@ -180,6 +180,7 @@ typedef struct block_len_t
     char* cache; // During msz extraction, store decompressed block here as a "cache".
 
     char* encoded_cache;
+    uint32_t encoded_cache_fmt;
     uint64_t encoded_cache_len;
     size_t* encoded_cache_lens;
 

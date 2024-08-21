@@ -76,6 +76,7 @@ cdef extern from "../src/mscompress.h":
         char* cache
 
         char* encoded_cache
+        uint32_t encoded_cache_fmt
         uint64_t encoded_cache_len
         size_t* encoded_cache_lens
 
@@ -377,6 +378,10 @@ def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
         path = path.encode('utf-8')
     path = os.path.expanduser(path)
     path = os.path.abspath(path)
+
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File not found: {path}")
+    
     filesize = _get_filesize(path)
     fd = _open_input_file(path)
     mapping = _get_mapping(fd)
@@ -385,6 +390,8 @@ def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
         ret = MZMLFile(path, filesize, fd)
     elif filetype == 2: # msz
         ret = MSZFile(path, filesize, fd)
+    else:
+        raise OSError(f"Error processing file {path}")
     return ret
 
 
@@ -631,11 +638,8 @@ cdef class MSZFile(BaseFile):
             inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
         )
 
-        result_str = res.decode('utf-8')
-
-        print(out_len)
-        print(len(result_str))
-
+        result_str = res[:out_len].decode('utf-8', errors='replace')
+ 
         element = fromstring(result_str)
 
         return element

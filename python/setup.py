@@ -1,4 +1,5 @@
 import os
+import sys
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
@@ -48,6 +49,14 @@ include_dirs = [
     "../vendor/zstd",
 ]
 
+# Check if compiling on Windows
+if sys.platform == 'win32':
+    extra_compile_args = ["/Zi", "/Od"]  # "/Zi" generates debugging information, "/Od" disables optimization
+    extra_link_args = ["/DEBUG"]
+else:
+    extra_compile_args = ["-g"]
+    extra_link_args = ["-g"]
+
 extensions = [
     Extension(
         "mscompress",
@@ -55,8 +64,8 @@ extensions = [
         include_dirs=include_dirs,  
         libraries=[],
         library_dirs=[],
-        extra_compile_args=["-g"], # Enables debugging flags
-        extra_link_args=["-g"], # Enables debugging flags
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args
     )
 ]
 

@@ -449,11 +449,12 @@ void
 encode_binary_block(block_len_t* blk,
                     data_positions_t* curr_dp,
                     uint32_t source_fmt,
+                    uint32_t target_fmt,
                     encode_fun encode_fun,
                     float scale_factor,
                     Algo target_fun)
 {
-    if (blk->encoded_cache_len > 0)
+    if (blk->encoded_cache_len > 0 && blk->encoded_cache_fmt == target_fmt)
         return;
     uint64_t total_spec = curr_dp->total_spec;
 
@@ -482,6 +483,7 @@ encode_binary_block(block_len_t* blk,
     // free(a_args);
 
     blk->encoded_cache = buff;
+    blk->encoded_cache_fmt = target_fmt;
     blk->encoded_cache_len = buff_off;
     blk->encoded_cache_lens = res_lens;
 }
@@ -552,16 +554,25 @@ extract_spectrum_mz(char* input_map,
     else
         decmp_mz = mz_blk_len->cache;
 
-    if(!encode) /* Disables encoding for python library*/
-        df->encode_source_compression_mz_fun = set_encode_fun(_no_encode_, _lossless_, _64d_); 
-
-    encode_binary_block(mz_blk_len,
+    if(!encode) 
+    {
+        encode_binary_block(mz_blk_len,
                         mz,
                         df->source_mz_fmt,
+                        _no_encode_,
+                        set_encode_fun(_no_encode_, _lossless_, _64d_), /* Disables encoding for python library*/ 
+                        df->mz_scale_factor,
+                        df->target_mz_fun);
+    } else 
+    {
+        encode_binary_block(mz_blk_len,
+                        mz,
+                        df->source_mz_fmt,
+                        df->target_mz_format,
                         df->encode_source_compression_mz_fun,
                         df->mz_scale_factor,
                         df->target_mz_fun);
-
+    }
     res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
 
     return res;
@@ -621,6 +632,7 @@ extract_spectrum_inten(char* input_map,
         encode_binary_block(inten_blk_len,
                             inten,
                             df->source_inten_fmt,
+                            _no_encode_,
                             set_encode_fun(_no_encode_, _lossless_, _64d_), /* Disables encoding for python library*/
                             df->int_scale_factor,
                             df->target_inten_fun);
@@ -628,6 +640,7 @@ extract_spectrum_inten(char* input_map,
         encode_binary_block(inten_blk_len,
                             inten,
                             df->source_inten_fmt,
+                            df->target_inten_format,
                             df->encode_source_compression_inten_fun,
                             df->int_scale_factor,
                             df->target_inten_fun);
