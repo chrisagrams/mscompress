@@ -4,10 +4,11 @@ import warnings
 cimport numpy as np
 cimport bindings
 from typing import Union
-from xml.etree.ElementTree import fromstring, Element
+from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy
 from libc.math cimport nan
+import math
 
 np.import_array()
 
@@ -638,8 +639,8 @@ cdef class MSZFile(BaseFile):
             inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
         )
 
-        result_str = res[:out_len].decode('utf-8', errors='replace')
- 
+        result_str = res.decode('utf-8')
+
         element = fromstring(result_str)
 
         return element
@@ -793,7 +794,7 @@ cdef class Spectrum:
         uint64_t index
         uint32_t scan
         uint16_t ms_level
-        float retention_time
+        float _retention_time
         BaseFile _file
         object _mz
         object _intensity
@@ -803,7 +804,7 @@ cdef class Spectrum:
         self.index = index
         self.scan = scan
         self.ms_level = ms_level
-        self.retention_time = retention_time
+        self._retention_time = retention_time
         self._file = file
         self._mz = None
         self._intensity = None
@@ -824,6 +825,19 @@ cdef class Spectrum:
                 self._mz = self._file.get_mz_binary(self.index)
             return len(self._mz)
     
+    property retention_time:
+        def __get__(self):
+            if math.isnan(self._retention_time):
+                try:
+                    if self._xml is None:
+                        self._xml = self._file.get_xml(self.index)
+                    scan = self._xml.find('scanList/scan')
+                    for param in scan.findall("cvParam"):
+                        if param.attrib['accession'] == 'MS:1000016':
+                            return float(param.attrib['value'])
+                except ParseError as e:
+                    return nan("1")
+
     property mz:
         def __get__(self):
             if self._mz is None:
