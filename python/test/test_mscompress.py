@@ -1,45 +1,99 @@
-from mscompress import get_num_threads, get_filesize, MZMLFile, read
+import os
+import pytest
+from mscompress import get_num_threads, get_filesize, MZMLFile, MSZFile, BaseFile, DataFormat, Division, read
 
-mzml_path = "/Users/chrisgrams/Notes/mscompress_dev/test/lossless_tests/163-3A_1.mzML"
-msz_path = "~/Downloads/hek_std2_64bit.msz"
-if __name__ == "__main__":
-    # print(get_num_threads())
-    # print(get_filesize(mzml_path))
-    # print(MZMLFile(mzml_path))
-    # print(MZMLFile(mzml_path).describe())
-    # mzml_file = read(mzml_path)
-    # print(mzml_file)
-    # print(mzml_file.describe())
-    # print(mzml_file.describe()['format'].to_dict())
 
-    # spectra = mzml_file.spectra
-    # # print(spectra[0])
+test_mzml_data = [
+    "test/data/test.mzML",
+]
 
-    # # Get info of first spectrum
-    # print(spectra[0].size)
-    # print(spectra[0].mz)
-    # print(spectra[0].intensity)
-    # print(spectra[0].peaks)
+test_msz_data = [
+    "test/data/test.msz",
+]
 
-    # # Iterate over all spectra
-    # for spectrum in spectra:
-    #     print(spectrum)
-    
-    
 
-    msz_file = read(msz_path)
-    print(msz_file)
-    print(msz_file.describe())
-    print(msz_file.describe()['format'].to_dict())
+def test_get_num_threads():
+    assert get_num_threads() == os.cpu_count()
 
-    # print(msz_file.positions.scans)
-    spectra = msz_file.spectra
-    for spectrum in spectra:
-        print(spectrum)
-    print(len(spectra[0].mz))
-    print(spectra[0].mz)
-    print(len(spectra[0].intensity))
-    print(spectra[0].intensity)
-    print(spectra[0].peaks)
 
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_get_filesize(mzml_file):
+    assert get_filesize(mzml_file) == os.path.getsize(mzml_file)
+
+
+def test_get_filesize_invalid_path():
+    with pytest.raises(FileNotFoundError) as e:
+        get_filesize("ABC123")
+
+
+def test_base_file():
+    """
+    Two functions inside BaseFile will be overridden (compress, decompress, get_mz_binary, get_inten_binary),
+    Test if a "base" BaseFile will raise the exception when trying to access it.
+    """
+    bf = BaseFile(b"ABC", 0, 0)
+    with pytest.raises(NotImplementedError) as e:
+        bf.compress("out")
+    with pytest.raises(NotImplementedError) as e:
+        bf.decompress("out")
+    with pytest.raises(NotImplementedError) as e:
+        bf.get_mz_binary(0)
+    with pytest.raises(NotImplementedError) as e:
+        bf.get_inten_binary(0)
+    with pytest.raises(NotImplementedError) as e:
+        bf.get_xml(0)
+
+
+def test_read_nonexistent_file():
+    with pytest.raises(FileNotFoundError) as e:
+        f = read("ABC")
+
+
+def test_read_invalid_file(tmp_path):
+    with pytest.raises(OSError) as e:
+        f = read(str(tmp_path))
+
+
+def test_read_invalid_parameter():
+    p = {}
+    with pytest.raises(ValueError) as e:
+        f = read(p)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_read_mzml_file(mzml_file):
+    mzml = read(mzml_file)
+    assert isinstance(mzml, MZMLFile)
+    assert mzml.path == os.path.abspath(mzml_file).encode('utf-8')
+    assert mzml.filesize == os.path.getsize(mzml_file)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_read_msz_file(msz_file):
+    msz = read(msz_file)
+    assert isinstance(msz, MSZFile)
+    assert msz.path == os.path.abspath(msz_file).encode('utf-8')
+    assert msz.filesize == os.path.getsize(msz_file)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_describe_mzml(mzml_file):
+    mzml = read(mzml_file)
+    description = mzml.describe()
+    assert isinstance(description, dict)
+    assert isinstance(description['path'], bytes)
+    assert isinstance(description['filesize'], int)
+    assert isinstance(description['format'], DataFormat)
+    assert isinstance(description['positions'], Division)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_describe_msz(msz_file):
+    msz = read(msz_file)
+    description = msz.describe()
+    assert isinstance(description, dict)
+    assert isinstance(description['path'], bytes)
+    assert isinstance(description['filesize'], int)
+    assert isinstance(description['format'], DataFormat)
+    assert isinstance(description['positions'], Division)
 

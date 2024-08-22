@@ -4,6 +4,8 @@ from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
 
+debug = True 
+
 def get_all_c_files(path):
     files = os.listdir(path)
     c_files = [os.path.join(path, f) for f in files if f.endswith('.c')]
@@ -49,13 +51,17 @@ include_dirs = [
     "../vendor/zstd",
 ]
 
-# Check if compiling on Windows
-if sys.platform == 'win32':
-    extra_compile_args = ["/Zi", "/Od"]  # "/Zi" generates debugging information, "/Od" disables optimization
-    extra_link_args = ["/DEBUG"]
+if debug:
+    # Check if compiling on Windows
+    if sys.platform == 'win32':
+        extra_compile_args = ["/Zi", "/Od"]  # "/Zi" generates debugging information, "/Od" disables optimization
+        extra_link_args = ["/DEBUG"]
+    else:
+        extra_compile_args = ["-g"]
+        extra_link_args = ["-g"]
 else:
-    extra_compile_args = ["-g"]
-    extra_link_args = ["-g"]
+    extra_compile_args = []
+    extra_link_args = []
 
 extensions = [
     Extension(
@@ -65,12 +71,13 @@ extensions = [
         libraries=[],
         library_dirs=[],
         extra_compile_args=extra_compile_args,
-        extra_link_args=extra_link_args
+        extra_link_args=extra_link_args,
+        define_macros=[('CYTHON_TRACE', '1')]
     )
 ]
 
 setup(
     name="mscompress",
-    ext_modules=cythonize(extensions),
+    ext_modules=cythonize(extensions, compiler_directives={'linetrace': True}),
     include_dirs=[numpy.get_include()]
 )

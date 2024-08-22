@@ -680,7 +680,7 @@ extract_spectra(char* input_map,
     division_index = determine_division_by_index(divisions, index);
     determine_spectrum_start_end(divisions, index, &spectrum_start, &spectrum_end);
 
-    res = malloc((spectrum_end-spectrum_start) * 2); // Over-allocate as b64 may grow
+    res = calloc((spectrum_end-spectrum_start), 2); // Over-allocate as b64 may grow
 
     size_t start_xml_len = 0; 
     char* spectrum_start_xml = extract_spectrum_start_xml(input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start, spectrum_end, &start_xml_len);
