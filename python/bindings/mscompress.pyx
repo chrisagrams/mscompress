@@ -106,23 +106,23 @@ cdef class DataFormat:
         return obj
 
     property source_mz_fmt:
-        def __get__(self):
+        def __get__(self) -> int:
             return self._data_format.source_mz_fmt
 
     property source_inten_fmt:
-        def __get__(self):
+        def __get__(self) -> int:
             return self._data_format.source_inten_fmt
 
     property source_compression:
-        def __get__(self):
+        def __get__(self) -> int:
             return self._data_format.source_compression
 
     property source_total_spec:
-        def __get__(self):
+        def __get__(self) -> int:
             return self._data_format.source_total_spec
 
     def __str__(self):
-        return f"Source m/z: {self._data_format.source_mz_fmt}"
+        return f"DataFormat(source_mz_fmt={self.source_mz_fmt}, source_inten_fmt={self.source_inten_fmt}, source_compression={self.source_compression}, source_total_spec={self.source_total_spec})"
 
     def to_dict(self):
         return {
@@ -143,19 +143,19 @@ cdef class DataPositions:
         return obj
     
     property start_positions:
-        def __get__(self):
+        def __get__(self) -> np.ndarray:
             cdef np.npy_intp shape[1]
             shape[0] = <np.npy_intp>self.data_positions.total_spec
             return np.asarray(<uint64_t[:shape[0]]>self.data_positions.start_positions)
     
     property end_positions:
-        def __get__(self):
+        def __get__(self) -> np.ndarray:
             cdef np.npy_intp shape[1]
             shape[0] = <np.npy_intp>self.data_positions.total_spec
             return np.asarray(<uint64_t[:shape[0]]>self.data_positions.end_positions)
     
     property total_spec:
-        def __get__(self):
+        def __get__(self) -> int:
             return self.data_positions.total_spec
 
 
@@ -169,39 +169,39 @@ cdef class Division:
         return obj
 
     property spectra:
-        def __get__(self):
+        def __get__(self) -> DataPositions:
             return DataPositions.from_ptr(self._division.spectra)
 
     property xml:
-        def __get__(self):
+        def __get__(self) -> DataPositions:
             return DataPositions.from_ptr(self._division.xml)
 
     property mz:
-        def __get__(self):
+        def __get__(self) -> DataPositions:
             return DataPositions.from_ptr(self._division.mz)
 
     property inten:
-        def __get__(self):
+        def __get__(self) -> DataPositions:
             return DataPositions.from_ptr(self._division.inten)
 
     property size:
-        def __get__(self):
+        def __get__(self) -> int:
             return self._division.size
 
     property scans:
-        def __get__(self):
+        def __get__(self) -> np.ndarray:
             cdef np.npy_intp shape[1]
             shape[0] = <np.npy_intp>self._division.mz.total_spec
             return np.asarray(<uint32_t[:shape[0]]>self._division.scans)
 
     property ms_levels:
-        def __get__(self):
+        def __get__(self) -> np.ndarray:
             cdef np.npy_intp shape[1]
             shape[0] = <np.npy_intp>self._division.mz.total_spec
             return np.asarray(<uint16_t[:shape[0]]>self._division.ms_levels)
 
     property ret_times:
-        def __get__(self):
+        def __get__(self) -> np.ndarray:
             if self._division.ret_times is NULL:
                 return None
             cdef np.npy_intp shape[1]
@@ -541,6 +541,10 @@ cdef class BaseFile:
     @property
     def filesize(self) -> int:
         return self.filesize
+ 
+    @property
+    def format(self) -> DataFormat:
+        return DataFormat.from_ptr(self._df)
     
     @property
     def spectra(self):

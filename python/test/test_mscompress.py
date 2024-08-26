@@ -1,6 +1,9 @@
 import os
+import re
 import pytest
-from mscompress import get_num_threads, get_filesize, MZMLFile, MSZFile, BaseFile, DataFormat, Division, read
+import numpy as np
+from xml.etree.ElementTree import Element
+from mscompress import get_num_threads, get_filesize, MZMLFile, MSZFile, BaseFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
 
 
 test_mzml_data = [
@@ -97,3 +100,205 @@ def test_describe_msz(msz_file):
     assert isinstance(description['format'], DataFormat)
     assert isinstance(description['positions'], Division)
 
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_get_mzml_spectra(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    assert isinstance(spectra, Spectra)
+    assert isinstance(len(spectra), int) # Test __len__
+    for spectrum in spectra: # Test __iter__ + __next__ 
+        assert isinstance(spectrum, Spectrum)
+
+    with pytest.raises(IndexError) as e: # Test out of bound IndexError
+        spectra[len(spectra) + 1]
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_get_msz_spectra(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    assert isinstance(spectra, Spectra)
+    assert isinstance(len(spectra), int) # Test __len__
+    for spectrum in spectra: # Test __iter__ + __next__ 
+        assert isinstance(spectrum, Spectrum)
+
+    with pytest.raises(IndexError) as e: # Test out of bound IndexError
+        spectra[len(spectra) + 1]
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_repr(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    result = repr(spectrum)
+    pattern = r"^Spectrum\(index=\d+, scan=\d+, ms_level=\d+, retention_time=(\d+(\.\d+)?|None)\)$"
+    assert re.match(pattern, result)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_repr(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    result = repr(spectrum)
+    pattern = r"^Spectrum\(index=\d+, scan=\d+, ms_level=\d+, retention_time=(\d+(\.\d+)?|None)\)$"
+    assert re.match(pattern, result)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_size(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    assert isinstance(spectrum.size, int)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_size(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    assert isinstance(spectrum.size, int)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_mz(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    mz = spectrum.mz
+    assert isinstance(mz, np.ndarray) 
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_mz(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    mz = spectrum.mz
+    assert isinstance(mz, np.ndarray)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_inten(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    inten = spectrum.intensity
+    assert isinstance(inten, np.ndarray) 
+
+
+#@pytest.mark.parametrize("msz_file", test_msz_data)
+#def test_msz_spectrum_inten(msz_file):
+    #msz = read(msz_file)
+    #spectra = msz.spectra
+    #spectrum = spectra[0]
+    #inten = spectrum.intensity
+    #assert isinstance(inten, np.ndarray)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_peaks(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    peaks = spectrum.peaks
+    assert isinstance(peaks, np.ndarray)
+
+
+#@pytest.mark.parametrize("msz_file", test_msz_data)
+#def test_msz_spectrum_peaks(msz_file):
+    #msz = read(msz_file)
+    #spectra = msz.spectra
+    #spectrum = spectra[0]
+    #peaks = spectrum.peaks
+    #assert isinstance(peaks, np.ndarray)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_xml(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    spec_xml = spectrum.xml
+    assert isinstance(spec_xml, Element)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_xml(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    spec_xml = spectrum.xml
+    assert isinstance(spec_xml, Element)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_positions(mzml_file):
+    mzml = read(mzml_file)
+    assert isinstance(mzml.positions, Division)
+    assert isinstance(mzml.positions.size, int)
+    assert isinstance(mzml.positions.spectra, DataPositions)
+    assert isinstance(mzml.positions.xml, DataPositions)
+    assert isinstance(mzml.positions.mz, DataPositions)
+    assert isinstance(mzml.positions.inten, DataPositions)
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_positions(msz_file):
+    msz = read(msz_file)
+    assert isinstance(msz.positions, Division)
+    assert isinstance(msz.positions.size, int)
+    assert isinstance(msz.positions.spectra, DataPositions)
+    assert isinstance(msz.positions.xml, DataPositions)
+    assert isinstance(msz.positions.mz, DataPositions)
+    assert isinstance(msz.positions.inten, DataPositions)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_datapositions(mzml_file):
+    mzml = read(mzml_file)
+    positions = mzml.positions.spectra
+    assert isinstance(positions.start_positions, np.ndarray)
+    assert isinstance(positions.end_positions, np.ndarray)
+    assert isinstance(positions.total_spec, int)
+    assert len(positions.start_positions) == positions.total_spec
+    assert len(positions.end_positions) == positions.total_spec
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_mzml_datapositions(msz_file):
+    msz = read(msz_file)
+    positions = msz.positions.spectra
+    assert isinstance(positions.start_positions, np.ndarray)
+    assert isinstance(positions.end_positions, np.ndarray)
+    assert isinstance(positions.total_spec, int)
+    assert len(positions.start_positions) == positions.total_spec
+    assert len(positions.end_positions) == positions.total_spec
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_dataformat(mzml_file):
+    mzml = read(mzml_file)
+    format = mzml.format
+    assert isinstance(format, DataFormat)
+    assert isinstance(format.source_mz_fmt, int)
+    assert isinstance(format.source_inten_fmt, int)
+    assert isinstance(format.source_compression, int)
+    pattern = re.compile(
+        r"DataFormat\(source_mz_fmt=\d+, source_inten_fmt=\d+, source_compression=\d+, source_total_spec=\d+\)"
+    )
+    assert pattern.match(str(format))
+    pattern = {
+        'source_mz_fmt': re.compile(r'MS:\d+'),
+        'source_inten_fmt': re.compile(r'MS:\d+'),
+        'source_compression': re.compile(r'MS:\d+'),
+        'source_total_spec': re.compile(r'\d+')
+    }
+    
+    result = format.to_dict()
+    
+    for key, regex in pattern.items():
+        assert regex.match(str(result[key]))
