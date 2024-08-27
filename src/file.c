@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stddef.h>
 #include "mscompress.h"
 
 #ifdef _WIN32
@@ -113,6 +114,9 @@ get_filesize(char* path)
     struct stat fi;
 
     stat(path, &fi);
+
+    if (S_ISDIR(fi.st_mode)) // Is a directory
+      return 0;
 
     return fi.st_size;
 }

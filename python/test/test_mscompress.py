@@ -190,13 +190,13 @@ def test_mzml_spectrum_inten(mzml_file):
     assert isinstance(inten, np.ndarray) 
 
 
-#@pytest.mark.parametrize("msz_file", test_msz_data)
-#def test_msz_spectrum_inten(msz_file):
-    #msz = read(msz_file)
-    #spectra = msz.spectra
-    #spectrum = spectra[0]
-    #inten = spectrum.intensity
-    #assert isinstance(inten, np.ndarray)
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_inten(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    inten = spectrum.intensity
+    assert isinstance(inten, np.ndarray)
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -208,13 +208,13 @@ def test_mzml_spectrum_peaks(mzml_file):
     assert isinstance(peaks, np.ndarray)
 
 
-#@pytest.mark.parametrize("msz_file", test_msz_data)
-#def test_msz_spectrum_peaks(msz_file):
-    #msz = read(msz_file)
-    #spectra = msz.spectra
-    #spectrum = spectra[0]
-    #peaks = spectrum.peaks
-    #assert isinstance(peaks, np.ndarray)
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_peaks(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    peaks = spectrum.peaks
+    assert isinstance(peaks, np.ndarray)
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)

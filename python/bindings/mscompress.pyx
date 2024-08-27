@@ -230,6 +230,9 @@ def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
     if not os.path.exists(path):
         raise FileNotFoundError(f"File not found: {path}")
     
+    if os.path.isdir(path):
+        raise IsADirectoryError(f"{path} is a directory.")
+    
     filesize = _get_filesize(path)
     fd = _open_input_file(path)
     mapping = _get_mapping(fd)
