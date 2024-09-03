@@ -121,6 +121,18 @@ cdef class DataFormat:
         def __get__(self) -> int:
             return self._data_format.source_total_spec
 
+    property target_xml_format:
+        def __get__(self) -> int:
+            return self._data_format.target_xml_format
+
+    property target_mz_format:
+        def __get__(self) -> int:
+            return self._data_format.target_mz_format
+    
+    property target_inten_format:
+        def __get__(self) -> int:
+            return self._data_format.target_inten_format
+
     def __str__(self):
         return f"DataFormat(source_mz_fmt={self.source_mz_fmt}, source_inten_fmt={self.source_inten_fmt}, source_compression={self.source_compression}, source_total_spec={self.source_total_spec})"
 
@@ -268,6 +280,7 @@ cdef class MZMLFile(BaseFile):
         self._prepare_divisions()
         output_fd = self._prepare_output_fd(output) 
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, output_fd)
+        _flush(output_fd)
         _close_file(output_fd)
 
     def get_mz_binary(self, size_t index):
@@ -558,6 +571,10 @@ cdef class BaseFile:
     @property
     def positions(self):
         return Division.from_ptr(self._positions)
+
+    @property
+    def arguments(self):
+        return self._arguments
 
 
     def _prepare_output_fd(self, path: Union[str, bytes]) -> int:

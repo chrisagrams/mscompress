@@ -78,6 +78,10 @@ cdef extern from "../src/mscompress.h":
         uint32_t source_compression
         uint32_t source_total_spec
 
+        uint32_t target_xml_format
+        uint32_t target_mz_format
+        uint32_t target_inten_format
+
         decode_fun decode_source_compression_mz_fun
         decode_fun decode_source_compression_inten_fun
         encode_fun encode_source_compression_mz_fun
@@ -124,6 +128,8 @@ cdef extern from "../src/mscompress.h":
     int _open_input_file "open_input_file"(char* input_path)
     int _open_output_file "open_output_file"(char* path)
     int _close_file "close_file"(int fd)
+    int _remove_mapping "remove_mapping"(void* addr, size_t length)
+    int _flush "flush"(int fd)
     size_t _get_filesize "get_filesize"(char* path)
     void* _get_mapping "get_mapping"(int fd)
     int _determine_filetype "determine_filetype"(void* input_map, size_t input_length)

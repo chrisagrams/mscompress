@@ -2,8 +2,9 @@ import os
 import re
 import pytest
 import numpy as np
+import time
 from xml.etree.ElementTree import Element
-from mscompress import get_num_threads, get_filesize, MZMLFile, MSZFile, BaseFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
+from mscompress import get_num_threads, get_filesize, MZMLFile, MSZFile, BaseFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions, RuntimeArguments
 
 
 test_mzml_data = [
@@ -13,6 +14,26 @@ test_mzml_data = [
 test_msz_data = [
     "test/data/test.msz",
 ]
+
+block_formats = [
+    # 1000576, # No comp
+    4700001, # ZSTD
+    # 4700012, # LZ4
+]
+
+# binary_formats = [
+#     4700000, # _lossless_
+#     4700002, # _cast_64_to_32_
+#     # 4700003, # _log2_transform_
+#     # 4700004, # _delta16_transform_
+#     # 4700005, # _delta24_transform_
+#     # 4700006, # _delta32_transform_
+#     # 4700007, # _vbr_
+#     # 4700008, # _bitpack_
+#     # 4700009, # _vdelta16_transform_
+#     # 4700010, # _vdelta24_transform_
+#     # 4700011, # _cast_64_to_16_
+# ]
 
 
 def test_get_num_threads():
@@ -302,3 +323,80 @@ def test_mzml_dataformat(mzml_file):
     
     for key, regex in pattern.items():
         assert regex.match(str(result[key]))
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_dataformat(msz_file):
+    msz = read(msz_file)
+    format = msz.format
+    assert isinstance(format, DataFormat)
+    assert isinstance(format.source_mz_fmt, int)
+    assert isinstance(format.source_inten_fmt, int)
+    assert isinstance(format.source_compression, int)
+    pattern = re.compile(
+        r"DataFormat\(source_mz_fmt=\d+, source_inten_fmt=\d+, source_compression=\d+, source_total_spec=\d+\)"
+    )
+    assert pattern.match(str(format))
+    pattern = {
+        'source_mz_fmt': re.compile(r'MS:\d+'),
+        'source_inten_fmt': re.compile(r'MS:\d+'),
+        'source_compression': re.compile(r'MS:\d+'),
+        'source_total_spec': re.compile(r'\d+')
+    }
+    
+    result = format.to_dict()
+    
+    for key, regex in pattern.items():
+        assert regex.match(str(result[key]))
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_arguments(mzml_file):
+    mzml = read(mzml_file)
+    assert isinstance(mzml.arguments, RuntimeArguments)
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_arguments_threads(mzml_file):
+    mzml = read(mzml_file)
+    mzml.arguments.threads = 1
+    assert mzml.arguments.threads == 1
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_arguments_zstd_level(mzml_file):
+    mzml = read(mzml_file)
+    mzml.arguments.zstd_compression_level = 1
+    assert mzml.arguments.zstd_compression_level == 1
+
+
+@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+def test_target_xml_format(tmp_path, mzml_file, format):
+    mzml = read(mzml_file)
+    mzml.arguments.target_xml_format = format
+    assert mzml.arguments.target_xml_format == format
+    mzml.compress(os.path.join(tmp_path, "test_target_xml_format.msz"))
+    msz = read(os.path.join(tmp_path, "test_target_xml_format.msz"))
+    assert msz.format.target_xml_format == format
+
+
+@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+def test_target_mz_format(tmp_path, mzml_file, format):
+    mzml = read(mzml_file)
+    mzml.arguments.target_mz_format = format
+    assert mzml.arguments.target_mz_format == format
+    p = os.path.join(tmp_path, "test_target_mz_format.msz")
+    mzml.compress(p)
+    msz = read(p)
+    assert msz.format.target_mz_format == format
+
+
+@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+def test_target_inten_format(tmp_path, mzml_file, format):
+    mzml = read(mzml_file)
+    mzml.arguments.target_inten_format = format
+    assert mzml.arguments.target_inten_format == format
+    p = os.path.join(tmp_path, f"test_target_inten_{format}.msz")
+    mzml.compress(p)
+    msz = read(p)
+    assert msz.format.target_inten_format == format

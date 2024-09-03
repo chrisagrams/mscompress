@@ -74,7 +74,7 @@ get_mapping(int fd)
 }
 
 int 
-remove_mapping(void* addr, int fd)
+remove_mapping(void* addr, size_t length)
 {
     int result = -1;
 
@@ -84,7 +84,7 @@ remove_mapping(void* addr, int fd)
 
     #else
 
-        result = munmap(addr, fd);
+        result = munmap(addr, length);
 
     #endif
 
@@ -624,6 +624,19 @@ close_file(int fd)
   }
   return ret;
 }
+
+int
+flush(int fd)
+{
+   if (fsync(fd) == -1) 
+   {
+      perror("fsync failed");
+      return 1;
+  }
+
+  return 0;
+}
+
 
 int
 open_input_file(char* input_path)
