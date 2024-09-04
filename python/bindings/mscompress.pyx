@@ -281,7 +281,6 @@ cdef class MZMLFile(BaseFile):
         output_fd = self._prepare_output_fd(output) 
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, output_fd)
         _flush(output_fd)
-        _close_file(output_fd)
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
@@ -426,7 +425,6 @@ cdef class MSZFile(BaseFile):
     def decompress(self, output: Union[str, bytes]):
         output_fd = self._prepare_output_fd(output)
         _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), output_fd)
-        _close_file(output_fd)
 
 
     def get_mz_binary(self, size_t index):
@@ -541,6 +539,7 @@ cdef class BaseFile:
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
 
+
     def __init__(self, bytes path, size_t filesize, int fd):
         self.path = path
         self.filesize = filesize
@@ -549,6 +548,29 @@ cdef class BaseFile:
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
+
+
+    def __enter__(self):
+        self.filesize = _get_filesize(self.path)
+        self._fd = _open_input_file(self.path)
+        self._mapping = _get_mapping(self._fd)
+        return self
+    
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._cleanup()
+    
+
+    def _cleanup(self):
+        if self._fd is not None and self._fd > 0:
+            _close_file(self._fd)
+
+        if self._mapping != NULL: 
+            _remove_mapping(self._mapping, self.filesize)
+
+        if self.output_fd is not None and self.output_fd > 0:
+            _close_file(self.output_fd)
+    
 
     @property
     def path(self) -> bytes:
@@ -715,6 +737,14 @@ cdef class Spectrum:
     def __repr__(self):
         return f"Spectrum(index={self.index}, scan={self.scan}, ms_level={self.ms_level}, retention_time={self.retention_time})"
 
+    property index:
+        def __get__(self):
+            return self.index
+    
+    property scan:
+        def __get__(self):
+            return self.scan
+    
     property xml:
         def __get__(self):
             if self._xml is None:
@@ -727,9 +757,13 @@ cdef class Spectrum:
                 self._mz = self._file.get_mz_binary(self.index)
             return len(self._mz)
     
+    property ms_level:
+        def __get__(self):
+            return self.ms_level
+    
     property retention_time:
         def __get__(self):
-            if math.isnan(self._retention_time):
+            if math.isnan(self._retention_time): # If the ms level wasn't derived from preprocessing step, find it
                 try:
                     if self._xml is None:
                         self._xml = self._file.get_xml(self.index)
@@ -739,6 +773,8 @@ cdef class Spectrum:
                             return float(param.attrib['value'])
                 except ParseError as e:
                     return nan("1")
+            else:
+                return self._retention_time
 
     property mz:
         def __get__(self):

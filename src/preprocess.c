@@ -421,7 +421,7 @@ get_binary_end(char* ptr)
 long
 get_ms_level(char* spectrum_start)
 {
-    char* ptr = strstr(spectrum_start, "\"ms level\"") + sizeof("\"ms level\"");
+    char* ptr = strstr(spectrum_start, "\"MS:1000511\"") + sizeof("\"MS:1000511\"");
     if(ptr == NULL)
         return 0;
     ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;

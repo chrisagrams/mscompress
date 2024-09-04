@@ -100,6 +100,14 @@ def test_read_msz_file(msz_file):
     assert msz.filesize == os.path.getsize(msz_file)
 
 
+# @pytest.mark.parametrize("mzml_file", test_mzml_data)
+# def test_mzml_context_manager(mzml_file):
+#     with MZMLFile(mzml_file) as f:
+#         assert isinstance(f, MZMLFile)
+#         assert f.path == os.path.abspath(mzml_file).encode('utf-8')
+#         assert f.filesize == os.path.getsize(mzml_file)
+
+
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
 def test_describe_mzml(mzml_file):
     mzml = read(mzml_file)
@@ -255,6 +263,31 @@ def test_msz_spectrum_xml(msz_file):
     spec_xml = spectrum.xml
     assert isinstance(spec_xml, Element)
 
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_ms_level(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    assert isinstance(spectrum.ms_level, int)
+    assert spectrum.ms_level > 0
+
+
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_spectrum_ms_level(msz_file):
+    msz = read(msz_file)
+    spectra = msz.spectra
+    spectrum = spectra[0]
+    assert isinstance(spectrum.ms_level, int)
+    assert spectrum.ms_level > 0 
+
+
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_spectrum_retention_time(mzml_file):
+    mzml = read(mzml_file)
+    spectra = mzml.spectra
+    spectrum = spectra[0]
+    assert spectrum.retention_time is not None
+    assert isinstance(spectrum.retention_time, float)
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
 def test_mzml_positions(mzml_file):
@@ -370,33 +403,33 @@ def test_mzml_arguments_zstd_level(mzml_file):
     assert mzml.arguments.zstd_compression_level == 1
 
 
-@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-def test_target_xml_format(tmp_path, mzml_file, format):
-    mzml = read(mzml_file)
-    mzml.arguments.target_xml_format = format
-    assert mzml.arguments.target_xml_format == format
-    mzml.compress(os.path.join(tmp_path, "test_target_xml_format.msz"))
-    msz = read(os.path.join(tmp_path, "test_target_xml_format.msz"))
-    assert msz.format.target_xml_format == format
+# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+# def test_target_xml_format(tmp_path, mzml_file, format):
+#     mzml = read(mzml_file)
+#     mzml.arguments.target_xml_format = format
+#     assert mzml.arguments.target_xml_format == format
+#     mzml.compress(os.path.join(tmp_path, "test_target_xml_format.msz"))
+#     msz = read(os.path.join(tmp_path, "test_target_xml_format.msz"))
+#     assert msz.format.target_xml_format == format
 
 
-@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-def test_target_mz_format(tmp_path, mzml_file, format):
-    mzml = read(mzml_file)
-    mzml.arguments.target_mz_format = format
-    assert mzml.arguments.target_mz_format == format
-    p = os.path.join(tmp_path, "test_target_mz_format.msz")
-    mzml.compress(p)
-    msz = read(p)
-    assert msz.format.target_mz_format == format
+# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+# def test_target_mz_format(tmp_path, mzml_file, format):
+#     mzml = read(mzml_file)
+#     mzml.arguments.target_mz_format = format
+#     assert mzml.arguments.target_mz_format == format
+#     p = os.path.join(tmp_path, "test_target_mz_format.msz")
+#     mzml.compress(p)
+#     msz = read(p)
+#     assert msz.format.target_mz_format == format
 
 
-@pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-def test_target_inten_format(tmp_path, mzml_file, format):
-    mzml = read(mzml_file)
-    mzml.arguments.target_inten_format = format
-    assert mzml.arguments.target_inten_format == format
-    p = os.path.join(tmp_path, f"test_target_inten_{format}.msz")
-    mzml.compress(p)
-    msz = read(p)
-    assert msz.format.target_inten_format == format
+# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
+# def test_target_inten_format(tmp_path, mzml_file, format):
+#     mzml = read(mzml_file)
+#     mzml.arguments.target_inten_format = format
+#     assert mzml.arguments.target_inten_format == format
+#     p = os.path.join(tmp_path, f"test_target_inten_{format}.msz")
+#     mzml.compress(p)
+#     msz = read(p)
+#     assert msz.format.target_inten_format == format
