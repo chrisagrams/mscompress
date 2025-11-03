@@ -1,3 +1,6 @@
+#ifndef MSCOMPRESS_H
+#define MSCOMPRESS_H
+
 #include "../vendor/zstd/lib/zstd.h"
 #include <stdint.h>
 #include <sys/types.h>
@@ -536,3 +539,5 @@ void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, 
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* MSCOMPRESS_H */

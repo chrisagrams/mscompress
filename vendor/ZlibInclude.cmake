@@ -6,6 +6,14 @@ if(WIN32)
         COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
     )
+elseif(APPLE)
+    # On macOS, define fdopen to prevent zlib's macro redefinition conflict
+    add_custom_target(
+        zlib_build
+        COMMAND env CFLAGS=-Dfdopen=fdopen ${ZLIB_SOURCE_DIR}/configure
+        COMMAND make -C ${ZLIB_SOURCE_DIR}
+        WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+    )
 else()
     add_custom_target(
         zlib_build

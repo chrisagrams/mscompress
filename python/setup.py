@@ -124,7 +124,6 @@ for fname in ["../vendor/zlib/gzlib.c", "../vendor/zlib/gzread.c",
 # relative paths like ../vendor/ from cli/ subdirectory
 include_dirs = [
     BASE_DIR,  # Add package root for relative includes to work
-    BASE_DIR,  # Add again for zlib_wrapper.h
     _abs("../vendor/base64/include"),
     _abs("../vendor/base64/lib"),
     _abs("../vendor/base64/lib/tables"),
@@ -150,10 +149,14 @@ else:
     extra_compile_args = []
     extra_link_args = []
 
-# Add compiler flag to include our wrapper header first
-if sys.platform == 'darwin':  # macOS
-    extra_compile_args.append('-include')
-    extra_compile_args.append(os.path.join(BASE_DIR, 'zlib_wrapper.h'))
+define_macros = [
+    ('CYTHON_TRACE', '1'),
+    ('NO_GZCOMPRESS', '1'),  # Disable gzip support to avoid fdopen macro conflicts
+]
+
+# On macOS, define fdopen before compilation to prevent zlib's macro redefinition
+if sys.platform == 'darwin':
+    define_macros.append(('fdopen', 'fdopen'))
 
 extensions = [
     Extension(
@@ -164,12 +167,7 @@ extensions = [
         library_dirs=[],
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args,
-        define_macros=[
-            ('CYTHON_TRACE', '1'),
-            ('NO_GZCOMPRESS', '1'),  # Disable gzip support to avoid fdopen macro conflicts
-            # Note: We don't use Z_SOLO as it disables zcalloc/zcfree which are needed
-            # Instead we use -include to force-include zlib_wrapper.h on macOS
-        ]
+        define_macros=define_macros
     )
 ]
 
