@@ -1,3 +1,19 @@
 [build-system]
-requires = ["setuptools", "wheel", "cython", "numpy"]
+requires = ["setuptools>=45", "wheel", "cython", "numpy"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "mscompress"
+version = "0.0.0"
+description = "Python bindings for mscompress, a compression library for mass spectrometry data"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.package-data]
+"*" = ["*.pyx", "*.pxd", "*.c", "*.h"]
