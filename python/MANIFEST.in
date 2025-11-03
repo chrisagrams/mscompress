@@ -1,7 +1,6 @@
 include pyproject.toml
 include setup.py
 include README.md
-include zlib_wrapper.h
 
 # Include Cython source
 recursive-include bindings *.pyx *.pxd *.pxi
