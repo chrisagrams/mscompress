@@ -3,6 +3,7 @@ import sys
 import shutil
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist as _sdist
+from setuptools.command.build_ext import build_ext as _build_ext
 from Cython.Build import cythonize
 import numpy
 
@@ -67,6 +68,34 @@ def get_all_c_files(path):
         return []
     files = os.listdir(full)
     return [os.path.join(full, f) for f in files if f.endswith('.c')]
+
+
+class build_ext_with_stubs(_build_ext):
+    """Custom build_ext that copies stub files to the build directory."""
+    def run(self):
+        # Run the standard build
+        _build_ext.run(self)
+        
+        # Copy stub files to the build directory where the .so file is
+        if self.inplace:
+            build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
+        else:
+            build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
+        
+        # Source files
+        stub_file = _abs('bindings/mscompress.pyi')
+        py_typed = _abs('bindings/py.typed')
+        
+        # Copy if they exist
+        if os.path.exists(stub_file):
+            dest = os.path.join(build_dir, 'mscompress.pyi')
+            print(f"Copying {stub_file} to {dest}")
+            shutil.copy2(stub_file, dest)
+        
+        if os.path.exists(py_typed):
+            dest = os.path.join(build_dir, 'py.typed')
+            print(f"Copying {py_typed} to {dest}")
+            shutil.copy2(py_typed, dest)
 
 
 class sdist_with_vendor(_sdist):
@@ -175,5 +204,12 @@ setup(
     name="mscompress",
     ext_modules=cythonize(extensions, compiler_directives={'linetrace': linetrace}),
     include_dirs=[numpy.get_include()],
-    cmdclass={'sdist': sdist_with_vendor}
+    cmdclass={
+        'build_ext': build_ext_with_stubs,
+        'sdist': sdist_with_vendor
+    },
+    package_data={
+        '': ['*.pyi', 'py.typed'],  # Include stub files wherever the module ends up
+    },
+    zip_safe=False,
 )

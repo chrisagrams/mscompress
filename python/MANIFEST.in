@@ -2,8 +2,9 @@ include pyproject.toml
 include setup.py
 include README.md
 
-# Include Cython source
-recursive-include bindings *.pyx *.pxd *.pxi
+# Include Cython source and type stubs
+recursive-include bindings *.pyx *.pxd *.pxi *.pyi
+include bindings/py.typed
 
 # Include vendored C source and header files (if copied locally)
 recursive-include vendor *.c *.h

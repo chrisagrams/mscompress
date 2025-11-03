@@ -16,4 +16,4 @@ dependencies = [
 include-package-data = false
 
 [tool.setuptools.package-data]
-"*" = ["*.pyx", "*.pxd", "*.c", "*.h"]
+"*" = ["*.pyx", "*.pxd", "*.c", "*.h", "*.pyi", "py.typed"]
