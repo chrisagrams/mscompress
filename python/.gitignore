@@ -166,5 +166,5 @@ Makefile
 
 vendor/
 src/
-bindings/
+bindings/mscompress.c
 cli/

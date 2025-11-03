@@ -263,8 +263,13 @@ cdef class MZMLFile(BaseFile):
         super(MZMLFile, self).__init__(path, filesize, fd)
         self._df = _pattern_detect(<char*> self._mapping)
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
-        _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)    
+        _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
 
+    @staticmethod
+    def _reopen(path: bytes):
+        fs = _get_filesize(path)
+        fd = _open_input_file(path)
+        return MZMLFile(path, fs, fd)
 
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
@@ -421,6 +426,11 @@ cdef class MSZFile(BaseFile):
         self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
         _set_decompress_runtime_variables(self._df, self._footer)
 
+    @staticmethod
+    def _reopen(path: bytes):
+        fs = _get_filesize(path)
+        fd = _open_input_file(path)
+        return MSZFile(path, fs, fd)
     
     def decompress(self, output: Union[str, bytes]):
         output_fd = self._prepare_output_fd(output)
@@ -528,7 +538,7 @@ cdef class BaseFile:
         Prepares a output file for compression/decompression and returns an integer representing the open file descriptor.
     
     """
-    cdef bytes path
+    cdef bytes _path
     cdef size_t filesize
     cdef int _fd
     cdef void* _mapping
@@ -541,7 +551,7 @@ cdef class BaseFile:
 
 
     def __init__(self, bytes path, size_t filesize, int fd):
-        self.path = path
+        self._path = path
         self.filesize = filesize
         self._fd = fd
         self._mapping = _get_mapping(self._fd)
@@ -551,8 +561,8 @@ cdef class BaseFile:
 
 
     def __enter__(self):
-        self.filesize = _get_filesize(self.path)
-        self._fd = _open_input_file(self.path)
+        self.filesize = _get_filesize(self._path)
+        self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)
         return self
     
@@ -560,6 +570,14 @@ cdef class BaseFile:
     def __exit__(self, exc_type, exc_value, traceback):
         self._cleanup()
     
+    def __reduce__(self):
+        return (self.__class__._reopen, (self._path,))
+
+    @staticmethod
+    def _reopen(path: bytes):
+        fs = _get_filesize(path)
+        fd = _open_input_file(path)
+        return BaseFile(path, fs, fd)
 
     def _cleanup(self):
         if self._fd is not None and self._fd > 0:
@@ -574,7 +592,7 @@ cdef class BaseFile:
 
     @property
     def path(self) -> bytes:
-        return self.path
+        return self._path
 
     @property
     def filesize(self) -> int:
