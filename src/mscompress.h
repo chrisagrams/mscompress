@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include "../vendor/zlib/zlib.h"
 
-#define VERSION "1.0.0a"
+#define VERSION "1.0.1"
 #define STATUS "Dev"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"

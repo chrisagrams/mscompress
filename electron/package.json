@@ -1,6 +1,6 @@
 {
   "name": "MScompress",
-  "version": "1.0.0a",
+  "version": "1.0.1",
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",

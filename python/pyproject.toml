@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mscompress"
-version = "1.0.0a"
+version = "1.0.1a"
 description = "Python bindings for mscompress, a compression library for mass spectrometry data"
 readme = "README.md"
 requires-python = ">=3.8"

@@ -38,3 +38,4 @@ mscompress-win32-x64*
 *.pyc
 vendor/zlib/zconf.h
 *.venv
+vendor/zlib/zconf.h
