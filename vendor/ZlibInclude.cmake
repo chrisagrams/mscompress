@@ -3,7 +3,7 @@ set(ZLIB_SOURCE_DIR ${VENDOR_DIR}/zlib)
 if(WIN32)
     add_custom_target(
         zlib_build
-        COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc
+        COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc zlib.lib
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
     )
 elseif(APPLE)
