@@ -1,0 +1,29 @@
+BasedOnStyle: Google
+Language: Cpp
+
+IndentWidth: 3
+TabWidth: 3
+UseTab: Never
+
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+
+ColumnLimit: 80
+ContinuationIndentWidth: 4
+AlignOperands: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+PointerAlignment: Left
+
+IncludeBlocks: Regroup
+SortIncludes: true
+
+ReflowComments: true
+IndentCaseLabels: true
+AllowShortEnumsOnASingleLine: false
