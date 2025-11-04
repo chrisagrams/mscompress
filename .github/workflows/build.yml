@@ -1,0 +1,119 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, dev, chore/CICD ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  build-cli:
+    name: Build CLI - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.20.x'
+      
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        working-directory: ./cli
+        run: cmake -DENABLE_DEBUG_SYMBOLS=ON .
+      
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./cli
+        run: cmake -DENABLE_DEBUG_SYMBOLS=ON .
+      
+      - name: Build CLI
+        working-directory: ./cli
+        run: cmake --build . --config Release
+      
+      - name: Test CLI exists (Unix)
+        if: runner.os != 'Windows'
+        working-directory: ./cli
+        run: |
+          ls -la mscompress || ls -la ./mscompress
+          ./mscompress --help || true
+      
+      - name: Test CLI exists (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./cli
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "mscompress.exe"
+          if (Test-Path "./Release/mscompress.exe") {
+            ./Release/mscompress.exe --help
+          } elseif (Test-Path "./mscompress.exe") {
+            ./mscompress.exe --help
+          }
+      
+      - name: Upload CLI artifact (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mscompress-cli-${{ runner.os }}
+          path: ./cli/mscompress
+      
+      - name: Upload CLI artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mscompress-cli-${{ runner.os }}
+          path: |
+            ./cli/Release/mscompress.exe
+            ./cli/mscompress.exe
+
+  build-python:
+    name: Build Python - ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      
+      - name: Build Python package with uv
+        working-directory: ./python
+        run: uv build
+      
+      - name: List build artifacts
+        working-directory: ./python
+        shell: bash
+        run: |
+          echo "Contents of dist directory:"
+          ls -la dist/
+      
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-${{ runner.os }}-py${{ matrix.python-version }}
+          path: ./python/dist/*
