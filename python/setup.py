@@ -1,5 +1,6 @@
 import os
 import sys
+import platform
 import shutil
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist as _sdist
@@ -193,6 +194,19 @@ if linetrace:
 # On macOS, define fdopen before compilation to prevent zlib's macro redefinition
 if sys.platform == 'darwin':
     define_macros.append(('fdopen', 'fdopen'))
+
+# On Windows, ensure Windows SDK target-architecture macro is defined early
+# so that <Windows.h>/winnt.h doesn't error with "No Target Architecture".
+if sys.platform == 'win32':
+    arch = platform.machine().lower()
+    if 'arm64' in arch or 'aarch64' in arch:
+        define_macros.append(('_ARM64_', '1'))
+    elif 'amd64' in arch or 'x86_64' in arch or 'x64' in arch:
+        define_macros.append(('_AMD64_', '1'))
+    elif arch in ('x86', 'i386', 'i686'):
+        define_macros.append(('_X86_', '1'))
+    # Target a reasonably recent Windows version
+    define_macros.append(('_WIN32_WINNT', '0x0600'))
 
 extensions = [
     Extension(
