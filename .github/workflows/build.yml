@@ -101,6 +101,9 @@ jobs:
         with:
           version: "latest"
       
+      - name: Generate config.h for base64
+        run: python vendor/generate_config.py
+      
       - name: Build Python package with uv
         working-directory: ./python
         run: uv build
