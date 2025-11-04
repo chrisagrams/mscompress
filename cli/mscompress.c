@@ -178,6 +178,18 @@ parse_arguments(int argc, char* argv[], Arguments* arguments) {
       }
       arguments->zstd_compression_level = num;
     }  
+    else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+      print_usage(stdout, 0);
+    }
+    else if (
+        strcmp(argv[i], "-V") == 0 ||
+        strcmp(argv[i], "--version") == 0
+      ) 
+    {
+      fprintf(stdout, "MSCompress version %s %s\n", VERSION, STATUS);
+      fprintf(stdout, "Supports msz versions %s-%s\n", MIN_SUPPORT, MAX_SUPPORT);
+      exit(0);
+    }
     else if (arguments->input_file == NULL) {
       arguments->input_file = argv[i];
     }
