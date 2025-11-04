@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Generate config.h for base64 library.
-This script detects available CPU features and generates the appropriate config.h file.
+Generate config.h for base64 library for python build.
+Sets all features to 0 to disable SIMD optimizations to ensure compatibility across platforms.
 """
 
 import os
-import platform
 
 
 def detect_features():
     """Detect available CPU features based on platform."""
+    # Disable all SIMD features to use generic codec only
     features = {
         "HAVE_AVX2": 0,
         "HAVE_NEON32": 0,
@@ -19,24 +19,6 @@ def detect_features():
         "HAVE_SSE42": 0,
         "HAVE_AVX": 0,
     }
-
-    machine = platform.machine().lower()
-
-    # Enable x86/x64 features for Intel/AMD processors
-    if machine in ["x86_64", "amd64", "i386", "i686"]:
-        # Enable common x86 features (most modern CPUs support these)
-        features["HAVE_SSSE3"] = 1
-        features["HAVE_SSE41"] = 1
-        features["HAVE_SSE42"] = 1
-        features["HAVE_AVX"] = 1
-        features["HAVE_AVX2"] = 1
-
-    # Enable ARM NEON features for ARM processors
-    elif "arm" in machine or "aarch64" in machine:
-        if "64" in machine or "aarch64" in machine:
-            features["HAVE_NEON64"] = 1
-        else:
-            features["HAVE_NEON32"] = 1
 
     return features
 
