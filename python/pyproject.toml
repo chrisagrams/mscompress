@@ -12,6 +12,13 @@ dependencies = [
     "numpy",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "setuptools>=45",
+    "cython",
+    "numpy",
+]
+
 [tool.setuptools]
 include-package-data = false
 

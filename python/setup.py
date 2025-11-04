@@ -178,10 +178,17 @@ else:
     extra_compile_args = []
     extra_link_args = []
 
-define_macros = [
-    ('CYTHON_TRACE', '1'),
+
+# TODO: Ideally we don't need to disable assembly optimizations, but for now we do.
+# Look for a better solution in the future.
+# TODO: NO_GZCOMPRESS is also a workaround for macos. Look into how to get around it.
+define_macros: list[tuple[str, str | None]] = [
     ('NO_GZCOMPRESS', '1'),  # Disable gzip support to avoid fdopen macro conflicts
+    ('ZSTD_DISABLE_ASM', '1') # Temporary workaround to disable assembly optimizations when building.
 ]
+
+if linetrace:
+    define_macros.append(('CYTHON_TRACE', '1'))
 
 # On macOS, define fdopen before compilation to prevent zlib's macro redefinition
 if sys.platform == 'darwin':
