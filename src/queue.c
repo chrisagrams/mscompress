@@ -130,6 +130,7 @@ alloc_block_len(size_t original_size, size_t compressed_size)
     r->next = NULL;
 
     r->cache = NULL; // Set cache as "null"
+    r->encoded_cache_fmt = 0;
     r->encoded_cache = NULL;
     r->encoded_cache_len = 0;
     r->encoded_cache_lens = NULL;

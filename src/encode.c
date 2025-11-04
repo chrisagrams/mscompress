@@ -228,6 +228,26 @@ encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len, char* dest
     // *src += org_len + ZLIB_SIZE_OFFSET;
 }
 
+void
+no_encode_w_header(z_stream* z, char** src, size_t src_len, char* dest, size_t* out_len)
+/*
+    Performs no encoding (just return the float array), for Python library
+*/
+{
+    zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
+    decmp_input->mem = *src;
+    decmp_input->offset = ZLIB_SIZE_OFFSET;
+    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+
+    ZLIB_TYPE org_len = *(ZLIB_TYPE*)zlib_pop_header(decmp_input);
+
+    *out_len = org_len;
+
+    memcpy(dest, decmp_input->buff, org_len);
+
+    *src += org_len + ZLIB_SIZE_OFFSET;
+}
+
 encode_fun
 set_encode_fun(int compression_method, int algo, int accession)
 {
@@ -245,6 +265,11 @@ set_encode_fun(int compression_method, int algo, int accession)
                 return encode_no_comp_fun_w_header;
             else
                 return encode_no_comp_fun_no_header;
+        case _no_encode_:
+            if(algo == _lossless_ || (algo == _cast_64_to_32_ && accession == _32f_))
+                return no_encode_w_header;
+            else
+                assert(0); // Not yet implemented!
         default:
             error("Invalid compression method.");
             return NULL;

@@ -449,11 +449,12 @@ void
 encode_binary_block(block_len_t* blk,
                     data_positions_t* curr_dp,
                     uint32_t source_fmt,
+                    uint32_t target_fmt,
                     encode_fun encode_fun,
                     float scale_factor,
                     Algo target_fun)
 {
-    if (blk->encoded_cache_len > 0)
+    if (blk->encoded_cache_len > 0 && blk->encoded_cache_fmt == target_fmt)
         return;
     uint64_t total_spec = curr_dp->total_spec;
 
@@ -482,6 +483,7 @@ encode_binary_block(block_len_t* blk,
     // free(a_args);
 
     blk->encoded_cache = buff;
+    blk->encoded_cache_fmt = target_fmt;
     blk->encoded_cache_len = buff_off;
     blk->encoded_cache_lens = res_lens;
 }
@@ -511,7 +513,7 @@ extract_spectrum_mz(char* input_map,
                           long mz_binary_blk_pos,
                           divisions_t* divisions,
                           long index,
-                          size_t* out_len)
+                          size_t* out_len, int encode)
 {
     data_positions_t* mz;
     long mz_off = 0;
@@ -523,6 +525,7 @@ extract_spectrum_mz(char* input_map,
     block_len_t* mz_blk_len;
     long mz_blk_offset;
     char* decmp_mz;
+    char* res;
 
     // Determine what division contains mz and in which position
     for (division_index; division_index < divisions->n_divisions; division_index++)
@@ -551,14 +554,26 @@ extract_spectrum_mz(char* input_map,
     else
         decmp_mz = mz_blk_len->cache;
 
-    encode_binary_block(mz_blk_len,
+    if(!encode) 
+    {
+        encode_binary_block(mz_blk_len,
                         mz,
                         df->source_mz_fmt,
+                        _no_encode_,
+                        set_encode_fun(_no_encode_, _lossless_, _64d_), /* Disables encoding for python library*/ 
+                        df->mz_scale_factor,
+                        df->target_mz_fun);
+    } else 
+    {
+        encode_binary_block(mz_blk_len,
+                        mz,
+                        df->source_mz_fmt,
+                        df->target_mz_format,
                         df->encode_source_compression_mz_fun,
                         df->mz_scale_factor,
                         df->target_mz_fun);
-
-    char* res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
+    }
+    res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
 
     return res;
 }
@@ -571,7 +586,7 @@ extract_spectrum_inten(char* input_map,
                           long inten_binary_blk_pos,
                           divisions_t* divisions,
                           long index,
-                          size_t* out_len)
+                          size_t* out_len, int encode)
 {
     data_positions_t* inten;
     long inten_off = 0;
@@ -583,6 +598,7 @@ extract_spectrum_inten(char* input_map,
     block_len_t* inten_blk_len;
     long inten_blk_offset;
     char* decmp_inten;
+    char* res;
 
     // Determine what division contains iten and in which position
     for (division_index; division_index < divisions->n_divisions; division_index++)
@@ -611,14 +627,26 @@ extract_spectrum_inten(char* input_map,
     else
         decmp_inten = inten_blk_len->cache;
 
-    encode_binary_block(inten_blk_len,
-                        inten,
-                        df->source_inten_fmt,
-                        df->encode_source_compression_inten_fun,
-                        df->int_scale_factor,
-                        df->target_inten_fun);
+    if(!encode) 
+    {
+        encode_binary_block(inten_blk_len,
+                            inten,
+                            df->source_inten_fmt,
+                            _no_encode_,
+                            set_encode_fun(_no_encode_, _lossless_, _64d_), /* Disables encoding for python library*/
+                            df->int_scale_factor,
+                            df->target_inten_fun);
+    } else {
+        encode_binary_block(inten_blk_len,
+                            inten,
+                            df->source_inten_fmt,
+                            df->target_inten_format,
+                            df->encode_source_compression_inten_fun,
+                            df->int_scale_factor,
+                            df->target_inten_fun);
+    }
 
-    char* res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
+    res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
 
     return res;
 }
@@ -652,7 +680,7 @@ extract_spectra(char* input_map,
     division_index = determine_division_by_index(divisions, index);
     determine_spectrum_start_end(divisions, index, &spectrum_start, &spectrum_end);
 
-    res = malloc((spectrum_end-spectrum_start) * 2); // Over-allocate as b64 may grow
+    res = calloc((spectrum_end-spectrum_start), 2); // Over-allocate as b64 may grow
 
     size_t start_xml_len = 0; 
     char* spectrum_start_xml = extract_spectrum_start_xml(input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start, spectrum_end, &start_xml_len);
@@ -660,7 +688,7 @@ extract_spectra(char* input_map,
     *out_len += start_xml_len;
 
     size_t mz_len = 0;
-    char* spectrum_mz = extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos, divisions, index, &mz_len);
+    char* spectrum_mz = extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos, divisions, index, &mz_len, TRUE);
     memcpy(res+*out_len, spectrum_mz, mz_len);
     *out_len += mz_len;
 
@@ -670,7 +698,7 @@ extract_spectra(char* input_map,
     *out_len += inner_xml_len;
 
     size_t inten_len = 0;
-    char* spectrum_inten = extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens, inten_pos, divisions, index, &inten_len);
+    char* spectrum_inten = extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens, inten_pos, divisions, index, &inten_len, TRUE);
     memcpy(res+*out_len, spectrum_inten, inten_len);
     *out_len += inten_len;
 

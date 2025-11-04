@@ -49,7 +49,7 @@ print_usage(FILE* stream, int exit_code) {
 }
 
 static int 
-parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
+parse_arguments(int argc, char* argv[], Arguments* arguments) {
   int i;
 
   init_args(arguments);
@@ -201,7 +201,7 @@ parse_arguments(int argc, char* argv[], struct Arguments* arguments) {
 int 
 main(int argc, char* argv[]) 
 {
-    struct Arguments arguments;
+    Arguments arguments;
 
     double abs_start, abs_stop;
     struct base64_state state;
@@ -233,6 +233,11 @@ main(int argc, char* argv[])
       fds[0] = open_input_file(arguments.input_file);
       input_map = get_mapping(fds[0]);
       input_filesize = get_filesize(arguments.input_file);
+      if (input_filesize == 0) 
+      {
+        warning("Error in opening input file. Is it a directory?\n");
+        exit(1);
+      }
     }
     else
       operation = prepare_fds(arguments.input_file, &arguments.output_file, NULL, &input_map, &input_filesize, &fds);

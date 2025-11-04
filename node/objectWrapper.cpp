@@ -351,8 +351,8 @@ namespace mscompress {
     }
 
     /* Napi -> C arguments */
-    struct Arguments* NapiObjectToArguments(const Napi::Object& obj) {
-        struct Arguments* args = new Arguments();
+    Arguments* NapiObjectToArguments(const Napi::Object& obj) {
+        Arguments* args = new Arguments();
 
         // Init arguments
         init_args(args);

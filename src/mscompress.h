@@ -1,9 +1,12 @@
+#ifndef MSCOMPRESS_H
+#define MSCOMPRESS_H
+
 #include "../vendor/zstd/lib/zstd.h"
 #include <stdint.h>
 #include <sys/types.h>
 #include "../vendor/zlib/zlib.h"
 
-#define VERSION "0.0.1"
+#define VERSION "1.0.0a"
 #define STATUS "Dev"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
@@ -34,6 +37,9 @@
 
 #define DEBUG 0
 
+#define TRUE 1
+#define FALSE 0
+
 #define _32i_ 1000519
 #define _16e_ 1000520
 #define _32f_ 1000521
@@ -59,6 +65,7 @@
 #define _vdelta16_transform_ 4700009 //TODO fix these
 #define _vdelta24_transform_ 4700010
 #define _cast_64_to_16_      4700011
+#define _no_encode_         4700012
 
 #define _LZ4_compression_   4700012
 
@@ -81,7 +88,7 @@ extern "C" {
 
 extern int verbose;
 
-struct Arguments {
+typedef struct {
     int verbose;
     int threads;
     int extract_only;
@@ -104,7 +111,7 @@ struct Arguments {
     int target_inten_format;
 
     int zstd_compression_level;
-};
+} Arguments;
 
 typedef struct
 {
@@ -176,6 +183,7 @@ typedef struct block_len_t
     char* cache; // During msz extraction, store decompressed block here as a "cache".
 
     char* encoded_cache;
+    uint32_t encoded_cache_fmt;
     uint64_t encoded_cache_len;
     size_t* encoded_cache_lens;
 
@@ -273,13 +281,13 @@ typedef struct
 } data_format_t;
 
 /* arguments.c */
-void init_args(struct Arguments* args);
-int set_threads(struct Arguments* args, int threads);
-int set_mz_lossy(struct Arguments* args, const char* mz_lossy);
-int set_int_lossy(struct Arguments* args, const char* int_lossy);
-int set_mz_scale_factor(struct Arguments* args, const char* scale_factor_str);
-int set_int_scale_factor(struct Arguments* args, const char* scale_factor_str);
-void set_compress_runtime_variables(struct Arguments* args, data_format_t* df);
+void init_args(Arguments* args);
+int set_threads(Arguments* args, int threads);
+int set_mz_lossy(Arguments* args, const char* mz_lossy);
+int set_int_lossy(Arguments* args, const char* int_lossy);
+int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
+int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
+void set_compress_runtime_variables(Arguments* args, data_format_t* df);
 void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
@@ -287,7 +295,8 @@ extern long fd_pos[3];
 extern int fds[3];
 
 void* get_mapping(int fd);
-int remove_mapping(void* addr, int fd);
+int remove_mapping(void* addr, size_t length);
+int flush (int fd);
 int remove_file(char* path);
 size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
@@ -336,7 +345,10 @@ void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
 void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+division_t* flatten_divisions(divisions_t* divisions);
 divisions_t* create_divisions(division_t* div, long n_divisions);
+long determine_n_divisions(long filesize, long blocksize);
+long get_division_size_max(divisions_t* divisions);
 data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
@@ -344,15 +356,15 @@ long* string_to_array(char* str, long* size);
 long* map_scan_to_index(uint32_t* scans, long scans_length, division_t* div, long index_offset, long* indices_length);
 long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length, divisions_t* divisions, long* indicies_length);
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
-int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
+int preprocess_mzml(char* input_map, long  input_filesize, long* blocksize, Arguments* arguments, data_format_t** df, divisions_t** divisions);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize, block_len_queue_t**xml_block_lens, block_len_queue_t** mz_binary_block_lens, block_len_queue_t** inten_binary_block_lens, divisions_t** divisions, int* n_divisions);
-int preprocess_external(char* input_map, long  input_filesize, long* blocksize, struct Arguments* arguments, data_format_t** df, divisions_t** divisions);
+int preprocess_external(char* input_map, long  input_filesize, long* blocksize, Arguments* arguments, data_format_t** df, divisions_t** divisions);
 data_format_t* create_external_df();
 
 /* sys.c */
 
 int get_num_threads();
-void prepare_threads(struct Arguments* args);
+void prepare_threads(Arguments* args);
 int get_thread_id();
 double get_time(void);
 int print(const char* format, ...);
@@ -385,6 +397,40 @@ void extract_msz(char* input_map,
             uint16_t ms_level,
             int output_fd);
 
+char* extract_spectrum_mz(char* input_map,
+                          ZSTD_DCtx* dctx,
+                          data_format_t* df,
+                          block_len_queue_t *mz_binary_block_lens,
+                          long mz_binary_blk_pos,
+                          divisions_t* divisions,
+                          long index,
+                          size_t* out_len, int encode);
+
+char* extract_spectrum_inten(char* input_map,
+                          ZSTD_DCtx* dctx,
+                          data_format_t* df,
+                          block_len_queue_t *inten_binary_block_lens,
+                          long inten_binary_blk_pos,
+                          divisions_t* divisions,
+                          long index,
+                          size_t* out_len, int encode);
+
+char* 
+extract_spectra(char* input_map,
+                ZSTD_DCtx* dctx,
+                data_format_t* df,
+                block_len_queue_t *xml_block_lens,
+                block_len_queue_t *mz_binary_block_lens,
+                block_len_queue_t *inten_binary_block_lens,
+                long xml_pos,
+                long mz_pos,
+                long inten_pos,
+                int mz_fmt,
+                int inten_fmt,
+                divisions_t* divisions,
+                long index,
+                size_t* out_len);
+
 /* compress.c */
 typedef struct 
 {
@@ -404,7 +450,7 @@ ZSTD_CCtx* alloc_cctx();
 void * zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len, size_t* out_len, int compression_level);
 void * compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd); 
-void compress_mzml(char* input_map, size_t input_filesize, struct Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd);
+void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
@@ -434,7 +480,7 @@ void * decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* inpu
 void * decompress_routine(void* args);
 void decompress_msz(char* input_map,
     size_t input_filesize,
-    struct Arguments* args,
+    Arguments* args,
     int fd);
 decompression_fun set_decompress_fun(int accession);
 
@@ -493,3 +539,5 @@ void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads, 
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* MSCOMPRESS_H */
