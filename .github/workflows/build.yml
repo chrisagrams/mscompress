@@ -37,9 +37,15 @@ jobs:
         working-directory: ./cli
         run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
       
-      - name: Build CLI
+      - name: Build CLI (Unix)
+        if: runner.os != 'Windows'
         working-directory: ./cli
         run: cmake --build . --config Release
+      
+      - name: Build CLI (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./cli
+        run: cmake --build build --config Release
       
       - name: Test CLI exists (Unix)
         if: runner.os != 'Windows'
@@ -54,7 +60,9 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem -Recurse -Filter "mscompress.exe"
-          if (Test-Path "./Release/mscompress.exe") {
+          if (Test-Path "./build/Release/mscompress.exe") {
+            ./build/Release/mscompress.exe --help
+          } elseif (Test-Path "./Release/mscompress.exe") {
             ./Release/mscompress.exe --help
           } elseif (Test-Path "./mscompress.exe") {
             ./mscompress.exe --help
@@ -73,6 +81,7 @@ jobs:
         with:
           name: mscompress-cli-${{ runner.os }}
           path: |
+            ./cli/build/Release/mscompress.exe
             ./cli/Release/mscompress.exe
             ./cli/mscompress.exe
 
