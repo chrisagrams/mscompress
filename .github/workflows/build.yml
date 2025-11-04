@@ -35,7 +35,7 @@ jobs:
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: ./cli
-        run: cmake -DENABLE_DEBUG_SYMBOLS=ON .
+        run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON .
       
       - name: Build CLI
         working-directory: ./cli
