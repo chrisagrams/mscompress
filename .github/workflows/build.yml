@@ -117,7 +117,8 @@ jobs:
         with:
           arch: x64
       
-      - name: Install uv
+      - name: Install uv (Unix)
+        if: runner.os != 'Windows'
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
@@ -125,9 +126,20 @@ jobs:
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
       
-      - name: Build Python package with uv
+      - name: Build Python package with uv (Unix)
+        if: runner.os != 'Windows'
         working-directory: ./python
         run: uv build
+      
+      - name: Install build dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: pip install build setuptools wheel cython numpy
+      
+      - name: Build Python package (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./python
+        shell: cmd
+        run: python -m build
       
       - name: List build artifacts
         working-directory: ./python
