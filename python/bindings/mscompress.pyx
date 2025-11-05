@@ -273,13 +273,17 @@ cdef class MZMLFile(BaseFile):
 
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
-        if (n_divisions > self._positions.mz.total_spec): # If we have more divisions than spectra, decrease number of divisions
-            warnings.warn(f"n_divisions ({n_divisions}) > total_spec ({self._positions.mz.total_spec}). Setting n_divisions to {self._positions.mz.total_spec)}")
-        elif (n_divisions >= self._arguments.threads):
+        if n_divisions > self._positions.mz.total_spec:  # If we have more divisions than spectra, decrease number of divisions
+            warnings.warn(
+                f"n_divisions ({n_divisions}) > total_spec ({self._positions.mz.total_spec}). "
+                f"Setting n_divisions to {self._positions.mz.total_spec}"
+            )
+        elif n_divisions >= self._arguments.threads:
             self._divisions = _create_divisions(self._positions, n_divisions)
         else:
             self._divisions = _create_divisions(self._positions, self._arguments.threads)
-            self._arguments.blocksize = _get_division_size_max(self._divisions) # If we have more threads than divisions, increase the blocksize to max division size
+            # If we have more threads than divisions, increase the blocksize to max division size
+            self._arguments.blocksize = _get_division_size_max(self._divisions)
 
     def compress(self, output: Union[str, bytes]):
         self._prepare_divisions()
