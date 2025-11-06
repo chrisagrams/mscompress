@@ -110,8 +110,13 @@ size_t get_filesize(char* path) {
 
    stat(path, &fi);
 
+#ifdef _WIN32
+   if (fi.st_mode & _S_IFDIR)  // Is a directory on Windows
+      return 0;
+#else
    if (S_ISDIR(fi.st_mode))  // Is a directory
       return 0;
+#endif
 
    return fi.st_size;
 }
@@ -580,10 +585,17 @@ int close_file(int fd) {
 }
 
 int flush(int fd) {
+#ifdef _WIN32
+   if (_commit(fd) == -1) {
+      perror("_commit failed");
+      return 1;
+   }
+#else
    if (fsync(fd) == -1) {
       perror("fsync failed");
       return 1;
    }
+#endif
 
    return 0;
 }
