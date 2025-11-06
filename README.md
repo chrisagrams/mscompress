@@ -37,6 +37,60 @@ Our application is packaged as a portable executable containing all necessary de
 ## Reporting Bugs
 Our implementation is still currently in its pre-release stage undergoing further testing. If you experience any issues, we ask to please open a new [Issue](https://github.com/chrisagrams/mscompress/issues).
 
+## Command-Line Usage
+### Compression
+
+To compress an `.mzML` file to lossless `.msz` format in same directory:
+```
+./mscompress in.mzML
+```
+
+or
+
+```
+./mscompress in.mzML out.msz
+```
+
+### Decompression
+To decompress, specify `.msz` file as first argument. Will output to `out.mzML`:
+```
+./mscompress out.msz
+```
+
+### Lossy Compression
+Currently, we support the following lossy formats: cast, log, delta(16, 32), and vbr.
+
+To specify delta32 lossy compression for m/z data and vbr lossy compression for intensity data:
+
+```
+./mscompress --mz-lossy delta32 --int-lossy vbr in.mzML
+```
+
+
+### Extract Spectrum
+MScompress can extract spectra from either `.mzML` or compressed `.msz` files. Specific indicies, scan numbers, or MSn level can be extracted.
+
+Ex. Extracting scan numbers 100-110 and 200-220
+```
+./mscompress --extract --extract-scans [100-110,200-220] in.mzML
+```
+or
+```
+./mscompress --extract --extract-scans [100-110,200-220] in.msz
+```
+
+Ex. Extracting all spectra with MS level 1
+```
+./mscompress --extract --ms-level 1 in.mzML
+```
+or 
+```
+./mscompress --extract --ms-level 1 in.msz
+```
+
+
+
+
 ## Compilation
 Our repository relies on CMake to support cross-platform compilation. Ensure that the necessary dependencies are installed for compilation.
 ### Prerequisites
