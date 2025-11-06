@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project (mscompress  VERSION 1.0)
+project (mscompress  VERSION 1.0.1)
 
 option(BUILD_CLI "Build command line application" ON)
 option(BUILD_NODE "Build node library" ON)

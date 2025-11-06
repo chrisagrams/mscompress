@@ -40,6 +40,24 @@ set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 file(GLOB SOURCES ${SRC_DIR}/*.c mscompress.c)
 add_executable(mscompress ${SOURCES})
 
+# Ensure winnt.h sees a target arch and keep headers tidy on MSVC
+if(WIN32)
+  target_compile_definitions(mscompress PRIVATE
+    _AMD64_
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+    _CRT_SECURE_NO_WARNINGS
+  )
+endif()
+
+# Link libs
+if(WIN32)
+  target_link_libraries(mscompress PRIVATE ${ZLIB_LIBRARY} zstd yxml base64 lz4)
+else()
+  target_link_libraries(mscompress PRIVATE ${ZLIB_LIBRARY} zstd yxml base64 m lz4)
+endif()
+
+
 target_include_directories(mscompress PUBLIC 
                             ${VENDOR_DIR}/zstd/lib 
                             ${VENDOR_DIR}/base64/include

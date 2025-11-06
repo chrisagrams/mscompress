@@ -51,7 +51,7 @@ namespace mscompress {
         std::string path = pathValue.Utf8Value();
         char* charPath = (char*)path.c_str(); // Convert to char*
 
-        int fd = open_file(charPath);
+        int fd = open_input_file(charPath);
         return Napi::Number::New(env, fd);
     }
 
@@ -289,7 +289,7 @@ namespace mscompress {
         data_format_t* df = NapiObjectToDataFormatT(info[1].As<Napi::Object>());
 
         // Parse arguments
-        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+        Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
 
         //TODO : Parse arguments
 
@@ -341,7 +341,7 @@ namespace mscompress {
         size_t input_filesize = info[1].As<Napi::Number>().Int64Value();
 
         // Parse arguments
-        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+        Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
 
         // Parse df
         data_format_t* df = NapiObjectToDataFormatT(info[3].As<Napi::Object>());
@@ -421,7 +421,7 @@ namespace mscompress {
         size_t input_filesize = info[1].As<Napi::Number>().Int64Value();
 
         // Parse arguments
-        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+        Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
 
         // Parse output_fd
         int output_fd = info[3].As<Napi::Number>().Int32Value();
@@ -458,7 +458,7 @@ namespace mscompress {
         size_t input_filesize = info[1].As<Napi::Number>().Int64Value();
 
         // Parse arguments
-        struct Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
+        Arguments* args = NapiObjectToArguments(info[2].As<Napi::Object>());
 
         // Parse output_fd
         int output_fd = info[3].As<Napi::Number>().Int32Value();

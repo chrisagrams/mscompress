@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(mscompress_modules VERSION 1.0)
+project(mscompress_modules VERSION 1.0.1)
 
 # Find PyInstaller
 find_program(PYINSTALLER_EXECUTABLE pyinstaller)
