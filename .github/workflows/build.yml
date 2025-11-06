@@ -141,3 +141,32 @@ jobs:
         with:
           name: python-package-${{ runner.os }}-py${{ matrix.python-version }}
           path: ./python/dist/*
+
+  publish-python:
+    name: Publish Python Package to PyPI
+    needs: build-python
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mscompress
+    permissions:
+      id-token: write
+    
+    steps:
+      - name: Download all Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-package-*
+          path: dist
+          merge-multiple: true
+      
+      - name: List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -la dist/
+      
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
