@@ -552,6 +552,7 @@ cdef class BaseFile:
     cdef Spectra _spectra
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
+    cdef int output_fd
 
 
     def __init__(self, bytes path, size_t filesize, int fd):
@@ -562,6 +563,7 @@ cdef class BaseFile:
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
+        self.output_fd = -1
 
 
     def __enter__(self):

@@ -75,6 +75,14 @@ def test_mzml_context_manager(mzml_file):
         assert f.filesize == os.path.getsize(mzml_file)
 
 
+@pytest.mark.parametrize("msz_file", test_msz_data)
+def test_msz_context_manager(msz_file):
+    with read(msz_file) as f:
+        assert isinstance(f, MSZFile)
+        assert f.path == os.path.abspath(msz_file).encode('utf-8')
+        assert f.filesize == os.path.getsize(msz_file)
+
+
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
 def test_describe_mzml(mzml_file):
     mzml = read(mzml_file)
