@@ -17,6 +17,7 @@ dev = [
     "setuptools>=45",
     "cython",
     "numpy",
+    "pytest"
 ]
 
 [tool.setuptools]
