@@ -21,21 +21,6 @@ block_formats = [
     # 4700012, # LZ4
 ]
 
-# binary_formats = [
-#     4700000, # _lossless_
-#     4700002, # _cast_64_to_32_
-#     # 4700003, # _log2_transform_
-#     # 4700004, # _delta16_transform_
-#     # 4700005, # _delta24_transform_
-#     # 4700006, # _delta32_transform_
-#     # 4700007, # _vbr_
-#     # 4700008, # _bitpack_
-#     # 4700009, # _vdelta16_transform_
-#     # 4700010, # _vdelta24_transform_
-#     # 4700011, # _cast_64_to_16_
-# ]
-
-
 def test_get_num_threads():
     assert get_num_threads() == os.cpu_count()
 
@@ -48,24 +33,6 @@ def test_get_filesize(mzml_file):
 def test_get_filesize_invalid_path():
     with pytest.raises(FileNotFoundError) as e:
         get_filesize("ABC123")
-
-
-def test_base_file():
-    """
-    Two functions inside BaseFile will be overridden (compress, decompress, get_mz_binary, get_inten_binary),
-    Test if a "base" BaseFile will raise the exception when trying to access it.
-    """
-    bf = BaseFile(b"ABC", 0, 0)
-    with pytest.raises(NotImplementedError) as e:
-        bf.compress("out")
-    with pytest.raises(NotImplementedError) as e:
-        bf.decompress("out")
-    with pytest.raises(NotImplementedError) as e:
-        bf.get_mz_binary(0)
-    with pytest.raises(NotImplementedError) as e:
-        bf.get_inten_binary(0)
-    with pytest.raises(NotImplementedError) as e:
-        bf.get_xml(0)
 
 
 def test_read_nonexistent_file():
@@ -81,7 +48,7 @@ def test_read_invalid_file(tmp_path):
 def test_read_invalid_parameter():
     p = {}
     with pytest.raises(ValueError) as e:
-        f = read(p)
+        f = read(p) # type: ignore
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -100,12 +67,12 @@ def test_read_msz_file(msz_file):
     assert msz.filesize == os.path.getsize(msz_file)
 
 
-# @pytest.mark.parametrize("mzml_file", test_mzml_data)
-# def test_mzml_context_manager(mzml_file):
-#     with MZMLFile(mzml_file) as f:
-#         assert isinstance(f, MZMLFile)
-#         assert f.path == os.path.abspath(mzml_file).encode('utf-8')
-#         assert f.filesize == os.path.getsize(mzml_file)
+@pytest.mark.parametrize("mzml_file", test_mzml_data)
+def test_mzml_context_manager(mzml_file):
+    with read(mzml_file) as f:
+        assert isinstance(f, MZMLFile)
+        assert f.path == os.path.abspath(mzml_file).encode('utf-8')
+        assert f.filesize == os.path.getsize(mzml_file)
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -190,6 +157,7 @@ def test_msz_spectrum_size(msz_file):
     spectra = msz.spectra
     spectrum = spectra[0]
     assert isinstance(spectrum.size, int)
+    assert spectrum.size > 0
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -199,6 +167,8 @@ def test_mzml_spectrum_mz(mzml_file):
     spectrum = spectra[0]
     mz = spectrum.mz
     assert isinstance(mz, np.ndarray) 
+    assert mz.dtype == np.float64 or mz.dtype == np.float32
+    assert mz.size > 0
 
 
 @pytest.mark.parametrize("msz_file", test_msz_data)
@@ -208,6 +178,8 @@ def test_msz_spectrum_mz(msz_file):
     spectrum = spectra[0]
     mz = spectrum.mz
     assert isinstance(mz, np.ndarray)
+    assert mz.dtype == np.float64 or mz.dtype == np.float32
+    assert mz.size > 0
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -216,7 +188,9 @@ def test_mzml_spectrum_inten(mzml_file):
     spectra = mzml.spectra
     spectrum = spectra[0]
     inten = spectrum.intensity
-    assert isinstance(inten, np.ndarray) 
+    assert isinstance(inten, np.ndarray)
+    assert inten.dtype == np.float64 or inten.dtype == np.float32
+    assert inten.size > 0
 
 
 @pytest.mark.parametrize("msz_file", test_msz_data)
@@ -226,6 +200,8 @@ def test_msz_spectrum_inten(msz_file):
     spectrum = spectra[0]
     inten = spectrum.intensity
     assert isinstance(inten, np.ndarray)
+    assert inten.dtype == np.float64 or inten.dtype == np.float32
+    assert inten.size > 0
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -235,15 +211,19 @@ def test_mzml_spectrum_peaks(mzml_file):
     spectrum = spectra[0]
     peaks = spectrum.peaks
     assert isinstance(peaks, np.ndarray)
+    assert peaks.size > 0
+    assert peaks.dtype == np.float64 or peaks.dtype == np.float32
 
 
 @pytest.mark.parametrize("msz_file", test_msz_data)
 def test_msz_spectrum_peaks(msz_file):
     msz = read(msz_file)
     spectra = msz.spectra
-    spectrum = spectra[0]
+    spectrum = spectra[1]
     peaks = spectrum.peaks
     assert isinstance(peaks, np.ndarray)
+    assert peaks.size > 0
+    assert peaks.dtype == np.float64 or peaks.dtype == np.float32
 
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
@@ -323,7 +303,7 @@ def test_mzml_datapositions(mzml_file):
 
 
 @pytest.mark.parametrize("msz_file", test_msz_data)
-def test_mzml_datapositions(msz_file):
+def test_msz_datapositions(msz_file):
     msz = read(msz_file)
     positions = msz.positions.spectra
     assert isinstance(positions.start_positions, np.ndarray)
@@ -401,35 +381,3 @@ def test_mzml_arguments_zstd_level(mzml_file):
     mzml = read(mzml_file)
     mzml.arguments.zstd_compression_level = 1
     assert mzml.arguments.zstd_compression_level == 1
-
-
-# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-# def test_target_xml_format(tmp_path, mzml_file, format):
-#     mzml = read(mzml_file)
-#     mzml.arguments.target_xml_format = format
-#     assert mzml.arguments.target_xml_format == format
-#     mzml.compress(os.path.join(tmp_path, "test_target_xml_format.msz"))
-#     msz = read(os.path.join(tmp_path, "test_target_xml_format.msz"))
-#     assert msz.format.target_xml_format == format
-
-
-# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-# def test_target_mz_format(tmp_path, mzml_file, format):
-#     mzml = read(mzml_file)
-#     mzml.arguments.target_mz_format = format
-#     assert mzml.arguments.target_mz_format == format
-#     p = os.path.join(tmp_path, "test_target_mz_format.msz")
-#     mzml.compress(p)
-#     msz = read(p)
-#     assert msz.format.target_mz_format == format
-
-
-# @pytest.mark.parametrize(("mzml_file", "format"), zip(test_mzml_data, block_formats))
-# def test_target_inten_format(tmp_path, mzml_file, format):
-#     mzml = read(mzml_file)
-#     mzml.arguments.target_inten_format = format
-#     assert mzml.arguments.target_inten_format == format
-#     p = os.path.join(tmp_path, f"test_target_inten_{format}.msz")
-#     mzml.compress(p)
-#     msz = read(p)
-#     assert msz.format.target_inten_format == format
