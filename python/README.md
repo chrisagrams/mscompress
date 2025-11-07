@@ -14,7 +14,7 @@ The MScompress Python library provides a fast and efficient way to compress and 
 
 ## Installation
 
-### From PyPI (Coming Soon)
+### From PyPI
 
 ```bash
 pip install mscompress
@@ -23,7 +23,7 @@ pip install mscompress
 ### From Source
 
 **Prerequisites:**
-- Python ≥ 3.8
+- Python ≥ 3.9
 - NumPy
 - Cython
 - C compiler (GCC, Clang, or MSVC)
