@@ -297,7 +297,7 @@ cdef class MZMLFile(BaseFile):
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
         cdef size_t start, end
-        cdef np.ndarray[np.float64_t, ndim=1] mz_array
+        cdef object mz_array
         cdef double* double_ptr
         cdef float* float_ptr
 
@@ -343,7 +343,7 @@ cdef class MZMLFile(BaseFile):
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
         cdef size_t start, end
-        cdef np.ndarray[np.float64_t, ndim=1] inten_array
+        cdef object inten_array
         cdef double* double_ptr
         cdef float* float_ptr
 
@@ -444,7 +444,7 @@ cdef class MSZFile(BaseFile):
     def get_mz_binary(self, size_t index):
         cdef char* res = NULL
         cdef size_t out_len = 0
-        cdef np.ndarray[np.float64_t, ndim=1] mz_array
+        cdef object mz_array
         cdef double* double_ptr
         cdef float* float_ptr
         
@@ -471,7 +471,7 @@ cdef class MSZFile(BaseFile):
     def get_inten_binary(self, size_t index):
         cdef char* res = NULL
         cdef size_t out_len = 0
-        cdef np.ndarray[np.float64_t, ndim=1] inten_array
+        cdef object inten_array
         cdef double* double_ptr
         cdef float* float_ptr
         
@@ -552,6 +552,7 @@ cdef class BaseFile:
     cdef Spectra _spectra
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
+    cdef int output_fd
 
 
     def __init__(self, bytes path, size_t filesize, int fd):
@@ -562,6 +563,7 @@ cdef class BaseFile:
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
+        self.output_fd = -1
 
 
     def __enter__(self):
@@ -812,7 +814,11 @@ cdef class Spectrum:
 
     property peaks:
         def __get__(self):
-            return np.column_stack((self.mz, self.intensity))
+            mz = self.mz
+            intensity = self.intensity
+            if len(mz) != len(intensity):
+                raise ValueError(f"Mismatch in array lengths: mz has {len(mz)} elements, intensity has {len(intensity)} elements for spectrum {self.index}")
+            return np.column_stack((mz, intensity))
 
 def get_num_threads() -> int:
     """
