@@ -2,11 +2,8 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main, dev, bugfix/CI]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ main, dev ]
   workflow_dispatch:
 
 jobs:
@@ -175,15 +172,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: python-package-*
-          path: dist
           merge-multiple: true
       
-      - name: List downloaded artifacts
+      - name: Prepare dist directory
         run: |
-          echo "Downloaded artifacts:"
-          ls -la dist/
+          # Consolidate all wheels and source dists into a single dist directory
+          mkdir -p dist_combined
+          find . -name "*.whl" -exec cp {} dist_combined/ \;
+          find . -name "*.tar.gz" -exec cp {} dist_combined/ \;
+          echo "Contents of dist_combined directory:"
+          ls -la dist_combined/
       
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          packages-dir: dist_combined/
