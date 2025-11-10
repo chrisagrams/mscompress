@@ -9,14 +9,14 @@
 
 zlib_block_t* zlib_alloc(int offset) {
    if (offset < 0) {
-      warning("zlib_alloc: offset must be >= 0");
+      error("zlib_alloc: offset must be >= 0");
       return NULL;
    }
 
    zlib_block_t* r = malloc(sizeof(zlib_block_t));
 
    if (r == NULL) {
-      warning("zlib_alloc: malloc error");
+      error("zlib_alloc: malloc error");
       return NULL;
    }
    r->len = ZLIB_BUFF_FACTOR;
@@ -64,6 +64,10 @@ void* zlib_pop_header(zlib_block_t* blk) {
    return r;
 }
 
+/**
+* @brief Compresses a buffer using zlib and returns the compressed buffer on success, NULL on error.
+* @return A pointer to the compressed buffer on success. NULL on error.
+*/
 z_stream* alloc_z_stream() {
    z_stream* z;
 
@@ -81,6 +85,10 @@ z_stream* alloc_z_stream() {
    return z;
 }
 
+/**
+ * @brief Deallocates a z_stream struct and its fields. Frees the memory allocated for the struct and its fields.
+ * @param z A pointer to the z_stream struct to be deallocated.
+ */
 void dealloc_z_stream(z_stream* z) {
    if (z) {
       deflateEnd(z);

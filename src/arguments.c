@@ -176,22 +176,47 @@ void set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    return;
 }
 
-void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
+/**
+ * @brief Sets the decompression runtime variables for the given data format and footer. This function initializes the decompression functions based on the target formats specified in the footer.
+ * @param df A pointer to the data_format_t struct to set the decompression variables for
+ * @param msz_footer A pointer to the footer_t struct containing the target formats for the decompression functions
+ * @return Returns 0 on success, 1 on error. If an error occurs, the function will print an error message to stderr.
+ * Note: This function modifies the data_format_t struct in place.
+ */
+int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    // Set target encoding and decompression functions.
    df->encode_source_compression_mz_fun = set_encode_fun(
        df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
    df->encode_source_compression_inten_fun = set_encode_fun(
        df->source_compression, msz_footer->inten_fmt, df->source_mz_fmt);
 
+   if (df->encode_source_compression_mz_fun == NULL ||
+       df->encode_source_compression_inten_fun == NULL) {
+      error("set_decompress_runtime_variables: Failed to set encode functions.\n");
+      return 1;
+   }
+
+   // Set target decompression functions.
    df->target_mz_fun =
        set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
    df->target_inten_fun =
        set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
+
+   if (df->target_mz_fun == NULL || df->target_inten_fun == NULL) {
+      error("set_decompress_runtime_variables: Failed to set target decompression functions.\n");
+      return 1;
+   }
 
    // Set target decompression functions.
    df->xml_decompression_fun = set_decompress_fun(df->target_xml_format);
    df->mz_decompression_fun = set_decompress_fun(df->target_mz_format);
    df->inten_decompression_fun = set_decompress_fun(df->target_inten_format);
 
-   return;
+   if (df->xml_decompression_fun == NULL || df->mz_decompression_fun == NULL ||
+       df->inten_decompression_fun == NULL) {
+      error("set_decompress_runtime_variables: Failed to set decompression functions.\n");
+      return 1;
+   }
+
+   return 0;
 }

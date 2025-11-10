@@ -273,7 +273,7 @@ int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
 void set_compress_runtime_variables(Arguments* args, data_format_t* df);
-void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
+int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
 extern long fd_pos[3];
@@ -378,6 +378,16 @@ int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
+/* Callback types for error/warning handling */
+typedef void (*error_callback_t)(const char* message);
+typedef void (*warning_callback_t)(const char* message);
+
+/* Set custom error/warning callbacks (for Python bindings) */
+void set_error_callback(error_callback_t callback);
+void set_warning_callback(warning_callback_t callback);
+void reset_error_callback(void);
+void reset_warning_callback(void);
+
 /* decode.c */
 
 void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len);
@@ -442,6 +452,21 @@ int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
 /* decompress.c */
+
+/**
+ * @brief Structure containing the arguments for decompression.
+ * @param input_map The input buffer containing the compressed data.
+ * @param df A pointer to a data_format_t struct containing the data format information.
+ * @param xml_blk A pointer to a block_len_t struct containing the original and compressed sizes
+ * @param mz_binary_blk A pointer to a block_len_t struct containing the original and compressed sizes of the m/z binary block.
+ * @param inten_binary_blk A pointer to a block_len_t struct containing the original and compressed
+ * @param division A pointer to a division_t struct containing the division information.
+ * @param footer_xml_off The offset within the input buffer where the XML block starts.
+ * @param footer_mz_bin_off The offset within the input buffer where the m/z binary block starts.
+ * @param footer_inten_bin_off The offset within the input buffer where the intensity binary block starts.
+ * @param ret A pointer to a char* where the decompressed data will be stored.
+ * @param ret_len A pointer to a size_t where the length of the decompressed data will be stored.
+ */
 typedef struct {
    char* input_map;
    int binary_encoding;
