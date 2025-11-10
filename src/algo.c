@@ -2963,6 +2963,12 @@ Algo set_compress_algo(int algo, int accession) {
    }
 }
 
+/**
+ * @brief Returns the appropriate decompression algorithm function pointer based on the provided algorithm and accession type.
+ * @param algo The compression algorithm type.
+ * @param accession The data type accession (e.g., 32f for 32-bit float, 64d for 64-bit double).
+ * @return A function pointer to the corresponding decompression algorithm. If the algorithm or accession type is unknown, it returns NULL and logs an error.
+ */
 Algo set_decompress_algo(int algo, int accession) {
    switch (algo) {
       case _lossless_:
@@ -3050,6 +3056,7 @@ Algo set_decompress_algo(int algo, int accession) {
       };
       default:
          error("set_decompress_algo: Unknown compression algorithm");
+         return NULL;
    }
 }
 
