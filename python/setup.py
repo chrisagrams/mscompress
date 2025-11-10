@@ -2,6 +2,7 @@ import os
 import sys
 import platform
 import shutil
+import tomli
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist as _sdist
 from setuptools.command.build_ext import build_ext as _build_ext
@@ -221,9 +222,23 @@ extensions = [
     )
 ]
 
+# Read pyproject.toml
+with open("pyproject.toml", "rb") as f:
+    pyproject = tomli.load(f)
+version = pyproject["project"]["version"]
+description = pyproject["project"]["description"]
+
 setup(
     name="mscompress",
-    ext_modules=cythonize(extensions, compiler_directives={'linetrace': linetrace}),
+    version=version,
+    description=description,
+    author="Chris Grams",
+    author_email="chrisagrams@gmail.com",
+    ext_modules=cythonize(
+        extensions,
+        compiler_directives={'linetrace': linetrace},
+        compile_time_env={'MSC_VERSION': version}
+    ),
     include_dirs=[numpy.get_include()],
     cmdclass={
         'build_ext': build_ext_with_stubs,
