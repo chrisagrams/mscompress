@@ -331,9 +331,9 @@ int close_file(int fd);
 
 data_block_t* alloc_data_block(size_t max_size);
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
-void dealloc_data_block(data_block_t* db);
+int dealloc_data_block(data_block_t* db);
 cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
-void dealloc_cmp_block(cmp_block_t* blk);
+int dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
 

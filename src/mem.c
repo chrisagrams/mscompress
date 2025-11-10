@@ -102,16 +102,6 @@ int dealloc_data_block(data_block_t* db)
  */
 cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size)
 {
-   if (mem == NULL) {
-      error("alloc_cmp_block: invalid mem for cmp block.\n");
-      return NULL;
-   }
-
-   if (size <= 0 || original_size <= 0) {
-      error("alloc_cmp_block: invalid size for cmp block.\n");
-      return NULL;
-   }
-
    cmp_block_t* r = malloc(sizeof(cmp_block_t));
 
    if (r == NULL) {
@@ -135,10 +125,6 @@ int dealloc_cmp_block(cmp_block_t* blk) {
    if (blk) {
       if (blk->mem)
          free(blk->mem);
-      else {
-         error("dealloc_cmp_block: blk's mem is NULL\n");
-         return -1;
-      }
       free(blk);
    } else {
       error("dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
