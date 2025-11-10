@@ -821,6 +821,11 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    print("Decoding and compression time: %1.4fs\n", end - start);
 }
 
+/**
+ * @brief Sets the compression function based on the accession integer.
+ * @param accession An integer representing the compression type.
+ * @return A function pointer to the corresponding compression function on success. NULL on error.
+ */
 compression_fun set_compress_fun(int accession) {
    switch (accession) {
       case _ZSTD_compression_:
@@ -831,12 +836,20 @@ compression_fun set_compress_fun(int accession) {
          return no_compress;
       default:
          error("Compression type not supported.");
+         return NULL;
    }
 }
 
+/**
+ * @brief Gets the compression type accession integer based on the string argument.
+ * @param arg A string representing the compression type ("zstd", "lz4", "nocomp", "none").
+ * @return An integer representing the compression type on success. -1 on error.
+ */
 int get_compress_type(char* arg) {
-   if (arg == NULL)
+   if (arg == NULL) {
       error("Compression type not specified.");
+      return -1;
+   }
    if (strcmp(arg, "zstd") == 0 || strcmp(arg, "ZSTD") == 0)
       return _ZSTD_compression_;
    if (strcmp(arg, "lz4") == 0 || strcmp(arg, "LZ4") == 0)
