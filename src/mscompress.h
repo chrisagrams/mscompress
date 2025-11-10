@@ -534,7 +534,7 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 zlib_block_t* zlib_alloc(int offset);
 z_stream* alloc_z_stream();
 void dealloc_z_stream(z_stream* z);
-void zlib_realloc(zlib_block_t* old_block, size_t new_size);
+int zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);

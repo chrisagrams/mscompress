@@ -98,6 +98,14 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
    // uint16_t org_len = *(uint16_t*)decmp_header;
 
    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src), cmp_output, src_len);
+   if (zlib_len == 0) {
+      error("encode_zlib_fun: zlib_compress error\n");
+      free(decmp_input);
+      free(cmp_output);
+      // Continue to move forward
+      *src += src_len;
+      return;
+   }
    // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET,
    // cmp_output, src_len);
 
@@ -148,8 +156,15 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
 
    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src) + ZLIB_SIZE_OFFSET,
                                     cmp_output, org_len);
-   // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET,
-   // cmp_output, src_len);
+
+   if (zlib_len == 0) {
+      error("encode_zlib_fun: zlib_compress error\n");
+      free(decmp_input);
+      free(cmp_output);
+      // Continue to move forward
+      *src += org_len + ZLIB_SIZE_OFFSET;
+      return;
+   }
 
    free(decmp_input);
    free(decmp_header);

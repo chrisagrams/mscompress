@@ -155,7 +155,7 @@ void* no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
  * @param input_map The input buffer containing the compressed data.
  * @param offset The offset within the input buffer where the compressed data starts.
  * @param blk A block_len_t struct containing the original and compressed sizes of the data block
- * @return A pointer to the decompressed buffer on success. NULL on error.
+ * @return A pointer to the decompressed buffer on success. Can return NULL if the block is empty or if decompression fails.
  */
 void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk) {
@@ -275,7 +275,7 @@ DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
  * @brief Thread routine for decompression. Calls the decmp_block function to decompress the data blocks and writes the decompressed data to the output buffer.
  * @param args A pointer to the decompress_args_t struct containing the arguments for decompression.
  * @return Always returns NULL. `args->ret` will contain the decompressed data and `args->ret_len` will contain the length of the decompressed data on success.
- * on error, `args->ret` will be NULL and `args->ret_len` will be 0.
+ * on error, `args->ret` will be NULL and `args->ret_len` will be -1.
  *
  * Note: The caller is responsible for freeing the memory allocated for `args->ret`.
  */
@@ -292,9 +292,9 @@ void* decompress_routine(void* args) {
       return NULL;
    }
 
-   // Initialize the return values to NULL and 0 in case of early return due to errors
+   // Initialize the return values to NULL and -1 in case of early return due to errors
    db_args->ret = NULL;
-   db_args->ret_len = 0;
+   db_args->ret_len = -1;
 
    // Allocate a decompression context
    ZSTD_DCtx* dctx = alloc_dctx();
@@ -318,14 +318,6 @@ void* decompress_routine(void* args) {
         *decmp_inten_binary = (char*)decmp_block(
             db_args->df->inten_decompression_fun, dctx, db_args->input_map,
             db_args->footer_inten_bin_off, db_args->inten_binary_blk);
-   
-   if (decmp_xml == NULL || decmp_mz_binary == NULL || decmp_inten_binary == NULL) {
-      error("decompress_routine: Decompression failed for one or more blocks.\n");
-      if (decmp_xml) free(decmp_xml);
-      if (decmp_mz_binary) free(decmp_mz_binary);
-      if (decmp_inten_binary) free(decmp_inten_binary);
-      return NULL;
-   }
 
    size_t binary_len = 0;
 
@@ -587,7 +579,7 @@ void decompress_msz(char* input_map, size_t input_filesize,
 #endif
 
       for (i = divisions_used; i < divisions_used + threads; i++) {
-         if (args[i]->ret == NULL || args[i]->ret_len == 0) {
+         if (args[i]->ret == NULL || args[i]->ret_len == -1) {
             error("decompress_msz: Decompression failed for division %d.\n", i);
             return;
          }

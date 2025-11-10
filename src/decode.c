@@ -113,7 +113,9 @@ void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
    ZLIB_TYPE decmp_size =
        (ZLIB_TYPE)zlib_decompress(z, b64_out_buff, decmp_output, b64_out_len);
 
-   zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
+   int zlib_ret = zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
+   if (zlib_ret != 0)
+      error("decode_zlib_fun: zlib_append_header returned with an error.\n");
 
    // free(b64_out_buff);
 
