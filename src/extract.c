@@ -488,6 +488,8 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       return 1;
    }
 
+   a_args->ret_code = 0; // Initialize return code to 0 (success).
+
    size_t algo_output_len = 0;
    char* decmp_binary = blk->cache;
 
@@ -528,7 +530,18 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
       a_args->scale_factor = scale_factor;
+
+      // Call the target function to encode the binary block and write it to the output buffer
       target_fun((void*)a_args);
+
+      if (a_args->ret_code != 0) {
+         error("encode_binary_block: Failed to encode binary block for spectrum %d.\n", i);
+         free(a_args);
+         free(buff);
+         free(res_lens);
+         return 1;
+      }
+      
       res_lens[i] = *a_args->dest_len;
       buff_off += *a_args->dest_len;
    }

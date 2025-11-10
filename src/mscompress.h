@@ -70,8 +70,6 @@
 
 #define _LZ4_compression_ 4700012
 
-#define ERROR_CHECK 1 /* If defined, runtime error checks will be enabled. */
-
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
@@ -495,6 +493,20 @@ void decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
 decompression_fun set_decompress_fun(int accession);
 
 /* algo.c */
+/**
+ * @brief Structure containing the arguments for the algorithm.
+ * @param src A pointer to a `char*` where the source data is stored.
+ * @param src_len The length of the source data.
+ * @param dest A pointer to a `char*` where the destination data will be stored.
+ * @param dest_len A pointer to a `size_t` where the length of the destination data will be stored.
+ * @param src_format An integer representing the format of the source data.
+ * @param enc_fun A function pointer to the encoding function to be used.
+ * @param dec_fun A function pointer to the decoding function to be used.
+ * @param tmp A pointer to a `data_block_t` struct used for temporary storage during encoding/decoding.
+ * @param z A pointer to a `z_stream` struct used for zlib compression/decompression.
+ * @param scale_factor A float representing the scale factor to be applied to the data during encoding/decoding.
+ * @param ret_code An integer representing the return code of the algorithm.
+ */
 typedef struct {
    char** src;
    size_t src_len;
@@ -506,6 +518,7 @@ typedef struct {
    data_block_t* tmp;
    z_stream* z;
    float scale_factor;
+   int ret_code;
 } algo_args;
 
 Algo set_compress_algo(int algo, int accession);

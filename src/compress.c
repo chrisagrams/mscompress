@@ -527,11 +527,32 @@ void* compress_routine(void* args)
 
    compress_args_t* cb_args = (compress_args_t*)args;
    algo_args* a_args = malloc(sizeof(algo_args));
+   if (a_args == NULL) {
+      error("compress_routine: Failed to allocate algo_args.\n");
+      return NULL;
+   }
+
    a_args->tmp =
        alloc_data_block(cb_args->blocksize);  // Allocate a temporary data_block
                                               // to intermediately store data.
+   
+   if (a_args->tmp == NULL) {
+      error("compress_routine: Failed to allocate data_block.\n");
+      free(a_args);
+      return NULL;
+   }
+
    a_args->z =
        alloc_z_stream();  // Allocate a z_stream to intermediately store data.
+
+   if (a_args->z == NULL) {
+      error("compress_routine: Failed to allocate z_stream.\n");
+      dealloc_data_block(a_args->tmp);
+      free(a_args);
+      return NULL;
+   }
+   
+   a_args->ret_code = 0; // Initialize return code to 0 (success).
 
    if (cb_args == NULL)
       error("compress_routine: Invalid compress_args_t\n");

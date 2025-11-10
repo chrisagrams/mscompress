@@ -347,13 +347,22 @@ void* decompress_routine(void* args) {
    int64_t curr_len = 0;
 
    algo_args* a_args = malloc(sizeof(algo_args));
-
-   a_args->z = alloc_z_stream();
-
+   
    if (a_args == NULL) {
       error("decompress_routine: Failed to allocate algo_args.\n");
       return NULL;
    }
+
+   a_args->z = alloc_z_stream();
+
+   if (a_args->z == NULL) {
+      error("decompress_routine: Failed to allocate z_stream.\n");
+      free(a_args);
+      return NULL;
+   }
+
+   a_args->ret_code = 0; // Initialize return code to 0 (success).
+
 
    size_t algo_output_len = 0;
    a_args->dest_len = &algo_output_len;
@@ -402,7 +411,16 @@ void* decompress_routine(void* args) {
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
+
+            // Call the target mz function to encode the mz block and write it to the output buffer
             db_args->df->target_mz_fun((void*)a_args);
+
+            if (a_args->ret_code != 0) {
+               error("decompress_routine: Failed to encode mz block.\n");
+               free(a_args);
+               return NULL;
+            }
+
             buff_off += *a_args->dest_len;
             mz_i++;
             block++;
@@ -447,7 +465,16 @@ void* decompress_routine(void* args) {
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             a_args->scale_factor = db_args->df->int_scale_factor;
+
+            // Call the target intensity function to encode the intensity block and write it to the output buffer
             db_args->df->target_inten_fun((void*)a_args);
+
+            if (a_args->ret_code != 0) {
+               error("decompress_routine: Failed to encode intensity block.\n");
+               free(a_args);
+               return NULL;
+            }
+            
             buff_off += *a_args->dest_len;
             inten_i++;
             block = 0;
