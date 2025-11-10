@@ -1,0 +1,17 @@
+site_name: MSCompress Documentation
+site_description: Documentation for MSCompress, a tool for compressing Mass Spectrometry data.
+repo_url: https://github.com/chrisagrams/mscompress
+theme:
+  name: material
+  logo: https://raw.githubusercontent.com/chrisagrams/mscompress/refs/heads/main/electron/assets/logos/msc_logo.svg
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+extra_css:
+  - styles/extra.css
+nav:
+  - Home: index.md
+  # - Usage: usage.md
+  # - API: api.md
+  # - Contributing: contributing.md

@@ -1,0 +1,9 @@
+:root {
+  --mscompress-purple: #e60f8a;
+  --mscompress-blue: #24a8df;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--mscompress-purple) !important;
+  --md-accent-fg-color: var(--mscompress-blue) !important;
+}
