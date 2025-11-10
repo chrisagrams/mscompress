@@ -44,24 +44,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 include (${VENDOR_DIR}/Lz4Include.cmake) # Add lz4 library
 
 #zlib
-# include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
-# Conditional build or link of zlib
-if(WIN32)
-    file(GLOB ZLIB_SOURCES ${VENDOR_DIR}/zlib/*.c)
-    add_library(my_zlib STATIC ${ZLIB_SOURCES})
-    set_target_properties(my_zlib PROPERTIES LINKER_LANGUAGE C) # set zlib library language to C
-else()
-    set(ZLIB_SOURCE_DIR ${VENDOR_DIR}/zlib)
-    add_custom_target(
-        zlib_build
-        COMMAND ${ZLIB_SOURCE_DIR}/configure
-        COMMAND make -C ${ZLIB_SOURCE_DIR}
-        WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
-    )
-    set(ZLIB_LIBRARY "${ZLIB_SOURCE_DIR}/libz.a")
-    include_directories(${ZLIB_SOURCE_DIR})
-    add_dependencies(mscompress zlib_build)
-endif()
+include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library with macOS fdopen workaround
 
 
 #zstd
@@ -83,11 +66,7 @@ option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 # Linking stage
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 my_zlib)
-else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
-endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
 
 get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)
 message("Link libraries of target ${PROJECT_NAME}: ${TMP_TARGET_LINK_LIBRARIES}")
