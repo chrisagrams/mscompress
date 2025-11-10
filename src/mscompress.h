@@ -220,9 +220,35 @@ typedef decode_fun (*decode_fun_ptr)();
 typedef void (*encode_fun)(z_stream*, char**, size_t, char*, size_t*);
 typedef encode_fun (*encode_fun_ptr)();
 
+
+/**
+ * @brief Compression function type.
+ * This function takes a `ZSTD_CCtx` pointer, input data, input size,
+ * output size pointer, and compression level, and returns a pointer to the
+ * compressed data.
+ * @param czstd A pointer to a `ZSTD_CCtx` struct for compression.
+ * @param src A pointer to the input data to be compressed.
+ * @param src_size The size of the input data.
+ * @param dest_len A pointer to a `size_t` where the size of the compressed data
+ * will be stored.
+ * @param compression_level The compression level to use.
+ * @return A pointer to the compressed data. Returns NULL on error.
+ */
 typedef void* (*compression_fun)(ZSTD_CCtx*, void*, size_t, size_t*, int);
 typedef compression_fun (*compression_fun_ptr)();
 
+
+/**
+ * @brief Decompression function type.
+ * This function takes a `ZSTD_DCtx` pointer, input data, input size,
+ * output size pointer, and returns a pointer to the decompressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param src A pointer to the input data to be decompressed.
+ * @param src_size The size of the input data.
+ * @param dest_len A pointer to a `size_t` where the size of the decompressed
+ * data will be stored.
+ * @return A pointer to the decompressed data. Returns NULL on error.
+ */
 typedef void* (*decompression_fun)(ZSTD_DCtx*, void*, size_t, size_t);
 typedef decompression_fun (*decompression_fun_ptr)();
 
