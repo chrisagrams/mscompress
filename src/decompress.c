@@ -324,7 +324,6 @@ void* decompress_routine(void* args) {
       if (decmp_xml) free(decmp_xml);
       if (decmp_mz_binary) free(decmp_mz_binary);
       if (decmp_inten_binary) free(decmp_inten_binary);
-      dealloc_z_stream(dctx);
       return NULL;
    }
 
