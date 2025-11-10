@@ -7,7 +7,7 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 #define STATUS "Dev"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
