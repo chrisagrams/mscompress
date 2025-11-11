@@ -98,6 +98,14 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
    // uint16_t org_len = *(uint16_t*)decmp_header;
 
    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src), cmp_output, src_len);
+   if (zlib_len == 0) {
+      error("encode_zlib_fun: zlib_compress error\n");
+      free(decmp_input);
+      free(cmp_output);
+      // Continue to move forward
+      *src += src_len;
+      return;
+   }
    // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET,
    // cmp_output, src_len);
 
@@ -148,8 +156,15 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
 
    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src) + ZLIB_SIZE_OFFSET,
                                     cmp_output, org_len);
-   // zlib_len = (size_t)zlib_compress(((Bytef*)*src) + ZLIB_SIZE_OFFSET,
-   // cmp_output, src_len);
+
+   if (zlib_len == 0) {
+      error("encode_zlib_fun: zlib_compress error\n");
+      free(decmp_input);
+      free(cmp_output);
+      // Continue to move forward
+      *src += org_len + ZLIB_SIZE_OFFSET;
+      return;
+   }
 
    free(decmp_input);
    free(decmp_header);
@@ -246,6 +261,13 @@ void no_encode_w_header(z_stream* z, char** src, size_t src_len, char* dest,
    *src += org_len + ZLIB_SIZE_OFFSET;
 }
 
+/**
+ * @brief Sets the encode function pointer based on the compression method, algorithm, and accession.
+ * @param compression_method The compression method to use (e.g. _zlib_, _no_comp_, _no_encode_).
+ * @param algo The algorithm to use (e.g. _lossless_, _cast_64_to_32_).
+ * @param accession The accession to use (e.g. _32f_, _64f_).
+ * @return A pointer to the appropriate encode function based on the provided parameters. If the combination of parameters is invalid, the function will print an error message and return NULL.
+*/
 encode_fun set_encode_fun(int compression_method, int algo, int accession) {
    if (algo == 0)
       error("set_encode_fun: lossy is 0");

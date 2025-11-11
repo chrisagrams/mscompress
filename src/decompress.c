@@ -13,13 +13,13 @@
 #include "../vendor/zstd/lib/zstd.h"
 #include "mscompress.h"
 
-ZSTD_DCtx* alloc_dctx()
 /**
  * @brief Creates a ZSTD decompression context and handles errors.
  *
- * @return A ZSTD decompression context on success. Exits on error.
+ * @return A ZSTD decompression context on success. NULL on error.
  *
  */
+ZSTD_DCtx* alloc_dctx()
 {
    ZSTD_DCtx* dctx = ZSTD_createDCtx();
    if (dctx == NULL)
@@ -27,6 +27,9 @@ ZSTD_DCtx* alloc_dctx()
    return dctx;
 }
 
+/**
+* @brief Allocates a buffer for ZSTD decompression. Returns the buffer on success, NULL on error.
+*/
 void* alloc_ztsd_dbuff(size_t buff_len) {
    void* r = malloc(buff_len);
    if (r == NULL)
@@ -34,22 +37,55 @@ void* alloc_ztsd_dbuff(size_t buff_len) {
    return r;
 }
 
-void* zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
-                      size_t org_len) {
+
+/**
+ * @brief Decompresses a buffer using ZSTD returning the decompressed buffer on success, NULL on error.
+ * @param dctx A ZSTD decompression context.
+ * @param src_buff The compressed buffer to be decompressed.
+ * @param src_len The length of the compressed buffer.
+ * @param org_len The expected length of the decompressed buffer.
+ * @return A pointer to the decompressed buffer on success. NULL on error.
+*/
+void* 
+zstd_decompress(
+   ZSTD_DCtx* dctx,
+   void* src_buff,
+   size_t src_len,
+   size_t org_len
+) {
    void* out_buff;
    size_t decmp_len = 0;
 
-   out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, exit on error
+   out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, NULL on error
+
+   if (out_buff == NULL) {
+      error("zstd_decompress: error in malloc()\n");
+      return NULL;
+   }
 
    decmp_len = ZSTD_decompressDCtx(dctx, out_buff, org_len, src_buff, src_len);
 
-   if (decmp_len != org_len)
-      error("zstd_decompress: ZSTD_decompressDCtx() error: %s\n",
-            ZSTD_getErrorName(decmp_len));
+   if (decmp_len != org_len) {
+      error(
+         "zstd_decompress: ZSTD_decompressDCtx() error: %s\n",
+         ZSTD_getErrorName(decmp_len)
+      );
+      free(out_buff);
+      return NULL;
+   }
 
    return out_buff;
 }
 
+
+/**
+ * @brief Decompresses a buffer using LZ4 returning the decompressed buffer on success, NULL on error.
+ * @param dctx A ZSTD decompression context (not used in this function, but included for consistency with other decompression functions).
+ * @param src_buff The compressed buffer to be decompressed.
+ * @param src_len The length of the compressed buffer.
+ * @param org_len The expected length of the decompressed buffer.
+ * @return A pointer to the decompressed buffer on success. NULL on error.
+*/
 void* lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
                      size_t org_len) {
    void* out_buff;
@@ -85,40 +121,94 @@ void* lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
    return out_buff;
 }
 
+
+/**
+ * @brief A no-op decompression function that simply copies the input buffer to the output buffer. Returns the output buffer on success, NULL on error.
+ * @param dctx A ZSTD decompression context (not used in this function, but included for consistency with other decompression functions).
+ * @param src_buff The compressed buffer to be "decompressed".
+ * @param src_len The length of the compressed buffer.
+ * @param org_len The expected length of the "decompressed" buffer.
+ * @return A pointer to the "decompressed" buffer on success. NULL on error.
+ */
 void* no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
                     size_t org_len)
-/*
-    Same function signature as zstd_decompress, but does not decompress.
-*/
 {
    void* out_buff;
    size_t decmp_len = 0;
 
-   out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, exit on error
+   out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, NULL on error
+
+   if (out_buff == NULL) {
+      error("no_decompress: error in malloc()\n");
+      return NULL;
+   }
 
    memcpy(out_buff, src_buff, org_len);
 
    return out_buff;
 }
 
+/**
+ * @brief Decompresses a block of data using the provided decompression function. Returns the decompressed buffer on success, NULL on error.
+ * @param decompress_fun The decompression function to use.
+ * @param dctx A ZSTD decompression context.
+ * @param input_map The input buffer containing the compressed data.
+ * @param offset The offset within the input buffer where the compressed data starts.
+ * @param blk A block_len_t struct containing the original and compressed sizes of the data block
+ * @return A pointer to the decompressed buffer on success. Can return NULL if the block is empty or if decompression fails.
+ */
 void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk) {
    if (blk == NULL)  // Empty block, return null.
       return NULL;
-   return decompress_fun(dctx, (uint8_t*)input_map + offset,
-                         blk->compressed_size, blk->original_size);
+
+   void *out_buff = decompress_fun(
+      dctx,
+      (uint8_t*)input_map + offset,
+      blk->compressed_size,
+      blk->original_size
+   );
+
+   if (out_buff == NULL) {
+      error("decmp_block: Decompression failed for block at offset %ld.\n", offset);
+      return NULL;
+   }
+
+   return out_buff;
 }
 
+
+/**
+ * @brief Allocates a decompress_args_t struct and initializes its fields. Returns the struct on success, NULL on error.
+ * @param input_map The input buffer containing the compressed data.
+ * @param df A pointer to a data_format_t struct containing the data format information.
+ * @param xml_blk A pointer to a block_len_t struct containing the original and compressed sizes
+ * @param mz_binary_blk A pointer to a block_len_t struct containing the original and compressed sizes of the m/z binary block.
+ * @param inten_binary_blk A pointer to a block_len_t struct containing the original and compressed
+ * @param division A pointer to a division_t struct containing the division information.
+ * @param footer_xml_off The offset within the input buffer where the XML block starts.
+ * @param footer_mz_bin_off The offset within the input buffer where the m/z binary block starts.
+ * @param footer_inten_bin_off The offset within the input buffer where the intensity binary block starts.
+ * @return A pointer to the allocated decompress_args_t struct on success. NULL on error.
+ */
 decompress_args_t* alloc_decompress_args(
-    char* input_map, data_format_t* df, block_len_t* xml_blk,
-    block_len_t* mz_binary_blk, block_len_t* inten_binary_blk,
-    division_t* division, uint64_t footer_xml_off, uint64_t footer_mz_bin_off,
-    uint64_t footer_inten_bin_off) {
+   char* input_map,
+   data_format_t* df,
+   block_len_t* xml_blk,
+   block_len_t* mz_binary_blk,
+   block_len_t* inten_binary_blk,
+   division_t* division,
+   uint64_t footer_xml_off,
+   uint64_t footer_mz_bin_off,
+   uint64_t footer_inten_bin_off) 
+   {
    decompress_args_t* r;
 
    r = malloc(sizeof(decompress_args_t));
-   if (r == NULL)
+   if (r == NULL) {
       error("alloc_decompress_args: malloc() error.\n");
+      return NULL;
+   }
 
    r->input_map = input_map;
    r->df = df;
@@ -136,6 +226,10 @@ decompress_args_t* alloc_decompress_args(
    return r;
 }
 
+/**
+ * @brief Deallocates a decompress_args_t struct and its fields. Frees the memory allocated for the struct and its fields.
+ * @param args A pointer to the decompress_args_t struct to be deallocated.
+ */
 void dealloc_decompress_args(decompress_args_t* args) {
    if (args) {
       if (args->ret)
@@ -144,6 +238,13 @@ void dealloc_decompress_args(decompress_args_t* args) {
    }
 }
 
+/**
+ * @brief Returns the index of the lowest value among three integers. Returns -1 if all values are equal.
+ * @param i_0 The first integer.
+ * @param i_1 The second integer.
+ * @param i_2 The third integer.
+ * @return The index of the lowest value among the three integers. Returns -1 if all values are equal.
+ */
 int get_lowest(int i_0, int i_1, int i_2) {
    int ret = -1;
 
@@ -158,6 +259,11 @@ int get_lowest(int i_0, int i_1, int i_2) {
 }
 
 #ifdef _WIN32
+/**
+ * @brief Windows thread routine for decompression. Calls the decompress_routine function with the provided arguments.
+ * @param lpParam A pointer to the decompress_args_t struct containing the arguments for decompression
+ * @return 0 on success.
+ */
 DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
    decompress_args_t* args = (decompress_args_t*)lpParam;
    decompress_routine(args);
@@ -165,21 +271,42 @@ DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
 }
 #endif
 
+/**
+ * @brief Thread routine for decompression. Calls the decmp_block function to decompress the data blocks and writes the decompressed data to the output buffer.
+ * @param args A pointer to the decompress_args_t struct containing the arguments for decompression.
+ * @return Always returns NULL. `args->ret` will contain the decompressed data and `args->ret_len` will contain the length of the decompressed data on success.
+ * on error, `args->ret` will be NULL and `args->ret_len` will be -1.
+ *
+ * Note: The caller is responsible for freeing the memory allocated for `args->ret`.
+ */
 void* decompress_routine(void* args) {
    // Get thread ID
    int tid = get_thread_id();
 
+   // Cast the input argument to the correct type
+   decompress_args_t* db_args = (decompress_args_t*)args;
+
+   // Check if the input arguments are valid
+   if (db_args == NULL) {
+      error("decompress_routine: Decompression arguments are null.\n");
+      return NULL;
+   }
+
+   // Initialize the return values to NULL and -1 in case of early return due to errors
+   db_args->ret = NULL;
+   db_args->ret_len = -1;
+
    // Allocate a decompression context
    ZSTD_DCtx* dctx = alloc_dctx();
 
-   if (dctx == NULL)
+   // Check if the decompression context was successfully allocated
+   if (dctx == NULL) {
       error("decompress_routine: ZSTD Context failed.\n");
+      return NULL;
+   }
 
-   decompress_args_t* db_args = (decompress_args_t*)args;
+   // Get the division information from the arguments
    division_t* division = db_args->division;
-
-   if (db_args == NULL)
-      error("decompress_routine: Decompression arguments are null.\n");
 
    // Decompress each block of data
    char *decmp_xml = (char*)decmp_block(
@@ -201,26 +328,41 @@ void* decompress_routine(void* args) {
 
    long len = division->size;
 
-   if (len <= 0)
+   if (len <= 0) {
       error(
           "decompress_routine: Error determining decompression buffer size.\n");
+      return NULL;
+   }
 
    char* buff = malloc(len * 2);
 
-   if (buff == NULL)
+   if (buff == NULL) {
       error(
           "decompress_routine: Failed to allocate buffer for decompression.\n");
+      return NULL;
+   }
 
    db_args->ret = buff;
 
    int64_t curr_len = 0;
 
    algo_args* a_args = malloc(sizeof(algo_args));
+   
+   if (a_args == NULL) {
+      error("decompress_routine: Failed to allocate algo_args.\n");
+      return NULL;
+   }
 
    a_args->z = alloc_z_stream();
 
-   if (a_args == NULL)
-      error("decompress_routine: Failed to allocate algo_args.\n");
+   if (a_args->z == NULL) {
+      error("decompress_routine: Failed to allocate z_stream.\n");
+      free(a_args);
+      return NULL;
+   }
+
+   a_args->ret_code = 0; // Initialize return code to 0 (success).
+
 
    size_t algo_output_len = 0;
    a_args->dest_len = &algo_output_len;
@@ -269,7 +411,16 @@ void* decompress_routine(void* args) {
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
+
+            // Call the target mz function to encode the mz block and write it to the output buffer
             db_args->df->target_mz_fun((void*)a_args);
+
+            if (a_args->ret_code != 0) {
+               error("decompress_routine: Failed to encode mz block.\n");
+               free(a_args);
+               return NULL;
+            }
+
             buff_off += *a_args->dest_len;
             mz_i++;
             block++;
@@ -314,7 +465,16 @@ void* decompress_routine(void* args) {
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             a_args->scale_factor = db_args->df->int_scale_factor;
+
+            // Call the target intensity function to encode the intensity block and write it to the output buffer
             db_args->df->target_inten_fun((void*)a_args);
+
+            if (a_args->ret_code != 0) {
+               error("decompress_routine: Failed to encode intensity block.\n");
+               free(a_args);
+               return NULL;
+            }
+            
             buff_off += *a_args->dest_len;
             inten_i++;
             block = 0;
@@ -331,6 +491,14 @@ void* decompress_routine(void* args) {
    return NULL;
 }
 
+
+/**
+ * @brief Decompresses an .msz file and writes the decompressed data to the provided file descriptor. Uses multiple threads to decompress the data in parallel.
+ * @param input_map The input buffer containing the compressed data.
+ * @param input_filesize The size of the input buffer.
+ * @param arguments A pointer to an Arguments struct containing the command line arguments.
+ * @param fd The file descriptor to write the decompressed data to.
+ */
 void decompress_msz(char* input_map, size_t input_filesize,
                     Arguments* arguments, int fd) {
    block_len_queue_t *xml_block_lens, *mz_binary_block_lens,
@@ -355,7 +523,11 @@ void decompress_msz(char* input_map, size_t input_filesize,
       return;
    }
 
-   set_decompress_runtime_variables(df, msz_footer);
+   int ret = set_decompress_runtime_variables(df, msz_footer);
+   if (ret != 0) {
+      error("decompress_msz: Failed to set decompression runtime variables.\n");
+      return;
+   }
 
    decompress_args_t** args =
        malloc(sizeof(decompress_args_t*) * divisions->n_divisions);
@@ -409,14 +581,14 @@ void decompress_msz(char* input_map, size_t input_filesize,
              CreateThread(NULL, 0, decompress_routine_win, args[i], 0, NULL);
          if (ptid[i] == NULL) {
             perror("CreateThread");
-            exit(-1);
+            return;
          }
 #else
          int ret =
              pthread_create(&ptid[i], NULL, decompress_routine, (void*)args[i]);
          if (ret != 0) {
             perror("pthread_create");
-            exit(-1);
+            return;
          }
 #endif
       }
@@ -428,12 +600,16 @@ void decompress_msz(char* input_map, size_t input_filesize,
          int ret = pthread_join(ptid[i], NULL);
          if (ret != 0) {
             perror("pthread_join");
-            exit(-1);
+            return;
          }
       }
 #endif
 
       for (i = divisions_used; i < divisions_used + threads; i++) {
+         if (args[i]->ret == NULL || args[i]->ret_len == -1) {
+            error("decompress_msz: Decompression failed for division %d.\n", i);
+            return;
+         }
          start = get_time();
          write_to_file(fd, args[i]->ret, args[i]->ret_len);
          stop = get_time();
@@ -452,6 +628,11 @@ void decompress_msz(char* input_map, size_t input_filesize,
    free(ptid);
 }
 
+/**
+ * @brief Sets the decompression function based on the accession integer.
+ * @param accession An integer representing the compression type.
+ * @return A function pointer to the corresponding decompression function on success. NULL on error.
+ */
 decompression_fun set_decompress_fun(int accession) {
    switch (accession) {
       case _ZSTD_compression_:
@@ -462,5 +643,6 @@ decompression_fun set_decompress_fun(int accession) {
          return no_decompress;
       default:
          error("Compression type not supported.");
+         return NULL;
    }
 }

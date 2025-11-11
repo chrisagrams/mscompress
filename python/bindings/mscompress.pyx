@@ -1,4 +1,6 @@
 # cython: linetrace=True
+__version__ = "1.0.2"
+
 import os 
 import numpy as np
 import warnings
@@ -6,13 +8,35 @@ cimport numpy as np
 from typing import Union
 from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
-from libc.string cimport memcpy
+from libc.string cimport memcpy, const_char
 from libc.math cimport nan
 import math
 
 np.import_array()
 
 include "headers.pxi"
+
+# Global error/warning handler for Python
+def _install_mscompress_warning_formatter():
+    import warnings
+    def _mscompress_formatwarning(message, category, filename, lineno, line=None):
+        return f"mscompress : {category.__name__}: {message}\n"
+    warnings.formatwarning = _mscompress_formatwarning
+
+_install_mscompress_warning_formatter()
+cdef void _python_error_handler(const char* message) noexcept:
+    """Callback function to handle C errors in Python"""
+    msg = message.decode('utf-8') if isinstance(message, bytes) else message
+    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+
+cdef void _python_warning_handler(const char* message) noexcept:
+    """Callback function to handle C warnings in Python"""
+    msg = message.decode('utf-8') if isinstance(message, bytes) else message
+    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+
+# Initialize callbacks when module is imported
+_set_error_callback(_python_error_handler)
+_set_warning_callback(_python_warning_handler)
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
@@ -450,6 +474,9 @@ cdef class MSZFile(BaseFile):
         
         res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE)
         
+        if res == NULL:
+            raise ValueError(f"Failed to extract m/z binary for index {index}")
+        
         if self._df.source_mz_fmt == _64d_:
             count = int((out_len) / 8)
             double_ptr = <double*>res
@@ -476,7 +503,10 @@ cdef class MSZFile(BaseFile):
         cdef float* float_ptr
         
         res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE)
-        
+
+        if res == NULL:
+            raise ValueError(f"Failed to extract intensity binary for index {index}")
+
         if self._df.source_inten_fmt == _64d_:
             count = int((out_len) / 8)
             double_ptr = <double*>res
@@ -513,6 +543,9 @@ cdef class MSZFile(BaseFile):
             self._inten_binary_block_lens, xml_pos, mz_pos,
             inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
         )
+
+        if res == NULL:
+            raise ValueError(f"Failed to extract XML for index {index}")
 
         result_str = res.decode('utf-8')
 

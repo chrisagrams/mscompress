@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "cython", "oldest-supported-numpy"]
+requires = ["setuptools>=45", "wheel", "cython", "oldest-supported-numpy", "tomli"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mscompress"
-version = "1.0.1a4"
+version = "1.0.2"
 description = "Python bindings for mscompress, a compression library for mass spectrometry data"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,7 +17,8 @@ dev = [
     "setuptools>=45",
     "cython",
     "numpy",
-    "pytest"
+    "pytest",
+    "tomli"
 ]
 
 [tool.setuptools]

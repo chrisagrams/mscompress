@@ -7,7 +7,7 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 #define STATUS "Dev"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
@@ -69,8 +69,6 @@
 #define _no_encode_ 4700012
 
 #define _LZ4_compression_ 4700012
-
-#define ERROR_CHECK 1 /* If defined, runtime error checks will be enabled. */
 
 #define COMPRESS 1
 #define DECOMPRESS 2
@@ -222,9 +220,35 @@ typedef decode_fun (*decode_fun_ptr)();
 typedef void (*encode_fun)(z_stream*, char**, size_t, char*, size_t*);
 typedef encode_fun (*encode_fun_ptr)();
 
+
+/**
+ * @brief Compression function type.
+ * This function takes a `ZSTD_CCtx` pointer, input data, input size,
+ * output size pointer, and compression level, and returns a pointer to the
+ * compressed data.
+ * @param czstd A pointer to a `ZSTD_CCtx` struct for compression.
+ * @param src A pointer to the input data to be compressed.
+ * @param src_size The size of the input data.
+ * @param dest_len A pointer to a `size_t` where the size of the compressed data
+ * will be stored.
+ * @param compression_level The compression level to use.
+ * @return A pointer to the compressed data. Returns NULL on error.
+ */
 typedef void* (*compression_fun)(ZSTD_CCtx*, void*, size_t, size_t*, int);
 typedef compression_fun (*compression_fun_ptr)();
 
+
+/**
+ * @brief Decompression function type.
+ * This function takes a `ZSTD_DCtx` pointer, input data, input size,
+ * output size pointer, and returns a pointer to the decompressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param src A pointer to the input data to be decompressed.
+ * @param src_size The size of the input data.
+ * @param dest_len A pointer to a `size_t` where the size of the decompressed
+ * data will be stored.
+ * @return A pointer to the decompressed data. Returns NULL on error.
+ */
 typedef void* (*decompression_fun)(ZSTD_DCtx*, void*, size_t, size_t);
 typedef decompression_fun (*decompression_fun_ptr)();
 
@@ -272,8 +296,8 @@ int set_mz_lossy(Arguments* args, const char* mz_lossy);
 int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
-void set_compress_runtime_variables(Arguments* args, data_format_t* df);
-void set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
+int set_compress_runtime_variables(Arguments* args, data_format_t* df);
+int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
 extern long fd_pos[3];
@@ -307,9 +331,9 @@ int close_file(int fd);
 
 data_block_t* alloc_data_block(size_t max_size);
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size);
-void dealloc_data_block(data_block_t* db);
+int dealloc_data_block(data_block_t* db);
 cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size);
-void dealloc_cmp_block(cmp_block_t* blk);
+int dealloc_cmp_block(cmp_block_t* blk);
 
 /* preprocess.c */
 
@@ -378,6 +402,16 @@ int error(const char* format, ...);
 int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
+/* Callback types for error/warning handling */
+typedef void (*error_callback_t)(const char* message);
+typedef void (*warning_callback_t)(const char* message);
+
+/* Set custom error/warning callbacks (for Python bindings) */
+void set_error_callback(error_callback_t callback);
+void set_warning_callback(warning_callback_t callback);
+void reset_error_callback(void);
+void reset_warning_callback(void);
+
 /* decode.c */
 
 void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len);
@@ -442,6 +476,21 @@ int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
 /* decompress.c */
+
+/**
+ * @brief Structure containing the arguments for decompression.
+ * @param input_map The input buffer containing the compressed data.
+ * @param df A pointer to a data_format_t struct containing the data format information.
+ * @param xml_blk A pointer to a block_len_t struct containing the original and compressed sizes
+ * @param mz_binary_blk A pointer to a block_len_t struct containing the original and compressed sizes of the m/z binary block.
+ * @param inten_binary_blk A pointer to a block_len_t struct containing the original and compressed
+ * @param division A pointer to a division_t struct containing the division information.
+ * @param footer_xml_off The offset within the input buffer where the XML block starts.
+ * @param footer_mz_bin_off The offset within the input buffer where the m/z binary block starts.
+ * @param footer_inten_bin_off The offset within the input buffer where the intensity binary block starts.
+ * @param ret A pointer to a char* where the decompressed data will be stored.
+ * @param ret_len A pointer to a size_t where the length of the decompressed data will be stored.
+ */
 typedef struct {
    char* input_map;
    int binary_encoding;
@@ -470,6 +519,20 @@ void decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
 decompression_fun set_decompress_fun(int accession);
 
 /* algo.c */
+/**
+ * @brief Structure containing the arguments for the algorithm.
+ * @param src A pointer to a `char*` where the source data is stored.
+ * @param src_len The length of the source data.
+ * @param dest A pointer to a `char*` where the destination data will be stored.
+ * @param dest_len A pointer to a `size_t` where the length of the destination data will be stored.
+ * @param src_format An integer representing the format of the source data.
+ * @param enc_fun A function pointer to the encoding function to be used.
+ * @param dec_fun A function pointer to the decoding function to be used.
+ * @param tmp A pointer to a `data_block_t` struct used for temporary storage during encoding/decoding.
+ * @param z A pointer to a `z_stream` struct used for zlib compression/decompression.
+ * @param scale_factor A float representing the scale factor to be applied to the data during encoding/decoding.
+ * @param ret_code An integer representing the return code of the algorithm.
+ */
 typedef struct {
    char** src;
    size_t src_len;
@@ -481,6 +544,7 @@ typedef struct {
    data_block_t* tmp;
    z_stream* z;
    float scale_factor;
+   int ret_code;
 } algo_args;
 
 Algo set_compress_algo(int algo, int accession);
@@ -509,7 +573,7 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 zlib_block_t* zlib_alloc(int offset);
 z_stream* alloc_z_stream();
 void dealloc_z_stream(z_stream* z);
-void zlib_realloc(zlib_block_t* old_block, size_t new_size);
+int zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
 void* zlib_pop_header(zlib_block_t* blk);

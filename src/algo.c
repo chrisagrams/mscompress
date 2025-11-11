@@ -12,22 +12,24 @@
     @section Decoding functions
 */
 
-void algo_decode_lossless(void* args)
-/**
+
+/** 
  * @brief Lossless decoding function.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_decode_lossless(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args->src == NULL)
+   if (a_args->src == NULL) {
       error("algo_decode_lossless: src is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Decode using specified encoding format
    a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, a_args->dest,
@@ -38,9 +40,28 @@ void algo_decode_lossless(void* args)
    return;
 }
 
+/**
+ * @brief cast 64-bit double to 32-bit float.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_cast32_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_cast32_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_cast32_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -53,20 +74,16 @@ void algo_decode_cast32_64d(void* args) {
    uint16_t len;
    float* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_cast32_64d: Unknown data format");
-#endif
    len = decoded_len / sizeof(double);
    res = malloc(
        (len + 1) *
        sizeof(float));  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_cast32: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_cast32_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    for (int i = 1; i < len + 1; i++) {
@@ -83,9 +100,29 @@ void algo_decode_cast32_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief cast 32-bit float to 16-bit unsigned integer.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_cast16_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_cast16_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_cast16_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -98,26 +135,22 @@ void algo_decode_cast16_32f(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_cast16_32f: Unknown data format");
-#endif
    len = decoded_len / sizeof(float);
 
    res = calloc(1, (len * sizeof(uint16_t)) +
                        sizeof(uint16_t));  // Allocate space for result and
                                            // leave room for header
 
+   if (res == NULL) {
+      error("algo_decode_cast16_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
+
    uint16_t* tmp = res + 1;  // Skip header
 
    // Store length of array in first 4 bytes
    memcpy(res, &len, sizeof(uint16_t));
-
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_cast16: malloc failed");
-#endif
 
    float* f = (float*)(decoded);
 
@@ -137,9 +170,29 @@ void algo_decode_cast16_32f(void* args) {
    return;
 }
 
+
+/**
+ * @brief cast 64-bit double to 16-bit unsigned integer.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_cast16_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_cast16_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_cast16_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -152,26 +205,22 @@ void algo_decode_cast16_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_cast32_64d: Unknown data format");
-#endif
    len = decoded_len / sizeof(double);
 
    res = calloc(1, (len * sizeof(uint16_t)) +
                        sizeof(uint16_t));  // Allocate space for result and
                                            // leave room for header
 
+   if (res == NULL) {
+      error("algo_decode_cast16_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
+   
    uint16_t* tmp = res + 1;  // Skip header
 
    // Store length of array in first 4 bytes
    memcpy(res, &len, sizeof(uint16_t));
-
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_cast16: malloc failed");
-#endif
 
    double* f = (double*)(decoded);
 
@@ -191,17 +240,29 @@ void algo_decode_cast16_64d(void* args) {
    return;
 }
 
-void algo_decode_log_2_transform_32f(void* args)
 /**
- * @brief Log2 transform decoding function.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @brief Log2 transform decoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_decode_log_2_transform_32f(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_log_2_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_log_2_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -214,25 +275,19 @@ void algo_decode_log_2_transform_32f(void* args)
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_log_2_transform_32f: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(float);
 
    size_t res_len = (len + 1) * sizeof(uint16_t);
 
    // Perform log2 transform
-   res =
-       calloc(1,
-              res_len);  // Allocate space for result and leave room for header
+   res = calloc(1, res_len);  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_log_2_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_log_2_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
+
    double ltran;
 
    float* f = (float*)(decoded);
@@ -256,9 +311,28 @@ void algo_decode_log_2_transform_32f(void* args)
    return;
 }
 
+/**
+ * @brief Log2 transform decoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_log_2_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_log_2_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_log_2_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -271,12 +345,6 @@ void algo_decode_log_2_transform_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_log_2_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    // Perform log2 transform
@@ -285,10 +353,11 @@ void algo_decode_log_2_transform_64d(void* args) {
        sizeof(
            uint16_t));  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_log_2_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_log_2_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double ltran;
 
@@ -313,9 +382,29 @@ void algo_decode_log_2_transform_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief Delta transform decoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta16_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta16_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_delta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -328,12 +417,6 @@ void algo_decode_delta16_transform_32f(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_32f: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(float);
 
    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) + sizeof(float);
@@ -342,10 +425,11 @@ void algo_decode_delta16_transform_32f(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta16_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* f = (float*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -379,9 +463,29 @@ void algo_decode_delta16_transform_32f(void* args) {
    return;
 }
 
+
+/**
+ * @brief Delta transform decoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta16_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta16_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_delta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -394,12 +498,6 @@ void algo_decode_delta16_transform_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    size_t res_len =
@@ -409,10 +507,11 @@ void algo_decode_delta16_transform_64d(void* args) {
    res = malloc(res_len);  // Allocate space for result and leave room for
                            // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta16_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -451,9 +550,29 @@ void algo_decode_delta16_transform_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief Delta transform decoding function for 32-bit floats with 24-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta24_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta24_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_delta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -466,12 +585,6 @@ void algo_decode_delta24_transform_32f(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_32f: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(float);
 
    size_t res_len =
@@ -481,10 +594,11 @@ void algo_decode_delta24_transform_32f(void* args) {
    res = calloc(res_len, 1);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta24_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* f = (float*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -528,9 +642,29 @@ void algo_decode_delta24_transform_32f(void* args) {
    return;
 }
 
+
+/**
+ * @brief Delta transform decoding function for 64-bit doubles with 24-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta24_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta24_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_delta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -543,12 +677,6 @@ void algo_decode_delta24_transform_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    size_t res_len =
@@ -558,10 +686,11 @@ void algo_decode_delta24_transform_64d(void* args) {
    res = calloc(res_len, 1);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta24_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -605,9 +734,28 @@ void algo_decode_delta24_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform decoding function for 32-bit floats with 32-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta32_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta32_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_delta32_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -620,11 +768,6 @@ void algo_decode_delta32_transform_32f(void* args) {
    uint16_t len;
    uint32_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_32f: Unknown data format");
-#endif
 
    len = decoded_len / sizeof(float);
 
@@ -634,10 +777,11 @@ void algo_decode_delta32_transform_32f(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta32_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* f = (float*)(decoded);
    uint32_t* tmp =
@@ -670,9 +814,28 @@ void algo_decode_delta32_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform decoding function for 64-bit doubles with 32-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_delta32_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_delta32_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_delta32_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -685,12 +848,6 @@ void algo_decode_delta32_transform_64d(void* args) {
    uint16_t len;
    uint32_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    size_t res_len =
@@ -700,10 +857,11 @@ void algo_decode_delta32_transform_64d(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_delta32_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    uint32_t* tmp =
@@ -738,9 +896,28 @@ void algo_decode_delta32_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform decoding function for 32-bit floats with 16-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vdelta16_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_vdelta16_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -753,12 +930,6 @@ void algo_decode_vdelta16_transform_32f(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_vdelta16_transform_32f: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(float);
 
    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) +
@@ -768,10 +939,11 @@ void algo_decode_vdelta16_transform_32f(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_vdelta16_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* f = (float*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -822,9 +994,28 @@ void algo_decode_vdelta16_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform decoding function for 64-bit doubles with 16-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vdelta16_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_vdelta16_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -837,12 +1028,6 @@ void algo_decode_vdelta16_transform_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    size_t res_len = (len * sizeof(uint16_t)) + sizeof(uint16_t) +
@@ -852,10 +1037,11 @@ void algo_decode_vdelta16_transform_64d(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_vdelta16_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -906,9 +1092,29 @@ void algo_decode_vdelta16_transform_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief Delta transform decoding function for 32-bit floats with 24-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vdelta24_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_vdelta24_transform_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -921,12 +1127,6 @@ void algo_decode_vdelta24_transform_32f(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_vdelta24_transform_32f: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(float);
 
    size_t res_len = (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) +
@@ -936,10 +1136,11 @@ void algo_decode_vdelta24_transform_32f(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_decode_vdelta24_transform_32f: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* f = (float*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -1000,9 +1201,28 @@ void algo_decode_vdelta24_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform decoding function for 64-bit doubles with 24-bit unsigned integer deltas.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vdelta24_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_vdelta24_transform_64d: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -1015,12 +1235,6 @@ void algo_decode_vdelta24_transform_64d(void* args) {
    uint16_t len;
    uint16_t* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_delta_transform_64d: Unknown data format");
-#endif
-
    len = decoded_len / sizeof(double);
 
    size_t res_len = (len * 3 * sizeof(uint8_t)) + sizeof(uint16_t) +
@@ -1030,10 +1244,11 @@ void algo_decode_vdelta24_transform_64d(void* args) {
    res = calloc(1, res_len);  // Allocate space for result and leave room for
                               // header and first value
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_vdelta24_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* f = (double*)(decoded);
    uint16_t* tmp = (uint16_t*)(res + 1);  // Ignore header in first 4 bytes
@@ -1094,9 +1309,29 @@ void algo_decode_vdelta24_transform_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief Variable bit rate decoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vbr_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args->src == NULL) {
+      error("algo_decode_vbr_32f: src is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -1109,15 +1344,12 @@ void algo_decode_vbr_32f(void* args) {
    uint32_t len;
    unsigned char* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_vbr_32f: Unknown data format");
-#endif
-
    if (decoded_len + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t) >
-       UINT32_MAX)
+       UINT32_MAX) {
       error("algo_decode_vbr_32f: decoded_len > UINT32_MAX");
+      a_args->ret_code = -1;
+      return;
+   }
 
    len = (uint32_t)decoded_len;
 
@@ -1146,10 +1378,11 @@ void algo_decode_vbr_32f(void* args) {
        calloc(1,
               res_len);  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_vbr_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    unsigned char* tmp_res = res + sizeof(uint32_t) + sizeof(float) +
                             sizeof(uint32_t);  // Ignore header
@@ -1220,9 +1453,28 @@ void algo_decode_vbr_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Variable bit rate decoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_vbr_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args == NULL) {
+      error("algo_decode_vbr_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -1235,15 +1487,12 @@ void algo_decode_vbr_64d(void* args) {
    uint32_t len;
    unsigned char* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_vbr_64d: Unknown data format");
-#endif
-
    if (decoded_len + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t) >
-       UINT32_MAX)
+       UINT32_MAX) {
       error("algo_decode_vbr_64d: decoded_len > UINT32_MAX");
+      a_args->ret_code = -1;
+      return;
+   }
 
    len = (uint32_t)decoded_len;
 
@@ -1272,10 +1521,11 @@ void algo_decode_vbr_64d(void* args) {
        calloc(1,
               res_len);  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_decode_vbr_64d: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    unsigned char* tmp_res = res + sizeof(uint32_t) + sizeof(double) +
                             sizeof(uint32_t);  // Ignore header
@@ -1346,9 +1596,29 @@ void algo_decode_vbr_64d(void* args) {
    return;
 }
 
+
+/**
+ * @brief Bit packing decoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_bitpack_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args == NULL) {
+      error("algo_decode_bitpack_32f: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_decode_bitpack_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -1361,16 +1631,13 @@ void algo_decode_bitpack_32f(void* args) {
    uint32_t len;
    unsigned char* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_decode_bitpack_32f: Unknown data format");
-#endif
-
    size_t header_size = sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t);
 
-   if (decoded_len + header_size > UINT32_MAX)
+   if (decoded_len + header_size > UINT32_MAX) {
       error("algo_decode_bitpack_32f: decoded_len > UINT32_MAX");
+      a_args->ret_code = -1;
+      return;
+   }
 
    len = (uint32_t)(decoded_len / sizeof(float));
 
@@ -1387,10 +1654,11 @@ void algo_decode_bitpack_32f(void* args) {
        calloc(1,
               res_len);  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_bitpack_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    unsigned char* tmp_res = res + header_size;  // Ignore header
 
@@ -1441,9 +1709,28 @@ void algo_decode_bitpack_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Bit packing decoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_decode_bitpack_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
+
+   if (a_args == NULL) {
+      error("algo_decode_bitpack_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_decode_bitpack_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    char* decoded = NULL;
    size_t decoded_len = 0;
@@ -1456,16 +1743,13 @@ void algo_decode_bitpack_64d(void* args) {
    uint32_t len;
    unsigned char* res;
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_decode_vbr_64d: Unknown data format");
-#endif
-
    size_t header_size = sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t);
 
-   if (decoded_len + header_size > UINT32_MAX)
+   if (decoded_len + header_size > UINT32_MAX) {
       error("algo_decode_vbr_64d: decoded_len > UINT32_MAX");
+      a_args->ret_code = -1;
+      return;
+   }
 
    len = (uint32_t)(decoded_len / sizeof(double));
 
@@ -1482,10 +1766,11 @@ void algo_decode_bitpack_64d(void* args) {
        calloc(1,
               res_len);  // Allocate space for result and leave room for header
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_decode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_decode_bitpack_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    unsigned char* tmp_res = res + header_size;  // Ignore header
 
@@ -1540,22 +1825,24 @@ void algo_decode_bitpack_64d(void* args) {
     @section Encoding functions
 */
 
-void algo_encode_lossless(void* args)
 /**
  * @brief Lossless encoding function.
- *
- * @param args Pointer to algo_args struct.
+ * @param args Pointer to `algo_args` struct containing encoding parameters.
  *
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_lossless(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_lossless: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    /* Lossless, don't touch anything */
 
@@ -1566,24 +1853,29 @@ void algo_encode_lossless(void* args)
    return;
 }
 
-void algo_encode_cast32_64d(void* args)
 /**
  * @brief Casts 32-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_cast32_64d(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_cast32: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_cast32_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    float* arr = (float*)(*a_args->src);
@@ -1591,24 +1883,20 @@ void algo_encode_cast32_64d(void* args)
    // Get array length
    uint16_t len = (uint16_t)arr[0];
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
-      error("algo_encode_cast32: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_cast32_64d: Unknown data format");
-#endif
+   if (len <= 0) {
+      error("algo_encode_cast32_64d: len is <= 0");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = malloc(sizeof(double) * len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_cast32: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_cast32_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* res_arr = (double*)res;
 
@@ -1627,24 +1915,32 @@ void algo_encode_cast32_64d(void* args)
    return;
 }
 
-void algo_encode_cast16_32f(void* args)
+
 /**
  * @brief Casts 16-bit float array to 32-bit float array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_cast16_32f(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_cast16_32f: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 16-bit to 64-bit
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_cast16_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
+
+   // Cast 16-bit to 32-bit
 
    // Get source array
    uint16_t* arr = (uint16_t*)(*a_args->src);
@@ -1652,26 +1948,23 @@ void algo_encode_cast16_32f(void* args)
    // Get array length
    uint16_t len = (uint16_t)arr[0];
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_cast16_32f: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_cast16_32f: Unknown data format");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = malloc(sizeof(float) * len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_cast16_32f: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   uint16_t* tmp = arr + 1;  // Ignore header
+   // Get pointer to the array, ignoring the header
+   uint16_t* tmp = arr + 1;
 
    float* res_arr = (float*)res;
 
@@ -1692,24 +1985,29 @@ void algo_encode_cast16_32f(void* args)
    return;
 }
 
-void algo_encode_cast16_64d(void* args)
 /**
  * @brief Casts 16-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_cast16_64d(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
-      error("algo_encode_cast32: args is NULL");
-#endif
+   if (a_args == NULL) {
+      error("algo_encode_cast16_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_cast16_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    uint16_t* arr = (uint16_t*)(*a_args->src);
@@ -1717,24 +2015,20 @@ void algo_encode_cast16_64d(void* args)
    // Get array length
    uint16_t len = (uint16_t)arr[0];
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
-      error("algo_encode_cast32: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_cast32_64d: Unknown data format");
-#endif
+   if (len <= 0) {
+      error("algo_encode_cast16_64d: len is <= 0");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = malloc(sizeof(double) * len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_cast32: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_cast16_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    uint16_t* tmp = arr + 1;  // Ignore header
 
@@ -1757,40 +2051,50 @@ void algo_encode_cast16_64d(void* args)
    return;
 }
 
+/**
+ * @brief Logarithmic base 2 transform via exp2 to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_log_2_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_log_2_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_log_2_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_log_2_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_log_2_transform: Unknown data format");
-#endif
 
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_log_2_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform log2 transform
    for (size_t i = 0; i < len; i++)
@@ -1806,31 +2110,40 @@ void algo_encode_log_2_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Logarithmic base 2 transform via exp2 to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_log_2_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_log_2_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_log_2_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_log_2_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_log_2_transform: Unknown data format");
-#endif
 
    // Allocate buffer
    size_t res_len = len * sizeof(double);
@@ -1851,22 +2164,37 @@ void algo_encode_log_2_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 16-bit integers to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta16_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -1875,20 +2203,15 @@ void algo_encode_delta16_transform_32f(void* args) {
    uint16_t* arr =
        (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -1905,22 +2228,37 @@ void algo_encode_delta16_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 16-bit integers to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta16_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -1929,20 +2267,15 @@ void algo_encode_delta16_transform_64d(void* args) {
    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                                sizeof(double));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -1959,22 +2292,37 @@ void algo_encode_delta16_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Variable delta transform encoding function for 16-bit integers to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_vdelta16_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_vdelta16_transform_32f: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_vdelta16_transform_32f: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -1988,20 +2336,15 @@ void algo_encode_vdelta16_transform_32f(void* args) {
    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                                sizeof(float) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_vdelta16_transform_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2019,22 +2362,38 @@ void algo_encode_vdelta16_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Variable delta transform encoding function for 16-bit integers to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_vdelta16_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
-      error("algo_encode_delta_transform: args is NULL");
-#endif
+   if (a_args == NULL) {
+      error("algo_encode_vdelta16_transform_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
+
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
-      error("algo_encode_delta_transform: len is <= 0");
-#endif
+   if (len <= 0) {
+      error("algo_encode_vdelta16_transform_64d: len is <= 0");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2048,20 +2407,15 @@ void algo_encode_vdelta16_transform_64d(void* args) {
    uint16_t* arr = (uint16_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                                sizeof(float) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_vdelta16_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2079,22 +2433,37 @@ void algo_encode_vdelta16_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Variable delta transform encoding function for 24-bit integers to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_vdelta24_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_vdelta24_transform_32f: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_vdelta24_transform_32f: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2107,21 +2476,16 @@ void algo_encode_vdelta24_transform_32f(void* args) {
    // Get source array
    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                              sizeof(float) + sizeof(float));
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_vdelta24_transform_32f: Unknown data format");
-#endif
 
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_vdelta24_transform_32f: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2150,22 +2514,37 @@ void algo_encode_vdelta24_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Variable delta transform encoding function for 24-bit integers to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_vdelta24_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
-      error("algo_encode_delta_transform: args is NULL");
-#endif
+   if (a_args == NULL) {
+      error("algo_encode_vdelta24_transform_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
-      error("algo_encode_delta_transform: len is <= 0");
-#endif
+   if (len <= 0) {
+      error("algo_encode_vdelta24_transform_64d: len is <= 0");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2179,20 +2558,15 @@ void algo_encode_vdelta24_transform_64d(void* args) {
    uint8_t* arr = (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                              sizeof(float) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_delta_transform: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_vdelta24_transform_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2221,22 +2595,37 @@ void algo_encode_vdelta24_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 24-bit integers to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta24_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
+   
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2245,20 +2634,15 @@ void algo_encode_delta24_transform_32f(void* args) {
    uint8_t* arr =
        (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2287,22 +2671,37 @@ void algo_encode_delta24_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 24-bit integers to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta24_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2311,20 +2710,15 @@ void algo_encode_delta24_transform_64d(void* args) {
    uint8_t* arr =
        (uint8_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(double));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2353,22 +2747,37 @@ void algo_encode_delta24_transform_64d(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 32-bit integers to 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta32_transform_32f(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    float start = *(float*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2377,20 +2786,15 @@ void algo_encode_delta32_transform_32f(void* args) {
    uint32_t* arr =
        (uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) + sizeof(float));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(float);
    float* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2407,22 +2811,37 @@ void algo_encode_delta32_transform_32f(void* args) {
    return;
 }
 
+/**
+ * @brief Delta transform encoding function for 32-bit integers to 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
+ * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
+ */
 void algo_encode_delta32_transform_64d(void* args) {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_delta_transform: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
+
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get array length
    uint16_t len = *(uint16_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_delta_transform: len is <= 0");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get starting value
    double start = *(double*)((uint8_t*)(*a_args->src) + sizeof(uint16_t));
@@ -2431,20 +2850,15 @@ void algo_encode_delta32_transform_64d(void* args) {
    uint32_t* arr = (uint32_t*)((uint8_t*)(*a_args->src) + sizeof(uint16_t) +
                                sizeof(double));
 
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_delta_transform: Unknown data format");
-#endif
-
    // Allocate buffer
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_delta_transform: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Perform delta transform
    res[0] = start;
@@ -2461,24 +2875,29 @@ void algo_encode_delta32_transform_64d(void* args) {
    return;
 }
 
-void algo_encode_vbr_32f(void* args)
 /**
- * @brief Casts 32-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @brief Variable Bit Rate (VBR) encoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_vbr_32f(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_vbr_32f: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    unsigned char* arr = (unsigned char*)(*a_args->src);
@@ -2489,24 +2908,20 @@ void algo_encode_vbr_32f(void* args)
    // Get array length
    uint32_t len = *(uint32_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_vbr_32f: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_vbr_32f: Unknown data format");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = calloc(1, len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_vbr_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* res_arr = (float*)res;
 
@@ -2567,24 +2982,29 @@ void algo_encode_vbr_32f(void* args)
    return;
 }
 
-void algo_encode_vbr_64d(void* args)
 /**
- * @brief Casts 32-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @brief Variable Bit Rate (VBR) encoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_vbr_64d(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_vbr_64d: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    unsigned char* arr = (unsigned char*)(*a_args->src);
@@ -2595,24 +3015,20 @@ void algo_encode_vbr_64d(void* args)
    // Get array length
    uint32_t len = *(uint32_t*)(*a_args->src);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_vbr_64d: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_vbr_64d: Unknown data format");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = calloc(1, len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
+   if (res == NULL) {
       error("algo_encode_vbr_64d: malloc failed");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* res_arr = (double*)res;
 
@@ -2673,24 +3089,29 @@ void algo_encode_vbr_64d(void* args)
    return;
 }
 
-void algo_encode_bitpack_32f(void* args)
 /**
- * @brief Casts 32-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @brief Bitpack encoding function for 32-bit floats.
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_bitpack_32f(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
+   if (a_args == NULL) {
       error("algo_encode_bitpack_32f: args is NULL");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _32f_) {
+      error("algo_encode_bitpack_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    unsigned char* arr = (unsigned char*)(*a_args->src);
@@ -2701,24 +3122,20 @@ void algo_encode_bitpack_32f(void* args)
    // Get array length (in bytes)
    uint32_t len = *(uint32_t*)(*a_args->src) * sizeof(float);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
+   if (len <= 0) {
       error("algo_encode_bitpack_32f: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _32f_)  // non-essential check, but useful for debugging
-      error("algo_encode_bitpack_32f: Unknown data format");
-#endif
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = calloc(1, len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_bitpack_32f: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    float* res_arr = (float*)res;
 
@@ -2771,24 +3188,29 @@ void algo_encode_bitpack_32f(void* args)
    return;
 }
 
-void algo_encode_bitpack_64d(void* args)
 /**
- * @brief Casts 32-bit float array to 64-bit double array.
- *
- * @param args Pointer to algo_args struct.
- *
+ * @brief Bitpack encoding function for 64-bit doubles.
+ * @param args Pointer to `algo_args` struct.
  * @return void
+ * 
+ * Note: Returns errors via `a_args->ret_code`, which is set to -1 on error and 0 on success.
  */
+void algo_encode_bitpack_64d(void* args)
 {
    // Parse args
    algo_args* a_args = (algo_args*)args;
 
-#ifdef ERROR_CHECK
-   if (a_args == NULL)
-      error("algo_encode_vbr_64d: args is NULL");
-#endif
+   if (a_args == NULL) {
+      error("algo_encode_bitpack_64d: args is NULL");
+      a_args->ret_code = -1;
+      return;
+   }
 
-   // Cast 32-bit to 64-bit
+   if (a_args->src_format != _64d_) {
+      error("algo_encode_bitpack_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Get source array
    unsigned char* arr = (unsigned char*)(*a_args->src);
@@ -2799,24 +3221,20 @@ void algo_encode_bitpack_64d(void* args)
    // Get array length (in bytes)
    uint32_t len = *(uint32_t*)(*a_args->src) * sizeof(double);
 
-#ifdef ERROR_CHECK
-   if (len <= 0)
-      error("algo_encode_vbr_64d: len is <= 0");
-#endif
-
-#ifdef ERROR_CHECK
-   if (a_args->src_format !=
-       _64d_)  // non-essential check, but useful for debugging
-      error("algo_encode_vbr_64d: Unknown data format");
-#endif
+   if (len <= 0) {
+      error("algo_encode_bitpack_64d: len is <= 0");
+      a_args->ret_code = -1;
+      return;
+   }
 
    // Allocate buffer
    void* res = calloc(1, len);
 
-#ifdef ERROR_CHECK
-   if (res == NULL)
-      error("algo_encode_vbr_64d: malloc failed");
-#endif
+   if (res == NULL) {
+      error("algo_encode_bitpack_64d: malloc failed");
+      a_args->ret_code = -1;
+      return;
+   }
 
    double* res_arr = (double*)res;
 
@@ -2873,6 +3291,12 @@ void algo_encode_bitpack_64d(void* args)
     @section Algo switch
 */
 
+/**
+ * @brief Returns the appropriate compression algorithm function pointer based on the provided algorithm and accession type.
+ * @param algo The compression algorithm type.
+ * @param accession The data type accession (e.g., 32f for 32-bit float, 64d for 64-bit double).
+ * @return A function pointer to the corresponding compression algorithm. If the algorithm or accession type is unknown, it returns NULL and logs an error.
+ */
 Algo set_compress_algo(int algo, int accession) {
    switch (algo) {
       case _lossless_:
@@ -2960,9 +3384,16 @@ Algo set_compress_algo(int algo, int accession) {
       };
       default:
          error("set_compress_algo: Unknown compression algorithm");
+         return NULL;
    }
 }
 
+/**
+ * @brief Returns the appropriate decompression algorithm function pointer based on the provided algorithm and accession type.
+ * @param algo The compression algorithm type.
+ * @param accession The data type accession (e.g., 32f for 32-bit float, 64d for 64-bit double).
+ * @return A function pointer to the corresponding decompression algorithm. If the algorithm or accession type is unknown, it returns NULL and logs an error.
+ */
 Algo set_decompress_algo(int algo, int accession) {
    switch (algo) {
       case _lossless_:
@@ -3050,9 +3481,15 @@ Algo set_decompress_algo(int algo, int accession) {
       };
       default:
          error("set_decompress_algo: Unknown compression algorithm");
+         return NULL;
    }
 }
 
+/**
+ * @brief Returns the algorithm type based on the provided argument.
+ * @param arg The argument representing the algorithm type.
+ * @return An integer representing the algorithm type. If the argument is NULL or unknown, it logs an error and returns -1.
+ */
 int get_algo_type(char* arg) {
    if (arg == NULL)
       error("get_algo_type: arg is NULL");
@@ -3078,6 +3515,8 @@ int get_algo_type(char* arg) {
       return _vbr_;
    else if (strcmp(arg, "bitpack") == 0)
       return _bitpack_;
-   else
+   else {
       error("get_algo_type: Unknown compression algorithm");
+      return -1;
+   }
 }

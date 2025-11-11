@@ -141,8 +141,8 @@ cdef extern from "../src/mscompress.h":
     long _determine_n_divisions "determine_n_divisions"(long filesize, long blocksize)
     divisions_t* _create_divisions "create_divisions"(division_t* div, long n_divisions)
     long _get_division_size_max "get_division_size_max"(divisions_t* divisions)
-    void _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
-    void _set_decompress_runtime_variables "set_decompress_runtime_variables"(data_format_t* df, footer_t* msz_footer)
+    int _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
+    int _set_decompress_runtime_variables "set_decompress_runtime_variables"(data_format_t* df, footer_t* msz_footer)
     data_block_t* _alloc_data_block "alloc_data_block"(size_t max_size)
     void _dealloc_data_block "dealloc_data_block"(data_block_t* db)
     z_stream* _alloc_z_stream "alloc_z_stream"()
@@ -159,3 +159,12 @@ cdef extern from "../src/mscompress.h":
     char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
     void _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
     void _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
+
+    # Error/warning callback functions
+    ctypedef void (*error_callback_t)(const char* message)
+    ctypedef void (*warning_callback_t)(const char* message)
+    
+    void _set_error_callback "set_error_callback"(error_callback_t callback)
+    void _set_warning_callback "set_warning_callback"(warning_callback_t callback)
+    void _reset_error_callback "reset_error_callback"()
+    void _reset_warning_callback "reset_warning_callback"()

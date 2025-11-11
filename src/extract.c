@@ -210,16 +210,26 @@ char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len) {
    return res;
 }
 
+
+/**
+ * @brief Extracts the XML block corresponding to the start of a spectrum from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param xml_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the XML blocks.
+ * @param xml_pos The offset within the input buffer where the XML blocks start.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param spectrum_start The starting position of the spectrum to extract.
+ * @param spectrum_end The ending position of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted XML block will be stored.
+ * @return A pointer to the extracted XML block on success. NULL on error
+ */
 char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
                                  size_t* out_len)
-/*
- * Extract from spectrum_start until xml->end_position (from <spectrum> to
- * <binary>)
- */
 {
    char* res;
 
@@ -268,6 +278,10 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
    if (!xml_blk_len->cache) {
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_spectrum_start_xml: Failed to decompress XML block.\n");
+         return NULL;
+      }
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
@@ -279,16 +293,25 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
    return res;
 }
 
+/**
+ * @brief Extracts the XML block corresponding to the end of a spectrum from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param xml_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the XML blocks.
+ * @param xml_pos The offset within the input buffer where the XML blocks start.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param spectrum_start The starting position of the spectrum to extract.
+ * @param spectrum_end The ending position of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted XML block will be stored.
+ * @return A pointer to the extracted XML block on success. NULL on error
+ */
 char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
                                  size_t* out_len)
-/*
- * Extract XML between binary sections (XML positions fully inside
- * spectrum_start and spectrum_end).
- */
 {
    char* res;
 
@@ -337,6 +360,10 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
    if (!xml_blk_len->cache) {
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_spectrum_inner_xml: Failed to decompress XML block.\n");
+         return NULL;
+      }
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
@@ -348,14 +375,24 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
    return res;
 }
 
+/**
+ * @brief Extracts the XML block corresponding to the end of a spectrum from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param xml_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the XML blocks.
+ * @param xml_pos The offset within the input buffer where the XML blocks start.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param spectrum_start The starting position of the spectrum to extract.
+ * @param spectrum_end The ending position of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted XML block will be stored.
+ * @return A pointer to the extracted XML block on success. NULL on error.
+ */
 char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
                                 data_format_t* df,
                                 block_len_queue_t* xml_block_lens, long xml_pos,
                                 divisions_t* divisions, uint64_t spectrum_start,
                                 uint64_t spectrum_end, size_t* out_len)
-/*
- * Extract final XML in spectrum after last binary.
- */
 {
    char* res;
 
@@ -405,6 +442,10 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       xml_blk_len->cache = decmp_xml;
+      if (decmp_xml == NULL) {
+         error("extract_spectrum_last_xml: Failed to decompress XML block.\n");
+         return NULL;
+      }
    } else
       decmp_xml = xml_blk_len->cache;
 
@@ -416,22 +457,70 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
    return res;
 }
 
-void encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
+/**
+ * @brief Encodes a binary block using the specified encoding function and algorithm.
+ * @param blk A pointer to the `block_len_t` structure containing the binary block to be encoded.
+ * @param curr_dp A pointer to the `data_positions_t` structure containing the positions of the data to be encoded.
+ * @param source_fmt The format of the source data.
+ * @param target_fmt The format of the target encoded data.
+ * @param encode_fun A pointer to the encoding function to be used for encoding the data.
+ * @param scale_factor A float value representing the scale factor to be applied during encoding.
+ * @param target_fun A pointer to the algorithm function to be used for encoding the data.
+ * @return Returns 0 on success, and 1 on failure.
+ * 
+ * Note: Caller is responsible for freeing the memory allocated for the encoded cache and its lengths in the `block_len_t` structure after use.
+ */
+int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
                          uint32_t source_fmt, uint32_t target_fmt,
                          encode_fun encode_fun, float scale_factor,
-                         Algo target_fun) {
-   if (blk->encoded_cache_len > 0 && blk->encoded_cache_fmt == target_fmt)
-      return;
+                         Algo target_fun) 
+{
+   if (blk->encoded_cache_len > 0 && blk->encoded_cache_fmt == target_fmt) {
+      // Already encoded with the same format, no need to re-encode
+      return 0;
+   }
    uint64_t total_spec = curr_dp->total_spec;
 
+   // Allocate memory for algo_args
    algo_args* a_args = malloc(sizeof(algo_args));
+   if (!a_args) {
+      error("encode_binary_block: Failed to allocate algo_args.\n");
+      return 1;
+   }
+
+   a_args->ret_code = 0; // Initialize return code to 0 (success).
+
    size_t algo_output_len = 0;
    char* decmp_binary = blk->cache;
+
+   // Allocate a buffer to hold the encoded data. The size is determined by the total length of the binary data to be encoded.
    char* buff = malloc(curr_dp->end_positions[total_spec - 1] -
                        curr_dp->start_positions[0]);
+   if (!buff) {
+      error("encode_binary_block: Failed to allocate buffer for encoded data.\n");
+      free(a_args);
+      return 1;
+   }
+
+   // Allocate an array to hold the lengths of the encoded blocks for each spectrum.
    size_t* res_lens = malloc(total_spec * sizeof(size_t));
+   if (!res_lens) {
+      error("encode_binary_block: Failed to allocate res_lens array.\n");
+      free(a_args);
+      free(buff);
+      return 1;
+   }
    uint64_t buff_off = 0;
+
+   // Initialize the z_stream for encoding
    a_args->z = alloc_z_stream();
+   if (!a_args->z) {
+      error("encode_binary_block: Failed to allocate z_stream.\n");
+      free(a_args);
+      free(buff);
+      free(res_lens);
+      return 1;
+   }
    a_args->dest_len = &algo_output_len;
 
    for (int i = 0; i < total_spec; i++) {
@@ -441,24 +530,46 @@ void encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
       a_args->scale_factor = scale_factor;
+
+      // Call the target function to encode the binary block and write it to the output buffer
       target_fun((void*)a_args);
+
+      if (a_args->ret_code != 0) {
+         error("encode_binary_block: Failed to encode binary block for spectrum %d.\n", i);
+         free(a_args);
+         free(buff);
+         free(res_lens);
+         return 1;
+      }
+      
       res_lens[i] = *a_args->dest_len;
       buff_off += *a_args->dest_len;
    }
 
    // free(a_args);
 
+   // Update the block structure with the encoded data and its format
    blk->encoded_cache = buff;
    blk->encoded_cache_fmt = target_fmt;
    blk->encoded_cache_len = buff_off;
    blk->encoded_cache_lens = res_lens;
+
+   return 0;
 }
 
+/**
+ * @brief Extracts a specific encoded block from the given `block_len_t` structure.
+ * @param blk A pointer to the `block_len_t` structure containing the encoded blocks.
+ * @param index The index of the block to extract.
+ * @param out_len A pointer to a `size_t` variable where the length of the extracted block will be stored.
+ * @return A pointer to the extracted block on success, or NULL on failure.
+ */
 char* extract_from_encoded_block(block_len_t* blk, long index,
                                  size_t* out_len) {
    size_t offset = 0;
    size_t len = blk->encoded_cache_lens[index];
    char* res = malloc(len);
+   if (!res) return NULL;
 
    for (int i = 0; i < index; i++) offset += blk->encoded_cache_lens[i];
 
@@ -468,6 +579,20 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
    return res;
 }
 
+
+/**
+ * @brief Extracts the m/z values for a given spectrum index from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param mz_binary_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the m/z binary blocks.
+ * @param mz_binary_blk_pos The offset within the input buffer where the m/z binary blocks start.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param index The index of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted m/z block will be stored.
+ * @param encode An integer flag indicating whether to encode the extracted block (1) or not (0).
+ * @return A pointer to the extracted m/z block on success. NULL on error.
+ */
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
@@ -507,6 +632,10 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    if (!mz_blk_len->cache) {
       decmp_mz = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                     mz_blk_offset, mz_blk_len);
+      if (decmp_mz == NULL) {
+         error("extract_spectrum_mz: Failed to decompress mz block.\n");
+         return NULL;
+      }
       mz_blk_len->cache = decmp_mz;
    } else
       decmp_mz = mz_blk_len->cache;
@@ -528,6 +657,19 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    return res;
 }
 
+/**
+ * @brief Extracts the intensity values for a given spectrum index from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param inten_binary_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the intensity binary blocks.
+ * @param inten_binary_blk_pos The offset within the input buffer where the intensity binary blocks start.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param index The index of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted intensity block will be stored.
+ * @param encode An integer flag indicating whether to encode the extracted block (1) or not (0).
+ * @return A pointer to the extracted intensity block on success. NULL on error.
+ */
 char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
@@ -569,21 +711,33 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       decmp_inten =
           (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                              inten_blk_offset, inten_blk_len);
+      if (decmp_inten == NULL) {
+         error("extract_spectrum_inten: Failed to decompress intensity block.\n");
+         return NULL;
+      }
       inten_blk_len->cache = decmp_inten;
    } else
       decmp_inten = inten_blk_len->cache;
 
    if (!encode) {
-      encode_binary_block(
+      int ret = encode_binary_block(
           inten_blk_len, inten, df->source_inten_fmt, _no_encode_,
           set_encode_fun(_no_encode_, _lossless_,
                          _64d_), /* Disables encoding for python library*/
           df->int_scale_factor, df->target_inten_fun);
+      if (ret != 0) {
+         error("extract_spectrum_inten: Failed to encode intensity block.\n");
+         return NULL;
+      }
    } else {
-      encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
+      int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
                           df->target_inten_format,
                           df->encode_source_compression_inten_fun,
                           df->int_scale_factor, df->target_inten_fun);
+      if (ret != 0) {
+         error("extract_spectrum_inten: Failed to encode intensity block.\n");
+         return NULL;
+      }
    }
 
    res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
@@ -591,6 +745,25 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
    return res;
 }
 
+
+/**
+ * @brief Extracts the complete spectrum for a given index from the input map.
+ * @param input_map The input buffer containing the compressed data.
+ * @param dctx A pointer to a `ZSTD_DCtx` struct for decompression.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param xml_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the XML blocks.
+ * @param mz_binary_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the m/z binary blocks.
+ * @param inten_binary_block_lens A pointer to a `block_len_queue_t` struct containing the lengths of the intensity binary blocks.
+ * @param xml_pos The offset within the input buffer where the XML blocks start.
+ * @param mz_pos The offset within the input buffer where the m/z binary blocks start.
+ * @param inten_pos The offset within the input buffer where the intensity binary blocks start.
+ * @param mz_fmt The format of the m/z values to be extracted.
+ * @param inten_fmt The format of the intensity values to be extracted.
+ * @param divisions A pointer to a `divisions_t` struct containing the division information.
+ * @param index The index of the spectrum to extract.
+ * @param out_len A pointer to a `size_t` where the length of the extracted spectrum will be stored.
+ * @return A pointer to the extracted spectrum on success. NULL on error.
+ */
 char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* xml_block_lens,
                       block_len_queue_t* mz_binary_block_lens,
@@ -625,6 +798,13 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    char* spectrum_mz =
        extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos,
                            divisions, index, &mz_len, TRUE);
+   
+   if (spectrum_mz == NULL) {
+      error("extract_spectra: Failed to extract m/z values for spectrum index %ld.\n",
+            index);
+      free(res);
+      return NULL;
+   }
    memcpy(res + *out_len, spectrum_mz, mz_len);
    *out_len += mz_len;
 
@@ -632,6 +812,14 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    char* spectrum_inner_xml = extract_spectrum_inner_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
        spectrum_end, &inner_xml_len);
+
+   if (spectrum_inner_xml == NULL) {
+      error("extract_spectra: Failed to extract inner XML for spectrum index %ld.\n",
+            index);
+      free(res);
+      return NULL;
+   }
+
    memcpy(res + *out_len, spectrum_inner_xml, inner_xml_len);
    *out_len += inner_xml_len;
 
@@ -639,6 +827,13 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    char* spectrum_inten =
        extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens,
                               inten_pos, divisions, index, &inten_len, TRUE);
+   if (spectrum_inten == NULL) {
+      error("extract_spectra: Failed to extract intensity values for spectrum index %ld.\n",
+            index);
+      free(res);
+      return NULL;
+   }
+
    memcpy(res + *out_len, spectrum_inten, inten_len);
    *out_len += inten_len;
 
@@ -646,6 +841,13 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    char* spectrum_last_xml = extract_spectrum_last_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
        spectrum_end, &last_xml_len);
+   if (spectrum_last_xml == NULL) {
+      error("extract_spectra: Failed to extract last XML for spectrum index %ld.\n",
+            index);
+      free(res);
+      return NULL;
+   }
+
    memcpy(res + *out_len, spectrum_last_xml, last_xml_len);
    *out_len += last_xml_len;
 
@@ -707,6 +909,10 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    xml_blk_offset = msz_footer->xml_pos;
    decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                   xml_blk_offset, xml_blk_len);
+   if (decmp_xml == NULL) {
+      error("extract_msz: Failed to decompress XML block for mzML header.\n");
+      return;
+   }
    xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_header =
        extract_mzml_header(decmp_xml, curr_division, &header_len);
@@ -734,6 +940,10 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
        get_block_offset_by_index(xml_block_lens, divisions->n_divisions - 1);
    decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                   xml_blk_offset, xml_blk_len);
+   if (decmp_xml == NULL) {
+      error("extract_msz: Failed to decompress XML block for mzML footer.\n");
+      return;
+   }
    xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_footer = extract_mzml_footer(decmp_xml, divisions, &footer_len);
    // print("%s\n", mzml_footer);

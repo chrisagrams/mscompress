@@ -113,6 +113,10 @@ double get_time() {
 #endif
 }
 
+/* Global callback pointers for custom error/warning handling */
+static error_callback_t custom_error_callback = NULL;
+static warning_callback_t custom_warning_callback = NULL;
+
 int print(const char* format, ...)
 /**
  * @brief printf() wrapper to print to console. Checks if program is running in
@@ -129,19 +133,57 @@ int print(const char* format, ...)
    return ret;
 }
 
+/**
+ * @brief error() wrapper to print error messages to stderr. Always prints the
+ * message regardless of the verbose flag. Drop-in replacement to fprintf(stderr, ...).
+ * If a custom callback is set, it will be used instead of stderr.
+ */
 int error(const char* format, ...) {
    va_list args;
    va_start(args, format);
-   vfprintf(stderr, format, args);
+   
+   if (custom_error_callback != NULL) {
+      char buffer[4096];
+      vsnprintf(buffer, sizeof(buffer), format, args);
+      custom_error_callback(buffer);
+   } else {
+      vfprintf(stderr, format, args);
+   }
+   
    va_end(args);
-   exit(-1);
+   return 0;
 }
 
 int warning(const char* format, ...) {
    va_list args;
    va_start(args, format);
-   vfprintf(stderr, format, args);
+   
+   if (custom_warning_callback != NULL) {
+      char buffer[4096];
+      vsnprintf(buffer, sizeof(buffer), format, args);
+      custom_warning_callback(buffer);
+   } else {
+      vfprintf(stderr, format, args);
+   }
+   
    va_end(args);
+   return 0;
+}
+
+void set_error_callback(error_callback_t callback) {
+   custom_error_callback = callback;
+}
+
+void set_warning_callback(warning_callback_t callback) {
+   custom_warning_callback = callback;
+}
+
+void reset_error_callback(void) {
+   custom_error_callback = NULL;
+}
+
+void reset_warning_callback(void) {
+   custom_warning_callback = NULL;
 }
 
 long parse_blocksize(char* arg) {

@@ -24,6 +24,10 @@ block_formats = [
 def test_get_num_threads():
     assert get_num_threads() == os.cpu_count()
 
+def test_get_version():
+    from mscompress import __version__ # type: ignore
+    assert isinstance(__version__, str)
+    assert re.match(r'^\d+\.\d+\.\d+$', __version__)
 
 @pytest.mark.parametrize("mzml_file", test_mzml_data)
 def test_get_filesize(mzml_file):

@@ -127,9 +127,7 @@ data_positions_t** alloc_ddp(int len, int total_spec) {
    if (r == NULL)
       error("alloc_ddp: malloc failure.\n");
 
-   i = 0;
-
-   for (i; i < len; i++) {
+   for (i = 0; i < len; i++) {
       r[i] = alloc_dp(total_spec);
       r[i]->total_spec = 0;
    }
@@ -144,8 +142,7 @@ void free_ddp(data_positions_t** ddp, int divisions) {
       error("free_ddp: divisions is less than 1.\n");
 
    if (ddp) {
-      i = 0;
-      for (i; i < divisions; i++) dealloc_dp(ddp[i]);
+      for (i = 0; i < divisions; i++) dealloc_dp(ddp[i]);
 
       free(ddp);
    } else
