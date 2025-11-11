@@ -296,7 +296,7 @@ int set_mz_lossy(Arguments* args, const char* mz_lossy);
 int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
-void set_compress_runtime_variables(Arguments* args, data_format_t* df);
+int set_compress_runtime_variables(Arguments* args, data_format_t* df);
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */

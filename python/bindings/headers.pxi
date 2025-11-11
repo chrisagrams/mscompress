@@ -141,7 +141,7 @@ cdef extern from "../src/mscompress.h":
     long _determine_n_divisions "determine_n_divisions"(long filesize, long blocksize)
     divisions_t* _create_divisions "create_divisions"(division_t* div, long n_divisions)
     long _get_division_size_max "get_division_size_max"(divisions_t* divisions)
-    void _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
+    int _set_compress_runtime_variables "set_compress_runtime_variables"(Arguments* args, data_format_t* df)
     int _set_decompress_runtime_variables "set_decompress_runtime_variables"(data_format_t* df, footer_t* msz_footer)
     data_block_t* _alloc_data_block "alloc_data_block"(size_t max_size)
     void _dealloc_data_block "dealloc_data_block"(data_block_t* db)
