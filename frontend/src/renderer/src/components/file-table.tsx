@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronUp, X, Upload } from 'lucide-react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -15,6 +15,7 @@ import {
 } from './ui/table'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
+import { Checkbox } from './ui/checkbox'
 
 export interface FileData {
   id: string
@@ -29,6 +30,7 @@ interface FileTableProps {
   files?: FileData[]
   onRemoveFile?: (id: string) => void
   onClearAll?: () => void
+  onFilesDropped?: (files: File[]) => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -50,15 +52,68 @@ function formatDate(date?: Date): string {
   }).format(date)
 }
 
-export function FileTable({ files = [], onRemoveFile, onClearAll }: FileTableProps) {
+export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped }: FileTableProps) {
   const [isOpen, setIsOpen] = useState(true)
+  const [isDragging, setIsDragging] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
 
-  if (files.length === 0) {
-    return null
+  // Initialize all files as selected when files change
+  useEffect(() => {
+    setSelectedFiles(new Set(files.map(file => file.id)))
+  }, [files])
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if we're leaving the container itself
+    if (e.currentTarget === e.target) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    if (onFilesDropped && e.dataTransfer.files) {
+      const droppedFiles = Array.from(e.dataTransfer.files)
+      onFilesDropped(droppedFiles)
+    }
   }
 
   return (
-    <div className="w-full border-t bg-background">
+    <div 
+      className={`relative w-full border-t transition-all duration-200 ${
+        isDragging 
+          ? 'bg-primary/10' 
+          : 'bg-background'
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/5 backdrop-blur-[2px] pointer-events-none">
+          <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-background/90 border-2 border-dashed border-primary shadow-lg">
+            <Upload className="h-12 w-12 text-primary animate-bounce" />
+            <p className="text-lg font-semibold text-primary">Drop files here</p>
+            <p className="text-sm text-muted-foreground">Release to add files to the table</p>
+          </div>
+        </div>
+      )}
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <div className="flex items-center justify-between px-6 py-3 border-b">
           <div className="flex items-center gap-2">
@@ -72,10 +127,10 @@ export function FileTable({ files = [], onRemoveFile, onClearAll }: FileTablePro
               </Button>
             </CollapsibleTrigger>
             <h3 className="font-semibold text-sm">
-              Selected Files ({files.length})
+              File Manager {files.length > 0 && `(${selectedFiles.size}/${files.length})`}
             </h3>
           </div>
-          {onClearAll && (
+          {onClearAll && files.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -87,11 +142,21 @@ export function FileTable({ files = [], onRemoveFile, onClearAll }: FileTablePro
           )}
         </div>
         <CollapsibleContent>
-          <div className="max-h-64 overflow-y-auto">
-            <Table>
+          {files.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+              <Upload className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h4 className="font-semibold text-sm mb-2">No files selected</h4>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Drag and drop files here or use the file selection button above to add MSZ or MZML files for processing
+              </p>
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">File Name</TableHead>
+                  <TableHead className="w-[5%]"></TableHead>
+                  <TableHead className="w-[35%]">File Name</TableHead>
                   <TableHead className="w-[15%]">Size</TableHead>
                   <TableHead className="w-[15%]">Type</TableHead>
                   <TableHead className="w-[20%]">Modified</TableHead>
@@ -101,6 +166,20 @@ export function FileTable({ files = [], onRemoveFile, onClearAll }: FileTablePro
               <TableBody>
                 {files.map((file) => (
                   <TableRow key={file.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedFiles.has(file.id)}
+                        onCheckedChange={(checked) => {
+                          const newSelected = new Set(selectedFiles)
+                          if (checked) {
+                            newSelected.add(file.id)
+                          } else {
+                            newSelected.delete(file.id)
+                          }
+                          setSelectedFiles(newSelected)
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium truncate" title={file.path}>
                       {file.name}
                     </TableCell>
@@ -135,6 +214,7 @@ export function FileTable({ files = [], onRemoveFile, onClearAll }: FileTablePro
               </TableBody>
             </Table>
           </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </div>
