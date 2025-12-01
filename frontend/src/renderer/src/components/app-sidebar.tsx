@@ -31,7 +31,12 @@ const menuItems = [
   },
 ]
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  selectedPage: string
+  onPageSelect: (page: string) => void
+}
+
+export function AppSidebar({ selectedPage, onPageSelect }: AppSidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader>
@@ -46,8 +51,17 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                  <SidebarMenuButton 
+                    asChild
+                    isActive={selectedPage === item.title}
+                  >
+                    <a 
+                      href={item.url}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        onPageSelect(item.title)
+                      }}
+                    >
                       <item.icon />
                       <span>{item.title}</span>
                     </a>
