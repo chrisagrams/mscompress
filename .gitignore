@@ -38,7 +38,5 @@ mscompress-win32-x64*
 *.pyc
 vendor/zlib/zconf.h
 *.venv
-vendor/zlib/zconf.h
 frontend/out/
 uv.lock
-vendor/zlib/zconf.h
