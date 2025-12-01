@@ -7,6 +7,7 @@ set(BASE64_SOURCES
     ${VENDOR_DIR}/base64/lib/arch/sse41/codec.c
     ${VENDOR_DIR}/base64/lib/arch/sse42/codec.c
     ${VENDOR_DIR}/base64/lib/arch/avx/codec.c
+    ${VENDOR_DIR}/base64/lib/arch/avx512/codec.c
     ${VENDOR_DIR}/base64/lib/lib.c
     ${VENDOR_DIR}/base64/lib/codec_choose.c
     ${VENDOR_DIR}/base64/lib/tables/tables.c
@@ -14,4 +15,6 @@ set(BASE64_SOURCES
 
 add_library(base64 STATIC ${BASE64_SOURCES})
 
-target_include_directories(base64 PUBLIC lib)
+target_include_directories(base64 PUBLIC 
+    ${VENDOR_DIR}/base64/lib
+    ${VENDOR_DIR}/base64/include)

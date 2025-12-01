@@ -39,3 +39,6 @@ mscompress-win32-x64*
 vendor/zlib/zconf.h
 *.venv
 vendor/zlib/zconf.h
+frontend/out/
+uv.lock
+vendor/zlib/zconf.h

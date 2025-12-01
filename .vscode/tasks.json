@@ -18,7 +18,7 @@
                 "reveal": "always"
             },
             "options": {
-                "cwd": "${workspaceFolder}/cli"
+                "cwd": "${workspaceFolder}/"
             }
         },
         {
@@ -34,7 +34,7 @@
                 "reveal": "always"
             },
             "options": {
-                "cwd": "${workspaceFolder}/cli"
+                "cwd": "${workspaceFolder}/"
             }
         },
         {
