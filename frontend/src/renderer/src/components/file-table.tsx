@@ -41,6 +41,7 @@ interface FileTableProps {
   onRemoveFile?: (id: string) => void
   onClearAll?: () => void
   onFilesDropped?: (files: File[]) => void
+  emptyState?: React.ReactNode // Custom empty state message
 }
 
 function formatFileSize(bytes: number): string {
@@ -68,7 +69,8 @@ export function FileTable({
   showHeader = true,
   onRemoveFile, 
   onClearAll, 
-  onFilesDropped 
+  onFilesDropped,
+  emptyState
 }: FileTableProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
@@ -164,13 +166,15 @@ export function FileTable({
         )}
         <CollapsibleContent>
           {files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <Upload className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h4 className="font-semibold text-sm mb-2">No files selected</h4>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Drag and drop files here or use the file selection button above to add MSZ or MZML files for processing
-              </p>
-            </div>
+            emptyState || (
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                <Upload className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h4 className="font-semibold text-sm mb-2">No files selected</h4>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Drag and drop files here or use the file selection button above to add MSZ or MZML files for processing
+                </p>
+              </div>
+            )
           ) : (
             <div className="max-h-64 overflow-y-auto">
               <Table>

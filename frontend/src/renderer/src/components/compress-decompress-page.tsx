@@ -1,64 +1,65 @@
 import { Button } from './ui/button'
 import { Card } from './ui/card'
 import { FileTable, FileData } from './file-table'
+import { FolderOpen, FileCheck } from 'lucide-react'
 
 // Mock data for staging
 const mockStagingFiles: FileData[] = [
-  {
-    id: '1',
-    name: 'sample1.mzML',
-    size: 5242880,
-    path: '/path/to/sample1.mzML',
-    type: 'mzml',
-    dateModified: new Date('2024-11-15T10:30:00')
-  },
-  {
-    id: '2',
-    name: 'sample2.mzML',
-    size: 7340032,
-    path: '/path/to/sample2.mzML',
-    type: 'mzml',
-    dateModified: new Date('2024-11-16T14:20:00')
-  },
-  {
-    id: '3',
-    name: 'experiment.mzML',
-    size: 12582912,
-    path: '/path/to/experiment.mzML',
-    type: 'mzml',
-    dateModified: new Date('2024-11-17T09:15:00')
-  }
+  // {
+  //   id: '1',
+  //   name: 'sample1.mzML',
+  //   size: 5242880,
+  //   path: '/path/to/sample1.mzML',
+  //   type: 'mzml',
+  //   dateModified: new Date('2024-11-15T10:30:00')
+  // },
+  // {
+  //   id: '2',
+  //   name: 'sample2.mzML',
+  //   size: 7340032,
+  //   path: '/path/to/sample2.mzML',
+  //   type: 'mzml',
+  //   dateModified: new Date('2024-11-16T14:20:00')
+  // },
+  // {
+  //   id: '3',
+  //   name: 'experiment.mzML',
+  //   size: 12582912,
+  //   path: '/path/to/experiment.mzML',
+  //   type: 'mzml',
+  //   dateModified: new Date('2024-11-17T09:15:00')
+  // }
 ]
 
 // Mock data for output
 const mockOutputFiles: FileData[] = [
-  {
-    id: '4',
-    name: 'sample1.msz',
-    size: 2097152,
-    path: '/path/to/output/sample1.msz',
-    type: 'msz',
-    dateModified: new Date('2024-11-20T11:45:00'),
-    progress: 100
-  },
-  {
-    id: '5',
-    name: 'sample2.msz',
-    size: 2936012,
-    path: '/path/to/output/sample2.msz',
-    type: 'msz',
-    dateModified: new Date('2024-11-20T11:46:00'),
-    progress: 65
-  },
-  {
-    id: '6',
-    name: 'experiment.msz',
-    size: 0,
-    path: '/path/to/output/experiment.msz',
-    type: 'msz',
-    dateModified: new Date('2024-11-20T11:47:00'),
-    progress: 0
-  }
+  // {
+  //   id: '4',
+  //   name: 'sample1.msz',
+  //   size: 2097152,
+  //   path: '/path/to/output/sample1.msz',
+  //   type: 'msz',
+  //   dateModified: new Date('2024-11-20T11:45:00'),
+  //   progress: 100
+  // },
+  // {
+  //   id: '5',
+  //   name: 'sample2.msz',
+  //   size: 2936012,
+  //   path: '/path/to/output/sample2.msz',
+  //   type: 'msz',
+  //   dateModified: new Date('2024-11-20T11:46:00'),
+  //   progress: 65
+  // },
+  // {
+  //   id: '6',
+  //   name: 'experiment.msz',
+  //   size: 0,
+  //   path: '/path/to/output/experiment.msz',
+  //   type: 'msz',
+  //   dateModified: new Date('2024-11-20T11:47:00'),
+  //   progress: 0
+  // }
 ]
 
 export function CompressDecompressPage() {
@@ -80,6 +81,14 @@ export function CompressDecompressPage() {
               files={mockStagingFiles} 
               columns={['filename', 'size', 'type', 'modified']}
               showHeader={false}
+              emptyState={
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                  <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Select files from the file manager below
+                  </p>
+                </div>
+              }
             />
           </div>
         </Card>
@@ -95,6 +104,14 @@ export function CompressDecompressPage() {
               files={mockOutputFiles} 
               columns={['filename', 'type', 'progress']}
               showHeader={false}
+              emptyState={
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                  <FileCheck className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Files in the queue will appear here
+                  </p>
+                </div>
+              }
             />
           </div>
         </Card>
