@@ -314,7 +314,7 @@ int main(int argc, char* argv[]) {
 
          // Start compress routine.
          compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                       divisions, fds[1]);
+                       divisions, fds[1], NULL, NULL);
 
          break;
       }
@@ -322,7 +322,7 @@ int main(int argc, char* argv[]) {
          print("\nDecompression and encoding...\n");
 
          // Start decompress routine.
-         decompress_msz(input_map, input_filesize, &arguments, fds[1]);
+         decompress_msz(input_map, input_filesize, &arguments, fds[1], NULL, NULL);
 
          break;
       };
@@ -346,7 +346,7 @@ int main(int argc, char* argv[]) {
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
          compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                       divisions, fds[1]);
+                       divisions, fds[1], NULL, NULL);
       }
       case DESCRIBE: {
          footer_t* footer = read_footer((char*)input_map, input_filesize);

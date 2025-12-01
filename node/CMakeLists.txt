@@ -43,6 +43,7 @@ set(ADDON_SOURCE_FILES
   src/classes/MSZFile.cpp
   src/classes/MZMLFile.cpp
   src/utils/objectWrapper.cpp
+  src/progress.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${ADDON_SOURCE_FILES} ${CMAKE_JS_SRC})

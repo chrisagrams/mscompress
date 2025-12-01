@@ -223,6 +223,10 @@ decompress_args_t* alloc_decompress_args(
    r->ret = NULL;
    r->ret_len = 0;
 
+   /* Initialize progress callback fields to NULL */
+   r->progress_callback = NULL;
+   r->progress_user_data = NULL;
+
    return r;
 }
 
@@ -424,6 +428,13 @@ void* decompress_routine(void* args) {
             buff_off += *a_args->dest_len;
             mz_i++;
             block++;
+
+            /* Report progress every 10 spectra or on completion */
+            if (db_args->progress_callback != NULL && 
+                (mz_i % 10 == 0 || mz_i == division->mz->total_spec)) {
+               db_args->progress_callback(tid, mz_i, division->mz->total_spec,
+                                         db_args->progress_user_data);
+            }
             break;
          case 2:  // xml
             curr_dp = division->xml;
@@ -500,7 +511,9 @@ void* decompress_routine(void* args) {
  * @param fd The file descriptor to write the decompressed data to.
  */
 void decompress_msz(char* input_map, size_t input_filesize,
-                    Arguments* arguments, int fd) {
+                    Arguments* arguments, int fd,
+                    void (*progress_callback)(int, int, int, void*),
+                    void* progress_user_data) {
    block_len_queue_t *xml_block_lens, *mz_binary_block_lens,
        *inten_binary_block_lens;
    footer_t* msz_footer;
@@ -562,6 +575,10 @@ void decompress_msz(char* input_map, size_t input_filesize,
           divisions->divisions[i], footer_xml_off + msz_footer->xml_pos,
           footer_mz_bin_off + msz_footer->mz_binary_pos,
           footer_inten_bin_off + msz_footer->inten_binary_pos);
+
+      /* Set progress callback for this division */
+      args[i]->progress_callback = progress_callback;
+      args[i]->progress_user_data = progress_user_data;
 
       if (xml_blk != NULL)
          footer_xml_off += xml_blk->compressed_size;

@@ -463,6 +463,10 @@ typedef struct {
    cmp_blk_queue_t* ret;
    compression_fun comp_fun;
 
+   /* Progress callback support */
+   void (*progress_callback)(int thread_id, int completed, int total, void* user_data);
+   void* progress_user_data;
+
 } compress_args_t;
 
 ZSTD_CCtx* alloc_cctx();
@@ -470,8 +474,18 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
                     size_t* out_len, int compression_level);
 void* compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
+block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
+                                     data_format_t* df,
+                                     compression_fun comp_fun,
+                                     size_t cmp_blk_size, long blocksize,
+                                     int mode, int divisions, int threads,
+                                     int fd,
+                                     void (*progress_callback)(int, int, int, void*),
+                                     void* progress_user_data);
 void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
-                   data_format_t* df, divisions_t* divisions, int output_fd);
+                   data_format_t* df, divisions_t* divisions, int output_fd,
+                   void (*progress_callback)(int, int, int, void*),
+                   void* progress_user_data);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
@@ -506,6 +520,10 @@ typedef struct {
    char* ret;
    size_t ret_len;
 
+   /* Progress callback support */
+   void (*progress_callback)(int thread_id, int completed, int total, void* user_data);
+   void* progress_user_data;
+
 } decompress_args_t;
 
 ZSTD_DCtx* alloc_dctx();
@@ -515,7 +533,9 @@ void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk);
 void* decompress_routine(void* args);
 void decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
-                    int fd);
+                    int fd,
+                    void (*progress_callback)(int, int, int, void*),
+                    void* progress_user_data);
 decompression_fun set_decompress_fun(int accession);
 
 /* algo.c */

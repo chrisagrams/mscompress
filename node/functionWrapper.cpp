@@ -3,6 +3,7 @@
 #include <variant>
 #include <vector>
 #include "export.h"
+#include "progress.h"
 using namespace std;
 
 namespace mscompress { 
@@ -381,6 +382,19 @@ namespace mscompress {
         // Parse output_fd
         int output_fd = info[5].As<Napi::Number>().Int32Value();
 
+        // Check for optional progress callback (7th argument)
+        ProgressData* progress_data = nullptr;
+        if (info.Length() >= 7 && info[6].IsFunction()) {
+            progress_data = new ProgressData();
+            progress_data->tsfn = Napi::ThreadSafeFunction::New(
+                env,
+                info[6].As<Napi::Function>(),
+                "Compress Progress Callback",
+                0,  // unlimited queue
+                1   // initial thread count
+            );
+        }
+
         // Run
         std::cout << "Starting compression..." << std::endl;
         std::cout << "Arguments: " << std::endl;
@@ -390,7 +404,15 @@ namespace mscompress {
         std::cout << "target_inten_format: " << args->target_inten_format << std::endl;
         std::cout << "zstd_compression_level: " << args->zstd_compression_level << std::endl;
 
-        compress_mzml((char*)input_map, input_filesize, args, df, divisions, output_fd);
+        compress_mzml((char*)input_map, input_filesize, args, df, divisions, output_fd,
+                     progress_data ? progress_callback_bridge : nullptr,
+                     progress_data ? (void*)progress_data : nullptr);
+
+        // Cleanup progress callback
+        if (progress_data) {
+            progress_data->tsfn.Release();
+            delete progress_data;
+        }
 
         std::cout << "Compression finished." << std::endl;
 
@@ -426,9 +448,31 @@ namespace mscompress {
         // Parse output_fd
         int output_fd = info[3].As<Napi::Number>().Int32Value();
 
+        // Check for optional progress callback (5th argument)
+        ProgressData* progress_data = nullptr;
+        if (info.Length() >= 5 && info[4].IsFunction()) {
+            progress_data = new ProgressData();
+            progress_data->tsfn = Napi::ThreadSafeFunction::New(
+                env,
+                info[4].As<Napi::Function>(),
+                "Decompress Progress Callback",
+                0,  // unlimited queue
+                1   // initial thread count
+            );
+        }
+
         // Run
         std::cout << "Starting decompression..." << std::endl;
-        decompress_msz((char*)input_map, input_filesize, args, output_fd);
+        decompress_msz((char*)input_map, input_filesize, args, output_fd,
+                      progress_data ? progress_callback_bridge : nullptr,
+                      progress_data ? (void*)progress_data : nullptr);
+
+        // Cleanup progress callback
+        if (progress_data) {
+            progress_data->tsfn.Release();
+            delete progress_data;
+        }
+
         std::cout << "Decompression finished." << std::endl;
 
         return env.Null();

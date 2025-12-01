@@ -299,6 +299,10 @@ compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
 
    r->ret = NULL;
 
+   /* Initialize progress callback fields to NULL */
+   r->progress_callback = NULL;
+   r->progress_user_data = NULL;
+
    return r;
 }
 
@@ -634,6 +638,13 @@ void* compress_routine(void* args)
 
       cmp_fun(cb_args->comp_fun, czstd, a_args, cmp_buff, &curr_block,
               cb_args->df, map, len, &tot_size, &tot_cmp);
+
+      /* Report progress every 10 spectra or on the last spectrum */
+      if (cb_args->progress_callback != NULL && 
+          (i % 10 == 0 || i == cb_args->dp->total_spec - 1)) {
+         cb_args->progress_callback(tid, i + 1, cb_args->dp->total_spec, 
+                                   cb_args->progress_user_data);
+      }
    }
 
    cmp_flush(cb_args->comp_fun, czstd, cb_args->df->zstd_compression_level,
@@ -660,7 +671,9 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
                                      compression_fun comp_fun,
                                      size_t cmp_blk_size, long blocksize,
                                      int mode, int divisions, int threads,
-                                     int fd) {
+                                     int fd,
+                                     void (*progress_callback)(int, int, int, void*),
+                                     void* progress_user_data) {
    block_len_queue_t* blk_len_queue;
    compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
 
@@ -684,6 +697,9 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
          error("compress_parallel: Failed to allocate compress_args_t.\n");
          return NULL;
       }
+      /* Set progress callback for this division */
+      i_args->progress_callback = progress_callback;
+      i_args->progress_user_data = progress_user_data;
       args[i] = i_args;
    }
 
@@ -732,7 +748,9 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
 }
 
 void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
-                   data_format_t* df, divisions_t* divisions, int output_fd) {
+                   data_format_t* df, divisions_t* divisions, int output_fd,
+                   void (*progress_callback)(int, int, int, void*),
+                   void* progress_user_data) {
    // Initialize footer to all 0's to not write garbage to file.
    footer_t* footer = calloc(1, sizeof(footer_t));
 
@@ -768,7 +786,7 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    xml_block_lens = compress_parallel(
        (char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize,
        blocksize / 3, _xml_, divisions->n_divisions, threads,
-       output_fd); /* Compress XML */
+       output_fd, progress_callback, progress_user_data); /* Compress XML */
    free(xml_divisions);
 
    print("\t===m/z binary===\n");
@@ -778,7 +796,7 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    mz_binary_block_lens = compress_parallel(
        (char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize,
        blocksize / 3, _mass_, divisions->n_divisions, threads,
-       output_fd); /* Compress m/z binary */
+       output_fd, progress_callback, progress_user_data); /* Compress m/z binary */
    free(mz_divisions);
 
    print("\t===int binary===\n");
@@ -788,7 +806,7 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    inten_binary_block_lens = compress_parallel(
        (char*)input_map, inten_divisions, df, df->inten_compression_fun,
        blocksize, blocksize / 3, _intensity_, divisions->n_divisions, threads,
-       output_fd); /* Compress int binary */
+       output_fd, progress_callback, progress_user_data); /* Compress int binary */
    free(inten_divisions);
 
    // Dump block_len_queue to msz file.

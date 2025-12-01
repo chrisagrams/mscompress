@@ -1,5 +1,6 @@
 #include "MSZFile.h"
 #include "../utils/objectWrapper.h"
+#include "../../include/progress.h"
 #include <iostream>
 
 namespace mscompress {
@@ -299,8 +300,30 @@ Napi::Value MSZFile::Decompress(const Napi::CallbackInfo& info) {
         return env.Null();
     }
 
+    // Check for optional progress callback (3rd argument)
+    ProgressData* progress_data = nullptr;
+    if (info.Length() >= 3 && info[2].IsFunction()) {
+        progress_data = new ProgressData();
+        progress_data->tsfn = Napi::ThreadSafeFunction::New(
+            env,
+            info[2].As<Napi::Function>(),
+            "MSZFile Decompress Progress",
+            0,  // unlimited queue
+            1   // initial thread count
+        );
+    }
+
     std::cout << "Starting decompression..." << std::endl;
-    decompress_msz((char*)mmap_ptr_, filesize_, args, output_fd);
+    decompress_msz((char*)mmap_ptr_, filesize_, args, output_fd,
+                  progress_data ? progress_callback_bridge : nullptr,
+                  progress_data ? (void*)progress_data : nullptr);
+
+    // Cleanup progress callback
+    if (progress_data) {
+        progress_data->tsfn.Release();
+        delete progress_data;
+    }
+
     std::cout << "Decompression finished." << std::endl;
     
     close_file(output_fd);

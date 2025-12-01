@@ -1,5 +1,6 @@
 #include "MZMLFile.h"
 #include "../utils/objectWrapper.h"
+#include "../../include/progress.h"
 #include <iostream>
 #include <variant>
 #include <vector>
@@ -302,6 +303,19 @@ Napi::Value MZMLFile::Compress(const Napi::CallbackInfo& info) {
         return env.Null();
     }
 
+    // Check for optional progress callback (3rd argument)
+    ProgressData* progress_data = nullptr;
+    if (info.Length() >= 3 && info[2].IsFunction()) {
+        progress_data = new ProgressData();
+        progress_data->tsfn = Napi::ThreadSafeFunction::New(
+            env,
+            info[2].As<Napi::Function>(),
+            "MZMLFile Compress Progress",
+            0,  // unlimited queue
+            1   // initial thread count
+        );
+    }
+
     std::cout << "Starting compression..." << std::endl;
     std::cout << "threads: " << args->threads << std::endl;
     std::cout << "target_xml_format: " << args->target_xml_format << std::endl;
@@ -309,8 +323,16 @@ Napi::Value MZMLFile::Compress(const Napi::CallbackInfo& info) {
     std::cout << "target_inten_format: " << args->target_inten_format << std::endl;
     std::cout << "zstd_compression_level: " << args->zstd_compression_level << std::endl;
 
-    compress_mzml((char*)mmap_ptr_, filesize_, args, df_local, divisions, output_fd);
+    compress_mzml((char*)mmap_ptr_, filesize_, args, df_local, divisions, output_fd,
+                 progress_data ? progress_callback_bridge : nullptr,
+                 progress_data ? (void*)progress_data : nullptr);
     
+    // Cleanup progress callback
+    if (progress_data) {
+        progress_data->tsfn.Release();
+        delete progress_data;
+    }
+
     std::cout << "Compression finished." << std::endl;
     
     close_file(output_fd);
