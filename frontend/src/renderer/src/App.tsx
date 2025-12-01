@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SidebarProvider, SidebarTrigger } from './components/ui/sidebar'
 import { AppSidebar } from './components/app-sidebar'
 import { CompressDecompressPage } from './components/compress-decompress-page'
@@ -11,6 +11,21 @@ function App(): React.JSX.Element {
   // State for managing selected page
   const [selectedPage, setSelectedPage] = useState<string>('Compress/Decompress')
   
+  const [numThreads, setNumThreads] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchNumThreads() {
+      try {
+        const threads = await window.api.mscompress.getNumThreads();
+        setNumThreads(threads);
+        console.log(`Number of threads from mscompress: ${threads}`);
+      } catch (error) {
+        console.error('Error fetching number of threads:', error);
+      }
+    }
+
+    fetchNumThreads();
+  }, []);
   // State for managing selected files
   const [selectedFiles, setSelectedFiles] = useState<FileData[]>([
     // Example files - replace with actual file selection logic
