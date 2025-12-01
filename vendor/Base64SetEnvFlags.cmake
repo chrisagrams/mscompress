@@ -41,5 +41,11 @@ else()
     set(HAVE_AVX 0)
 endif()
 
+if(DEFINED ENV{AVX512_CFLAGS})
+    set(HAVE_AVX512 1)
+else()
+    set(HAVE_AVX512 0)
+endif()
+
 # Generate the config.h file
 configure_file(${VENDOR_DIR}/config.h.in ${VENDOR_DIR}/base64/lib/config.h)

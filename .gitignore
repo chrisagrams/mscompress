@@ -1,41 +1,58 @@
+# Build outputs
 mscompress
 mscompress.dSYM/
 *.o
-*.msz
-*.mzML
-vgcore.*
-.vscode/*
-.DS_Store
-heaptrack*
+*.a
+*.lib
+*.pdb
+build/
+cli/Debug/
+
+# CMake
 CMakeLists.txt.user
 CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
+CMakeFiles/
+CMakeScripts/
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
-_deps
-build/
-*.a
-node_modules/
-package-lock.json
+Testing/
+Makefile
+_deps/
+
+# Visual Studio
 *.vcxproj*
-*.log
-*.obj
 *.sln
+*.obj
 *.recipe
 *.tlog
-*.lib
-cli/Debug/*
-mscompress-win32-x64*
-*.pdb
-*.zip
-*dist/
-*.csv
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Python
 *.pyc
-vendor/zlib/zconf.h
 *.venv
-vendor/zlib/zconf.h
+dist/
+uv.lock
+
+# Data files
+*.msz
+*.mzML
+*.csv
+*.log
+
+# Distribution
+*.zip
+mscompress-win32-x64*
+frontend/out/
+
+# Debug/profiling
+vgcore.*
+heaptrack*
+
+# IDE/OS
+.vscode/*
+.DS_Store

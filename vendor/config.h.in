@@ -5,3 +5,4 @@
 #define HAVE_SSE41  @HAVE_SSE41@
 #define HAVE_SSE42  @HAVE_SSE42@
 #define HAVE_AVX    @HAVE_AVX@
+#define HAVE_AVX512 @HAVE_AVX512@
