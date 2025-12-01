@@ -58,12 +58,14 @@ function App(): React.JSX.Element {
   return (
     <SidebarProvider>
       <AppSidebar selectedPage={selectedPage} onPageSelect={setSelectedPage} />
-      <main className="flex-1 w-full flex flex-col">
-        <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-6 z-10">
+      <main className="flex-1 w-full flex flex-col h-screen">
+        <header className="sticky top-0 flex h-16 shrink-0 items-center gap-4 border-b bg-background px-6 z-10">
           <SidebarTrigger />
           <h1 className="text-xl font-semibold">{selectedPage}</h1>
         </header>
-        {renderPage()}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {renderPage()}
+        </div>
         <FileTable
           files={selectedFiles}
           onRemoveFile={handleRemoveFile}

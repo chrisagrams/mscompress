@@ -5,7 +5,7 @@ import { Separator } from './ui/separator'
 
 export function SettingsPage() {
   return (
-    <div className="flex flex-1 flex-col p-6 gap-6">
+    <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-2xl font-bold">Settings</h2>
         <p className="text-muted-foreground">Configure application preferences</p>
