@@ -35,9 +35,17 @@ message("Include dirs are: ${dirs}")
 
 
 # Common source files
-file(GLOB SOURCE_FILES ${SRC_DIR}/*.c *.cpp)
+file(GLOB SOURCE_FILES ${SRC_DIR}/*.c)
 
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+# Node addon source files
+set(ADDON_SOURCE_FILES
+  src/addon.cpp
+  src/classes/MSZFile.cpp
+  src/classes/MZMLFile.cpp
+  src/utils/objectWrapper.cpp
+)
+
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${ADDON_SOURCE_FILES} ${CMAKE_JS_SRC})
 
 
 #lz4
