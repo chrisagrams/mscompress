@@ -24,10 +24,15 @@ export interface FileData {
   path: string
   type: 'msz' | 'mzml'
   dateModified?: Date
+  progress?: number // For showing conversion progress
 }
+
+export type ColumnKey = 'checkbox' | 'filename' | 'size' | 'type' | 'modified' | 'progress' | 'actions'
 
 interface FileTableProps {
   files?: FileData[]
+  columns?: ColumnKey[] // Which columns to display
+  showHeader?: boolean // Whether to show the collapsible header
   onRemoveFile?: (id: string) => void
   onClearAll?: () => void
   onFilesDropped?: (files: File[]) => void
@@ -52,7 +57,14 @@ function formatDate(date?: Date): string {
   }).format(date)
 }
 
-export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped }: FileTableProps) {
+export function FileTable({ 
+  files = [], 
+  columns = ['checkbox', 'filename', 'size', 'type', 'modified', 'actions'],
+  showHeader = true,
+  onRemoveFile, 
+  onClearAll, 
+  onFilesDropped 
+}: FileTableProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
@@ -61,6 +73,8 @@ export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped
   useEffect(() => {
     setSelectedFiles(new Set(files.map(file => file.id)))
   }, [files])
+
+  const hasColumn = (col: ColumnKey) => columns.includes(col)
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
@@ -105,7 +119,7 @@ export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {isDragging && (
+      {isDragging && onFilesDropped && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/5 backdrop-blur-[2px] pointer-events-none">
           <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-background/90 border-2 border-dashed border-primary shadow-lg">
             <Upload className="h-12 w-12 text-primary animate-bounce" />
@@ -115,6 +129,7 @@ export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped
         </div>
       )}
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        {showHeader && (
         <div className="flex items-center justify-between px-6 py-3 border-b">
           <div className="flex items-center gap-2">
             <CollapsibleTrigger asChild>
@@ -141,6 +156,7 @@ export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped
             </Button>
           )}
         </div>
+        )}
         <CollapsibleContent>
           {files.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -155,60 +171,90 @@ export function FileTable({ files = [], onRemoveFile, onClearAll, onFilesDropped
               <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[5%]"></TableHead>
-                  <TableHead className="w-[35%]">File Name</TableHead>
-                  <TableHead className="w-[15%]">Size</TableHead>
-                  <TableHead className="w-[15%]">Type</TableHead>
-                  <TableHead className="w-[20%]">Modified</TableHead>
-                  <TableHead className="w-[10%] text-right">Actions</TableHead>
+                  {hasColumn('checkbox') && <TableHead className="w-[5%]"></TableHead>}
+                  {hasColumn('filename') && <TableHead className="w-[35%]">File Name</TableHead>}
+                  {hasColumn('size') && <TableHead className="w-[15%]">Size</TableHead>}
+                  {hasColumn('type') && <TableHead className="w-[15%]">Type</TableHead>}
+                  {hasColumn('modified') && <TableHead className="w-[20%]">Modified</TableHead>}
+                  {hasColumn('progress') && <TableHead className="w-[20%]">Progress</TableHead>}
+                  {hasColumn('actions') && <TableHead className="w-[10%] text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {files.map((file) => (
                   <TableRow key={file.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedFiles.has(file.id)}
-                        onCheckedChange={(checked) => {
-                          const newSelected = new Set(selectedFiles)
-                          if (checked) {
-                            newSelected.add(file.id)
-                          } else {
-                            newSelected.delete(file.id)
-                          }
-                          setSelectedFiles(newSelected)
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium truncate" title={file.path}>
-                      {file.name}
-                    </TableCell>
-                    <TableCell>{formatFileSize(file.size)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className="uppercase"
-                        style={{
-                          backgroundColor: file.type === 'msz' ? 'var(--mscompress-purple)' : 'var(--mscompress-blue)',
-                          color: 'white',
-                          borderColor: file.type === 'msz' ? 'var(--mscompress-purple)' : 'var(--mscompress-blue)'
-                        }}
-                      >
-                        {file.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(file.dateModified)}</TableCell>
-                    <TableCell className="text-right">
-                      {onRemoveFile && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onRemoveFile(file.id)}
-                          className="h-8 w-8 p-0"
+                    {hasColumn('checkbox') && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedFiles.has(file.id)}
+                          onCheckedChange={(checked) => {
+                            const newSelected = new Set(selectedFiles)
+                            if (checked) {
+                              newSelected.add(file.id)
+                            } else {
+                              newSelected.delete(file.id)
+                            }
+                            setSelectedFiles(newSelected)
+                          }}
+                        />
+                      </TableCell>
+                    )}
+                    {hasColumn('filename') && (
+                      <TableCell className="font-medium truncate" title={file.path}>
+                        {file.name}
+                      </TableCell>
+                    )}
+                    {hasColumn('size') && (
+                      <TableCell>{formatFileSize(file.size)}</TableCell>
+                    )}
+                    {hasColumn('type') && (
+                      <TableCell>
+                        <Badge
+                          className="uppercase"
+                          style={{
+                            backgroundColor: file.type === 'msz' ? 'var(--mscompress-purple)' : 'var(--mscompress-blue)',
+                            color: 'white',
+                            borderColor: file.type === 'msz' ? 'var(--mscompress-purple)' : 'var(--mscompress-blue)'
+                          }}
                         >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
+                          {file.type}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    {hasColumn('modified') && (
+                      <TableCell>{formatDate(file.dateModified)}</TableCell>
+                    )}
+                    {hasColumn('progress') && (
+                      <TableCell>
+                        {file.progress !== undefined && file.progress > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${file.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-10 text-right">{file.progress}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Queued</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {hasColumn('actions') && (
+                      <TableCell className="text-right">
+                        {onRemoveFile && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onRemoveFile(file.id)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
