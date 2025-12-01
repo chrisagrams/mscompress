@@ -4,6 +4,7 @@ import { AppSidebar } from './components/app-sidebar'
 import { CompressDecompressPage } from './components/compress-decompress-page'
 import { QAPage } from './components/qa-page'
 import { SettingsPage } from './components/settings-page'
+import { AboutPage } from './components/about-page'
 import { FileTable, FileData } from './components/file-table'
 
 function App(): React.JSX.Element {
@@ -47,6 +48,8 @@ function App(): React.JSX.Element {
         return <QAPage />
       case 'Settings':
         return <SettingsPage />
+      case 'About':
+        return <AboutPage />
       default:
         return <CompressDecompressPage />
     }
