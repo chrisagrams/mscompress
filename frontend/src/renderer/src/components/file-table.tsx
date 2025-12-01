@@ -16,6 +16,11 @@ import {
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Checkbox } from './ui/checkbox'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from './ui/hover-card'
 
 export interface FileData {
   id: string
@@ -200,8 +205,21 @@ export function FileTable({
                       </TableCell>
                     )}
                     {hasColumn('filename') && (
-                      <TableCell className="font-medium truncate" title={file.path}>
-                        {file.name}
+                      <TableCell className="font-medium">
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <span className="cursor-pointer truncate block underline decoration-dotted decoration-1 underline-offset-2">
+                              {file.name}
+                            </span>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-auto max-w-md">
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground break-all">
+                                {file.path}
+                              </p>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
                       </TableCell>
                     )}
                     {hasColumn('size') && (
