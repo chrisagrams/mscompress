@@ -4,6 +4,7 @@
       "name": "Mac",
       "includePath": [
         "${workspaceFolder}/../src",
+        "${workspaceFolder}/include",
         "${workspaceFolder}/node_modules/node-addon-api",
         "/usr/local/include/node"            // Intel macOS or nvm default
       ],
