@@ -73,7 +73,76 @@ def get_all_c_files(path):
 
 
 class build_ext_with_stubs(_build_ext):
-    """Custom build_ext that copies stub files to the build directory."""
+    """Custom build_ext that adds per-file SIMD compiler flags and copies stub files."""
+    def build_extensions(self):
+        # Add per-file compiler flags for SIMD files based on target architecture
+        target_arch = get_target_arch()
+        
+        for ext in self.extensions:
+            # Define SIMD flags based on target architecture and compiler
+            if sys.platform == 'win32':
+                # MSVC flags
+                simd_flags = {
+                    'avx2': ['/arch:AVX2'] if target_arch == 'x86_64' else [],
+                    'avx': ['/arch:AVX'] if target_arch == 'x86_64' else [],
+                    'ssse3': [] if target_arch == 'x86_64' else [],  # MSVC doesn't have separate SSSE3 flag
+                    'sse41': [] if target_arch == 'x86_64' else [],
+                    'sse42': [] if target_arch == 'x86_64' else [],
+                    'neon32': [] if target_arch == 'arm32' else [],
+                    'neon64': [] if target_arch == 'arm64' else [],
+                }
+            else:
+                # GCC/Clang flags
+                simd_flags = {
+                    'avx2': ['-mavx2'] if target_arch == 'x86_64' else [],
+                    'avx': ['-mavx'] if target_arch == 'x86_64' else [],
+                    'ssse3': ['-mssse3'] if target_arch == 'x86_64' else [],
+                    'sse41': ['-msse4.1'] if target_arch == 'x86_64' else [],
+                    'sse42': ['-msse4.2'] if target_arch == 'x86_64' else [],
+                    'neon32': [] if target_arch == 'arm32' else [],  # Enabled by default on ARM
+                    'neon64': [] if target_arch == 'arm64' else [],
+                }
+            
+            # Apply flags to matching source files
+            if not hasattr(ext, 'extra_compile_args_per_file'):
+                ext.extra_compile_args_per_file = {}
+            
+            for source in ext.sources:
+                source_lower = source.lower()
+                for simd_type, flags in simd_flags.items():
+                    if flags and simd_type in source_lower:
+                        ext.extra_compile_args_per_file[source] = flags
+                        break
+        
+        # Call parent build_extensions
+        _build_ext.build_extensions(self)
+    
+    def build_extension(self, ext):
+        # Apply per-file compiler args if they exist
+        if hasattr(ext, 'extra_compile_args_per_file'):
+            original_compile = self.compiler.compile
+            
+            def custom_compile(sources, output_dir=None, macros=None, include_dirs=None,
+                             debug=0, extra_preargs=None, extra_postargs=None, depends=None):
+                # Compile each source with its specific flags
+                objects = []
+                for source in sources:
+                    per_file_args = ext.extra_compile_args_per_file.get(source, [])
+                    combined_postargs = (extra_postargs or []) + per_file_args
+                    objs = original_compile([source], output_dir, macros, include_dirs,
+                                          debug, extra_preargs, combined_postargs, depends)
+                    objects.extend(objs)
+                return objects
+            
+            self.compiler.compile = custom_compile
+        
+        # Build the extension
+        _build_ext.build_extension(self, ext)
+        
+        # Restore original compile method
+        if hasattr(ext, 'extra_compile_args_per_file'):
+            self.compiler.compile = original_compile
+    
     def run(self):
         # Run the standard build
         _build_ext.run(self)
@@ -199,9 +268,37 @@ if linetrace:
 if sys.platform == 'darwin':
     define_macros.append(('fdopen', 'fdopen'))
 
-# Generate config.h for base64 library based on architecture
-arch = platform.machine().lower()
-if 'arm64' in arch or 'aarch64' in arch:
+# Generate config.h for base64 library based on TARGET architecture
+# cibuildwheel sets ARCHFLAGS or _PYTHON_HOST_PLATFORM for cross-compilation
+def get_target_arch():
+    """Detect target architecture for cross-compilation."""
+    # Check environment variables set by cibuildwheel
+    archflags = os.environ.get('ARCHFLAGS', '').lower()
+    if 'arm64' in archflags or 'aarch64' in archflags:
+        return 'arm64'
+    elif 'x86_64' in archflags or 'amd64' in archflags:
+        return 'x86_64'
+    
+    # Check _PYTHON_HOST_PLATFORM (used by cibuildwheel on macOS)
+    host_platform = os.environ.get('_PYTHON_HOST_PLATFORM', '').lower()
+    if 'arm64' in host_platform or 'aarch64' in host_platform:
+        return 'arm64'
+    elif 'x86_64' in host_platform or 'amd64' in host_platform or 'i686' in host_platform:
+        return 'x86_64'
+    
+    # Fall back to native architecture
+    arch = platform.machine().lower()
+    if 'arm64' in arch or 'aarch64' in arch:
+        return 'arm64'
+    elif 'arm' in arch:
+        return 'arm32'
+    else:
+        return 'x86_64'
+
+target_arch = get_target_arch()
+print(f"Target architecture detected: {target_arch}")
+
+if target_arch == 'arm64':
     # ARM64 architecture
     config_h_content = """
 #define HAVE_AVX2 0
@@ -213,7 +310,7 @@ if 'arm64' in arch or 'aarch64' in arch:
 #define HAVE_AVX 0
 #define HAVE_AVX512 0
 """
-elif 'arm' in arch:
+elif target_arch == 'arm32':
     # ARM32 architecture
     config_h_content = """
 #define HAVE_AVX2 0
@@ -246,12 +343,11 @@ with open(config_h_path, 'w') as f:
 # On Windows, ensure Windows SDK target-architecture macro is defined early
 # so that <Windows.h>/winnt.h doesn't error with "No Target Architecture".
 if sys.platform == 'win32':
-    arch = platform.machine().lower()
-    if 'arm64' in arch or 'aarch64' in arch:
+    if target_arch == 'arm64':
         define_macros.append(('_ARM64_', '1'))
-    elif 'amd64' in arch or 'x86_64' in arch or 'x64' in arch:
+    elif target_arch == 'x86_64':
         define_macros.append(('_AMD64_', '1'))
-    elif arch in ('x86', 'i386', 'i686'):
+    elif target_arch == 'x86':
         define_macros.append(('_X86_', '1'))
     # Target a reasonably recent Windows version
     define_macros.append(('_WIN32_WINNT', '0x0600'))
