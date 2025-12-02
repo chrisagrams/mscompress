@@ -354,8 +354,8 @@ if sys.platform == 'win32':
 
 extensions = [
     Extension(
-        "mscompress",
-        sources=["bindings/mscompress.pyx"] + c_sources,
+        "mscompress._core",
+        sources=["mscompress/_core.pyx"] + c_sources,
         include_dirs=include_dirs,  
         libraries=[],
         library_dirs=[],
@@ -377,6 +377,7 @@ setup(
     description=description,
     author="Chris Grams",
     author_email="chrisagrams@gmail.com",
+    packages=["mscompress"],
     ext_modules=cythonize(
         extensions,
         compiler_directives={'linetrace': linetrace},
@@ -388,7 +389,7 @@ setup(
         'sdist': sdist_with_vendor
     },
     package_data={
-        '': ['*.pyi', 'py.typed'],  # Include stub files wherever the module ends up
+        'mscompress': ['*.pyi', 'py.typed'],  # Include stub files
     },
     zip_safe=False,
 )

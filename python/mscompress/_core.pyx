@@ -1,5 +1,4 @@
 # cython: linetrace=True
-__version__ = "1.0.3"
 
 import os 
 import numpy as np
@@ -14,7 +13,7 @@ import math
 
 np.import_array()
 
-include "headers.pxi"
+include "_headers.pxi"
 
 # Global error/warning handler for Python
 def _install_mscompress_warning_formatter():
