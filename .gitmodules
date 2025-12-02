@@ -1,10 +1,16 @@
 [submodule "vendor/base64"]
 	path = vendor/base64
 	url = https://github.com/aklomp/base64.git
-
-[submodule "vendor/zstd"]
-	path = vendor/zstd
-	url = https://github.com/facebook/zstd.git
+	ignore = all
 [submodule "vendor/lz4"]
 	path = vendor/lz4
 	url = https://github.com/lz4/lz4.git
+	ignore = all
+[submodule "vendor/zstd"]
+	path = vendor/zstd
+	url = https://github.com/facebook/zstd.git
+	ignore=all
+[submodule "vendor/zlib"]
+	path = vendor/zlib
+	url = https://github.com/cloudflare/zlib.git
+	ignore=all
