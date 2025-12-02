@@ -13,7 +13,7 @@ import math
 
 np.import_array()
 
-include "_core.pxi"
+include "_headers.pxi"
 
 # Global error/warning handler for Python
 def _install_mscompress_warning_formatter():
