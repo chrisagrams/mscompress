@@ -135,6 +135,7 @@ c_sources.append(_abs("../vendor/base64/lib/arch/ssse3/codec.c"))
 c_sources.append(_abs("../vendor/base64/lib/arch/sse41/codec.c"))
 c_sources.append(_abs("../vendor/base64/lib/arch/sse42/codec.c"))
 c_sources.append(_abs("../vendor/base64/lib/arch/avx/codec.c"))
+c_sources.append(_abs("../vendor/base64/lib/arch/avx512/codec.c"))  # Needed for stub functions
 c_sources.append(_abs("../vendor/base64/lib/lib.c"))
 c_sources.append(_abs("../vendor/base64/lib/codec_choose.c"))
 c_sources.append(_abs("../vendor/base64/lib/tables/tables.c"))
@@ -186,7 +187,9 @@ else:
 # TODO: NO_GZCOMPRESS is also a workaround for macos. Look into how to get around it.
 define_macros: list[tuple[str, str | None]] = [
     ('NO_GZCOMPRESS', '1'),  # Disable gzip support to avoid fdopen macro conflicts
-    ('ZSTD_DISABLE_ASM', '1') # Temporary workaround to disable assembly optimizations when building.
+    ('ZSTD_DISABLE_ASM', '1'), # Temporary workaround to disable assembly optimizations when building.
+    ('BASE64_STATIC_DEFINE', '1'),  # Tell base64 library to use static linking on Windows
+    ('zmemset', 'memset'),  # Define zmemset as memset for Windows (zlib cloudflare fork expects this)
 ]
 
 if linetrace:
@@ -195,6 +198,50 @@ if linetrace:
 # On macOS, define fdopen before compilation to prevent zlib's macro redefinition
 if sys.platform == 'darwin':
     define_macros.append(('fdopen', 'fdopen'))
+
+# Generate config.h for base64 library based on architecture
+arch = platform.machine().lower()
+if 'arm64' in arch or 'aarch64' in arch:
+    # ARM64 architecture
+    config_h_content = """
+#define HAVE_AVX2 0
+#define HAVE_NEON32 0
+#define HAVE_NEON64 1
+#define HAVE_SSSE3 0
+#define HAVE_SSE41 0
+#define HAVE_SSE42 0
+#define HAVE_AVX 0
+#define HAVE_AVX512 0
+"""
+elif 'arm' in arch:
+    # ARM32 architecture
+    config_h_content = """
+#define HAVE_AVX2 0
+#define HAVE_NEON32 1
+#define HAVE_NEON64 0
+#define HAVE_SSSE3 0
+#define HAVE_SSE41 0
+#define HAVE_SSE42 0
+#define HAVE_AVX 0
+#define HAVE_AVX512 0
+"""
+else:
+    # x86/x64 architecture
+    config_h_content = """
+#define HAVE_AVX2 1
+#define HAVE_NEON32 0
+#define HAVE_NEON64 0
+#define HAVE_SSSE3 1
+#define HAVE_SSE41 1
+#define HAVE_SSE42 1
+#define HAVE_AVX 1
+#define HAVE_AVX512 0
+"""
+
+config_h_path = _abs("../vendor/base64/lib/config.h")
+os.makedirs(os.path.dirname(config_h_path), exist_ok=True)
+with open(config_h_path, 'w') as f:
+    f.write(config_h_content)
 
 # On Windows, ensure Windows SDK target-architecture macro is defined early
 # so that <Windows.h>/winnt.h doesn't error with "No Target Architecture".
