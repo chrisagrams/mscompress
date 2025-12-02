@@ -4,6 +4,7 @@
 
 # Initialize all to 0
 set(HAVE_AVX2 0)
+set(HAVE_AVX512 0)
 set(HAVE_NEON32 0)
 set(HAVE_NEON64 0)
 set(HAVE_SSSE3 0)
@@ -19,6 +20,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|x86|i686|i386")
     set(HAVE_SSE42 1)
     set(HAVE_AVX 1)
     set(HAVE_AVX2 1)
+    # Disable AVX512 by default as it requires specific compiler flags
+    set(HAVE_AVX512 0)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
     # 64-bit ARM architecture
     set(HAVE_NEON64 1)
@@ -58,8 +61,6 @@ endif()
 
 if(DEFINED ENV{AVX512_CFLAGS})
     set(HAVE_AVX512 1)
-else()
-    set(HAVE_AVX512 0)
 endif()
 
 # Generate the config.h file
