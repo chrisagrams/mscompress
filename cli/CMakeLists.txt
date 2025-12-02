@@ -50,14 +50,6 @@ if(WIN32)
   )
 endif()
 
-# Link libs
-if(WIN32)
-  target_link_libraries(mscompress PRIVATE ${ZLIB_LIBRARY} zstd yxml base64 lz4)
-else()
-  target_link_libraries(mscompress PRIVATE ${ZLIB_LIBRARY} zstd yxml base64 m lz4)
-endif()
-
-
 target_include_directories(mscompress PUBLIC 
                             ${VENDOR_DIR}/zstd/lib 
                             ${VENDOR_DIR}/base64/include
@@ -83,8 +75,9 @@ include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
 include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
+# Link libs - only once, after all libraries are defined
 if(WIN32)
-    target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64)
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
 else()
-    target_link_libraries(mscompress PRIVATE  ${ZLIB_LIBRARY} zstd yxml base64 m lz4) # need math library
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m) # need math library
 endif()

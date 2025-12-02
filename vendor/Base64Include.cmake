@@ -16,5 +16,7 @@ set(BASE64_SOURCES
 add_library(base64 STATIC ${BASE64_SOURCES})
 
 target_include_directories(base64 PUBLIC 
+    ${VENDOR_DIR}/base64/include
     ${VENDOR_DIR}/base64/lib
-    ${VENDOR_DIR}/base64/include)
+    ${VENDOR_DIR}/base64/lib/tables
+)
