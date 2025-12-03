@@ -2,6 +2,7 @@ import os
 import re
 import pytest
 from mscompress import get_num_threads, get_filesize, read
+
 def test_get_num_threads():
     assert get_num_threads() == os.cpu_count()
 
