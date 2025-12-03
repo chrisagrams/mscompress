@@ -170,8 +170,8 @@ jobs:
           python -m pip install --find-links=. mscompress
       
       - name: Run pytest
-        working-directory: ./python/test
-        run: pytest -v
+        working-directory: ./python
+        run: pytest test -v
 
   publish-python:
     name: Publish Python Package to PyPI
