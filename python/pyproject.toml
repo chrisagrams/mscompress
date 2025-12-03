@@ -18,6 +18,7 @@ dev = [
     "cython",
     "numpy",
     "pytest",
+    "pytest-cov",
     "tomli"
 ]
 
