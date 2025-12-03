@@ -164,8 +164,10 @@ jobs:
       - name: Install built wheel
         shell: bash
         run: |
-          python_version=$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
-          pip install ./python/wheelhouse/mscompress*-cp${python_version}-*.whl
+          cd ./python/wheelhouse
+          # Use pip's wheel discovery to find the compatible wheel
+          # This avoids glob pattern issues and lets pip find the right one
+          python -m pip install --find-links=. mscompress
       
       - name: Run pytest
         working-directory: ./python/test
