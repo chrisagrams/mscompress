@@ -43,11 +43,11 @@ static void print_usage(FILE* stream, int exit_code) {
            "transform or threshold for vbr\n");
    fprintf(stream,
            " --extract-indices [range]      Extract indices from mzML or msz "
-           "file (eg. [1-3,5-6]). (disabled by default)\n");
+           "file (eg. 0-100 or [0-100]). (disabled by default)\n");
    fprintf(
        stream,
        " --extract-scans [range]        Extract scans from mzML or msz file "
-       "(eg. [1-3,5-6]). (disabled by default)\n");
+       "(eg. 1-3,5-6 or [1-3,5-6]). (disabled by default)\n");
    fprintf(stream,
            " --ms-level level               Extract specified ms level (1, 2, "
            "n) from mzML or msz file. (disabled by default)\n");
@@ -341,11 +341,13 @@ int main(int argc, char* argv[]) {
                              &divisions);
 
          extract_mzml((char*)input_map, divisions, fds[1]);
+         break;
       };
       case EXTRACT_MSZ: {
          extract_msz((char*)input_map, input_filesize, arguments.indices,
                      arguments.indices_length, arguments.scans,
                      arguments.scans_length, arguments.ms_level, fds[1]);
+         break;
       };
       case EXTERNAL: {
          preprocess_external((char*)input_map, input_filesize,
@@ -353,12 +355,14 @@ int main(int argc, char* argv[]) {
                              &divisions);
          compress_mzml((char*)input_map, input_filesize, &arguments, df,
                        divisions, fds[1]);
+         break;
       }
       case DESCRIBE: {
          footer_t* footer = read_footer((char*)input_map, input_filesize);
          if (!footer)
             exit(1);
          print_footer_csv(footer);
+         break;
       };
    }
    print("\nCleaning up...\n");
