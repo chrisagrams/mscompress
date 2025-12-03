@@ -164,7 +164,8 @@ jobs:
       - name: Install built wheel
         shell: bash
         run: |
-          pip install ./python/wheelhouse/mscompress*.whl
+          python_version=$(python -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
+          pip install ./python/wheelhouse/mscompress*-cp${python_version}-*.whl
       
       - name: Run pytest
         working-directory: ./python/test
