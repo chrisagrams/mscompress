@@ -383,8 +383,10 @@ footer_t* read_footer(void* input_map, long filesize)
 
    footer = (footer_t*)((char*)input_map + filesize - sizeof(footer_t));
 
-   if (footer->magic_tag != MAGIC_TAG)
+   if (footer->magic_tag != MAGIC_TAG) {
       error("read_footer: invalid magic tag.\n");
+      return NULL;
+   }
 
    return footer;
 }
