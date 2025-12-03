@@ -279,9 +279,15 @@ int main(int argc, char* argv[]) {
          warning("Error in opening input file. Is it a directory?\n");
          exit(1);
       }
-   } else
+   } else {
       operation = prepare_fds(arguments.input_file, &arguments.output_file,
                               NULL, &input_map, &input_filesize, &fds);
+
+      // If error occurred during prepare_fds, exit.
+      if (operation < 0) {
+         exit(1);
+      }
+   }
 
    if (arguments.describe_only)
       operation = DESCRIBE;
