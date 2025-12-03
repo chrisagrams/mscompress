@@ -9,6 +9,7 @@ description = "Python bindings for mscompress, a compression library for mass sp
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "mlcroissant>=1.0.0",
     "numpy<2",
 ]
 
