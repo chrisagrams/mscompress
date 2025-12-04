@@ -1,6 +1,7 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
 from typing import Union, Iterator, Optional, Dict, Any
+from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
@@ -124,21 +125,21 @@ class BaseFile:
     
     def describe(self) -> Dict[str, Any]: ...
     
-    def compress(self, output: Union[str, bytes]) -> None: ...
+    def compress(self, output: Union[str, PathLike, bytes]) -> None: ...
     
-    def decompress(self, output: Union[str, bytes]) -> None: ...
+    def decompress(self, output: Union[str, PathLike, bytes]) -> None: ...
 
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""
     
     def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
     
-    def compress(self, output: Union[str, bytes]) -> None:
+    def compress(self, output: Union[str, PathLike, bytes]) -> None:
         """
         Compress an mzML file to MSZ format.
         
         Parameters:
-            output: Output file path (string or bytes).
+            output: Output file path (string, path-like, or bytes).
         """
         ...
     
@@ -183,12 +184,12 @@ class MSZFile(BaseFile):
     
     def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
     
-    def decompress(self, output: Union[str, bytes]) -> None:
+    def decompress(self, output: Union[str, PathLike, bytes]) -> None:
         """
         Decompress an MSZ file to mzML format.
         
         Parameters:
-            output: Output file path (string or bytes).
+            output: Output file path (string, path-like, or bytes).
         """
         ...
     

@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 cimport numpy as np
 from typing import Union
+from os import PathLike
 from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
@@ -656,7 +657,9 @@ cdef class BaseFile:
         return self._arguments
 
 
-    def _prepare_output_fd(self, path: Union[str, bytes]) -> int:
+    def _prepare_output_fd(self, path: Union[str, PathLike, bytes]) -> int:
+        # Use os.fspath() to handle path-like objects (PEP 519)
+        path = os.fspath(path)
         if isinstance(path, str):
             path = path.encode('utf-8')
         cdef int output_fd = _open_output_file(path)
