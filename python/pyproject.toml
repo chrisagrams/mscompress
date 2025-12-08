@@ -19,6 +19,7 @@ dev = [
     "cython",
     "numpy",
     "pytest",
+    "pytest-cov",
     "tomli"
 ]
 
@@ -41,3 +42,6 @@ archs = ["AMD64"]
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
+
+[tool.coverage.run]
+plugins = ["Cython.Coverage"]

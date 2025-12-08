@@ -1486,6 +1486,8 @@ int is_valid_input(char* str) {
    int i;
 
    for (i = 0; i < len; i++) {
+      // Allow digits, dash (for ranges), brackets, comma (for separating ranges), and whitespace
+      // Brackets are now optional
       if (!(str[i] >= '0' && str[i] <= '9') && str[i] != '-' && str[i] != '[' &&
           str[i] != ']' && str[i] != ',' && !isspace((unsigned char)str[i])) {
          return 0;
@@ -1495,9 +1497,11 @@ int is_valid_input(char* str) {
    return 1;
 }
 
+
 long* string_to_array(char* str, long* size)
 /*
     This function converts a string of numbers into an array of numbers.
+    Supports both bracketed format [0-100,200-300] and non-bracketed format 0-100,200-300.
     The function returns the array and sets the size of the array.
 */
 {
@@ -1510,54 +1514,68 @@ long* string_to_array(char* str, long* size)
    long* arr = malloc(max * sizeof(long));
    *size = 0;
 
-   for (i = 0; i < len; i++) {
-      if (str[i] == ' ')
-         continue;  // Skip spaces
+   i = 0;
+   
+   // Skip leading whitespace
+   while (i < len && isspace((unsigned char)str[i])) {
+      i++;
+   }
+   
+   // Skip opening bracket if present
+   if (i < len && str[i] == '[') {
+      i++;
+   }
 
+   while (i < len) {
+      // Skip whitespace
+      while (i < len && isspace((unsigned char)str[i])) {
+         i++;
+      }
+      
+      // Stop if we hit closing bracket or end of string
+      if (i >= len || str[i] == ']') {
+         break;
+      }
+      
+      // Skip commas
+      if (str[i] == ',') {
+         i++;
+         continue;
+      }
+
+      // Parse a number or range
       if (str[i] >= '0' && str[i] <= '9') {
-         long num = str[i] - '0';
-         for (j = i + 1; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
-            num = num * 10 + (str[j] - '0');
+         long start = 0;
+         for (j = i; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
+            start = start * 10 + (str[j] - '0');
          }
-         if (*size >= max)
-            error("Too many spectra specified.\n");
-         arr[*size] = num;
-         (*size)++;
-         i = j - 1;
-      } else if (str[i] == '[') {
-         i++;  // Move past the '['
-         while (i < len && str[i] != ']') {
-            if (str[i] == ' ') {  // Skip spaces
-               i++;
-               continue;
-            }
-
-            long start = 0;
-            for (j = i; j < len && str[j] != '-' && str[j] != ']' &&
-                        str[j] != ',' && str[j] != ' ';
-                 j++) {
-               start = start * 10 + (str[j] - '0');
-            }
-            long end = start;     // Initialize end to start
-            if (str[j] == '-') {  // if there is a range
+         i = j;
+         
+         long end = start;  // Initialize end to start
+         
+         // Check for range (dash followed by a number)
+         if (i < len && str[i] == '-') {
+            // Look ahead to distinguish between minus sign and range separator
+            // If next char is a digit, it's a range
+            if (i + 1 < len && str[i + 1] >= '0' && str[i + 1] <= '9') {
+               i++;  // Skip the dash
                end = 0;
-               for (j = j + 1;
-                    j < len && str[j] != ']' && str[j] != ',' && str[j] != ' ';
-                    j++) {
+               for (j = i; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
                   end = end * 10 + (str[j] - '0');
                }
-            }
-            for (long num = start; num <= end; num++) {
-               if (*size >= max)
-                  error("Too many spectra specified.\n");
-               arr[*size] = num;
-               (*size)++;
-            }
-            i = j;
-            while (str[i] == ' ' || str[i] == ',') {  // Skip spaces and commas
-               i++;
+               i = j;
             }
          }
+         
+         // Add all numbers in the range [start, end]
+         for (long num = start; num <= end; num++) {
+            if (*size >= max)
+               error("Too many spectra specified.\n");
+            arr[*size] = num;
+            (*size)++;
+         }
+      } else {
+         i++;
       }
    }
 
