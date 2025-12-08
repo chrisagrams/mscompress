@@ -157,6 +157,8 @@ cdef extern from "../src/mscompress.h":
     char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
     char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
     char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
+    char* _extract_mzml_header "extract_mzml_header"(char* blk, division_t* first_division, size_t* out_len)
+    char* _extract_mzml_footer "extract_mzml_footer"(char* blk, divisions_t* divisions, size_t* out_len)
     void _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
     void _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
 

@@ -127,6 +127,42 @@ class BaseFile:
     def compress(self, output: Union[str, bytes]) -> None: ...
     
     def decompress(self, output: Union[str, bytes]) -> None: ...
+    
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string.
+        
+        This function extracts the header portion of an mzML file (everything from the start
+        of the file to the first spectrum element).
+        
+        Returns:
+            The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        ...
+    
+    def extract_metadata(self, tag_name: str) -> Element:
+        """
+        Extract and parse a specific XML tag from the mzML file header.
+        
+        This method extracts the header portion of an mzML file, searches for a specific
+        XML tag (e.g., 'referenceableParamGroupList', 'cvList', 'fileDescription'), 
+        strips any content outside of it, and parses that XML element.
+        
+        Parameters:
+            tag_name: The name of the XML tag to extract (without namespace).
+            
+        Returns:
+            An xml.etree.ElementTree.Element containing the parsed XML tag.
+            
+        Raises:
+            ValueError: If the tag is not found in the header.
+            RuntimeError: If header extraction fails.
+            ParseError: If XML parsing fails.
+        """
+        ...
 
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""

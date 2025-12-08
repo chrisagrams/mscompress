@@ -451,6 +451,11 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
                       divisions_t* divisions, long index, size_t* out_len);
 
+char* extract_mzml_header(char* blk, division_t* first_division,
+                          size_t* out_len);
+
+char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len);
+
 /* compress.c */
 typedef struct {
    char* input_map;
