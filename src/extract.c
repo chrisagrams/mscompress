@@ -136,11 +136,15 @@ int determine_division(divisions_t* divisions, long target) {
    return 0;
 }
 
+/**
+ * @brief Extracts the mzML header from the first division. (From byte 0 -> first spectra start)
+ * @param blk The input buffer containing the data.
+ * @param first_divison The first division containing the header information.
+ * @param out_len Pointer to a size_t where the length of the extracted header will be stored.
+ * @return A pointer to the extracted mzML header on success. NULL on error.
+ */
 char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len)
-/*
- * Extract from [XML position 0 -> First spectra position 0]
- */
 {
    data_positions_t *spectra, *xml;
    char* res;
@@ -163,6 +167,13 @@ char* extract_mzml_header(char* blk, division_t* first_division,
    return res;
 }
 
+/**
+ * @brief Extracts the mzML footer from the last division. (From last spectra end -> last XML end)
+ * @param blk The input buffer containing the data.
+ * @param divisions The divisions containing the footer information.
+ * @param out_len Pointer to a size_t where the length of the extracted footer will be stored.
+ * @return A pointer to the extracted mzML footer on success. NULL on error.
+ */
 char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len) {
    data_positions_t *spectra, *xml;
    char* res;
