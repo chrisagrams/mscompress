@@ -87,6 +87,12 @@ cdef extern from "../src/mscompress.h":
         encode_fun encode_source_compression_mz_fun
         encode_fun encode_source_compression_inten_fun
 
+        decompression_fun xml_decompression_fun
+        Algo target_mz_fun
+        Algo target_inten_fun
+        float mz_scale_factor
+        float int_scale_factor
+
     ctypedef struct data_positions_t:
         uint64_t* start_positions
         uint64_t* end_positions
@@ -153,6 +159,8 @@ cdef extern from "../src/mscompress.h":
     divisions_t* _read_divisions "read_divisions"(void* input_map, long position, int n_divisions)
     division_t* _flatten_divisions "flatten_divisions"(divisions_t* divisions)
     block_len_queue_t* _read_block_len_queue "read_block_len_queue"(void* input_map, long offset, long end)
+    block_len_t* _get_block_by_index "get_block_by_index"(block_len_queue_t* queue, int index)
+    void* _decmp_block "decmp_block"(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 
     char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
     char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)

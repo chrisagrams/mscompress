@@ -11,6 +11,7 @@ from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
 from libc.math cimport nan
 import math
+import re
 
 np.import_array()
 
@@ -553,6 +554,62 @@ cdef class MSZFile(BaseFile):
 
         return element
     
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string from MSZ file.
+        
+        This function decompresses the first XML block and extracts the header portion
+        (everything from the start of the file to the first spectrum element).
+        
+        Returns:
+            str: The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        cdef char* header_data = NULL
+        cdef char* decmp_xml = NULL
+        cdef size_t header_len = 0
+        cdef division_t* first_division = NULL
+        cdef block_len_t* xml_blk_len = NULL
+        cdef long xml_blk_offset = 0
+        
+        try:
+            # Get the first division
+            first_division = self._divisions.divisions[0]
+            
+            if first_division == NULL:
+                raise RuntimeError("Failed to access first division.")
+            
+            # Get the first XML block
+            xml_blk_len = _get_block_by_index(self._xml_block_lens, 0)
+            xml_blk_offset = self._footer.xml_pos
+            
+            # Decompress the XML block
+            decmp_xml = <char*>_decmp_block(self._df.xml_decompression_fun, self._dctx, 
+                                             self._mapping, xml_blk_offset, xml_blk_len)
+            
+            if decmp_xml == NULL:
+                raise RuntimeError("Failed to decompress XML block for mzML header.")
+            
+            # Extract the header from decompressed XML
+            header_data = _extract_mzml_header(decmp_xml, first_division, &header_len)
+            
+            if header_data == NULL:
+                raise RuntimeError("Failed to extract mzML header.")
+            
+            # Convert to Python string
+            header_str = header_data[:header_len].decode('utf-8', errors='replace')
+            
+            return header_str
+        
+        finally:
+            # Free the allocated memory
+            if header_data != NULL:
+                free(header_data)
+            if decmp_xml != NULL:
+                free(decmp_xml)
+    
 
 cdef class BaseFile:
     """
@@ -704,20 +761,19 @@ cdef class BaseFile:
         
         try:
             if self._divisions == NULL or self._divisions.n_divisions == 0:
-                # For MZMLFile, use _positions
+                # For MZMLFile, use _positions and mapping directly
                 if self._positions != NULL:
                     first_division = self._positions
+                    header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
                 else:
                     raise RuntimeError("Failed to access division information.")
             else:
                 # For MSZFile, use first division from divisions array
                 first_division = self._divisions.divisions[0]
+                header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
             
             if first_division == NULL:
                 raise RuntimeError("Failed to access first division.")
-            
-            # Extract the header using the C function
-            header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
             
             if header_data == NULL:
                 raise RuntimeError("Failed to extract mzML header.")
@@ -786,7 +842,6 @@ cdef class BaseFile:
             mzml_tag = header_str[mzml_start:mzml_tag_end + 1]
             
             # Extract namespace attributes
-            import re
             ns_attrs = re.findall(r'xmlns[^=]*="[^"]*"', mzml_tag)
             ns_declaration = ' '.join(ns_attrs) if ns_attrs else ''
             
