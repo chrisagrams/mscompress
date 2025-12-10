@@ -10,7 +10,7 @@ from Cython.Build import cythonize
 import numpy
 
 debug = False 
-linetrace = False
+linetrace = True
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
