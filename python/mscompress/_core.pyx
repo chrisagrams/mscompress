@@ -12,6 +12,7 @@ from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
 from libc.math cimport nan
 import math
+import re
 
 np.import_array()
 
@@ -561,6 +562,62 @@ cdef class MSZFile(BaseFile):
 
         return element
     
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string from MSZ file.
+        
+        This function decompresses the first XML block and extracts the header portion
+        (everything from the start of the file to the first spectrum element).
+        
+        Returns:
+            str: The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        cdef char* header_data = NULL
+        cdef char* decmp_xml = NULL
+        cdef size_t header_len = 0
+        cdef division_t* first_division = NULL
+        cdef block_len_t* xml_blk_len = NULL
+        cdef long xml_blk_offset = 0
+        
+        try:
+            # Get the first division
+            first_division = self._divisions.divisions[0]
+            
+            if first_division == NULL:
+                raise RuntimeError("Failed to access first division.")
+            
+            # Get the first XML block
+            xml_blk_len = _get_block_by_index(self._xml_block_lens, 0)
+            xml_blk_offset = self._footer.xml_pos
+            
+            # Decompress the XML block
+            decmp_xml = <char*>_decmp_block(self._df.xml_decompression_fun, self._dctx, 
+                                             self._mapping, xml_blk_offset, xml_blk_len)
+            
+            if decmp_xml == NULL:
+                raise RuntimeError("Failed to decompress XML block for mzML header.")
+            
+            # Extract the header from decompressed XML
+            header_data = _extract_mzml_header(decmp_xml, first_division, &header_len)
+            
+            if header_data == NULL:
+                raise RuntimeError("Failed to extract mzML header.")
+            
+            # Convert to Python string
+            header_str = header_data[:header_len].decode('utf-8', errors='replace')
+            
+            return header_str
+        
+        finally:
+            # Free the allocated memory
+            if header_data != NULL:
+                free(header_data)
+            if decmp_xml != NULL:
+                free(decmp_xml)
+    
 
 cdef class BaseFile:
     """
@@ -694,6 +751,123 @@ cdef class BaseFile:
     
     def decompress(self, output):
         raise NotImplementedError("Cannot decompress this file type.")
+    
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string.
+        
+        This function extracts the header portion of an mzML file (everything from the start
+        of the file to the first spectrum element).
+        
+        Returns:
+            str: The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        cdef char* header_data = NULL
+        cdef size_t header_len = 0
+        cdef division_t* first_division = NULL
+        
+        try:
+            if self._divisions == NULL or self._divisions.n_divisions == 0:
+                # For MZMLFile, use _positions and mapping directly
+                if self._positions != NULL:
+                    first_division = self._positions
+                    header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
+                else:
+                    raise RuntimeError("Failed to access division information.")
+            else:
+                # For MSZFile, use first division from divisions array
+                first_division = self._divisions.divisions[0]
+                header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
+            
+            if first_division == NULL:
+                raise RuntimeError("Failed to access first division.")
+            
+            if header_data == NULL:
+                raise RuntimeError("Failed to extract mzML header.")
+            
+            # Convert to Python string
+            header_str = header_data[:header_len].decode('utf-8', errors='replace')
+            
+            return header_str
+        
+        finally:
+            # Free the allocated memory
+            if header_data != NULL:
+                free(header_data)
+    
+    def extract_metadata(self, tag_name: str) -> Element:
+        """
+        Extract and parse a specific XML tag from the mzML file header.
+        
+        This method extracts the header portion of an mzML file, searches for a specific
+        XML tag (e.g., 'referenceableParamGroupList', 'cvList', 'fileDescription'), 
+        strips any content outside of it, and parses that XML element.
+        
+        Parameters:
+            tag_name (str): The name of the XML tag to extract (without namespace).
+            
+        Returns:
+            Element: An xml.etree.ElementTree.Element containing the parsed XML tag.
+            
+        Raises:
+            ValueError: If the tag is not found in the header.
+            RuntimeError: If header extraction fails.
+            ParseError: If XML parsing fails.
+            
+        Examples:
+            >>> with mscompress.read('data.mzml') as f:
+            ...     param_groups = f.extract_metadata('referenceableParamGroupList')
+            ...     for group in param_groups:
+            ...         print(group.attrib)
+        """
+        header_str = self.get_header()
+        
+        # Find the tag in the header
+        # We need to handle namespace-aware searching
+        tag_pattern = f'<{tag_name}'
+        tag_start = header_str.find(tag_pattern)
+        
+        if tag_start == -1:
+            raise ValueError(f"Tag '{tag_name}' not found in mzML header.")
+        
+        # Find the closing tag
+        closing_tag = f'</{tag_name}>'
+        tag_end = header_str.find(closing_tag, tag_start)
+        
+        if tag_end == -1:
+            raise ValueError(f"Closing tag for '{tag_name}' not found in mzML header.")
+        
+        # Extract the tag with its closing tag
+        tag_end += len(closing_tag)
+        tag_content = header_str[tag_start:tag_end]
+        
+        # Wrap in a minimal XML document to handle namespaces properly
+        # Extract namespace declarations from the header
+        mzml_start = header_str.find('<mzML')
+        if mzml_start != -1:
+            mzml_tag_end = header_str.find('>', mzml_start)
+            mzml_tag = header_str[mzml_start:mzml_tag_end + 1]
+            
+            # Extract namespace attributes
+            ns_attrs = re.findall(r'xmlns[^=]*="[^"]*"', mzml_tag)
+            ns_declaration = ' '.join(ns_attrs) if ns_attrs else ''
+            
+            # Create a wrapper with proper namespace
+            wrapped_xml = f'<root {ns_declaration}>{tag_content}</root>'
+        else:
+            wrapped_xml = f'<root>{tag_content}</root>'
+        
+        # Parse the XML
+        root = fromstring(wrapped_xml)
+        
+        # Return the first child (the actual tag we want)
+        if len(root) > 0:
+            return root[0]
+        else:
+            raise ValueError(f"Failed to parse '{tag_name}' from header.")
 
 
 cdef class Spectra:
