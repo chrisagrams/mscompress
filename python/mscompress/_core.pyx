@@ -311,8 +311,7 @@ cdef class MZMLFile(BaseFile):
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
     def compress(self, output: Union[str, PathLike]):
-        if isinstance(output, PathLike):
-            output = os.fspath(output)
+        output = os.fspath(output)
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output) 
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
@@ -466,8 +465,7 @@ cdef class MSZFile(BaseFile):
         return MSZFile(path, fs, fd)
     
     def decompress(self, output: Union[str, PathLike]):
-        if isinstance(output, PathLike):
-            output = os.fspath(output)
+        output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
         _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
         _flush(self.output_fd)
