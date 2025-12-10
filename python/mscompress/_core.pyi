@@ -125,21 +125,21 @@ class BaseFile:
     
     def describe(self) -> Dict[str, Any]: ...
     
-    def compress(self, output: Union[str, PathLike, bytes]) -> None: ...
+    def compress(self, output: Union[str, PathLike]) -> None: ...
     
-    def decompress(self, output: Union[str, PathLike, bytes]) -> None: ...
+    def decompress(self, output: Union[str, PathLike]) -> None: ...
 
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""
     
     def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
     
-    def compress(self, output: Union[str, PathLike, bytes]) -> None:
+    def compress(self, output: Union[str, PathLike]) -> None:
         """
         Compress an mzML file to MSZ format.
         
         Parameters:
-            output: Output file path (string, path-like, or bytes).
+            output: Output file path (string or path-like).
         """
         ...
     
@@ -184,12 +184,12 @@ class MSZFile(BaseFile):
     
     def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
     
-    def decompress(self, output: Union[str, PathLike, bytes]) -> None:
+    def decompress(self, output: Union[str, PathLike]) -> None:
         """
         Decompress an MSZ file to mzML format.
         
         Parameters:
-            output: Output file path (string, path-like, or bytes).
+            output: Output file path (string or path-like).
         """
         ...
     
@@ -299,12 +299,12 @@ class Spectra:
     
     def __len__(self) -> int: ...
 
-def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
+def read(path: Union[str, PathLike]) -> Union[MZMLFile, MSZFile]:
     """
     Opens and parses mzML or MSZ file.
     
     Parameters:
-        path: Path to file (string or bytes).
+        path: Path to file (string or path-like).
         
     Returns:
         MZMLFile or MSZFile object depending on file type.
