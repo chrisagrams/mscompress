@@ -149,20 +149,13 @@ def test_mzml_arguments_zstd_level(mzml_file_path):
     mzml.arguments.zstd_compression_level = 1
     assert mzml.arguments.zstd_compression_level == 1
 
-def test_compress_mzml_file(mzml_file_path):
-    with read(mzml_file_path) as mzml:
-        # Create a temporary output file path
-        with tempfile.NamedTemporaryFile(suffix=".msz", delete=False) as tmp:
-            output_path = tmp.name
-    
+def test_compress_mzml_file(mzml_file_path, tmp_path):
+    output_path = tmp_path / "test_output.msz"
+    with read(mzml_file_path) as mzml:    
         # Compress the mzML file to MSZ
         mzml.compress(output_path)
-        assert os.path.exists(output_path)
-        assert os.path.getsize(output_path) > 0
-    
-    # Clean up the temporary file
-    if os.path.exists(output_path):
-        os.unlink(output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
 
 def test_decompress_mzml_file(mzml_file_path):
     with pytest.raises(NotImplementedError):
