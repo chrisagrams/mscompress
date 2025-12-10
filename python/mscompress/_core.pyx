@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 cimport numpy as np
 from typing import Union
+from os import PathLike
 from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
@@ -309,7 +310,9 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
-    def compress(self, output: Union[str, bytes]):
+    def compress(self, output: Union[str, PathLike]):
+        if isinstance(output, PathLike):
+            output = os.fspath(output)
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output) 
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
@@ -462,7 +465,9 @@ cdef class MSZFile(BaseFile):
         fd = _open_input_file(path)
         return MSZFile(path, fs, fd)
     
-    def decompress(self, output: Union[str, bytes]):
+    def decompress(self, output: Union[str, PathLike]):
+        if isinstance(output, PathLike):
+            output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
         _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
         _flush(self.output_fd)
@@ -661,7 +666,9 @@ cdef class BaseFile:
         return self._arguments
 
 
-    def _prepare_output_fd(self, path: Union[str, bytes]) -> int:
+    def _prepare_output_fd(self, path: Union[str, PathLike, bytes]) -> int:
+        # Use os.fspath() to handle path-like objects (PEP 519)
+        path = os.fspath(path)
         if isinstance(path, str):
             path = path.encode('utf-8')
         cdef int output_fd = _open_output_file(path)
