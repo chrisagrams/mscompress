@@ -158,15 +158,18 @@ def test_msz_dataformat(msz_file_path):
         assert regex.match(str(result[key]))
 
 def test_decompress_msz_file(msz_file_path):
-    msz = read(msz_file_path)
-
-    # Create a temporary output file path
-    with tempfile.NamedTemporaryFile(suffix=".mzML") as tmp:
-        output_path = tmp.name
+    with read(msz_file_path) as msz:
+        # Create a temporary output file path
+        with tempfile.NamedTemporaryFile(suffix=".mzML") as tmp:
+            output_path = tmp.name
         # Decompress the MSZ file to mzML
         msz.decompress(output_path)
         assert os.path.exists(output_path)
         assert os.path.getsize(output_path) > 0
+
+    # Cleanup the temporary file
+    if os.path.exists(output_path):
+        os.unlink(output_path)
 
 def test_compress_msz_file(msz_file_path):
     with pytest.raises(NotImplementedError):

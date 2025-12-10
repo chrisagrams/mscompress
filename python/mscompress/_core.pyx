@@ -314,9 +314,11 @@ cdef class MZMLFile(BaseFile):
         if isinstance(output, PathLike):
             output = os.fspath(output)
         self._prepare_divisions()
-        output_fd = self._prepare_output_fd(output) 
-        _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, output_fd)
-        _flush(output_fd)
+        self.output_fd = self._prepare_output_fd(output) 
+        _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
+        _flush(self.output_fd)
+        _close_file(self.output_fd)
+        self.output_fd = -1
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
@@ -466,8 +468,11 @@ cdef class MSZFile(BaseFile):
     def decompress(self, output: Union[str, PathLike]):
         if isinstance(output, PathLike):
             output = os.fspath(output)
-        output_fd = self._prepare_output_fd(output)
-        _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), output_fd)
+        self.output_fd = self._prepare_output_fd(output)
+        _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
+        _flush(self.output_fd)
+        _close_file(self.output_fd)
+        self.output_fd = -1
 
 
     def get_mz_binary(self, size_t index):
