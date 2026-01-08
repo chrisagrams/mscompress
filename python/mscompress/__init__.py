@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 from ._core import (
     RuntimeArguments,
@@ -17,7 +17,47 @@ from ._core import (
     get_filesize,
 )
 
+from .metadata import (
+    # Core abstractions
+    MetadataBuilder,
+    FieldDefinition,
+    RecordSetDefinition,
+    FileDistribution,
+    DataCollectionInfo,
+    JoinDefinition,
+    JoinStrategy,
+    # Builders
+    MSZMetadataBuilder,
+    SearchResultsMetadataBuilder,
+    PercolatorMetadataBuilder,
+    PepXMLMetadataBuilder,
+    CompositeMetadataBuilder,
+    # Convenience functions
+    build_msz_metadata,
+    build_composite_metadata,
+)
+
+from .mszx import (
+    # MSZX classes
+    MSZXFile,
+    MSZXBuilder,
+    MSZXManifest,
+    SearchResultEntry,
+    SearchResultFormat,
+    # Convenience functions
+    create_mszx,
+)
+
+from .annotations import (
+    # Search results types
+    PSM,
+    SearchResultsReader,
+    PINReader,
+    PepXMLReader,
+)
+
 __all__ = [
+    # Core types
     "RuntimeArguments",
     "DataFormat",
     "DataPositions",
@@ -31,4 +71,34 @@ __all__ = [
     "get_num_threads",
     "get_filesize",
     "__version__",
+    # Metadata abstractions
+    "MetadataBuilder",
+    "FieldDefinition",
+    "RecordSetDefinition",
+    "FileDistribution",
+    "DataCollectionInfo",
+    "JoinDefinition",
+    "JoinStrategy",
+    # Metadata builders
+    "MSZMetadataBuilder",
+    "SearchResultsMetadataBuilder",
+    "PercolatorMetadataBuilder",
+    "PepXMLMetadataBuilder",
+    "CompositeMetadataBuilder",
+    # Metadata convenience functions
+    "build_msz_metadata",
+    "build_composite_metadata",
+    # MSZX types
+    "MSZXFile",
+    "MSZXBuilder",
+    "MSZXManifest",
+    "SearchResultEntry",
+    "SearchResultFormat",
+    # MSZX convenience functions
+    "create_mszx",
+    # Search results types
+    "PSM",
+    "SearchResultsReader",
+    "PINReader",
+    "PepXMLReader",
 ]
