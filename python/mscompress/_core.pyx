@@ -837,7 +837,10 @@ cdef class Spectrum:
                     scan = self._xml.find('scanList/scan')
                     for param in scan.findall("cvParam"):
                         if param.attrib['accession'] == 'MS:1000016':
-                            return float(param.attrib['value'])
+                            if param.attrib.get('unitAccession', '') == 'UO:0000031':  # minutes
+                                return float(param.attrib['value']) * 60.0
+                            else:  # seconds
+                                return float(param.attrib['value'])
                 except ParseError as e:
                     return nan("1")
             else:
