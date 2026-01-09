@@ -392,16 +392,39 @@ long get_scan(char* spectrum_start) {
    return strtol(ptr, &e, 10);
 }
 
+/**
+ * @brief Extract retention time (in seconds) from spectrum XML block.
+ * @param spectrum_start Pointer to the start of the spectrum XML block.
+ * @return Retention time as a float. Returns 0 on failure.
+ */
 float get_ret_time(char* spectrum_start) {
+   // Find the position of the retention time cvParam
    char* ptr = strstr(spectrum_start, "accession=\"MS:1000016\"") +
                sizeof("accession=\"MS:1000016\"");
+   // Return 0 if not found
    if (ptr == NULL)
       return 0;
+
+   // Move the pointer to the value attribute
    ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
    char* e = strstr(ptr, "\"");
    if (e == NULL)
       return 0;
-   return strtof(ptr, &e);
+
+   // Convert the retention time string to float
+   float retention_time = strtof(ptr, &e);
+
+   // Find the unit of the retention time
+   ptr = strstr(e, "unitAccession=\"") + sizeof("unitAccession=\"") - 1;
+   e = strstr(ptr, "\"");
+   if (e == NULL)
+      return 0;
+
+   // Check if the unit is minutes and convert to seconds if necessary
+   if (strncmp(ptr, "UO:0000031", e - ptr) == 0) {
+      retention_time *= 60.0f;  // Convert minutes to seconds
+   }
+   return retention_time;
 }
 
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
