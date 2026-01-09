@@ -1,25 +1,37 @@
-"""Search results readers for peptide identification files.
+"""Annotation file handling for peptide identification files.
 
-This package provides implementations for reading peptide-spectrum match
-(PSM) data from various search result formats.
+This package provides implementations for reading and writing annotation
+files with compression support.
 
-Supported formats:
-- Percolator PIN files
-- pepXML files
+The annotation abstraction provides transparent zstd compression/decompression
+when reading and writing to archives.
 
 Example:
     Basic usage with auto-detection:
 
-    >>> from mscompress.annotations import SearchResultsReader
-    >>> reader = SearchResultsReader("results.pin")
+    >>> from mscompress.annotations import PSMReader
+    >>> reader = PSMReader("results.pin")
     >>> for psm in reader:
     ...     print(psm.peptide, psm.score)
 
     With context manager:
 
-    >>> with SearchResultsReader("results.pepXML") as reader:
+    >>> with PSMReader("results.pepXML") as reader:
     ...     for psm in reader:
     ...         print(psm.peptide)
+
+    Using annotation files with compression:
+
+    >>> from mscompress.annotations import AnnotationFile
+    >>> # Read a compressed annotation file
+    >>> annotation = AnnotationFile.from_file("results.pin.zst")
+    >>> for psm in annotation:
+    ...     print(psm.peptide, psm.score)
+    >>>
+    >>> # Create from reader and save compressed
+    >>> reader = PINReader("results.pin")
+    >>> annotation = AnnotationFile.from_reader(reader)
+    >>> annotation.save("results.pin.zst", compress=True)
 
     Using specific readers:
 
@@ -31,27 +43,40 @@ Example:
 from __future__ import annotations
 
 # Core types
-from ._types import PSM
+from .psms._types import PSM
 
-# Base class
-from ._base import BaseSearchResultsReader
+# PSM Base class
+from .psms._base import BasePSMReader
 
-# Generic reader with auto-detection
-from .reader import SearchResultsReader
+# Generic PSM reader
+from .psms.reader import PSMReader
 
-# Specific readers
-from .percolator import PINReader
-from .pepxml import PepXMLReader
+# Specific PSM readers
+from .psms.percolator import PINReader
+from .psms.pepxml import PepXMLReader
+
+# Annotation file abstraction
+from ._base import (
+    AnnotationMetadata,
+    BaseAnnotationFile,
+    MSZXAnnotationFile,
+    PathAnnotationFile,
+)
 
 
 __all__ = [
     # Types
     "PSM",
-    # Base class
-    "BaseSearchResultsReader",
-    # Generic reader (auto-detects format)
-    "SearchResultsReader",
-    # Specific readers
+    # PSM Base class
+    "BasePSMReader",
+    # Generic PSM reader
+    "PSMReader",
+    # Specific PSM readers
     "PINReader",
     "PepXMLReader",
+    # Annotation file abstraction
+    "AnnotationMetadata",
+    "BaseAnnotationFile",
+    "MSZXAnnotationFile",
+    "PathAnnotationFile",
 ]

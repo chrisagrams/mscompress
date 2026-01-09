@@ -42,7 +42,7 @@ from .mszx import (
     MSZXFile,
     MSZXBuilder,
     MSZXManifest,
-    SearchResultEntry,
+    AnnotationEntry,
     SearchResultFormat,
     # Convenience functions
     create_mszx,
@@ -51,7 +51,6 @@ from .mszx import (
 from .annotations import (
     # Search results types
     PSM,
-    SearchResultsReader,
     PINReader,
     PepXMLReader,
 )
@@ -92,13 +91,12 @@ __all__ = [
     "MSZXFile",
     "MSZXBuilder",
     "MSZXManifest",
-    "SearchResultEntry",
+    "AnnotationEntry",
     "SearchResultFormat",
     # MSZX convenience functions
     "create_mszx",
     # Search results types
     "PSM",
-    "SearchResultsReader",
     "PINReader",
     "PepXMLReader",
 ]

@@ -72,20 +72,3 @@ class PSM:
     def is_target(self) -> bool:
         """Whether this is a target (non-decoy) hit."""
         return not self.is_decoy
-
-    @property
-    def has_qvalue(self) -> bool:
-        """Whether a q-value is available."""
-        return self.q_value is not None
-
-    def passes_fdr(self, threshold: float = 0.01) -> bool:
-        """
-        Check if this PSM passes an FDR threshold.
-
-        Args:
-            threshold: Maximum q-value (default: 0.01 = 1% FDR).
-
-        Returns:
-            True if q-value is available and <= threshold.
-        """
-        return self.q_value is not None and self.q_value <= threshold

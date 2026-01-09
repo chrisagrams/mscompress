@@ -11,22 +11,33 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from ._base import BaseSearchResultsReader
+from .._base import BaseAnnotationFile
+from ._base import BasePSMReader
 from ._types import PSM
 
 
-class PINReader(BaseSearchResultsReader):
+class PINReader(BasePSMReader):
     """
     Reader for Percolator PIN (input) files.
 
     PIN files are tab-separated with a header row containing column names.
     Standard columns include: SpecId, Label, ScanNr, Peptide, Proteins
     Additional columns are features used by Percolator.
+    
+    Supports reading from file paths (compressed or uncompressed), 
+    tar archive members, or raw bytes via BaseAnnotationFile.
 
     Example:
         >>> reader = PINReader("results.pin")
         >>> for psm in reader:
         ...     print(psm.peptide, psm.score)
+        >>>
+        >>> # Read from tar archive
+        >>> import tarfile
+        >>> with tarfile.open("archive.tar") as tar:
+        ...     reader = PINReader.from_tar(tar, "results.pin")
+        ...     for psm in reader:
+        ...         print(psm.peptide)
     """
 
     # Regex to parse SpecId format: file.scan.scan.charge
@@ -34,17 +45,17 @@ class PINReader(BaseSearchResultsReader):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
+        source: Union[str, Path, BaseAnnotationFile],
         decoy_prefix: str = "DECOY_",
     ):
         """
         Initialize the PIN reader.
 
         Args:
-            file_path: Path to the .pin file.
+            source: Source for reading - file path or AnnotationSource.
             decoy_prefix: Prefix used to identify decoy proteins.
         """
-        super().__init__(file_path)
+        super().__init__(source)
         self._decoy_prefix = decoy_prefix
 
     @property
@@ -54,25 +65,31 @@ class PINReader(BaseSearchResultsReader):
 
     def _parse(self) -> None:
         """Parse the PIN file."""
-        with open(self._file_path, "r", newline="") as f:
-            # Read header
-            header_line = f.readline().strip()
-            if header_line.startswith("SpecId"):
-                headers = header_line.split("\t")
-            else:
-                # Try to detect delimiter
-                f.seek(0)
-                dialect = csv.Sniffer().sniff(f.read(4096))
-                f.seek(0)
-                headers = f.readline().strip().split(dialect.delimiter)
+        # Get decompressed data from source
+        data = self._source.read()
+        text = data.decode("utf-8")
+        
+        # Parse as text
+        lines = text.splitlines()
+        if not lines:
+            return
+        
+        # Read header
+        header_line = lines[0].strip()
+        if header_line.startswith("SpecId"):
+            headers = header_line.split("\t")
+        else:
+            # Try to detect delimiter
+            dialect = csv.Sniffer().sniff(text[:4096])
+            headers = header_line.split(dialect.delimiter)
 
-            # Create reader for remaining lines
-            reader = csv.DictReader(f, fieldnames=headers, delimiter="\t")
+        # Create reader for remaining lines
+        reader = csv.DictReader(lines[1:], fieldnames=headers, delimiter="\t")
 
-            for row in reader:
-                psm = self._parse_row(row, headers)
-                if psm:
-                    self._psms.append(psm)
+        for row in reader:
+            psm = self._parse_row(row, headers)
+            if psm:
+                self._psms.append(psm)
 
     def _parse_row(self, row: Dict[str, str], headers: List[str]) -> Optional[PSM]:
         """Parse a single row into a PSM."""

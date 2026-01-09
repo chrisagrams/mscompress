@@ -6,21 +6,26 @@ This module provides a reader for pepXML search result files.
 
 from __future__ import annotations
 
+import io
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 from xml.etree import ElementTree as ET
 
-from ._base import BaseSearchResultsReader
+from .._base import BaseAnnotationFile
+from ._base import BasePSMReader
 from ._types import PSM
 
 
-class PepXMLReader(BaseSearchResultsReader):
+class PepXMLReader(BasePSMReader):
     """
     Reader for pepXML search result files.
 
     pepXML is an XML format for peptide identification results from
     database search engines like Comet, X!Tandem, MSFragger, etc.
+    
+    Supports reading from file paths (compressed or uncompressed),
+    tar archive members, or raw bytes via AnnotationSource.
 
     Example:
         >>> reader = PepXMLReader("results.pepXML")
@@ -29,6 +34,13 @@ class PepXMLReader(BaseSearchResultsReader):
         >>>
         >>> # Get PSMs for a specific scan
         >>> psms = reader.get_by_scan(1234)
+        >>>
+        >>> # Read from tar archive
+        >>> import tarfile
+        >>> with tarfile.open("archive.tar") as tar:
+        ...     reader = PepXMLReader.from_tar(tar, "results.pepXML")
+        ...     for psm in reader:
+        ...         print(psm.peptide)
     """
 
     # pepXML namespace
@@ -36,7 +48,7 @@ class PepXMLReader(BaseSearchResultsReader):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
+        source: Union[str, Path, BaseAnnotationFile],
         min_rank: int = 1,
         decoy_prefix: str = "DECOY_",
     ):
@@ -44,11 +56,11 @@ class PepXMLReader(BaseSearchResultsReader):
         Initialize the pepXML reader.
 
         Args:
-            file_path: Path to the .pepXML file.
+            source: Source for reading - file path or BaseAnnotationFile.
             min_rank: Only include hits with rank <= min_rank.
             decoy_prefix: Prefix used to identify decoy proteins.
         """
-        super().__init__(file_path)
+        super().__init__(source)
         self._min_rank = min_rank
         self._decoy_prefix = decoy_prefix
 
@@ -59,8 +71,11 @@ class PepXMLReader(BaseSearchResultsReader):
 
     def _parse(self) -> None:
         """Parse the pepXML file."""
-        # Use iterparse for memory efficiency with large files
-        context = ET.iterparse(str(self._file_path), events=("end",))
+        # Get decompressed data from source
+        data = self._source.read()
+        
+        # Use iterparse with BytesIO for memory efficiency
+        context = ET.iterparse(io.BytesIO(data), events=("end",))
 
         for event, elem in context:
             # Handle both namespaced and non-namespaced elements

@@ -35,8 +35,10 @@ import numpy.typing as npt
 
 from ._core import MSZFile, read
 from .annotations import (
-    BaseSearchResultsReader,
-    SearchResultsReader,
+    BasePSMReader,
+    PSMReader,
+    MSZXAnnotationFile,
+    PathAnnotationFile,
 )
 
 if TYPE_CHECKING:
@@ -56,20 +58,22 @@ class SearchResultFormat(Enum):
 
 
 @dataclass
-class SearchResultEntry:
-    """Entry describing a search result file in the archive."""
+class AnnotationEntry:
+    """Entry describing an annotation file in the archive."""
 
     filename: str
     format: str
+    compressed: bool
     description: Optional[str] = None
     num_psms: Optional[int] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SearchResultEntry":
+    def from_dict(cls, data: Dict[str, Any]) -> AnnotationEntry:
         """Create from dictionary."""
         return cls(
             filename=data["filename"],
             format=data["format"],
+            compressed=data.get("compressed", False),
             description=data.get("description"),
             num_psms=data.get("num_psms"),
         )
@@ -87,7 +91,7 @@ class MSZXManifest:
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     spectra_file: str = "spectra.msz"
     num_spectra: int = 0
-    search_results: List[SearchResultEntry] = field(default_factory=list)
+    annotations: List[AnnotationEntry] = field(default_factory=list)
     join_key: str = "scan_number"
     description: Optional[str] = None
     source_file: Optional[str] = None
@@ -100,7 +104,7 @@ class MSZXManifest:
             "created_at": self.created_at,
             "spectra_file": self.spectra_file,
             "num_spectra": self.num_spectra,
-            "search_results": [asdict(sr) for sr in self.search_results],
+            "annotations": [asdict(sr) for sr in self.annotations],
             "join_key": self.join_key,
         }
         if self.description:
@@ -118,15 +122,15 @@ class MSZXManifest:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> MSZXManifest:
         """Create from dictionary."""
-        search_results = [
-            SearchResultEntry.from_dict(sr) for sr in data.get("search_results", [])
+        annotations = [
+            AnnotationEntry.from_dict(sr) for sr in data.get("annotations", [])
         ]
         return cls(
             version=data.get("version", "1.0"),
             created_at=data.get("created_at", ""),
             spectra_file=data.get("spectra_file", "spectra.msz"),
             num_spectra=data.get("num_spectra", 0),
-            search_results=search_results,
+            annotations=annotations,
             join_key=data.get("join_key", "scan_number"),
             description=data.get("description"),
             source_file=data.get("source_file"),
@@ -141,12 +145,12 @@ class MSZXManifest:
 
 class MSZXBuilder:
     """
-    Builder for creating MSZX archives from MSZ files and search results.
+    Builder for creating MSZX archives from MSZ files and annotations.
 
     Example:
         >>> msz = mscompress.read("sample.msz")
         >>> builder = MSZXBuilder(msz)
-        >>> builder.add_search_results(reader, description="Percolator results")
+        >>> builder.add_annotations(reader, description="Percolator results")
         >>> builder.set_description("Proteomics dataset with PSM annotations")
         >>> builder.save("sample.mszx")
     """
@@ -155,6 +159,7 @@ class MSZXBuilder:
         self,
         msz: MSZFile,
         source_name: Optional[str] = None,
+        compression: bool = True,
     ):
         """
         Initialize the builder with an MSZ file.
@@ -165,44 +170,49 @@ class MSZXBuilder:
         """
         self._msz = msz
         path_str = msz.path.decode("utf-8") if isinstance(msz.path, bytes) else str(msz.path)
+        self.compression = compression
         self._msz_path = Path(path_str)
-        self._search_results: List[tuple[Path, SearchResultEntry]] = []
+        self._annotations: List[tuple[Path, AnnotationEntry]] = []
         self._description: Optional[str] = None
         self._source_name = source_name or self._msz_path.name
         self._join_key = "scan_number"
         self._extra: Dict[str, Any] = {}
 
-    def add_search_results(
+    def add_annotations(
         self,
-        reader: BaseSearchResultsReader,
+        reader: BasePSMReader,
         description: Optional[str] = None,
     ) -> MSZXBuilder:
         """
-        Add search results to the archive.
+        Add annotations to the archive.
 
         Args:
-            reader: BaseSearchResultsReader instance containing the search results.
-            description: Optional description of the search results.
-
+            reader: BasePSMReader instance containing the annotations.
+            description: Optional description of the annotations.
         Returns:
             Self for method chaining.
         """
         # Get path from reader
+        if reader.file_path is None:
+            raise ValueError("Annotation reader must have a file path for archiving")
         path = Path(reader.file_path)
         if not path.exists():
-            raise FileNotFoundError(f"Search results file not found: {path}")
+            raise FileNotFoundError(f"Annotation file not found: {path}")
 
         # Automatically detect format and count PSMs from reader
         fmt = reader.format
         num_psms = len(reader)
 
-        entry = SearchResultEntry(
-            filename=path.name,
+        filename = path.name if not self.compression else path.name + ".zst"
+
+        entry = AnnotationEntry(
+            filename=filename,
             format=fmt,
+            compressed=self.compression,
             description=description,
             num_psms=num_psms,
         )
-        self._search_results.append((path, entry))
+        self._annotations.append((path, entry))
         return self
 
     def set_description(self, description: str) -> MSZXBuilder:
@@ -225,7 +235,7 @@ class MSZXBuilder:
         return MSZXManifest(
             spectra_file=self._msz_path.name,
             num_spectra=len(self._msz.spectra),
-            search_results=[entry for _, entry in self._search_results],
+            annotations=[entry for _, entry in self._annotations],
             join_key=self._join_key,
             description=self._description,
             source_file=self._source_name,
@@ -258,9 +268,21 @@ class MSZXBuilder:
             # Add MSZ file
             tar.add(str(self._msz_path), arcname=manifest.spectra_file)
 
-            # Add search results
-            for path, entry in self._search_results:
-                tar.add(str(path), arcname=entry.filename)
+            # Add annotations
+            for path, entry in self._annotations:
+                if self.compression:
+                    # Use PathAnnotationFile to handle compression
+                    annotation_source = PathAnnotationFile(path)
+                    compressed_data = annotation_source.get_compressed()
+                    
+                    # Add compressed data to archive
+                    compressed_filename = entry.filename
+                    annotation_info = tarfile.TarInfo(name=compressed_filename)
+                    annotation_info.size = len(compressed_data)
+                    tar.addfile(annotation_info, io.BytesIO(compressed_data))
+                else:
+                    # Add uncompressed file directly
+                    tar.add(str(path), arcname=entry.filename)                    
 
         return output
 
@@ -281,9 +303,9 @@ class MSZXFile:
         ...         psms = mszx.get_psms_for_spectrum(spectrum)
         ...         print(spectrum.scan, len(psms), "PSMs")
         ...     
-        ...     # Direct search results access
-        ...     for psm in mszx.search_results:
-        ...         print(psm.peptide, psm.score)
+        ...     # Direct annotations access
+        ...     for annotation in mszx.annotations:
+        ...         print(annotation.peptide, annotation.score)
     """
 
     def __init__(
@@ -292,7 +314,7 @@ class MSZXFile:
         manifest: MSZXManifest,
         msz_file: MSZFile,
         temp_dir: Path,
-        search_readers: Optional[Dict[str, BaseSearchResultsReader]] = None,
+        annotation_readers: Optional[Dict[str, BasePSMReader]] = None,
     ):
         """
         Initialize MSZXFile.
@@ -302,19 +324,19 @@ class MSZXFile:
             manifest: Parsed manifest.
             msz_file: Extracted MSZ file handler.
             temp_dir: Temporary directory containing extracted files.
-            search_readers: Dict mapping filenames to search result readers.
+            annotation_readers: Dict mapping filenames to annotation readers.
         """
         self._archive_path = Path(archive_path)
         self._manifest = manifest
         self._msz = msz_file
         self._temp_dir = temp_dir
         self._closed = False
-        self._search_readers: Dict[str, BaseSearchResultsReader] = search_readers or {}
-        self._primary_search_reader: Optional[BaseSearchResultsReader] = None
+        self._annotations: Dict[str, BasePSMReader] = annotation_readers or {}
+        self._primary_annotation_reader: Optional[BasePSMReader] = None
 
-        # Set primary search reader (first one)
-        if self._search_readers:
-            self._primary_search_reader = next(iter(self._search_readers.values()))
+        # Set primary annotation reader (first one)
+        if self._annotations:
+            self._primary_annotation_reader = next(iter(self._annotations.values()))
 
     @classmethod
     def open(cls, path: Union[str, Path]) -> MSZXFile:
@@ -335,7 +357,7 @@ class MSZXFile:
         if not archive_path.exists():
             raise FileNotFoundError(f"MSZX file not found: {archive_path}")
 
-        # Create temp directory for extraction
+        # Create temp directory for extraction (only MSZ file needs to be extracted)
         temp_dir = Path(tempfile.mkdtemp(prefix="mszx_"))
 
         try:
@@ -352,8 +374,41 @@ class MSZXFile:
 
                 manifest = MSZXManifest.from_json(manifest_file.read().decode("utf-8"))
 
-                # Extract all files to temp directory
-                tar.extractall(temp_dir)
+                # Extract only the MSZ file (it needs to be on disk for the core reader)
+                try:
+                    msz_member = tar.getmember(manifest.spectra_file)
+                    tar.extract(msz_member, temp_dir)
+                except KeyError:
+                    raise ValueError(
+                        f"Invalid MSZX archive: missing spectra file {manifest.spectra_file}"
+                    )
+
+                # Read annotation files directly from tar using AnnotationSource
+                annotation_readers: Dict[str, BasePSMReader] = {}
+                for entry in manifest.annotations:
+                    try:
+                        member = tar.getmember(entry.filename)
+                        mszx_source = MSZXAnnotationFile(
+                            mszx_file=tar,
+                            member=member,
+                            name=entry.filename,
+                        )
+                        
+                        reader = PSMReader(mszx_source)
+                        annotation_readers[entry.filename] = reader
+                    except KeyError:
+                        warnings.warn(
+                            f"Annotation file '{entry.filename}' not found in archive",
+                            UserWarning,
+                            stacklevel=2
+                        )
+                    except (ValueError, Exception) as e:
+                        # Skip files we can't parse, but print a warning
+                        warnings.warn(
+                            f"Could not parse annotation file '{entry.filename}': {e}",
+                            UserWarning,
+                            stacklevel=2
+                        )
 
             # Open the MSZ file
             msz_path = temp_dir / manifest.spectra_file
@@ -362,35 +417,18 @@ class MSZXFile:
                     f"Invalid MSZX archive: missing spectra file {manifest.spectra_file}"
                 )
 
-            msz_file = read(msz_path)
+            msz_file = read(str(msz_path))
             if not isinstance(msz_file, MSZFile):
                 raise ValueError(
                     f"Spectra file {manifest.spectra_file} is not a valid MSZ file"
                 )
-
-            # Open search result readers
-            search_readers: Dict[str, BaseSearchResultsReader] = {}
-            for entry in manifest.search_results:
-                search_path = temp_dir / entry.filename
-                if search_path.exists():
-                    try:
-                        reader = SearchResultsReader(search_path, format=entry.format)
-                        search_readers[entry.filename] = reader
-                    except (ValueError, FileNotFoundError) as e:
-                        # Skip files we can't parse, but print a warning
-                        warnings.warn(
-                            f"Could not parse search results file '{entry.filename}': {e}",
-                            UserWarning,
-                            stacklevel=2
-                        )
-                        pass
 
             return cls(
                 archive_path=archive_path,
                 manifest=manifest,
                 msz_file=msz_file,
                 temp_dir=temp_dir,
-                search_readers=search_readers,
+                annotation_readers=annotation_readers,
             )
 
         except Exception:
@@ -429,41 +467,40 @@ class MSZXFile:
         return self._manifest
 
     @property
-    def search_result_files(self) -> List[SearchResultEntry]:
-        """List of search result entries in the archive."""
-        return self._manifest.search_results
+    def annotation_files(self) -> List[AnnotationEntry]:
+        """List of annotation entries in the archive."""
+        return self._manifest.annotations
 
-    def get_search_result_path(self, filename: str) -> Path:
+    def get_annotation_reader(self, filename: str) -> BasePSMReader:
         """
-        Get the path to an extracted search results file.
+        Get the annotation reader for a specific file.
 
         Args:
-            filename: Name of the search results file.
+            filename: Name of the annotation file.
 
         Returns:
-            Path to the extracted file.
+            BasePSMReader for the annotation file.
 
         Raises:
             KeyError: If the file is not in the archive.
         """
-        for entry in self._manifest.search_results:
-            if entry.filename == filename:
-                return self._temp_dir / filename
-        raise KeyError(f"Search result file not found: {filename}")
+        if filename in self._annotations:
+            return self._annotations[filename]
+        raise KeyError(f"Annotation file not found: {filename}")
 
     @property
-    def search_results(self) -> Optional[BaseSearchResultsReader]:
+    def annotations(self) -> Optional[BasePSMReader]:
         """
-        Primary search results reader.
+        Primary annotation reader.
 
-        Returns the first search results reader, or None if no search results.
+        Returns the first annotation reader, or None if no annotations.
         """
-        return self._primary_search_reader
+        return self._primary_annotation_reader
 
     @property
-    def search_readers(self) -> Dict[str, BaseSearchResultsReader]:
-        """Dict of all search result readers, keyed by filename."""
-        return self._search_readers
+    def annotation_readers(self) -> Dict[str, BasePSMReader]:
+        """Dict of all annotation readers, keyed by filename."""
+        return self._annotations
 
 
     @property
@@ -517,7 +554,7 @@ class MSZXFile:
         desc = self._msz.describe()
         desc["archive"] = {
             "path": str(self._archive_path),
-            "search_results": [asdict(sr) for sr in self._manifest.search_results],
+            "annotations": [asdict(sr) for sr in self._manifest.annotations],
         }
         return desc
 
@@ -537,7 +574,7 @@ class MSZXFile:
 def create_mszx(
     msz: MSZFile,
     output_path: Union[str, Path],
-    search_results: Optional[List[Union[str, Path, BaseSearchResultsReader]]] = None,
+    annotations: Optional[List[Union[str, Path, BasePSMReader]]] = None,
     description: Optional[str] = None,
 ) -> Path:
     """
@@ -548,7 +585,7 @@ def create_mszx(
     Args:
         msz: MSZFile object.
         output_path: Output path for the .mszx file.
-        search_results: List of file paths or readers for search results.
+        annotations: List of file paths or readers for annotations.
         description: Optional description for the archive.
 
     Returns:
@@ -559,7 +596,7 @@ def create_mszx(
         >>> create_mszx(
         ...     msz,
         ...     "sample.mszx",
-        ...     search_results=[("sample.pin", "pin")],
+        ...     annotations=["sample.pin", "sample.pepXML"],
         ...     description="Annotated proteomics dataset"
         ... )
     """
@@ -568,12 +605,12 @@ def create_mszx(
     if description:
         builder.set_description(description)
 
-    if search_results:
-        for search_result in search_results:
-            if isinstance(search_result, (str, Path)):
-                reader = SearchResultsReader(search_result)
-                builder.add_search_results(reader)
-            elif isinstance(search_result, BaseSearchResultsReader):
-                builder.add_search_results(search_result)
+    if annotations:
+        for annotation in annotations:
+            if isinstance(annotation, (str, Path)):
+                reader = PSMReader(annotation)
+                builder.add_annotations(reader)
+            elif isinstance(annotation, BasePSMReader):
+                builder.add_annotations(annotation)
 
     return builder.save(output_path)

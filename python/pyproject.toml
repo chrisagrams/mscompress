@@ -11,6 +11,7 @@ requires-python = ">=3.9"
 dependencies = [
     "mlcroissant>=1.0.0",
     "numpy<2",
+    "zstandard>=0.19.0",
 ]
 
 [project.optional-dependencies]
