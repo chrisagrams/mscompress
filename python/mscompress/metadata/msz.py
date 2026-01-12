@@ -1,8 +1,5 @@
 """
 Metadata builder for MSZ (compressed mzML) files.
-
-This module provides the MSZMetadataBuilder class for extracting
-Croissant metadata from mass spectrometry files.
 """
 
 from __future__ import annotations
