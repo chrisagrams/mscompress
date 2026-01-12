@@ -34,6 +34,8 @@ import numpy.typing as npt
 
 from ._core import MSZFile
 
+from .types import AnnotationFormat
+
 from .annotations import (
     BasePSMReader,
     PSMReader,
@@ -460,6 +462,23 @@ class MSZXFile:
         if filename in self._annotations:
             return self._annotations[filename]
         raise KeyError(f"Annotation file not found: {filename}")
+
+    def get_annotation_readers_by_format(self, format: AnnotationFormat) -> List[BasePSMReader]:
+        """
+        Get all annotation readers matching a specific format.
+
+        Args:
+            format: The annotation format to filter by.
+
+        Returns:
+            List of BasePSMReader instances matching the format.
+        """
+        
+        readers = []
+        for entry in self._manifest.annotations:
+            if entry.format == format and entry.filename in self._annotations:
+                readers.append(self._annotations[entry.filename])
+        return readers
 
     @property
     def annotations(self) -> Optional[BasePSMReader]:
