@@ -19,8 +19,9 @@ from typing import (
     overload,
 )
 
-from .._base import BaseAnnotationFile, PathAnnotationFile
-from ._types import PSM
+from mscompress.annotations._base import BaseAnnotationFile, PathAnnotationFile
+from mscompress.annotations.psms._types import PSM
+from mscompress.types import AnnotationFormat
 
 
 T = TypeVar("T", bound="BasePSMReader")
@@ -86,7 +87,7 @@ class BasePSMReader(ABC):
 
     @property
     @abstractmethod
-    def format(self) -> str:
+    def format(self) -> AnnotationFormat:
         """Return the format identifier for this reader (e.g., 'pin', 'pepxml')."""
         ...
 

@@ -57,7 +57,6 @@ from .psms.pepxml import PepXMLReader
 
 # Annotation file abstraction
 from ._base import (
-    AnnotationMetadata,
     BaseAnnotationFile,
     MSZXAnnotationFile,
     PathAnnotationFile,
@@ -75,7 +74,6 @@ __all__ = [
     "PINReader",
     "PepXMLReader",
     # Annotation file abstraction
-    "AnnotationMetadata",
     "BaseAnnotationFile",
     "MSZXAnnotationFile",
     "PathAnnotationFile",

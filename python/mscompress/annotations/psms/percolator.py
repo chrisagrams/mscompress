@@ -11,9 +11,10 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from .._base import BaseAnnotationFile
-from ._base import BasePSMReader
-from ._types import PSM
+from mscompress.annotations._base import BaseAnnotationFile
+from mscompress.annotations.psms._base import BasePSMReader
+from mscompress.annotations.psms._types import PSM
+from mscompress.types import AnnotationFormat
 
 
 class PINReader(BasePSMReader):
@@ -59,9 +60,9 @@ class PINReader(BasePSMReader):
         self._decoy_prefix = decoy_prefix
 
     @property
-    def format(self) -> str:
+    def format(self) -> AnnotationFormat:
         """Return the format identifier."""
-        return "pin"
+        return AnnotationFormat.PIN
 
     def _parse(self) -> None:
         """Parse the PIN file."""

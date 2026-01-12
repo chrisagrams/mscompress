@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import tarfile
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
-    Any,
-    Dict,
     Optional,
     Union,
 )
@@ -152,21 +149,3 @@ class MSZXAnnotationFile(BaseAnnotationFile):
         if self._cached_data is None:
             raise ValueError("Data was not cached during initialization")
         return self._cached_data
-
-@dataclass
-class AnnotationMetadata:
-    """Metadata for an annotation file.
-    
-    Attributes:
-        format: The format identifier (e.g., 'pin', 'pepxml').
-        original_filename: Original filename before compression.
-        num_records: Number of records in the file.
-        compression_level: Zstd compression level used.
-        extra: Additional format-specific metadata.
-    """
-    
-    format: str
-    original_filename: Optional[str] = None
-    num_records: Optional[int] = None
-    compression_level: int = DEFAULT_ZSTD_COMPRESSION_LEVEL
-    extra: Dict[str, Any] = field(default_factory=dict)

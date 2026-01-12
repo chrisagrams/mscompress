@@ -43,7 +43,6 @@ from .mszx import (
     MSZXBuilder,
     MSZXManifest,
     AnnotationEntry,
-    SearchResultFormat,
     # Convenience functions
     create_mszx,
 )
@@ -92,7 +91,6 @@ __all__ = [
     "MSZXBuilder",
     "MSZXManifest",
     "AnnotationEntry",
-    "SearchResultFormat",
     # MSZX convenience functions
     "create_mszx",
     # Search results types

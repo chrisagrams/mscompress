@@ -18,7 +18,6 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -41,6 +40,8 @@ from .annotations import (
     PathAnnotationFile,
 )
 
+from .types import AnnotationEntry
+
 if TYPE_CHECKING:
     from ._core import (
         DataFormat,
@@ -48,35 +49,6 @@ if TYPE_CHECKING:
         RuntimeArguments,
         Spectra,
     )
-
-class SearchResultFormat(Enum):
-    """Supported search result formats."""
-
-    PIN = "pin"
-    PEPXML = "pepxml"
-    TSV = "tsv"
-
-
-@dataclass
-class AnnotationEntry:
-    """Entry describing an annotation file in the archive."""
-
-    filename: str
-    format: str
-    compressed: bool
-    description: Optional[str] = None
-    num_psms: Optional[int] = None
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AnnotationEntry:
-        """Create from dictionary."""
-        return cls(
-            filename=data["filename"],
-            format=data["format"],
-            compressed=data.get("compressed", False),
-            description=data.get("description"),
-            num_psms=data.get("num_psms"),
-        )
 
 
 @dataclass
@@ -201,7 +173,7 @@ class MSZXBuilder:
 
         # Automatically detect format and count PSMs from reader
         fmt = reader.format
-        num_psms = len(reader)
+        num_records = len(reader)
 
         filename = path.name if not self.compression else path.name + ".zst"
 
@@ -210,7 +182,7 @@ class MSZXBuilder:
             format=fmt,
             compressed=self.compression,
             description=description,
-            num_psms=num_psms,
+            num_records=num_records,
         )
         self._annotations.append((path, entry))
         return self

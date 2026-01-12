@@ -5,10 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from .._base import BaseAnnotationFile, PathAnnotationFile
-from ._base import BasePSMReader
-from .percolator import PINReader
-from .pepxml import PepXMLReader
+from mscompress.annotations.psms._base import BasePSMReader, BaseAnnotationFile, PathAnnotationFile
+from mscompress.annotations.psms.percolator import PINReader
+from mscompress.annotations.psms.pepxml import PepXMLReader
 
 
 def _detect_format_from_name(name: str) -> Optional[str]:
