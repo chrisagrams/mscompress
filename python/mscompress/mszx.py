@@ -32,7 +32,8 @@ from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
 
-from ._core import MSZFile, read
+from ._core import MSZFile
+
 from .annotations import (
     BasePSMReader,
     PSMReader,
@@ -389,7 +390,7 @@ class MSZXFile:
                     f"Invalid MSZX archive: missing spectra file {manifest.spectra_file}"
                 )
 
-            msz_file = read(str(msz_path))
+            msz_file = MSZFile(str(msz_path).encode())
             if not isinstance(msz_file, MSZFile):
                 raise ValueError(
                     f"Spectra file {manifest.spectra_file} is not a valid MSZ file"

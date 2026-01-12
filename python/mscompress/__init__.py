@@ -2,6 +2,7 @@
 
 __version__ = "1.0.6"
 
+
 from ._core import (
     RuntimeArguments,
     DataFormat,
@@ -12,10 +13,11 @@ from ._core import (
     MSZFile,
     Spectrum,
     Spectra,
-    read,
     get_num_threads,
     get_filesize,
 )
+
+from .utils import read
 
 from .metadata import (
     # Core abstractions
@@ -65,10 +67,11 @@ __all__ = [
     "MSZFile",
     "Spectrum",
     "Spectra",
-    "read",
     "get_num_threads",
     "get_filesize",
     "__version__",
+    # Utility functions
+    "read",
     # Metadata abstractions
     "MetadataBuilder",
     "FieldDefinition",
@@ -98,3 +101,4 @@ __all__ = [
     "PINReader",
     "PepXMLReader",
 ]
+

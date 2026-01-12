@@ -168,7 +168,7 @@ class BaseFile:
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""
     
-    def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
+    def __init__(self, path: bytes) -> None: ...
     
     def compress(self, output: Union[str, PathLike]) -> None:
         """
@@ -218,7 +218,7 @@ class MZMLFile(BaseFile):
 class MSZFile(BaseFile):
     """Handler for MSZ (compressed) format files."""
     
-    def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
+    def __init__(self, path: bytes) -> None: ...
     
     def decompress(self, output: Union[str, PathLike]) -> None:
         """
@@ -334,23 +334,6 @@ class Spectra:
     def __getitem__(self, index: int) -> Spectrum: ...
     
     def __len__(self) -> int: ...
-
-def read(path: Union[str, PathLike]) -> Union[MZMLFile, MSZFile]:
-    """
-    Opens and parses mzML or MSZ file.
-    
-    Parameters:
-        path: Path to file (string or path-like).
-        
-    Returns:
-        MZMLFile or MSZFile object depending on file type.
-        
-    Raises:
-        FileNotFoundError: If file does not exist.
-        IsADirectoryError: If path points to a directory.
-        OSError: If file type cannot be determined.
-    """
-    ...
 
 def get_num_threads() -> int:
     """

@@ -247,55 +247,16 @@ cdef class Division:
             return np.asarray(<float[:shape[0]]>self._division.ret_times)
 
 
-def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
-    """
-    Opens and parses mzML or msz file.
-
-    Parameters:
-    path (Union[str, bytes]): Path to file. Can be a string or bytes.
-
-    Returns:
-    Union[MZMLFile, MSZFile]: An MZMLFile or MSZFile class object, depending on file contents.
-    """
-    if not isinstance(path, str) and not isinstance(path, bytes):
-        raise ValueError("Path must be a string or bytes.")
-    
-    if isinstance(path, str):
-        path = path.encode('utf-8')
-    path = os.path.expanduser(path)
-    path = os.path.abspath(path)
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
-    
-    if os.path.isdir(path):
-        raise IsADirectoryError(f"{path} is a directory.")
-    
-    filesize = _get_filesize(path)
-    fd = _open_input_file(path)
-    mapping = _get_mapping(fd)
-    filetype = _determine_filetype(mapping, filesize)
-    if filetype == 1: # mzML
-        ret = MZMLFile(path, filesize, fd)
-    elif filetype == 2: # msz
-        ret = MSZFile(path, filesize, fd)
-    else:
-        raise OSError(f"Error processing file {path}")
-    return ret
-
-
 cdef class MZMLFile(BaseFile):
-    def __init__(self, bytes path, size_t filesize, int fd):
-        super(MZMLFile, self).__init__(path, filesize, fd)
+    def __init__(self, bytes path):
+        super(MZMLFile, self).__init__(path)
         self._df = _pattern_detect(<char*> self._mapping)
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
         _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
 
     @staticmethod
     def _reopen(path: bytes):
-        fs = _get_filesize(path)
-        fd = _open_input_file(path)
-        return MZMLFile(path, fs, fd)
+        return MZMLFile(path)
 
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
@@ -447,8 +408,8 @@ cdef class MSZFile(BaseFile):
     cdef block_len_queue_t* _mz_binary_block_lens
     cdef block_len_queue_t* _inten_binary_block_lens
 
-    def __init__(self, bytes path, size_t filesize, int fd):
-        super(MSZFile, self).__init__(path, filesize, fd)
+    def __init__(self, bytes path):
+        super(MSZFile, self).__init__(path)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -461,9 +422,7 @@ cdef class MSZFile(BaseFile):
 
     @staticmethod
     def _reopen(path: bytes):
-        fs = _get_filesize(path)
-        fd = _open_input_file(path)
-        return MSZFile(path, fs, fd)
+        return MSZFile(path)
     
     def decompress(self, output: Union[str, PathLike]):
         output = os.fspath(output)
@@ -653,10 +612,10 @@ cdef class BaseFile:
     cdef int output_fd
 
 
-    def __init__(self, bytes path, size_t filesize, int fd):
+    def __init__(self, bytes path):
         self._path = path
-        self.filesize = filesize
-        self._fd = fd
+        self.filesize = _get_filesize(self._path)
+        self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)
         self._spectra = None
         self._arguments = RuntimeArguments()
@@ -681,7 +640,7 @@ cdef class BaseFile:
     def _reopen(path: bytes):
         fs = _get_filesize(path)
         fd = _open_input_file(path)
-        return BaseFile(path, fs, fd)
+        return BaseFile(path)
 
     def _cleanup(self):
         if self._fd is not None and self._fd > 0:
