@@ -7,6 +7,7 @@ import warnings
 cimport numpy as np
 from typing import Union
 from os import PathLike
+from pathlib import Path
 from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
@@ -281,6 +282,14 @@ cdef class MZMLFile(BaseFile):
         _close_file(self.output_fd)
         self.output_fd = -1
 
+    # def extract(
+    #     self,
+    #     output: Union[str, PathLike],
+    #     indicies: Optional[list[int]] = None,
+    #     scan_numbers: Optional[list[int]] = None,
+    #     ms_levels: Optional[list[int]] = None
+    # )
+
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
         cdef size_t out_len = 0
@@ -431,6 +440,82 @@ cdef class MSZFile(BaseFile):
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+
+    def extract(
+        self,
+        output: Union[str, PathLike],
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None
+    ) -> None:
+        """
+        Extract spectra from an MSZ file to mzML format with optional filtering.
+        
+        Args:
+            output: Path to the output file. Must have .mzml extension.
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+        
+        Raises:
+            ValueError: If output file extension is not supported.
+            NotImplementedError: If MSZ output format is requested.
+        """
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef uint16_t c_ms_level = 0
+        cdef np.ndarray[np.int64_t, ndim=1] indicies_arr
+        cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
+        
+        # Determine if output will be mzML or MSZ based on file extension
+        output = Path(output)
+        output_ext = output.suffix.lower()
+        
+        if output_ext == '.msz':
+            # Output as MSZ (compressed)
+            # TODO: Implement MSZ extraction with filtering
+            raise NotImplementedError("MSZ output not yet implemented for extract")
+        elif output_ext == '.mzml':
+            # Convert Python lists to C arrays
+            if indicies is not None:
+                indicies_arr = np.array(indicies, dtype=np.int64)
+                c_indicies = <long*>indicies_arr.data
+                indicies_length = len(indicies)
+            
+            if scan_numbers is not None:
+                scans_arr = np.array(scan_numbers, dtype=np.uint32)
+                c_scans = <uint32_t*>scans_arr.data
+                scans_length = len(scan_numbers)
+            
+            if ms_level is not None:
+                c_ms_level = <uint16_t>ms_level
+            
+            # Prepare output file
+            self.output_fd = self._prepare_output_fd(str(output))
+            
+            # Call the C extraction function
+            _extract_msz(
+                <char*>self._mapping,
+                self.filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                self.output_fd
+            )
+            
+            # Flush and close output
+            _flush(self.output_fd)
+            _close_file(self.output_fd)
+            self.output_fd = -1
+        else:
+            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzml")
+        
+
+
 
 
     def get_mz_binary(self, size_t index):
