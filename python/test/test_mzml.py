@@ -161,3 +161,18 @@ def test_decompress_mzml_file(mzml_file_path):
     with pytest.raises(NotImplementedError):
         mzml = read(mzml_file_path)
         mzml.decompress("test.out")
+
+def test_retention_time(mzml_file_path):
+    mzml = read(mzml_file_path)
+    spectra = mzml.spectra
+    for spectrum in spectra:
+        rt = spectrum.retention_time
+        assert isinstance(rt, float)
+        assert rt >= 0
+    
+    ## Test specific known retention time
+    spectrum = spectra[0]
+    assert abs(spectrum.retention_time - 0.21442476) < 1e-6
+
+    spectrum = spectra[10]
+    assert abs(spectrum.retention_time - 1.15352136) < 1e-6

@@ -169,3 +169,18 @@ def test_compress_msz_file(msz_file_path):
     with pytest.raises(NotImplementedError):
         msz = read(msz_file_path)
         msz.compress("test.out")
+
+def test_retention_time(msz_file_path):
+    msz = read(msz_file_path)
+    spectra = msz.spectra
+    for spectrum in spectra:
+        rt = spectrum.retention_time
+        assert isinstance(rt, float)
+        assert rt >= 0
+    
+    ## Test specific known retention time
+    spectrum = spectra[0]
+    assert abs(spectrum.retention_time - 0.21442476) < 1e-6
+
+    spectrum = spectra[10]
+    assert abs(spectrum.retention_time - 1.15352136) < 1e-6
