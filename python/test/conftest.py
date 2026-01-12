@@ -8,3 +8,7 @@ def mzml_file_path():
 @pytest.fixture
 def msz_file_path():
     return "test/data/test.msz"
+
+@pytest.fixture
+def test_data_dir():
+    return "test/data/"
