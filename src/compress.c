@@ -17,8 +17,7 @@
  * @brief Creates a ZSTD compression context and handles errors.
  * @return A ZSTD compression context on success. NULL on error.
  */
-ZSTD_CCtx* alloc_cctx()
-{
+ZSTD_CCtx* alloc_cctx() {
    ZSTD_CCtx* cctx;
    cctx = ZSTD_createCCtx();
    if (cctx == NULL)
@@ -30,21 +29,18 @@ ZSTD_CCtx* alloc_cctx()
  * @brief Deallocates a ZSTD compression context.
  * @param cctx A pointer to the ZSTD_CCtx to be deallocated.
  */
-void dealloc_cctx(ZSTD_CCtx* cctx)
-{
+void dealloc_cctx(ZSTD_CCtx* cctx) {
    ZSTD_freeCCtx(cctx); /* Never fails. */
 }
 
-
 /**
- * @brief Allocates a compression buffer for ZSTD with size based on ZSTD_compressBound.
+ * @brief Allocates a compression buffer for ZSTD with size based on
+ * ZSTD_compressBound.
  * @param src_len Length of string to compress.
  * @param buff_len A pass-by-reference return value of the size of the buffer.
  * @return A buffer of size `buff_len on success, NULL on error.
  */
-void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len)
-{
-
+void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len) {
    if (src_len == 0) {
       *buff_len = 0;
       return NULL;
@@ -71,7 +67,6 @@ void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len)
    return r;
 }
 
-
 /**
  * @brief A wrapper function for ZSTD_compressCCtx.
  * This function allows the reuse of a ZSTD compression context per thread to
@@ -94,8 +89,7 @@ void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len)
  * @return A buffer with the compressed string on success, NULL on error.
  */
 void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
-                    size_t* out_len, int compression_level)
-{
+                    size_t* out_len, int compression_level) {
    if (cctx == NULL) {
       error("zstd_compress: cctx is NULL.\n");
       return NULL;
@@ -141,7 +135,6 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
       return NULL;
    }
 
-
    return out_buff;
 }
 
@@ -150,7 +143,8 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
  * This function allows the reuse of an LZ4 compression context per thread to
  * reduce resource consumption. This function takes care of allocating the
  * proper buffer and handling errors.
- * @param cctx cctx A ZSTD compression context (not used in this function, but included for consistency with other compression functions).
+ * @param cctx cctx A ZSTD compression context (not used in this function, but
+ * included for consistency with other compression functions).
  * @param src_buff Source string to compress.
  * @param src_len Length of the source string.
  * @param out_len A pass-by-reference return value of the resulting compress
@@ -210,17 +204,20 @@ void* lz4_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
 }
 
 /**
- * @brief A no-op compression function that simply copies the input buffer to the output buffer. Returns the output buffer on success, NULL on error.
- * @param cctx A ZSTD compression context (not used in this function, but included for consistency with other compression functions).
+ * @brief A no-op compression function that simply copies the input buffer to
+ * the output buffer. Returns the output buffer on success, NULL on error.
+ * @param cctx A ZSTD compression context (not used in this function, but
+ * included for consistency with other compression functions).
  * @param src_buff The input buffer to be "compressed".
  * @param src_len The length of the input buffer.
- * @param out_len A pointer to a `size_t` where the size of the "compressed" data will be stored.
- * @param compression_level The compression level to use (not used in this function, but included for consistency with other compression functions).
+ * @param out_len A pointer to a `size_t` where the size of the "compressed"
+ * data will be stored.
+ * @param compression_level The compression level to use (not used in this
+ * function, but included for consistency with other compression functions).
  * @return A pointer to the "compressed" buffer on success. NULL on error.
  */
 void* no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
-                  size_t* out_len, int compression_level)
-{
+                  size_t* out_len, int compression_level) {
    *out_len = src_len;
    void* out_buff = malloc(src_len);
    if (out_buff == NULL) {
@@ -267,13 +264,16 @@ int append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 /**
  * @brief Allocates a `compress_args_t` struct.
  * @param input_map The input buffer containing the compressed data.
- * @param dp A pointer to a `data_positions_t` struct containing the data positions.
- * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param dp A pointer to a `data_positions_t` struct containing the data
+ * positions.
+ * @param df A pointer to a `data_format_t` struct containing the data format
+ * information.
  * @param comp_fun A pointer to a compression function.
  * @param cmp_blk_size The size of the compression block.
  * @param blocksize The size of the block.
  * @param mode The mode of compression.
- * @return A pointer to the allocated `compress_args_t` struct on success. NULL on error.
+ * @return A pointer to the allocated `compress_args_t` struct on success. NULL
+ * on error.
  */
 compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
                                      data_format_t* df,
@@ -376,22 +376,26 @@ void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
 }
 
 /**
- * @brief Flushes the current data block by compressing and appending to cmp_buff vector.
- * Handles the remainder of data blocks stored in the cmp_routine that did not fully populate a data block to be compressed.
+ * @brief Flushes the current data block by compressing and appending to
+ * cmp_buff vector. Handles the remainder of data blocks stored in the
+ * cmp_routine that did not fully populate a data block to be compressed.
  *
- * @param compression_fun A function pointer to the compression function to be used.
- * @param czstd A ZSTD compression context allocated by alloc_cctx() (one per thread).
+ * @param compression_fun A function pointer to the compression function to be
+ * used.
+ * @param czstd A ZSTD compression context allocated by alloc_cctx() (one per
+ * thread).
  * @param compression_level An integer representing the compression level.
  * @param cmp_buff A dereferenced pointer to the cmp_buff vector.
  * @param curr_block Current data block to append to and/or compress.
- * @param tot_size A pass-by-reference variable to bookkeep total number of XML bytes processed.
- * @param tot_cmp A pass-by-reference variable to bookkeep total compressed size of XML.
+ * @param tot_size A pass-by-reference variable to bookkeep total number of XML
+ * bytes processed.
+ * @param tot_cmp A pass-by-reference variable to bookkeep total compressed size
+ * of XML.
  * @return 0 on success, -1 on error.
  */
 int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
-               int compression_level, cmp_blk_queue_t* cmp_buff,
-               data_block_t** curr_block, size_t* tot_size, size_t* tot_cmp)
-{
+              int compression_level, cmp_blk_queue_t* cmp_buff,
+              data_block_t** curr_block, size_t* tot_size, size_t* tot_cmp) {
    void* cmp;
    cmp_block_t* cmp_block;
    size_t cmp_len = 0;
@@ -563,7 +567,7 @@ void* compress_routine(void* args)
    a_args->tmp =
        alloc_data_block(cb_args->blocksize);  // Allocate a temporary data_block
                                               // to intermediately store data.
-   
+
    if (a_args->tmp == NULL) {
       error("compress_routine: Failed to allocate data_block.\n");
       free(a_args);
@@ -580,7 +584,7 @@ void* compress_routine(void* args)
       return NULL;
    }
 
-   a_args->ret_code = 0; // Initialize return code to 0 (success).
+   a_args->ret_code = 0;  // Initialize return code to 0 (success).
 
    if (cb_args == NULL)
       error("compress_routine: Invalid compress_args_t\n");
@@ -678,8 +682,8 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
    int divisions_left = divisions;
 
    for (i = divisions_used; i < divisions; i++) {
-      compress_args_t* i_args = alloc_compress_args(input_map, ddp[i], df, comp_fun,
-                                    cmp_blk_size, blocksize, mode);
+      compress_args_t* i_args = alloc_compress_args(
+          input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
       if (i_args == NULL) {
          error("compress_parallel: Failed to allocate compress_args_t.\n");
          return NULL;
@@ -824,7 +828,8 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
 /**
  * @brief Sets the compression function based on the accession integer.
  * @param accession An integer representing the compression type.
- * @return A function pointer to the corresponding compression function on success. NULL on error.
+ * @return A function pointer to the corresponding compression function on
+ * success. NULL on error.
  */
 compression_fun set_compress_fun(int accession) {
    switch (accession) {
@@ -841,8 +846,10 @@ compression_fun set_compress_fun(int accession) {
 }
 
 /**
- * @brief Gets the compression type accession integer based on the string argument.
- * @param arg A string representing the compression type ("zstd", "lz4", "nocomp", "none").
+ * @brief Gets the compression type accession integer based on the string
+ * argument.
+ * @param arg A string representing the compression type ("zstd", "lz4",
+ * "nocomp", "none").
  * @return An integer representing the compression type on success. -1 on error.
  */
 int get_compress_type(char* arg) {

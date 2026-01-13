@@ -4,6 +4,7 @@
 import os 
 import numpy as np
 import warnings
+import tempfile
 cimport numpy as np
 from typing import Union
 from os import PathLike
@@ -251,8 +252,15 @@ cdef class Division:
 cdef class MZMLFile(BaseFile):
     def __init__(self, bytes path):
         super(MZMLFile, self).__init__(path)
+        if self._mapping is NULL:
+             raise RuntimeError("File mapping is NULL. Filesize might be 0.")
         self._df = _pattern_detect(<char*> self._mapping)
+        if self._df is NULL:
+             raise RuntimeError("pattern_detect returned NULL. Failed to detect mzML pattern.")
+        
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
+        if self._positions is NULL:
+             raise RuntimeError("scan_mzml returned NULL. The file might be empty or invalid.")
         _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
 
     @staticmethod
@@ -266,6 +274,10 @@ cdef class MZMLFile(BaseFile):
                 f"n_divisions ({n_divisions}) > total_spec ({self._positions.mz.total_spec}). "
                 f"Setting n_divisions to {self._positions.mz.total_spec}"
             )
+            n_divisions = self._positions.mz.total_spec
+            if n_divisions == 0:
+                n_divisions = 1
+            self._divisions = _create_divisions(self._positions, n_divisions)
         elif n_divisions >= self._arguments.threads:
             self._divisions = _create_divisions(self._positions, n_divisions)
         else:
@@ -276,7 +288,7 @@ cdef class MZMLFile(BaseFile):
     def compress(self, output: Union[str, PathLike]):
         output = os.fspath(output)
         self._prepare_divisions()
-        self.output_fd = self._prepare_output_fd(output) 
+        self.output_fd = self._prepare_output_fd(output)
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
@@ -470,13 +482,34 @@ cdef class MSZFile(BaseFile):
         cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
         
         # Determine if output will be mzML or MSZ based on file extension
-        output = Path(output)
+        output = Path(output).resolve()  # Convert to absolute path
         output_ext = output.suffix.lower()
         
         if output_ext == '.msz':
             # Output as MSZ (compressed)
-            # TODO: Implement MSZ extraction with filtering
-            raise NotImplementedError("MSZ output not yet implemented for extract")
+            # Create a temporary mzML file path, extract to it, then compress to MSZ
+            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
+            
+            # Delete output file if it already exists to avoid stale data
+            if output.exists():
+                output.unlink()
+            
+            # Extract to temporary mzML file
+            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+            
+            # Compress the temporary mzML to MSZ
+            temp_mzml = None
+            try:
+                temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
+                temp_mzml.compress(str(output))
+            finally:
+                # Clean up MZMLFile's memory mapping before deleting the file
+                if temp_mzml is not None:
+                    temp_mzml._cleanup()
+                # Clean up temporary file
+                if temp_mzml_path.exists():
+                    temp_mzml_path.unlink()
+        
         elif output_ext == '.mzml':
             # Convert Python lists to C arrays
             if indicies is not None:
@@ -512,11 +545,8 @@ cdef class MSZFile(BaseFile):
             _close_file(self.output_fd)
             self.output_fd = -1
         else:
-            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzml")
+            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
         
-
-
-
 
     def get_mz_binary(self, size_t index):
         cdef char* res = NULL
@@ -769,7 +799,15 @@ cdef class BaseFile:
         # Use os.fspath() to handle path-like objects (PEP 519)
         path = os.fspath(path)
         if isinstance(path, str):
+            path = os.path.expanduser(path)
+            path = os.path.abspath(path)
             path = path.encode('utf-8')
+        elif isinstance(path, bytes):
+            # Handle bytes path - decode, expand, encode back
+            path_str = path.decode('utf-8')
+            path_str = os.path.expanduser(path_str)
+            path_str = os.path.abspath(path_str)
+            path = path_str.encode('utf-8')
         cdef int output_fd = _open_output_file(path)
         return output_fd 
 
