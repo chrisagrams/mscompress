@@ -294,13 +294,95 @@ cdef class MZMLFile(BaseFile):
         _close_file(self.output_fd)
         self.output_fd = -1
 
-    # def extract(
-    #     self,
-    #     output: Union[str, PathLike],
-    #     indicies: Optional[list[int]] = None,
-    #     scan_numbers: Optional[list[int]] = None,
-    #     ms_levels: Optional[list[int]] = None
-    # )
+    def extract(
+        self,
+        output: Union[str, PathLike],
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None
+    ) -> None:
+        """
+        Extract spectra from an mzML file to mzML format with optional filtering.
+        
+        Args:
+            output: Path to the output file. Must have .mzml extension (or .msz).
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+        
+        Raises:
+            ValueError: If output file extension is not supported.
+        """
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef uint16_t c_ms_level = 0
+        cdef np.ndarray[np.int64_t, ndim=1] indicies_arr
+        cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
+
+        output = Path(output).resolve()
+        output_ext = output.suffix.lower()
+
+        if output_ext == '.msz':
+            # Output as MSZ (compressed)
+            # Create a temporary mzML file path, extract to it, then compress to MSZ
+            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
+            
+            # Delete output file if it already exists
+            if output.exists():
+                output.unlink()
+            
+            # Extract to temporary mzML file
+            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+            
+            # Compress the temporary mzML to MSZ
+            temp_mzml = None
+            try:
+                temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
+                temp_mzml.compress(str(output))
+            finally:
+                if temp_mzml is not None:
+                    temp_mzml._cleanup()
+                if temp_mzml_path.exists():
+                    temp_mzml_path.unlink()
+
+        elif output_ext == '.mzml':
+             # Convert Python lists to C arrays
+            if indicies is not None:
+                indicies_arr = np.array(indicies, dtype=np.int64)
+                c_indicies = <long*>indicies_arr.data
+                indicies_length = len(indicies)
+            
+            if scan_numbers is not None:
+                scans_arr = np.array(scan_numbers, dtype=np.uint32)
+                c_scans = <uint32_t*>scans_arr.data
+                scans_length = len(scan_numbers)
+            
+            if ms_level is not None:
+                c_ms_level = <uint16_t>ms_level
+
+            # Prepare output file
+            self.output_fd = self._prepare_output_fd(str(output))
+
+            _extract_mzml_filtered(
+                <char*>self._mapping,
+                self.filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                self._positions, 
+                self.output_fd
+            )
+
+            # Flush and close output
+            _flush(self.output_fd)
+            _close_file(self.output_fd)
+            self.output_fd = -1
+        else:
+            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
