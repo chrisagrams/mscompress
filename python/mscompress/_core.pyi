@@ -125,9 +125,9 @@ class BaseFile:
     
     def describe(self) -> Dict[str, Any]: ...
     
-    def compress(self, output: Union[str, PathLike]) -> None: ...
+    def compress(self, output: Union[str, PathLike]) -> MSZFile: ...
     
-    def decompress(self, output: Union[str, PathLike]) -> None: ...
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile: ...
 
     def extract(
             self,
@@ -135,7 +135,7 @@ class BaseFile:
             indicies: Optional[list[int]] = None,
             scan_numbers: Optional[list[int]] = None,
             ms_level: Optional[int] = None
-    ) -> None:
+    ) -> Union[MZMLFile, MSZFile]:
         """
         Extract specific spectra from a file to a new mzML or MSZ file.
 
@@ -189,7 +189,7 @@ class MZMLFile(BaseFile):
     
     def __init__(self, path: bytes) -> None: ...
     
-    def compress(self, output: Union[str, PathLike]) -> None:
+    def compress(self, output: Union[str, PathLike]) -> MSZFile:
         """
         Compress an mzML file to MSZ format.
         
@@ -198,7 +198,7 @@ class MZMLFile(BaseFile):
         """
         ...
     
-    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> None: ...
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> Union[MZMLFile, MSZFile]: ...
     """
     Extract specific spectra from an mzML file to a new mzML or MSZ file.
 
@@ -250,7 +250,7 @@ class MSZFile(BaseFile):
     
     def __init__(self, path: bytes) -> None: ...
     
-    def decompress(self, output: Union[str, PathLike]) -> None:
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         """
         Decompress an MSZ file to mzML format.
         
@@ -259,7 +259,7 @@ class MSZFile(BaseFile):
         """
         ...
 
-    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> None: ...
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> Union[MZMLFile, MSZFile]: ...
     """
     Extract specific spectra from an MSZ file to a new mzML or MSZ file.
     Parameters:

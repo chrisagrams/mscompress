@@ -143,7 +143,7 @@ class MSZXBuilder:
             msz: MSZFile object containing spectra.
             source_name: Optional source file name for provenance.
         """
-        self._msz = msz
+        self.msz = msz
         path_str = msz.path.decode("utf-8") if isinstance(msz.path, bytes) else str(msz.path)
         self.compression = compression
         self._msz_path = Path(path_str)
@@ -209,7 +209,7 @@ class MSZXBuilder:
         """Build the manifest from current state."""
         return MSZXManifest(
             spectra_file=self._msz_path.name,
-            num_spectra=len(self._msz.spectra),
+            num_spectra=len(self.msz.spectra),
             annotations=[entry for _, entry in self._annotations],
             join_key=self._join_key,
             description=self._description,
@@ -303,7 +303,7 @@ class MSZXFile:
         """
         self._archive_path = Path(archive_path)
         self._manifest = manifest
-        self._msz = msz_file
+        self.msz = msz_file
         self._temp_dir = temp_dir
         self._closed = False
         self._annotations: Dict[str, BasePSMReader] = annotation_readers or {}
@@ -498,52 +498,52 @@ class MSZXFile:
     @property
     def path(self) -> bytes:
         """Path to the underlying MSZ file."""
-        return self._msz.path
+        return self.msz.path
 
     @property
     def filesize(self) -> int:
         """Size of the underlying MSZ file."""
-        return self._msz.filesize
+        return self.msz.filesize
 
     @property
     def format(self) -> DataFormat:
         """Data format information."""
-        return self._msz.format
+        return self.msz.format
 
     @property
     def spectra(self) -> Spectra:
         """Collection of spectra with lazy loading."""
-        return self._msz.spectra
+        return self.msz.spectra
 
     @property
     def positions(self) -> Division:
         """Position information for data blocks."""
-        return self._msz.positions
+        return self.msz.positions
 
     @property
     def arguments(self) -> RuntimeArguments:
         """Runtime configuration arguments."""
-        return self._msz.arguments
+        return self.msz.arguments
 
     def get_mz_binary(
         self, index: int
     ) -> npt.NDArray[Union[np.float32, np.float64]]:
         """Extract m/z binary array for a spectrum at the given index."""
-        return self._msz.get_mz_binary(index)
+        return self.msz.get_mz_binary(index)
 
     def get_inten_binary(
         self, index: int
     ) -> npt.NDArray[Union[np.float32, np.float64]]:
         """Extract intensity binary array for a spectrum at the given index."""
-        return self._msz.get_inten_binary(index)
+        return self.msz.get_inten_binary(index)
 
     def get_xml(self, index: int) -> Element:
         """Extract XML element for a spectrum at the given index."""
-        return self._msz.get_xml(index)
-
+        return self.msz.get_xml(index)
+    
     def describe(self) -> Dict[str, Any]:
         """Get description of the file."""
-        desc = self._msz.describe()
+        desc = self.msz.describe()
         desc["archive"] = {
             "path": str(self._archive_path),
             "annotations": [sr.to_dict() for sr in self._manifest.annotations],
@@ -552,15 +552,15 @@ class MSZXFile:
 
     def get_header(self) -> str:
         """Extract the complete mzML header as a raw string."""
-        return self._msz.get_header()
+        return self.msz.get_header()
 
     def extract_metadata(self, tag_name: str) -> Element:
         """Extract and parse a specific XML tag from the mzML file header."""
-        return self._msz.extract_metadata(tag_name)
-
+        return self.msz.extract_metadata(tag_name)
+    
     def decompress(self, output: Union[str, os.PathLike]) -> None:
         """Decompress the MSZ file to mzML format."""
-        self._msz.decompress(output)
+        self.msz.decompress(output)
 
 
 def create_mszx(

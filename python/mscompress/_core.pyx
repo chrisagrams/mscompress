@@ -285,7 +285,7 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
-    def compress(self, output: Union[str, PathLike]):
+    def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
@@ -293,6 +293,7 @@ cdef class MZMLFile(BaseFile):
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        return MSZFile(output.encode('utf-8'))
 
     def extract(
         self,
@@ -300,7 +301,7 @@ cdef class MZMLFile(BaseFile):
         indicies: Optional[list[int]] = None,
         scan_numbers: Optional[list[int]] = None,
         ms_level: Optional[int] = None
-    ) -> None:
+    ) -> Union[MZMLFile, MSZFile]:
         """
         Extract spectra from an mzML file to mzML format with optional filtering.
         
@@ -340,7 +341,7 @@ cdef class MZMLFile(BaseFile):
             temp_mzml = None
             try:
                 temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
-                temp_mzml.compress(str(output))
+                return temp_mzml.compress(str(output))
             finally:
                 if temp_mzml is not None:
                     temp_mzml._cleanup()
@@ -381,6 +382,7 @@ cdef class MZMLFile(BaseFile):
             _flush(self.output_fd)
             _close_file(self.output_fd)
             self.output_fd = -1
+            return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
 
@@ -527,13 +529,14 @@ cdef class MSZFile(BaseFile):
     def _reopen(path: bytes):
         return MSZFile(path)
     
-    def decompress(self, output: Union[str, PathLike]):
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
         _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        return MZMLFile(output.encode('utf-8'))
 
     def extract(
         self,
@@ -541,7 +544,7 @@ cdef class MSZFile(BaseFile):
         indicies: Optional[list[int]] = None,
         scan_numbers: Optional[list[int]] = None,
         ms_level: Optional[int] = None
-    ) -> None:
+    ) -> Union[MZMLFile, MSZFile]:
         """
         Extract spectra from an MSZ file to mzML format with optional filtering.
         
@@ -583,7 +586,7 @@ cdef class MSZFile(BaseFile):
             temp_mzml = None
             try:
                 temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
-                temp_mzml.compress(str(output))
+                return temp_mzml.compress(str(output))
             finally:
                 # Clean up MZMLFile's memory mapping before deleting the file
                 if temp_mzml is not None:
@@ -626,6 +629,7 @@ cdef class MSZFile(BaseFile):
             _flush(self.output_fd)
             _close_file(self.output_fd)
             self.output_fd = -1
+            return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
         

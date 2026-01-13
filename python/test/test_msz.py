@@ -4,7 +4,7 @@ import tempfile
 import pytest
 import numpy as np
 from xml.etree.ElementTree import Element
-from mscompress import MSZFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
+from mscompress import MSZFile, MZMLFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
 
 def test_read_msz_file(msz_file_path):
     msz = read(msz_file_path)
@@ -161,9 +161,10 @@ def test_decompress_msz_file(msz_file_path, tmp_path):
     output_path = tmp_path / "test_output.mzML"
     with read(msz_file_path) as msz:
         # Decompress the MSZ file to mzML
-        msz.decompress(output_path)
+        mzml = msz.decompress(output_path)
         assert os.path.exists(output_path)
         assert os.path.getsize(output_path) > 0
+        assert isinstance(mzml, MZMLFile)
 
 def test_compress_msz_file(msz_file_path):
     with pytest.raises(NotImplementedError):
