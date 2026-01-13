@@ -220,7 +220,6 @@ typedef decode_fun (*decode_fun_ptr)();
 typedef void (*encode_fun)(z_stream*, char**, size_t, char*, size_t*);
 typedef encode_fun (*encode_fun_ptr)();
 
-
 /**
  * @brief Compression function type.
  * This function takes a `ZSTD_CCtx` pointer, input data, input size,
@@ -236,7 +235,6 @@ typedef encode_fun (*encode_fun_ptr)();
  */
 typedef void* (*compression_fun)(ZSTD_CCtx*, void*, size_t, size_t*, int);
 typedef compression_fun (*compression_fun_ptr)();
-
 
 /**
  * @brief Decompression function type.
@@ -433,6 +431,12 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
                  long indicies_length, uint32_t* scans, long scans_length,
                  uint16_t ms_level, int output_fd);
 
+void extract_mzml_filtered(char* input_map, size_t input_filesize,
+                           long* indicies, long indicies_length,
+                           uint32_t* scans, long scans_length,
+                           uint16_t ms_level, division_t* division,
+                           int output_fd);
+
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
@@ -485,16 +489,25 @@ compression_fun set_compress_fun(int accession);
 /**
  * @brief Structure containing the arguments for decompression.
  * @param input_map The input buffer containing the compressed data.
- * @param df A pointer to a data_format_t struct containing the data format information.
- * @param xml_blk A pointer to a block_len_t struct containing the original and compressed sizes
- * @param mz_binary_blk A pointer to a block_len_t struct containing the original and compressed sizes of the m/z binary block.
- * @param inten_binary_blk A pointer to a block_len_t struct containing the original and compressed
- * @param division A pointer to a division_t struct containing the division information.
- * @param footer_xml_off The offset within the input buffer where the XML block starts.
- * @param footer_mz_bin_off The offset within the input buffer where the m/z binary block starts.
- * @param footer_inten_bin_off The offset within the input buffer where the intensity binary block starts.
+ * @param df A pointer to a data_format_t struct containing the data format
+ * information.
+ * @param xml_blk A pointer to a block_len_t struct containing the original and
+ * compressed sizes
+ * @param mz_binary_blk A pointer to a block_len_t struct containing the
+ * original and compressed sizes of the m/z binary block.
+ * @param inten_binary_blk A pointer to a block_len_t struct containing the
+ * original and compressed
+ * @param division A pointer to a division_t struct containing the division
+ * information.
+ * @param footer_xml_off The offset within the input buffer where the XML block
+ * starts.
+ * @param footer_mz_bin_off The offset within the input buffer where the m/z
+ * binary block starts.
+ * @param footer_inten_bin_off The offset within the input buffer where the
+ * intensity binary block starts.
  * @param ret A pointer to a char* where the decompressed data will be stored.
- * @param ret_len A pointer to a size_t where the length of the decompressed data will be stored.
+ * @param ret_len A pointer to a size_t where the length of the decompressed
+ * data will be stored.
  */
 typedef struct {
    char* input_map;
@@ -529,13 +542,17 @@ decompression_fun set_decompress_fun(int accession);
  * @param src A pointer to a `char*` where the source data is stored.
  * @param src_len The length of the source data.
  * @param dest A pointer to a `char*` where the destination data will be stored.
- * @param dest_len A pointer to a `size_t` where the length of the destination data will be stored.
+ * @param dest_len A pointer to a `size_t` where the length of the destination
+ * data will be stored.
  * @param src_format An integer representing the format of the source data.
  * @param enc_fun A function pointer to the encoding function to be used.
  * @param dec_fun A function pointer to the decoding function to be used.
- * @param tmp A pointer to a `data_block_t` struct used for temporary storage during encoding/decoding.
- * @param z A pointer to a `z_stream` struct used for zlib compression/decompression.
- * @param scale_factor A float representing the scale factor to be applied to the data during encoding/decoding.
+ * @param tmp A pointer to a `data_block_t` struct used for temporary storage
+ * during encoding/decoding.
+ * @param z A pointer to a `z_stream` struct used for zlib
+ * compression/decompression.
+ * @param scale_factor A float representing the scale factor to be applied to
+ * the data during encoding/decoding.
  * @param ret_code An integer representing the return code of the algorithm.
  */
 typedef struct {

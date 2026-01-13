@@ -128,6 +128,25 @@ class BaseFile:
     def compress(self, output: Union[str, PathLike]) -> None: ...
     
     def decompress(self, output: Union[str, PathLike]) -> None: ...
+
+    def extract(
+            self,
+            output: Union[str, PathLike],
+            indicies: Optional[list[int]] = None,
+            scan_numbers: Optional[list[int]] = None,
+            ms_level: Optional[int] = None
+    ) -> None:
+        """
+        Extract specific spectra from a file to a new mzML or MSZ file.
+
+        Parameters:
+            output: Output file path (string or path-like), must end in .msz or .mzML.
+            indicies: List of spectrum indices to extract (optional).
+            scan_numbers: List of scan numbers to extract (optional).
+            ms_level: MS level to extract (optional).
+        """
+        ...
+
     
     def get_header(self) -> str:
         """
@@ -179,6 +198,17 @@ class MZMLFile(BaseFile):
         """
         ...
     
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> None: ...
+    """
+    Extract specific spectra from an mzML file to a new mzML or MSZ file.
+
+    Parameters:
+        output: Output file path (string or path-like), must end in .msz or .mzML.
+        indicies: List of spectrum indices to extract (optional).
+        scan_numbers: List of scan numbers to extract (optional).
+        ms_level: MS level to extract (optional).
+    """
+
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
         Extract m/z binary array for a spectrum at the given index.
@@ -228,6 +258,16 @@ class MSZFile(BaseFile):
             output: Output file path (string or path-like).
         """
         ...
+
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> None: ...
+    """
+    Extract specific spectra from an MSZ file to a new mzML or MSZ file.
+    Parameters:
+        output: Output file path (string or path-like).
+        indicies: List of spectrum indices to extract (optional).
+        scan_numbers: List of scan numbers to extract (optional).
+        ms_level: MS level to extract (optional).
+    """
     
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
