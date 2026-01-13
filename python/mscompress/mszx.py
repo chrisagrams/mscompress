@@ -16,7 +16,7 @@ import shutil
 import tarfile
 import tempfile
 import warnings
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
@@ -79,7 +79,7 @@ class MSZXManifest:
             "created_at": self.created_at,
             "spectra_file": self.spectra_file,
             "num_spectra": self.num_spectra,
-            "annotations": [asdict(sr) for sr in self.annotations],
+            "annotations": [sr.to_dict() for sr in self.annotations],
             "join_key": self.join_key,
         }
         if self.description:
@@ -546,7 +546,7 @@ class MSZXFile:
         desc = self._msz.describe()
         desc["archive"] = {
             "path": str(self._archive_path),
-            "annotations": [asdict(sr) for sr in self._manifest.annotations],
+            "annotations": [sr.to_dict() for sr in self._manifest.annotations],
         }
         return desc
 

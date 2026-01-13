@@ -23,6 +23,19 @@ class AnnotationEntry:
     description: Optional[str] = None
     num_records: Optional[int] = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        data: Dict[str, Any] = {
+            "filename": self.filename,
+            "format": self.format.value,
+            "compressed": self.compressed,
+        }
+        if self.description is not None:
+            data["description"] = self.description
+        if self.num_records is not None:
+            data["num_records"] = self.num_records
+        return data
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> AnnotationEntry:
         """Create from dictionary."""
