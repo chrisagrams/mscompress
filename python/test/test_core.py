@@ -32,5 +32,5 @@ def test_read_invalid_file(tmp_path):
 
 def test_read_invalid_parameter():
     p = {}
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         read(p) # type: ignore

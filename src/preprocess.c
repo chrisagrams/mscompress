@@ -578,8 +578,10 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
        validate_positions(inten_dp->start_positions, inten_dp->total_spec) ||
        validate_positions(inten_dp->end_positions, inten_dp->total_spec) ||
        validate_positions(xml_dp->start_positions, xml_dp->total_spec) ||
-       validate_positions(xml_dp->end_positions, xml_dp->total_spec))
+       validate_positions(xml_dp->end_positions, xml_dp->total_spec)) {
+      warning("scan_mzml: validate_positions failed.\n");
       return NULL;
+   }
 
    // Create division_t
 
@@ -1190,6 +1192,8 @@ division_t* read_division(void* input_map, long* position) {
    r->scans = read_uint32_arr(input_map, position);
    r->ms_levels = read_uint16_arr(input_map, position);
 
+   r->ret_times = NULL;
+
    return r;
 }
 
@@ -1509,8 +1513,8 @@ int is_valid_input(char* str) {
    int i;
 
    for (i = 0; i < len; i++) {
-      // Allow digits, dash (for ranges), brackets, comma (for separating ranges), and whitespace
-      // Brackets are now optional
+      // Allow digits, dash (for ranges), brackets, comma (for separating
+      // ranges), and whitespace Brackets are now optional
       if (!(str[i] >= '0' && str[i] <= '9') && str[i] != '-' && str[i] != '[' &&
           str[i] != ']' && str[i] != ',' && !isspace((unsigned char)str[i])) {
          return 0;
@@ -1520,12 +1524,11 @@ int is_valid_input(char* str) {
    return 1;
 }
 
-
 long* string_to_array(char* str, long* size)
 /*
     This function converts a string of numbers into an array of numbers.
-    Supports both bracketed format [0-100,200-300] and non-bracketed format 0-100,200-300.
-    The function returns the array and sets the size of the array.
+    Supports both bracketed format [0-100,200-300] and non-bracketed format
+   0-100,200-300. The function returns the array and sets the size of the array.
 */
 {
    if (!is_valid_input(str))
@@ -1538,12 +1541,12 @@ long* string_to_array(char* str, long* size)
    *size = 0;
 
    i = 0;
-   
+
    // Skip leading whitespace
    while (i < len && isspace((unsigned char)str[i])) {
       i++;
    }
-   
+
    // Skip opening bracket if present
    if (i < len && str[i] == '[') {
       i++;
@@ -1554,12 +1557,12 @@ long* string_to_array(char* str, long* size)
       while (i < len && isspace((unsigned char)str[i])) {
          i++;
       }
-      
+
       // Stop if we hit closing bracket or end of string
       if (i >= len || str[i] == ']') {
          break;
       }
-      
+
       // Skip commas
       if (str[i] == ',') {
          i++;
@@ -1573,9 +1576,9 @@ long* string_to_array(char* str, long* size)
             start = start * 10 + (str[j] - '0');
          }
          i = j;
-         
+
          long end = start;  // Initialize end to start
-         
+
          // Check for range (dash followed by a number)
          if (i < len && str[i] == '-') {
             // Look ahead to distinguish between minus sign and range separator
@@ -1589,7 +1592,7 @@ long* string_to_array(char* str, long* size)
                i = j;
             }
          }
-         
+
          // Add all numbers in the range [start, end]
          for (long num = start; num <= end; num++) {
             if (*size >= max)
@@ -1661,9 +1664,7 @@ long* map_ms_level_to_index(uint16_t ms_level, division_t* div,
    if (!is_monotonically_increasing(indicies, j))
       error("map_ms_level_to_index: Scans must be monotonically increasing.\n");
 
-   *indices_length = j - 1;
-
-   print("Found %ld spectra with ms level %ld.\n", j, ms_level);
+   *indices_length = j;
 
    return indicies;
 }
@@ -1707,6 +1708,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
    }
 
    *indicies_length = total_len;
+   
    return result;
 }
 

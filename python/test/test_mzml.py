@@ -4,7 +4,7 @@ import re
 import tempfile
 import numpy as np
 
-from mscompress import read, MZMLFile, DataFormat, Division, Spectra, Spectrum, DataPositions, RuntimeArguments
+from mscompress import read, MZMLFile, MSZFile, DataFormat, Division, Spectra, Spectrum, DataPositions, RuntimeArguments
 
 def test_read_mzml_file(mzml_file_path):
     mzml = read(mzml_file_path)
@@ -153,9 +153,10 @@ def test_compress_mzml_file(mzml_file_path, tmp_path):
     output_path = tmp_path / "test_output.msz"
     with read(mzml_file_path) as mzml:    
         # Compress the mzML file to MSZ
-        mzml.compress(output_path)
+        msz = mzml.compress(output_path)
         assert output_path.exists()
         assert output_path.stat().st_size > 0
+        assert isinstance(msz, MSZFile)
 
 def test_decompress_mzml_file(mzml_file_path):
     with pytest.raises(NotImplementedError):

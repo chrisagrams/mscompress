@@ -1,0 +1,1240 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<ns0:msms_pipeline_analysis xmlns:ns0="http://regis-web.systemsbiology.net/pepXML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" date="2024-08-27T18:36:46" summary_xml="/tmp/tmp.OfMCkj/HSA.pepXML" xsi:schemaLocation="http://sashimi.sourceforge.net/schema_revision/pepXML/pepXML_v122.xsd">
+<ns0:msms_run_summary base_name="/tmp/tmp.OfMCkj/HSA" raw_data_type="mzML" comment="This pepXML was from calibrated spectra." raw_data="mzML">
+<ns0:sample_enzyme name="stricttrypsin">
+<ns0:specificity cut="KR" no_cut="" sense="C" />
+</ns0:sample_enzyme>
+<ns0:search_summary base_name="/tmp/tmp.OfMCkj/HSA" precursor_mass_type="monoisotopic" search_engine="X! Tandem" search_engine_version="MSFragger-4.0" fragment_mass_type="monoisotopic" search_id="1">
+<ns0:search_database local_path="/app/fasta/2024-08-06-decoys-reviewed-contam-UP000005640.fas" type="AA" />
+<ns0:enzymatic_search_constraint enzyme="default" min_number_termini="2" max_num_internal_cleavages="2" />
+<ns0:aminoacid_modification aminoacid="C" massdiff="57.021465" mass="160.03065" variable="N" />
+<ns0:aminoacid_modification aminoacid="M" massdiff="15.994915" mass="147.03542" variable="Y" />
+<ns0:terminal_modification massdiff="42.010567" protein_terminus="Y" mass="43.01839" terminus="N" variable="Y" />
+<ns0:parameter name="# MSFragger.build" value="MSFragger-4.0" />
+<ns0:parameter name="database_name" value="/app/fasta/2024-08-06-decoys-reviewed-contam-UP000005640.fas" />
+<ns0:parameter name="decoy_prefix" value="rev_" />
+<ns0:parameter name="num_threads" value="8" />
+<ns0:parameter name="precursor_mass_lower" value="-20.0" />
+<ns0:parameter name="precursor_mass_upper" value="20.0" />
+<ns0:parameter name="precursor_mass_units" value="1" />
+<ns0:parameter name="precursor_true_tolerance" value="20.0" />
+<ns0:parameter name="data_type" value="0" />
+<ns0:parameter name="precursor_true_units" value="1" />
+<ns0:parameter name="fragment_mass_tolerance" value="10.0" />
+<ns0:parameter name="fragment_mass_units" value="1" />
+<ns0:parameter name="calibrate_mass" value="2" />
+<ns0:parameter name="use_all_mods_in_first_search" value="0" />
+<ns0:parameter name="write_calibrated_mzml" value="0" />
+<ns0:parameter name="write_uncalibrated_mgf" value="0" />
+<ns0:parameter name="write_mzbin_all" value="0" />
+<ns0:parameter name="isotope_error" value="0/1/2" />
+<ns0:parameter name="mass_offsets" value="0" />
+<ns0:parameter name="labile_search_mode" value="OFF" />
+<ns0:parameter name="restrict_deltamass_to" value="all" />
+<ns0:parameter name="precursor_mass_mode" value="SELECTED" />
+<ns0:parameter name="intensity_transform" value="1" />
+<ns0:parameter name="activation_types" value="" />
+<ns0:parameter name="group_variable" value="0" />
+<ns0:parameter name="require_precursor" value="0" />
+<ns0:parameter name="reuse_dia_fragment_peaks" value="0" />
+<ns0:parameter name="remove_precursor_peak" value="1" />
+<ns0:parameter name="remove_precursor_range" value="-1.5,1.5" />
+<ns0:parameter name="localize_delta_mass" value="0" />
+<ns0:parameter name="delta_mass_exclude_ranges" value="(-1.5,3.5)" />
+<ns0:parameter name="fragment_ion_series" value="b,y" />
+<ns0:parameter name="ion_series_definitions" value="" />
+<ns0:parameter name="search_enzyme_name" value="stricttrypsin" />
+<ns0:parameter name="min_sequence_matches" value="2" />
+<ns0:parameter name="check_spectral_files" value="1" />
+<ns0:parameter name="search_enzyme_cut_1" value="KR" />
+<ns0:parameter name="search_enzyme_nocut_1" value="" />
+<ns0:parameter name="num_enzyme_termini" value="2" />
+<ns0:parameter name="allowed_missed_cleavage_1" value="2" />
+<ns0:parameter name="search_enzyme_sense_1" value="C" />
+<ns0:parameter name="clip_nTerm_M" value="1" />
+<ns0:parameter name="allow_multiple_variable_mods_on_residue" value="0" />
+<ns0:parameter name="max_variable_mods_per_peptide" value="3" />
+<ns0:parameter name="max_variable_mods_combinations" value="5000" />
+<ns0:parameter name="mass_diff_to_variable_mod" value="0" />
+<ns0:parameter name="output_format" value="tsv_pepxml_pin" />
+<ns0:parameter name="output_report_topN" value="1" />
+<ns0:parameter name="output_max_expect" value="50.0" />
+<ns0:parameter name="report_alternative_proteins" value="1" />
+<ns0:parameter name="override_charge" value="0" />
+<ns0:parameter name="precursor_charge" value="1 4" />
+<ns0:parameter name="digest_min_length" value="7" />
+<ns0:parameter name="digest_max_length" value="50" />
+<ns0:parameter name="digest_mass_range" value="500.0 5000.0" />
+<ns0:parameter name="max_fragment_charge" value="1" />
+<ns0:parameter name="deisotope" value="1" />
+<ns0:parameter name="deneutralloss" value="1" />
+<ns0:parameter name="track_zero_topN" value="0" />
+<ns0:parameter name="zero_bin_accept_expect" value="0.0" />
+<ns0:parameter name="zero_bin_mult_expect" value="1.0" />
+<ns0:parameter name="minimum_peaks" value="15" />
+<ns0:parameter name="use_topN_peaks" value="200" />
+<ns0:parameter name="min_fragments_modelling" value="2" />
+<ns0:parameter name="min_matched_fragments" value="4" />
+<ns0:parameter name="minimum_ratio" value="0.0" />
+<ns0:parameter name="clear_mz_range" value="0.0 0.0" />
+<ns0:parameter name="excluded_scan_list_file" value="" />
+<ns0:parameter name="variable_mod_01" value="15.994915 M 3" />
+<ns0:parameter name="variable_mod_02" value="42.010565 [^ 1" />
+<ns0:parameter name="add_A_alanine" value="0.000000" />
+<ns0:parameter name="add_B_user_amino_acid" value="0.000000" />
+<ns0:parameter name="add_C_cysteine" value="57.021464" />
+<ns0:parameter name="add_Cterm_peptide" value="0.0" />
+<ns0:parameter name="add_Cterm_protein" value="0.0" />
+<ns0:parameter name="add_D_aspartic_acid" value="0.000000" />
+<ns0:parameter name="add_E_glutamic_acid" value="0.000000" />
+<ns0:parameter name="add_F_phenylalanine" value="0.000000" />
+<ns0:parameter name="add_G_glycine" value="0.000000" />
+<ns0:parameter name="add_H_histidine" value="0.000000" />
+<ns0:parameter name="add_I_isoleucine" value="0.000000" />
+<ns0:parameter name="add_J_user_amino_acid" value="0.000000" />
+<ns0:parameter name="add_K_lysine" value="0.000000" />
+<ns0:parameter name="add_L_leucine" value="0.000000" />
+<ns0:parameter name="add_M_methionine" value="0.000000" />
+<ns0:parameter name="add_N_asparagine" value="0.000000" />
+<ns0:parameter name="add_Nterm_peptide" value="0.0" />
+<ns0:parameter name="add_Nterm_protein" value="0.0" />
+<ns0:parameter name="add_O_user_amino_acid" value="0.000000" />
+<ns0:parameter name="add_P_proline" value="0.000000" />
+<ns0:parameter name="add_Q_glutamine" value="0.000000" />
+<ns0:parameter name="add_R_arginine" value="0.000000" />
+<ns0:parameter name="add_S_serine" value="0.000000" />
+<ns0:parameter name="add_T_threonine" value="0.000000" />
+<ns0:parameter name="add_U_user_amino_acid" value="0.000000" />
+<ns0:parameter name="add_V_valine" value="0.000000" />
+<ns0:parameter name="add_W_tryptophan" value="0.000000" />
+<ns0:parameter name="add_X_user_amino_acid" value="0.000000" />
+<ns0:parameter name="add_Y_tyrosine" value="0.000000" />
+<ns0:parameter name="add_Z_user_amino_acid" value="0.000000" />
+</ns0:search_summary>
+<ns0:spectrum_query start_scan="493" uncalibrated_precursor_neutral_mass="1375.695" assumed_charge="3" spectrum="HSA.493.493.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=493" end_scan="493" index="11" precursor_neutral_mass="1375.6925" retention_time_sec="130.49489">
+<ns0:search_result>
+<ns0:search_hit peptide="KSHHANSPTAGAAK" massdiff="-0.0030517578125" calc_neutral_pep_mass="1375.6956" peptide_next_aa="S" num_missed_cleavages="1" num_tol_term="2" protein_descr="Microtubule-associated protein RP/EB family member 2 OS=Homo sapiens OX=9606 GN=MAPRE2 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="26" hit_rank="1" num_matched_ions="8" protein="sp|Q15555|MARE2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="16.744" />
+<ns0:search_score name="nextscore" value="10.179" />
+<ns0:search_score name="expect" value="4.663311e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="532" uncalibrated_precursor_neutral_mass="830.45105" assumed_charge="2" spectrum="HSA.532.532.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=532" end_scan="532" index="15" precursor_neutral_mass="830.4496" retention_time_sec="140.37343">
+<ns0:search_result>
+<ns0:search_hit peptide="PSKDKEK" massdiff="-1.8310546875E-4" calc_neutral_pep_mass="830.44977" peptide_next_aa="E" num_missed_cleavages="2" num_tol_term="2" protein_descr="Cell division cycle and apoptosis regulator protein 1 OS=Homo sapiens OX=9606 GN=CCAR1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|Q8IX12|CCAR1_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="13.347" />
+<ns0:search_score name="nextscore" value="12.912" />
+<ns0:search_score name="expect" value="3.659791e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="533" uncalibrated_precursor_neutral_mass="999.399" assumed_charge="2" spectrum="HSA.533.533.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=533" end_scan="533" index="16" precursor_neutral_mass="999.40027" retention_time_sec="140.48819">
+<ns0:search_result>
+<ns0:search_hit peptide="MTAMDNASK" massdiff="1.220703125E-4" calc_neutral_pep_mass="999.40015" peptide_next_aa="N" num_missed_cleavages="0" num_tol_term="2" protein_descr="ATP synthase subunit gamma, mitochondrial OS=Homo sapiens OX=9606 GN=ATP5F1C PE=1 SV=1" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="10" protein="sp|P36542|ATPG_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="M[147]TAM[147]DNASK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="4" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="21.229" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="6.572793e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="547" uncalibrated_precursor_neutral_mass="809.41516" assumed_charge="2" spectrum="HSA.547.547.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=547" end_scan="547" index="17" precursor_neutral_mass="809.414" retention_time_sec="144.09541">
+<ns0:search_result>
+<ns0:search_hit peptide="TSMETIK" massdiff="1.013916015625" calc_neutral_pep_mass="808.4001" peptide_next_aa="W" num_missed_cleavages="0" num_tol_term="2" protein_descr="Putative uncharacterized protein ENSP00000382790 OS=Homo sapiens OX=9606 PE=5 SV=3" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="rev_sp|A8MVM7|YD021_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="7.266" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="2.034698e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="589" uncalibrated_precursor_neutral_mass="841.4294" assumed_charge="2" spectrum="HSA.589.589.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=589" end_scan="589" index="20" precursor_neutral_mass="841.428" retention_time_sec="154.91037">
+<ns0:search_result>
+<ns0:search_hit peptide="PSADSLPR" massdiff="-0.0013427734375" calc_neutral_pep_mass="841.4293" peptide_next_aa="G" num_missed_cleavages="0" num_tol_term="2" protein_descr="C3a anaphylatoxin chemotactic receptor OS=Homo sapiens OX=9606 GN=C3AR1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="sp|Q16581|C3AR_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.063" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.286027e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="604" uncalibrated_precursor_neutral_mass="835.3856" assumed_charge="2" spectrum="HSA.604.604.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=604" end_scan="604" index="21" precursor_neutral_mass="835.3846" retention_time_sec="158.78526">
+<ns0:search_result>
+<ns0:search_hit peptide="PQDSFSR" massdiff="0.002197265625" calc_neutral_pep_mass="835.3824" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="Oxysterols receptor LXR-beta OS=Homo sapiens OX=9606 GN=NR1H2 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="rev_sp|P55055|NR1H2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.989" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.341992e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="644" uncalibrated_precursor_neutral_mass="835.38586" assumed_charge="2" spectrum="HSA.644.644.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=644" end_scan="644" index="22" precursor_neutral_mass="835.3846" retention_time_sec="169.30011">
+<ns0:search_result>
+<ns0:search_hit peptide="PQDSFSR" massdiff="0.002197265625" calc_neutral_pep_mass="835.3824" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="Oxysterols receptor LXR-beta OS=Homo sapiens OX=9606 GN=NR1H2 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="rev_sp|P55055|NR1H2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.559" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="9.666072e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="771" uncalibrated_precursor_neutral_mass="835.3864" assumed_charge="2" spectrum="HSA.771.771.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=771" end_scan="771" index="25" precursor_neutral_mass="835.38495" retention_time_sec="202.82217">
+<ns0:search_result>
+<ns0:search_hit peptide="PQDSFSR" massdiff="0.0025634765625" calc_neutral_pep_mass="835.3824" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="Oxysterols receptor LXR-beta OS=Homo sapiens OX=9606 GN=NR1H2 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="rev_sp|P55055|NR1H2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.215" />
+<ns0:search_score name="nextscore" value="7.937" />
+<ns0:search_score name="expect" value="1.178284e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="810" uncalibrated_precursor_neutral_mass="835.38605" assumed_charge="2" spectrum="HSA.810.810.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=810" end_scan="810" index="26" precursor_neutral_mass="835.3849" retention_time_sec="213.12125">
+<ns0:search_result>
+<ns0:search_hit peptide="PQDSFSR" massdiff="0.00250244140625" calc_neutral_pep_mass="835.3824" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="Oxysterols receptor LXR-beta OS=Homo sapiens OX=9606 GN=NR1H2 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="rev_sp|P55055|NR1H2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.117" />
+<ns0:search_score name="nextscore" value="8.224" />
+<ns0:search_score name="expect" value="1.666583e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="873" uncalibrated_precursor_neutral_mass="1051.4425" assumed_charge="2" spectrum="HSA.873.873.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=873" end_scan="873" index="27" precursor_neutral_mass="1051.4401" retention_time_sec="229.65237">
+<ns0:search_result>
+<ns0:search_hit peptide="MKQQMQDQ" massdiff="-0.0025634765625" calc_neutral_pep_mass="1051.4426" peptide_next_aa="-" num_missed_cleavages="1" num_tol_term="2" protein_descr="Septin-5 OS=Homo sapiens OX=9606 GN=SEPTIN5 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="6" protein="sp|Q99719|SEPT5_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="MKQQM[147]QDQ">
+<ns0:mod_aminoacid_mass mass="147.03542" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.941" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="4.362646e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="931" uncalibrated_precursor_neutral_mass="964.4406" assumed_charge="2" spectrum="HSA.931.931.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=931" end_scan="931" index="28" precursor_neutral_mass="964.4372" retention_time_sec="245.03711">
+<ns0:search_result>
+<ns0:search_hit peptide="AAQSTAMNR" massdiff="-0.00244140625" calc_neutral_pep_mass="964.43964" peptide_next_aa="H" num_missed_cleavages="0" num_tol_term="2" protein_descr="Vesicle-fusing ATPase OS=Homo sapiens OX=9606 GN=NSF PE=1 SV=3" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="5" protein="sp|P46459|NSF_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="AAQSTAM[147]NR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="7" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="11.533" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="5.517597e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="971" uncalibrated_precursor_neutral_mass="964.4399" assumed_charge="2" spectrum="HSA.971.971.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=971" end_scan="971" index="30" precursor_neutral_mass="964.4387" retention_time_sec="255.3238">
+<ns0:search_result>
+<ns0:search_hit peptide="AAQSTAMNR" massdiff="-9.1552734375E-4" calc_neutral_pep_mass="964.43964" peptide_next_aa="H" num_missed_cleavages="0" num_tol_term="2" protein_descr="Vesicle-fusing ATPase OS=Homo sapiens OX=9606 GN=NSF PE=1 SV=3" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="8" protein="sp|P46459|NSF_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="AAQSTAM[147]NR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="7" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="17.57" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="9.605060e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1057" uncalibrated_precursor_neutral_mass="818.34247" assumed_charge="2" spectrum="HSA.1057.1057.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1057" end_scan="1057" index="35" precursor_neutral_mass="818.34045" retention_time_sec="277.59137">
+<ns0:search_result>
+<ns0:search_hit peptide="LGDDEDR" massdiff="-1.220703125E-4" calc_neutral_pep_mass="818.3406" peptide_next_aa="E" num_missed_cleavages="0" num_tol_term="2" protein_descr="Eukaryotic translation initiation factor 3 subunit A OS=Homo sapiens OX=9606 GN=EIF3A PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|Q14152|EIF3A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.123" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.242367e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1097" uncalibrated_precursor_neutral_mass="818.34064" assumed_charge="2" spectrum="HSA.1097.1097.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1097" end_scan="1097" index="38" precursor_neutral_mass="818.3409" retention_time_sec="287.87808">
+<ns0:search_result>
+<ns0:search_hit peptide="LGDDEDR" massdiff="3.0517578125E-4" calc_neutral_pep_mass="818.3406" peptide_next_aa="E" num_missed_cleavages="0" num_tol_term="2" protein_descr="Eukaryotic translation initiation factor 3 subunit A OS=Homo sapiens OX=9606 GN=EIF3A PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|Q14152|EIF3A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.638" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="9.236344e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1137" uncalibrated_precursor_neutral_mass="818.34094" assumed_charge="2" spectrum="HSA.1137.1137.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1137" end_scan="1137" index="39" precursor_neutral_mass="818.341" retention_time_sec="298.393">
+<ns0:search_result>
+<ns0:search_hit peptide="LGDDEDR" massdiff="4.2724609375E-4" calc_neutral_pep_mass="818.3406" peptide_next_aa="E" num_missed_cleavages="0" num_tol_term="2" protein_descr="Eukaryotic translation initiation factor 3 subunit A OS=Homo sapiens OX=9606 GN=EIF3A PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|Q14152|EIF3A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.827" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.473161e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1177" uncalibrated_precursor_neutral_mass="818.34106" assumed_charge="2" spectrum="HSA.1177.1177.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1177" end_scan="1177" index="41" precursor_neutral_mass="818.3408" retention_time_sec="308.76758">
+<ns0:search_result>
+<ns0:search_hit peptide="LGDDEDR" massdiff="2.44140625E-4" calc_neutral_pep_mass="818.3406" peptide_next_aa="E" num_missed_cleavages="0" num_tol_term="2" protein_descr="Eukaryotic translation initiation factor 3 subunit A OS=Homo sapiens OX=9606 GN=EIF3A PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|Q14152|EIF3A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.907" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="4.448874e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1211" uncalibrated_precursor_neutral_mass="819.4456" assumed_charge="2" spectrum="HSA.1211.1211.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1211" end_scan="1211" index="42" precursor_neutral_mass="819.4447" retention_time_sec="317.67654">
+<ns0:search_result>
+<ns0:search_hit peptide="KSSETLR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="819.445" peptide_next_aa="K" num_missed_cleavages="1" num_tol_term="2" protein_descr="2',3'-cyclic-nucleotide 3'-phosphodiesterase OS=Homo sapiens OX=9606 GN=CNP PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P09543|CN37_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.732" />
+<ns0:search_score name="nextscore" value="9.845" />
+<ns0:search_score name="expect" value="1.917374e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1218" uncalibrated_precursor_neutral_mass="818.3411" assumed_charge="2" spectrum="HSA.1218.1218.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1218" end_scan="1218" index="43" precursor_neutral_mass="818.3405" retention_time_sec="319.4099">
+<ns0:search_result>
+<ns0:search_hit peptide="LGDDEDR" massdiff="-6.103515625E-5" calc_neutral_pep_mass="818.3406" peptide_next_aa="E" num_missed_cleavages="0" num_tol_term="2" protein_descr="Eukaryotic translation initiation factor 3 subunit A OS=Homo sapiens OX=9606 GN=EIF3A PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|Q14152|EIF3A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.14" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.230269e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1251" uncalibrated_precursor_neutral_mass="819.4459" assumed_charge="2" spectrum="HSA.1251.1251.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1251" end_scan="1251" index="44" precursor_neutral_mass="819.4443" retention_time_sec="328.10312">
+<ns0:search_result>
+<ns0:search_hit peptide="KSSETLR" massdiff="-7.32421875E-4" calc_neutral_pep_mass="819.445" peptide_next_aa="K" num_missed_cleavages="1" num_tol_term="2" protein_descr="2',3'-cyclic-nucleotide 3'-phosphodiesterase OS=Homo sapiens OX=9606 GN=CNP PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|P09543|CN37_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.618" />
+<ns0:search_score name="nextscore" value="9.582" />
+<ns0:search_score name="expect" value="5.211830e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1380" uncalibrated_precursor_neutral_mass="819.445" assumed_charge="2" spectrum="HSA.1380.1380.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1380" end_scan="1380" index="46" precursor_neutral_mass="819.4449" retention_time_sec="362.3529">
+<ns0:search_result>
+<ns0:search_hit peptide="SSETLRK" massdiff="-1.220703125E-4" calc_neutral_pep_mass="819.445" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="2',3'-cyclic-nucleotide 3'-phosphodiesterase OS=Homo sapiens OX=9606 GN=CNP PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P09543|CN37_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.633" />
+<ns0:search_score name="nextscore" value="9.069" />
+<ns0:search_score name="expect" value="2.528734e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1390" uncalibrated_precursor_neutral_mass="871.3351" assumed_charge="2" spectrum="HSA.1390.1390.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1390" end_scan="1390" index="47" precursor_neutral_mass="871.3347" retention_time_sec="364.8893">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.809" />
+<ns0:search_score name="nextscore" value="8.809" />
+<ns0:search_score name="expect" value="2.646976e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1427" uncalibrated_precursor_neutral_mass="819.445" assumed_charge="2" spectrum="HSA.1427.1427.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1427" end_scan="1427" index="50" precursor_neutral_mass="819.4448" retention_time_sec="374.3728">
+<ns0:search_result>
+<ns0:search_hit peptide="SSETLRK" massdiff="-1.8310546875E-4" calc_neutral_pep_mass="819.445" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="2',3'-cyclic-nucleotide 3'-phosphodiesterase OS=Homo sapiens OX=9606 GN=CNP PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|P09543|CN37_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="13.3" />
+<ns0:search_score name="nextscore" value="11.532" />
+<ns0:search_score name="expect" value="1.212540e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1431" uncalibrated_precursor_neutral_mass="871.33575" assumed_charge="2" spectrum="HSA.1431.1431.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1431" end_scan="1431" index="51" precursor_neutral_mass="871.3347" retention_time_sec="375.3035">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="13.596" />
+<ns0:search_score name="nextscore" value="13.596" />
+<ns0:search_score name="expect" value="5.321084e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1469" uncalibrated_precursor_neutral_mass="819.44525" assumed_charge="2" spectrum="HSA.1469.1469.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1469" end_scan="1469" index="53" precursor_neutral_mass="819.44464" retention_time_sec="385.19492">
+<ns0:search_result>
+<ns0:search_hit peptide="SSETLRK" massdiff="-3.662109375E-4" calc_neutral_pep_mass="819.445" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="2',3'-cyclic-nucleotide 3'-phosphodiesterase OS=Homo sapiens OX=9606 GN=CNP PE=1 SV=2" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P09543|CN37_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="13.959" />
+<ns0:search_score name="nextscore" value="10.68" />
+<ns0:search_score name="expect" value="2.117170e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1471" uncalibrated_precursor_neutral_mass="871.33575" assumed_charge="2" spectrum="HSA.1471.1471.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1471" end_scan="1471" index="54" precursor_neutral_mass="871.3347" retention_time_sec="385.5906">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="15.758" />
+<ns0:search_score name="nextscore" value="13.864" />
+<ns0:search_score name="expect" value="8.619854e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1510" uncalibrated_precursor_neutral_mass="871.33563" assumed_charge="2" spectrum="HSA.1510.1510.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1510" end_scan="1510" index="55" precursor_neutral_mass="871.33484" retention_time_sec="395.8375">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-1.8310546875E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="15.146" />
+<ns0:search_score name="nextscore" value="13.256" />
+<ns0:search_score name="expect" value="2.180219e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1554" uncalibrated_precursor_neutral_mass="871.33527" assumed_charge="2" spectrum="HSA.1554.1554.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1554" end_scan="1554" index="57" precursor_neutral_mass="871.33466" retention_time_sec="407.33475">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.662109375E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="14.707" />
+<ns0:search_score name="nextscore" value="12.824" />
+<ns0:search_score name="expect" value="1.578520e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1563" uncalibrated_precursor_neutral_mass="1473.8036" assumed_charge="3" spectrum="HSA.1563.1563.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1563" end_scan="1563" index="58" precursor_neutral_mass="1473.8037" retention_time_sec="409.60352">
+<ns0:search_result>
+<ns0:search_hit peptide="KMSIQDSLALQPK" massdiff="0.0177001953125" calc_neutral_pep_mass="1473.786" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="Pleckstrin homology-like domain family B member 2 OS=Homo sapiens OX=9606 GN=PHLDB2 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="24" hit_rank="1" num_matched_ions="4" protein="sp|Q86SQ0|PHLB2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="KM[147]SIQDSLALQPK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.493" />
+<ns0:search_score name="nextscore" value="10.083" />
+<ns0:search_score name="expect" value="1.785459e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1594" uncalibrated_precursor_neutral_mass="871.3354" assumed_charge="2" spectrum="HSA.1594.1594.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1594" end_scan="1594" index="59" precursor_neutral_mass="871.3348" retention_time_sec="417.7612">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-2.44140625E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="15.8" />
+<ns0:search_score name="nextscore" value="13.903" />
+<ns0:search_score name="expect" value="1.496235e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1620" uncalibrated_precursor_neutral_mass="996.4175" assumed_charge="2" spectrum="HSA.1620.1620.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1620" end_scan="1620" index="60" precursor_neutral_mass="996.41626" retention_time_sec="424.52866">
+<ns0:search_result>
+<ns0:search_hit peptide="TMQSEETR" massdiff="-0.001953125" calc_neutral_pep_mass="996.4182" peptide_next_aa="V" num_missed_cleavages="0" num_tol_term="2" protein_descr="Calcium/calmodulin-dependent protein kinase type II subunit delta OS=Homo sapiens OX=9606 GN=CAMK2D PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="sp|Q13557|KCC2D_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="TM[147]QSEETR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="11.251" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.154117e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1635" uncalibrated_precursor_neutral_mass="871.33545" assumed_charge="2" spectrum="HSA.1635.1635.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1635" end_scan="1635" index="62" precursor_neutral_mass="871.3347" retention_time_sec="428.28677">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="16.107" />
+<ns0:search_score name="nextscore" value="14.211" />
+<ns0:search_score name="expect" value="3.965062e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1661" uncalibrated_precursor_neutral_mass="996.4188" assumed_charge="2" spectrum="HSA.1661.1661.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1661" end_scan="1661" index="63" precursor_neutral_mass="996.41656" retention_time_sec="435.05423">
+<ns0:search_result>
+<ns0:search_hit peptide="TMQSEETR" massdiff="-0.00164794921875" calc_neutral_pep_mass="996.4182" peptide_next_aa="V" num_missed_cleavages="0" num_tol_term="2" protein_descr="Calcium/calmodulin-dependent protein kinase type II subunit delta OS=Homo sapiens OX=9606 GN=CAMK2D PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="6" protein="sp|Q13557|KCC2D_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="TM[147]QSEETR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="13.362" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.082679e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1665" uncalibrated_precursor_neutral_mass="1253.5793" assumed_charge="3" spectrum="HSA.1665.1665.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1665" end_scan="1665" index="64" precursor_neutral_mass="1253.5776" retention_time_sec="435.98465">
+<ns0:search_result>
+<ns0:search_hit peptide="HGGYKPSDEHK" massdiff="-0.001220703125" calc_neutral_pep_mass="1253.5789" peptide_next_aa="T" num_missed_cleavages="1" num_tol_term="2" protein_descr="Creatine kinase B-type OS=Homo sapiens OX=9606 GN=CKB PE=1 SV=1" num_tot_proteins="1" tot_num_ions="20" hit_rank="1" num_matched_ions="10" protein="sp|P12277|KCRB_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="19.561" />
+<ns0:search_score name="nextscore" value="10.514" />
+<ns0:search_score name="expect" value="2.817607e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1676" uncalibrated_precursor_neutral_mass="871.335" assumed_charge="2" spectrum="HSA.1676.1676.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1676" end_scan="1676" index="65" precursor_neutral_mass="871.33466" retention_time_sec="438.7371">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.662109375E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="MM[147]M[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="16.245" />
+<ns0:search_score name="nextscore" value="14.358" />
+<ns0:search_score name="expect" value="6.512531e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1702" uncalibrated_precursor_neutral_mass="996.4196" assumed_charge="2" spectrum="HSA.1702.1702.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1702" end_scan="1702" index="66" precursor_neutral_mass="996.4169" retention_time_sec="445.50452">
+<ns0:search_result>
+<ns0:search_hit peptide="TMQSEETR" massdiff="-0.0013427734375" calc_neutral_pep_mass="996.4182" peptide_next_aa="V" num_missed_cleavages="0" num_tol_term="2" protein_descr="Calcium/calmodulin-dependent protein kinase type II subunit delta OS=Homo sapiens OX=9606 GN=CAMK2D PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="6" protein="sp|Q13557|KCC2D_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="TM[147]QSEETR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="13.172" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="6.792036e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1706" uncalibrated_precursor_neutral_mass="1253.5785" assumed_charge="3" spectrum="HSA.1706.1706.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1706" end_scan="1706" index="67" precursor_neutral_mass="1253.5776" retention_time_sec="446.435">
+<ns0:search_result>
+<ns0:search_hit peptide="HGGYKPSDEHK" massdiff="-0.001220703125" calc_neutral_pep_mass="1253.5789" peptide_next_aa="T" num_missed_cleavages="1" num_tol_term="2" protein_descr="Creatine kinase B-type OS=Homo sapiens OX=9606 GN=CKB PE=1 SV=1" num_tot_proteins="1" tot_num_ions="20" hit_rank="1" num_matched_ions="11" protein="sp|P12277|KCRB_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="21.546" />
+<ns0:search_score name="nextscore" value="10.674" />
+<ns0:search_score name="expect" value="1.430567e-05" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1717" uncalibrated_precursor_neutral_mass="871.3355" assumed_charge="2" spectrum="HSA.1717.1717.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1717" end_scan="1717" index="68" precursor_neutral_mass="871.33466" retention_time_sec="449.1874">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.662109375E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="8" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="17.338" />
+<ns0:search_score name="nextscore" value="15.459" />
+<ns0:search_score name="expect" value="3.471364e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1738" uncalibrated_precursor_neutral_mass="849.4375" assumed_charge="2" spectrum="HSA.1738.1738.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1738" end_scan="1738" index="69" precursor_neutral_mass="849.4372" retention_time_sec="454.61652">
+<ns0:search_result>
+<ns0:search_hit peptide="GTTLSGGQK" massdiff="1.99725341796875" calc_neutral_pep_mass="847.43994" peptide_next_aa="A" num_missed_cleavages="0" num_tol_term="2" protein_descr="ATP-binding cassette sub-family C member 4 OS=Homo sapiens OX=9606 GN=ABCC4 PE=1 SV=3" num_tot_proteins="2" tot_num_ions="16" hit_rank="1" num_matched_ions="6" protein="sp|O15439|MRP4_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Mitochondrial potassium channel ATP-binding subunit OS=Homo sapiens OX=9606 GN=ABCB8 PE=1 SV=3" protein="sp|Q9NUT2|MITOS_HUMAN" peptide_prev_aa="R" peptide_next_aa="Q" num_tol_term="2" />
+<ns0:search_score name="hyperscore" value="12.256" />
+<ns0:search_score name="nextscore" value="10.249" />
+<ns0:search_score name="expect" value="1.404862e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1743" uncalibrated_precursor_neutral_mass="996.4172" assumed_charge="2" spectrum="HSA.1743.1743.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1743" end_scan="1743" index="70" precursor_neutral_mass="996.4164" retention_time_sec="455.8146">
+<ns0:search_result>
+<ns0:search_hit peptide="TMQSEETR" massdiff="-0.0018310546875" calc_neutral_pep_mass="996.4182" peptide_next_aa="V" num_missed_cleavages="0" num_tol_term="2" protein_descr="Calcium/calmodulin-dependent protein kinase type II subunit delta OS=Homo sapiens OX=9606 GN=CAMK2D PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="sp|Q13557|KCC2D_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="TM[147]QSEETR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="11.337" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.953215e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1748" uncalibrated_precursor_neutral_mass="847.4398" assumed_charge="2" spectrum="HSA.1748.1748.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1748" end_scan="1748" index="71" precursor_neutral_mass="847.43994" retention_time_sec="457.01355">
+<ns0:search_result>
+<ns0:search_hit peptide="GTTLSGGQK" massdiff="0.0" calc_neutral_pep_mass="847.43994" peptide_next_aa="A" num_missed_cleavages="0" num_tol_term="2" protein_descr="ATP-binding cassette sub-family C member 4 OS=Homo sapiens OX=9606 GN=ABCC4 PE=1 SV=3" num_tot_proteins="2" tot_num_ions="16" hit_rank="1" num_matched_ions="5" protein="sp|O15439|MRP4_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Mitochondrial potassium channel ATP-binding subunit OS=Homo sapiens OX=9606 GN=ABCB8 PE=1 SV=3" protein="sp|Q9NUT2|MITOS_HUMAN" peptide_prev_aa="R" peptide_next_aa="Q" num_tol_term="2" />
+<ns0:search_score name="hyperscore" value="11.493" />
+<ns0:search_score name="nextscore" value="11.348" />
+<ns0:search_score name="expect" value="4.786437e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1754" uncalibrated_precursor_neutral_mass="902.4648" assumed_charge="2" spectrum="HSA.1754.1754.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1754" end_scan="1754" index="72" precursor_neutral_mass="902.46387" retention_time_sec="458.47937">
+<ns0:search_result>
+<ns0:search_hit peptide="MKQEPVR" massdiff="-4.8828125E-4" calc_neutral_pep_mass="902.46436" peptide_next_aa="S" num_missed_cleavages="1" num_tol_term="2" protein_descr="Rho-related GTP-binding protein RhoC OS=Homo sapiens OX=9606 GN=RHOC PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P08134|RHOC_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Rho-related GTP-binding protein RhoB OS=Homo sapiens OX=9606 GN=RHOB PE=1 SV=1" protein="sp|P62745|RHOB_HUMAN" peptide_prev_aa="R" peptide_next_aa="T" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]KQEPVR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.216" />
+<ns0:search_score name="nextscore" value="8.351" />
+<ns0:search_score name="expect" value="1.499073e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1759" uncalibrated_precursor_neutral_mass="871.33545" assumed_charge="2" spectrum="HSA.1759.1759.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1759" end_scan="1759" index="73" precursor_neutral_mass="871.3347" retention_time_sec="459.6776">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="15.981" />
+<ns0:search_score name="nextscore" value="14.128" />
+<ns0:search_score name="expect" value="7.581410e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1789" uncalibrated_precursor_neutral_mass="847.4405" assumed_charge="2" spectrum="HSA.1789.1789.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1789" end_scan="1789" index="74" precursor_neutral_mass="847.43994" retention_time_sec="467.51575">
+<ns0:search_result>
+<ns0:search_hit peptide="GTTLSGGQK" massdiff="0.0" calc_neutral_pep_mass="847.43994" peptide_next_aa="A" num_missed_cleavages="0" num_tol_term="2" protein_descr="ATP-binding cassette sub-family C member 4 OS=Homo sapiens OX=9606 GN=ABCC4 PE=1 SV=3" num_tot_proteins="2" tot_num_ions="16" hit_rank="1" num_matched_ions="7" protein="sp|O15439|MRP4_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Mitochondrial potassium channel ATP-binding subunit OS=Homo sapiens OX=9606 GN=ABCB8 PE=1 SV=3" protein="sp|Q9NUT2|MITOS_HUMAN" peptide_prev_aa="R" peptide_next_aa="Q" num_tol_term="2" />
+<ns0:search_score name="hyperscore" value="15.082" />
+<ns0:search_score name="nextscore" value="11.278" />
+<ns0:search_score name="expect" value="5.316142e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1798" uncalibrated_precursor_neutral_mass="1020.39307" assumed_charge="2" spectrum="HSA.1798.1798.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1798" end_scan="1798" index="75" precursor_neutral_mass="1020.3929" retention_time_sec="469.7844">
+<ns0:search_result>
+<ns0:search_hit peptide="ECENQDAR" massdiff="-1.8310546875E-4" calc_neutral_pep_mass="1020.39307" peptide_next_aa="L" num_missed_cleavages="0" num_tol_term="2" protein_descr="Versican core protein OS=Homo sapiens OX=9606 GN=VCAN PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="sp|P13611|CSPG2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="ECENQDAR">
+<ns0:mod_aminoacid_mass mass="160.03065" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.195" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.191928e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1800" uncalibrated_precursor_neutral_mass="871.3354" assumed_charge="2" spectrum="HSA.1800.1800.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1800" end_scan="1800" index="76" precursor_neutral_mass="871.3348" retention_time_sec="470.1794">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-2.44140625E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="8" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="17.447" />
+<ns0:search_score name="nextscore" value="17.446" />
+<ns0:search_score name="expect" value="3.260242e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1826" uncalibrated_precursor_neutral_mass="1059.4841" assumed_charge="2" spectrum="HSA.1826.1826.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1826" end_scan="1826" index="77" precursor_neutral_mass="1059.4843" retention_time_sec="476.947">
+<ns0:search_result>
+<ns0:search_hit peptide="HEANDYRR" massdiff="-2.44140625E-4" calc_neutral_pep_mass="1059.4845" peptide_next_aa="Q" num_missed_cleavages="1" num_tol_term="2" protein_descr="Glial fibrillary acidic protein OS=Homo sapiens OX=9606 GN=GFAP PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="sp|P14136|GFAP_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.335" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="3.477363e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1840" uncalibrated_precursor_neutral_mass="871.335" assumed_charge="2" spectrum="HSA.1840.1840.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1840" end_scan="1840" index="78" precursor_neutral_mass="871.3346" retention_time_sec="480.55423">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-4.2724609375E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="8" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="17.131" />
+<ns0:search_score name="nextscore" value="15.281" />
+<ns0:search_score name="expect" value="3.910658e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1848" uncalibrated_precursor_neutral_mass="876.4776" assumed_charge="2" spectrum="HSA.1848.1848.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1848" end_scan="1848" index="79" precursor_neutral_mass="876.474" retention_time_sec="482.50363">
+<ns0:search_result>
+<ns0:search_hit peptide="LMIAQSGR" massdiff="2.0045166015625" calc_neutral_pep_mass="874.4695" peptide_next_aa="L" num_missed_cleavages="0" num_tol_term="2" protein_descr="Laminin subunit beta-3 OS=Homo sapiens OX=9606 GN=LAMB3 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="rev_sp|Q13751|LAMB3_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="11.811" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="4.883156e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1855" uncalibrated_precursor_neutral_mass="992.4359" assumed_charge="2" spectrum="HSA.1855.1855.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1855" end_scan="1855" index="80" precursor_neutral_mass="992.43677" retention_time_sec="484.23724">
+<ns0:search_result>
+<ns0:search_hit peptide="HYAMQEAK" massdiff="-0.0018310546875" calc_neutral_pep_mass="992.4386" peptide_next_aa="Q" num_missed_cleavages="0" num_tol_term="2" protein_descr="Reticulocalbin-2 OS=Homo sapiens OX=9606 GN=RCN2 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="sp|Q14257|RCN2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="HYAM[147]QEAK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="4" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="9.972" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="7.620789e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1881" uncalibrated_precursor_neutral_mass="871.335" assumed_charge="2" spectrum="HSA.1881.1881.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1881" end_scan="1881" index="82" precursor_neutral_mass="871.3346" retention_time_sec="490.91702">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="-4.2724609375E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="8" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]MM[147]QSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="16.015" />
+<ns0:search_score name="nextscore" value="14.142" />
+<ns0:search_score name="expect" value="7.434472e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1889" uncalibrated_precursor_neutral_mass="876.47626" assumed_charge="2" spectrum="HSA.1889.1889.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1889" end_scan="1889" index="83" precursor_neutral_mass="876.47406" retention_time_sec="492.8663">
+<ns0:search_result>
+<ns0:search_hit peptide="AAMALEKK" massdiff="1.8310546875E-4" calc_neutral_pep_mass="876.4739" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="Ferritin light chain OS=Homo sapiens OX=9606 GN=FTL PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="6" protein="sp|P02792|FRIL_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="AAM[147]ALEKK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="12.673" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="4.286639e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1896" uncalibrated_precursor_neutral_mass="1064.586" assumed_charge="2" spectrum="HSA.1896.1896.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1896" end_scan="1896" index="84" precursor_neutral_mass="1064.5836" retention_time_sec="494.5999">
+<ns0:search_result>
+<ns0:search_hit peptide="AGAHLQGGAKR" massdiff="-2.44140625E-4" calc_neutral_pep_mass="1064.5839" peptide_next_aa="V" num_missed_cleavages="1" num_tol_term="2" protein_descr="Glyceraldehyde-3-phosphate dehydrogenase OS=Homo sapiens OX=9606 GN=GAPDH PE=1 SV=3" num_tot_proteins="1" tot_num_ions="20" hit_rank="1" num_matched_ions="6" protein="sp|P04406|G3P_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="12.391" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.893433e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1930" uncalibrated_precursor_neutral_mass="876.47424" assumed_charge="2" spectrum="HSA.1930.1930.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1930" end_scan="1930" index="88" precursor_neutral_mass="876.47394" retention_time_sec="503.14014">
+<ns0:search_result>
+<ns0:search_hit peptide="AAMALEKK" massdiff="6.103515625E-5" calc_neutral_pep_mass="876.4739" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="Ferritin light chain OS=Homo sapiens OX=9606 GN=FTL PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="8" protein="sp|P02792|FRIL_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="AAM[147]ALEKK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="15.896" />
+<ns0:search_score name="nextscore" value="10.052" />
+<ns0:search_score name="expect" value="4.477133e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1973" uncalibrated_precursor_neutral_mass="876.4758" assumed_charge="2" spectrum="HSA.1973.1973.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1973" end_scan="1973" index="90" precursor_neutral_mass="876.474" retention_time_sec="514.36975">
+<ns0:search_result>
+<ns0:search_hit peptide="AAMALEKK" massdiff="1.220703125E-4" calc_neutral_pep_mass="876.4739" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="Ferritin light chain OS=Homo sapiens OX=9606 GN=FTL PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="sp|P02792|FRIL_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="AAM[147]ALEKK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.481" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.069057e+01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="1994" uncalibrated_precursor_neutral_mass="1243.5803" assumed_charge="3" spectrum="HSA.1994.1994.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=1994" end_scan="1994" index="91" precursor_neutral_mass="1243.5781" retention_time_sec="519.8508">
+<ns0:search_result>
+<ns0:search_hit peptide="KQRYCSSADK" massdiff="1.9959716796875" calc_neutral_pep_mass="1241.5822" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 16 OS=Homo sapiens OX=9606 GN=SPATA16 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BXB7|SPT16_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KQRYCSSADK">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.403" />
+<ns0:search_score name="nextscore" value="10.086" />
+<ns0:search_score name="expect" value="3.622311e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2001" uncalibrated_precursor_neutral_mass="1022.49316" assumed_charge="2" spectrum="HSA.2001.2001.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2001" end_scan="2001" index="92" precursor_neutral_mass="1022.49475" retention_time_sec="521.5846">
+<ns0:search_result>
+<ns0:search_hit peptide="TGMREHFK" massdiff="2.013671875" calc_neutral_pep_mass="1020.4811" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="DBF4-type zinc finger-containing protein 2 OS=Homo sapiens OX=9606 GN=ZDBF2 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9HCK1|ZDBF2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="TGM[147]REHFK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="3" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.003" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="2.216379e+01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2034" uncalibrated_precursor_neutral_mass="1243.5803" assumed_charge="3" spectrum="HSA.2034.2034.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2034" end_scan="2034" index="94" precursor_neutral_mass="1243.5781" retention_time_sec="530.1375">
+<ns0:search_result>
+<ns0:search_hit peptide="KQRYCSSADK" massdiff="1.9959716796875" calc_neutral_pep_mass="1241.5822" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 16 OS=Homo sapiens OX=9606 GN=SPATA16 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BXB7|SPT16_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KQRYCSSADK">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.234" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.165467e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2040" uncalibrated_precursor_neutral_mass="847.42896" assumed_charge="2" spectrum="HSA.2040.2040.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2040" end_scan="2040" index="95" precursor_neutral_mass="847.4284" retention_time_sec="531.5515">
+<ns0:search_result>
+<ns0:search_hit peptide="IETLDEK" massdiff="0.9949951171875" calc_neutral_pep_mass="846.4334" peptide_next_aa="T" num_missed_cleavages="0" num_tol_term="2" protein_descr="Large ribosomal subunit protein uL10 OS=Homo sapiens OX=9606 GN=RPLP0 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="rev_sp|P05388|RLA0_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Putative ribosomal protein uL10-like OS=Homo sapiens OX=9606 GN=RPLP0P6 PE=5 SV=1" protein="rev_sp|Q8NHW5|RLA0L_HUMAN" peptide_prev_aa="R" peptide_next_aa="T" num_tol_term="2" />
+<ns0:search_score name="hyperscore" value="10.666" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="4.336897e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2047" uncalibrated_precursor_neutral_mass="1307.644" assumed_charge="3" spectrum="HSA.2047.2047.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2047" end_scan="2047" index="97" precursor_neutral_mass="1307.6493" retention_time_sec="533.1449">
+<ns0:search_result>
+<ns0:search_hit peptide="KTSDAETTAKEK" massdiff="-0.0074462890625" calc_neutral_pep_mass="1307.6567" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Zinc finger and BTB domain-containing protein 18 OS=Homo sapiens OX=9606 GN=ZBTB18 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="22" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q99592|ZBT18_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="8.606" />
+<ns0:search_score name="nextscore" value="8.553" />
+<ns0:search_score name="expect" value="1.673016e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2075" uncalibrated_precursor_neutral_mass="1243.5803" assumed_charge="3" spectrum="HSA.2075.2075.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2075" end_scan="2075" index="98" precursor_neutral_mass="1243.5781" retention_time_sec="540.49945">
+<ns0:search_result>
+<ns0:search_hit peptide="KQRYCSSADK" massdiff="1.9959716796875" calc_neutral_pep_mass="1241.5822" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 16 OS=Homo sapiens OX=9606 GN=SPATA16 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BXB7|SPT16_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KQRYCSSADK">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.24" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.161449e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2115" uncalibrated_precursor_neutral_mass="1243.581" assumed_charge="3" spectrum="HSA.2115.2115.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2115" end_scan="2115" index="100" precursor_neutral_mass="1243.5781" retention_time_sec="550.87427">
+<ns0:search_result>
+<ns0:search_hit peptide="KQRYCSSADK" massdiff="1.9959716796875" calc_neutral_pep_mass="1241.5822" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 16 OS=Homo sapiens OX=9606 GN=SPATA16 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BXB7|SPT16_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KQRYCSSADK">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.293" />
+<ns0:search_score name="nextscore" value="9.899" />
+<ns0:search_score name="expect" value="5.030128e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2121" uncalibrated_precursor_neutral_mass="903.3833" assumed_charge="2" spectrum="HSA.2121.2121.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2121" end_scan="2121" index="101" precursor_neutral_mass="903.3821" retention_time_sec="552.28827">
+<ns0:search_result>
+<ns0:search_hit peptide="HEANDYR" massdiff="-0.00140380859375" calc_neutral_pep_mass="903.3835" peptide_next_aa="R" num_missed_cleavages="0" num_tol_term="2" protein_descr="Glial fibrillary acidic protein OS=Homo sapiens OX=9606 GN=GFAP PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P14136|GFAP_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="13.731" />
+<ns0:search_score name="nextscore" value="9.805" />
+<ns0:search_score name="expect" value="8.754876e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2129" uncalibrated_precursor_neutral_mass="842.4496" assumed_charge="2" spectrum="HSA.2129.2129.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2129" end_scan="2129" index="102" precursor_neutral_mass="842.4488" retention_time_sec="554.2376">
+<ns0:search_result>
+<ns0:search_hit peptide="KLEDNPK" massdiff="-9.765625E-4" calc_neutral_pep_mass="842.44977" peptide_next_aa="S" num_missed_cleavages="1" num_tol_term="2" protein_descr="Elongation factor 1-alpha 2 OS=Homo sapiens OX=9606 GN=EEF1A2 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|Q05639|EF1A2_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="12.723" />
+<ns0:search_score name="nextscore" value="10.985" />
+<ns0:search_score name="expect" value="1.189826e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2131" uncalibrated_precursor_neutral_mass="937.4688" assumed_charge="2" spectrum="HSA.2131.2131.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2131" end_scan="2131" index="103" precursor_neutral_mass="937.4685" retention_time_sec="554.63275">
+<ns0:search_result>
+<ns0:search_hit peptide="KMPQYQK" massdiff="-6.103515625E-4" calc_neutral_pep_mass="937.4691" peptide_next_aa="E" num_missed_cleavages="1" num_tol_term="2" protein_descr="Syntaxin-binding protein 1 OS=Homo sapiens OX=9606 GN=STXBP1 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P61764|STXB1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Syntaxin-binding protein 2 OS=Homo sapiens OX=9606 GN=STXBP2 PE=1 SV=2" protein="sp|Q15833|STXB2_HUMAN" peptide_prev_aa="K" peptide_next_aa="E" num_tol_term="2" />
+<ns0:modification_info modified_peptide="KM[147]PQYQK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="11.055" />
+<ns0:search_score name="nextscore" value="8.178" />
+<ns0:search_score name="expect" value="4.085544e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2135" uncalibrated_precursor_neutral_mass="942.5248" assumed_charge="2" spectrum="HSA.2135.2135.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2135" end_scan="2135" index="104" precursor_neutral_mass="942.5234" retention_time_sec="555.56335">
+<ns0:search_result>
+<ns0:search_hit peptide="KSKGPSPSR" massdiff="-0.00128173828125" calc_neutral_pep_mass="942.52466" peptide_next_aa="S" num_missed_cleavages="2" num_tol_term="2" protein_descr="Phosphatidylinositol 4,5-bisphosphate 5-phosphatase A OS=Homo sapiens OX=9606 GN=INPP5J PE=1 SV=3" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q15735|PI5PA_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.84" />
+<ns0:search_score name="nextscore" value="9.683" />
+<ns0:search_score name="expect" value="2.693137e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2141" uncalibrated_precursor_neutral_mass="849.3906" assumed_charge="2" spectrum="HSA.2141.2141.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2141" end_scan="2141" index="105" precursor_neutral_mass="849.3903" retention_time_sec="557.02924">
+<ns0:search_result>
+<ns0:search_hit peptide="MVQEAEK" massdiff="1.220703125E-4" calc_neutral_pep_mass="849.3902" peptide_next_aa="Y" num_missed_cleavages="0" num_tol_term="2" protein_descr="Heat shock 70 kDa protein 1A OS=Homo sapiens OX=9606 GN=HSPA1A PE=1 SV=1" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|P0DMV8|HS71A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Heat shock 70 kDa protein 1B OS=Homo sapiens OX=9606 GN=HSPA1B PE=1 SV=1" protein="sp|P0DMV9|HS71B_HUMAN" peptide_prev_aa="R" peptide_next_aa="Y" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="Heat shock cognate 71 kDa protein OS=Homo sapiens OX=9606 GN=HSPA8 PE=1 SV=1" protein="sp|P11142|HSP7C_HUMAN" peptide_prev_aa="R" peptide_next_aa="Y" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]VQEAEK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="12.044" />
+<ns0:search_score name="nextscore" value="9.982" />
+<ns0:search_score name="expect" value="1.539332e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2158" uncalibrated_precursor_neutral_mass="1243.5812" assumed_charge="3" spectrum="HSA.2158.2158.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2158" end_scan="2158" index="107" precursor_neutral_mass="1243.5781" retention_time_sec="561.29926">
+<ns0:search_result>
+<ns0:search_hit peptide="KQRYCSSADK" massdiff="1.9959716796875" calc_neutral_pep_mass="1241.5822" peptide_next_aa="L" num_missed_cleavages="2" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 16 OS=Homo sapiens OX=9606 GN=SPATA16 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BXB7|SPT16_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KQRYCSSADK">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.476" />
+<ns0:search_score name="nextscore" value="9.681" />
+<ns0:search_score name="expect" value="3.839157e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2172" uncalibrated_precursor_neutral_mass="937.46985" assumed_charge="2" spectrum="HSA.2172.2172.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2172" end_scan="2172" index="108" precursor_neutral_mass="937.46857" retention_time_sec="564.9065">
+<ns0:search_result>
+<ns0:search_hit peptide="KMPQYQK" massdiff="-5.4931640625E-4" calc_neutral_pep_mass="937.4691" peptide_next_aa="E" num_missed_cleavages="1" num_tol_term="2" protein_descr="Syntaxin-binding protein 1 OS=Homo sapiens OX=9606 GN=STXBP1 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|P61764|STXB1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Syntaxin-binding protein 2 OS=Homo sapiens OX=9606 GN=STXBP2 PE=1 SV=2" protein="sp|Q15833|STXB2_HUMAN" peptide_prev_aa="K" peptide_next_aa="E" num_tol_term="2" />
+<ns0:modification_info modified_peptide="KM[147]PQYQK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="14.468" />
+<ns0:search_score name="nextscore" value="11.045" />
+<ns0:search_score name="expect" value="1.286969e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2177" uncalibrated_precursor_neutral_mass="899.4831" assumed_charge="2" spectrum="HSA.2177.2177.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2177" end_scan="2177" index="109" precursor_neutral_mass="899.4815" retention_time_sec="566.10455">
+<ns0:search_result>
+<ns0:search_hit peptide="KQVSGPER" massdiff="-9.1552734375E-4" calc_neutral_pep_mass="899.4824" peptide_next_aa="T" num_missed_cleavages="1" num_tol_term="2" protein_descr="Alpha-crystallin B chain OS=Homo sapiens OX=9606 GN=CRYAB PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="5" protein="sp|P02511|CRYAB_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="12.041" />
+<ns0:search_score name="nextscore" value="10.367" />
+<ns0:search_score name="expect" value="4.118603e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2183" uncalibrated_precursor_neutral_mass="849.3904" assumed_charge="2" spectrum="HSA.2183.2183.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2183" end_scan="2183" index="110" precursor_neutral_mass="849.39044" retention_time_sec="567.5704">
+<ns0:search_result>
+<ns0:search_hit peptide="MVQEAEK" massdiff="2.44140625E-4" calc_neutral_pep_mass="849.3902" peptide_next_aa="Y" num_missed_cleavages="0" num_tol_term="2" protein_descr="Heat shock 70 kDa protein 1A OS=Homo sapiens OX=9606 GN=HSPA1A PE=1 SV=1" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P0DMV8|HS71A_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="Heat shock 70 kDa protein 1B OS=Homo sapiens OX=9606 GN=HSPA1B PE=1 SV=1" protein="sp|P0DMV9|HS71B_HUMAN" peptide_prev_aa="R" peptide_next_aa="Y" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="Heat shock cognate 71 kDa protein OS=Homo sapiens OX=9606 GN=HSPA8 PE=1 SV=1" protein="sp|P11142|HSP7C_HUMAN" peptide_prev_aa="R" peptide_next_aa="Y" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]VQEAEK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.877" />
+<ns0:search_score name="nextscore" value="10.774" />
+<ns0:search_score name="expect" value="1.761590e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2187" uncalibrated_precursor_neutral_mass="942.522" assumed_charge="2" spectrum="HSA.2187.2187.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2187" end_scan="2187" index="111" precursor_neutral_mass="942.5229" retention_time_sec="568.50085">
+<ns0:search_result>
+<ns0:search_hit peptide="KSKGPSPSR" massdiff="-0.00177001953125" calc_neutral_pep_mass="942.52466" peptide_next_aa="S" num_missed_cleavages="2" num_tol_term="2" protein_descr="Phosphatidylinositol 4,5-bisphosphate 5-phosphatase A OS=Homo sapiens OX=9606 GN=INPP5J PE=1 SV=3" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="5" protein="rev_sp|Q15735|PI5PA_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.566" />
+<ns0:search_score name="nextscore" value="9.529" />
+<ns0:search_score name="expect" value="1.881399e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2214" uncalibrated_precursor_neutral_mass="937.4734" assumed_charge="2" spectrum="HSA.2214.2214.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2214" end_scan="2214" index="114" precursor_neutral_mass="937.4691" retention_time_sec="575.30756">
+<ns0:search_result>
+<ns0:search_hit peptide="KMPQYQK" massdiff="0.0" calc_neutral_pep_mass="937.4691" peptide_next_aa="E" num_missed_cleavages="1" num_tol_term="2" protein_descr="Syntaxin-binding protein 1 OS=Homo sapiens OX=9606 GN=STXBP1 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="5" protein="sp|P61764|STXB1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Syntaxin-binding protein 2 OS=Homo sapiens OX=9606 GN=STXBP2 PE=1 SV=2" protein="sp|Q15833|STXB2_HUMAN" peptide_prev_aa="K" peptide_next_aa="E" num_tol_term="2" />
+<ns0:modification_info modified_peptide="KM[147]PQYQK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="11.334" />
+<ns0:search_score name="nextscore" value="8.547" />
+<ns0:search_score name="expect" value="3.479366e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2216" uncalibrated_precursor_neutral_mass="934.4827" assumed_charge="2" spectrum="HSA.2216.2216.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2216" end_scan="2216" index="115" precursor_neutral_mass="934.4807" retention_time_sec="575.7027">
+<ns0:search_result>
+<ns0:search_hit peptide="KMGTGVGNR" massdiff="0.0152587890625" calc_neutral_pep_mass="934.46545" peptide_next_aa="F" num_missed_cleavages="1" num_tol_term="2" protein_descr="Neuropeptide S OS=Homo sapiens OX=9606 GN=NPS PE=3 SV=1" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="4" protein="rev_sp|P0C0P6|NPS_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KM[147]GTGVGNR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="9.134" />
+<ns0:search_score name="nextscore" value="9.134" />
+<ns0:search_score name="expect" value="1.252740e+01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2220" uncalibrated_precursor_neutral_mass="899.4825" assumed_charge="2" spectrum="HSA.2220.2220.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2220" end_scan="2220" index="116" precursor_neutral_mass="899.4816" retention_time_sec="576.63324">
+<ns0:search_result>
+<ns0:search_hit peptide="KQVSGPER" massdiff="-7.9345703125E-4" calc_neutral_pep_mass="899.4824" peptide_next_aa="T" num_missed_cleavages="1" num_tol_term="2" protein_descr="Alpha-crystallin B chain OS=Homo sapiens OX=9606 GN=CRYAB PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="8" protein="sp|P02511|CRYAB_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="16.434" />
+<ns0:search_score name="nextscore" value="11.886" />
+<ns0:search_score name="expect" value="9.677495e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2239" uncalibrated_precursor_neutral_mass="877.4074" assumed_charge="2" spectrum="HSA.2239.2239.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2239" end_scan="2239" index="117" precursor_neutral_mass="877.40753" retention_time_sec="581.527">
+<ns0:search_result>
+<ns0:search_hit peptide="LTSETDGR" massdiff="-0.006591796875" calc_neutral_pep_mass="877.4141" peptide_next_aa="G" num_missed_cleavages="0" num_tol_term="2" protein_descr="N-acetyl-beta-glucosaminyl-glycoprotein 4-beta-N-acetylgalactosaminyltransferase 1 OS=Homo sapiens OX=9606 GN=B4GALNT4 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="sp|Q76KP1|B4GN4_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="9.751" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.539040e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2243" uncalibrated_precursor_neutral_mass="1674.8414" assumed_charge="4" spectrum="HSA.2243.2243.4" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2243" end_scan="2243" index="118" precursor_neutral_mass="1674.8411" retention_time_sec="582.45734">
+<ns0:search_result>
+<ns0:search_hit peptide="GRGSRGQHQAHSLER" massdiff="1.220703125E-4" calc_neutral_pep_mass="1674.841" peptide_next_aa="V" num_missed_cleavages="2" num_tol_term="2" protein_descr="Myelin proteolipid protein OS=Homo sapiens OX=9606 GN=PLP1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="28" hit_rank="1" num_matched_ions="9" protein="sp|P60201|MYPR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="17.849" />
+<ns0:search_score name="nextscore" value="9.455" />
+<ns0:search_score name="expect" value="1.478356e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2252" uncalibrated_precursor_neutral_mass="1227.5864" assumed_charge="3" spectrum="HSA.2252.2252.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2252" end_scan="2252" index="119" precursor_neutral_mass="1227.5844" retention_time_sec="584.72626">
+<ns0:search_result>
+<ns0:search_hit peptide="KGLMMNVFDR" massdiff="1.98974609375" calc_neutral_pep_mass="1225.5946" peptide_next_aa="Y" num_missed_cleavages="1" num_tol_term="2" protein_descr="Allograft inflammatory factor 1-like OS=Homo sapiens OX=9606 GN=AIF1L PE=1 SV=1" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9BQI0|AIF1L_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="KGLM[147]MNVFDR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="4" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.636" />
+<ns0:search_score name="nextscore" value="8.636" />
+<ns0:search_score name="expect" value="2.858276e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2258" uncalibrated_precursor_neutral_mass="934.4821" assumed_charge="2" spectrum="HSA.2258.2258.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2258" end_scan="2258" index="121" precursor_neutral_mass="934.48193" retention_time_sec="586.0765">
+<ns0:search_result>
+<ns0:search_hit peptide="KMGTGVGNR" massdiff="0.0164794921875" calc_neutral_pep_mass="934.46545" peptide_next_aa="F" num_missed_cleavages="1" num_tol_term="2" protein_descr="Neuropeptide S OS=Homo sapiens OX=9606 GN=NPS PE=3 SV=1" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="4" protein="rev_sp|P0C0P6|NPS_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KM[147]GTGVGNR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.855" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.449606e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2262" uncalibrated_precursor_neutral_mass="899.4821" assumed_charge="2" spectrum="HSA.2262.2262.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2262" end_scan="2262" index="122" precursor_neutral_mass="899.48145" retention_time_sec="587.00696">
+<ns0:search_result>
+<ns0:search_hit peptide="KQVSGPER" massdiff="-9.765625E-4" calc_neutral_pep_mass="899.4824" peptide_next_aa="T" num_missed_cleavages="1" num_tol_term="2" protein_descr="Alpha-crystallin B chain OS=Homo sapiens OX=9606 GN=CRYAB PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="7" protein="sp|P02511|CRYAB_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="14.411" />
+<ns0:search_score name="nextscore" value="11.043" />
+<ns0:search_score name="expect" value="1.871759e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2286" uncalibrated_precursor_neutral_mass="1674.843" assumed_charge="4" spectrum="HSA.2286.2286.4" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2286" end_scan="2286" index="125" precursor_neutral_mass="1674.8411" retention_time_sec="592.8549">
+<ns0:search_result>
+<ns0:search_hit peptide="GRGSRGQHQAHSLER" massdiff="1.220703125E-4" calc_neutral_pep_mass="1674.841" peptide_next_aa="V" num_missed_cleavages="2" num_tol_term="2" protein_descr="Myelin proteolipid protein OS=Homo sapiens OX=9606 GN=PLP1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="28" hit_rank="1" num_matched_ions="13" protein="sp|P60201|MYPR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="26.355" />
+<ns0:search_score name="nextscore" value="14.443" />
+<ns0:search_score name="expect" value="1.055701e-08" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2302" uncalibrated_precursor_neutral_mass="934.48315" assumed_charge="2" spectrum="HSA.2302.2302.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2302" end_scan="2302" index="128" precursor_neutral_mass="934.482" retention_time_sec="596.6653">
+<ns0:search_result>
+<ns0:search_hit peptide="KMGTGVGNR" massdiff="0.01654052734375" calc_neutral_pep_mass="934.46545" peptide_next_aa="F" num_missed_cleavages="1" num_tol_term="2" protein_descr="Neuropeptide S OS=Homo sapiens OX=9606 GN=NPS PE=3 SV=1" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="4" protein="rev_sp|P0C0P6|NPS_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KM[147]GTGVGNR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="9.207" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.183723e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2314" uncalibrated_precursor_neutral_mass="844.4565" assumed_charge="2" spectrum="HSA.2314.2314.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2314" end_scan="2314" index="129" precursor_neutral_mass="844.45636" retention_time_sec="599.73724">
+<ns0:search_result>
+<ns0:search_hit peptide="LAGLVGCR" massdiff="-0.0025634765625" calc_neutral_pep_mass="844.4589" peptide_next_aa="T" num_missed_cleavages="0" num_tol_term="2" protein_descr="Protein THEM6 OS=Homo sapiens OX=9606 GN=THEM6 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q8WUY1|THEM6_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="LAGLVGCR">
+<ns0:mod_aminoacid_mass mass="160.03065" position="7" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.142" />
+<ns0:search_score name="nextscore" value="8.114" />
+<ns0:search_score name="expect" value="2.185244e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2315" uncalibrated_precursor_neutral_mass="1023.42065" assumed_charge="2" spectrum="HSA.2315.2315.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2315" end_scan="2315" index="130" precursor_neutral_mass="1023.4181" retention_time_sec="599.8893">
+<ns0:search_result>
+<ns0:search_hit peptide="AMEGAGTDEK" massdiff="1.8310546875E-4" calc_neutral_pep_mass="1023.4179" peptide_next_aa="A" num_missed_cleavages="0" num_tol_term="2" protein_descr="Annexin A6 OS=Homo sapiens OX=9606 GN=ANXA6 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="5" protein="sp|P08133|ANXA6_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="AM[147]EGAGTDEK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="12.264" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="2.037042e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2324" uncalibrated_precursor_neutral_mass="1008.5277" assumed_charge="2" spectrum="HSA.2324.2324.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2324" end_scan="2324" index="132" precursor_neutral_mass="1008.527" retention_time_sec="601.96606">
+<ns0:search_result>
+<ns0:search_hit peptide="KLSSAMSAAK" massdiff="-3.662109375E-4" calc_neutral_pep_mass="1008.52734" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="Malate dehydrogenase, cytoplasmic OS=Homo sapiens OX=9606 GN=MDH1 PE=1 SV=4" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="11" protein="sp|P40925|MDHC_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="KLSSAM[147]SAAK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="6" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="23.869" />
+<ns0:search_score name="nextscore" value="12.257" />
+<ns0:search_score name="expect" value="6.987888e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2329" uncalibrated_precursor_neutral_mass="1674.8428" assumed_charge="4" spectrum="HSA.2329.2329.4" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2329" end_scan="2329" index="133" precursor_neutral_mass="1674.841" retention_time_sec="603.16425">
+<ns0:search_result>
+<ns0:search_hit peptide="GRGSRGQHQAHSLER" massdiff="0.0" calc_neutral_pep_mass="1674.841" peptide_next_aa="V" num_missed_cleavages="2" num_tol_term="2" protein_descr="Myelin proteolipid protein OS=Homo sapiens OX=9606 GN=PLP1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="28" hit_rank="1" num_matched_ions="14" protein="sp|P60201|MYPR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="28.146" />
+<ns0:search_score name="nextscore" value="14.13" />
+<ns0:search_score name="expect" value="1.423823e-06" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2343" uncalibrated_precursor_neutral_mass="937.4704" assumed_charge="2" spectrum="HSA.2343.2343.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2343" end_scan="2343" index="136" precursor_neutral_mass="937.4698" retention_time_sec="606.4392">
+<ns0:search_result>
+<ns0:search_hit peptide="KMPQYQK" massdiff="6.7138671875E-4" calc_neutral_pep_mass="937.4691" peptide_next_aa="E" num_missed_cleavages="1" num_tol_term="2" protein_descr="Syntaxin-binding protein 1 OS=Homo sapiens OX=9606 GN=STXBP1 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="4" protein="sp|P61764|STXB1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Syntaxin-binding protein 2 OS=Homo sapiens OX=9606 GN=STXBP2 PE=1 SV=2" protein="sp|Q15833|STXB2_HUMAN" peptide_prev_aa="K" peptide_next_aa="E" num_tol_term="2" />
+<ns0:modification_info modified_peptide="KM[147]PQYQK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="8.761" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.530207e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2347" uncalibrated_precursor_neutral_mass="830.4145" assumed_charge="2" spectrum="HSA.2347.2347.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2347" end_scan="2347" index="137" precursor_neutral_mass="830.41425" retention_time_sec="607.3698">
+<ns0:search_result>
+<ns0:search_hit peptide="RNWGNGK" massdiff="-4.8828125E-4" calc_neutral_pep_mass="830.41473" peptide_next_aa="R" num_missed_cleavages="1" num_tol_term="2" protein_descr="Ganglioside-induced differentiation-associated protein 1 OS=Homo sapiens OX=9606 GN=GDAP1 PE=1 SV=3" num_tot_proteins="1" tot_num_ions="12" hit_rank="1" num_matched_ions="7" protein="sp|Q8TB36|GDAP1_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:search_score name="hyperscore" value="13.86" />
+<ns0:search_score name="nextscore" value="12.037" />
+<ns0:search_score name="expect" value="1.976076e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2366" uncalibrated_precursor_neutral_mass="1008.5287" assumed_charge="2" spectrum="HSA.2366.2366.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2366" end_scan="2366" index="138" precursor_neutral_mass="1008.52704" retention_time_sec="612.2634">
+<ns0:search_result>
+<ns0:search_hit peptide="KLSSAMSAAK" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="1008.52734" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="Malate dehydrogenase, cytoplasmic OS=Homo sapiens OX=9606 GN=MDH1 PE=1 SV=4" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="13" protein="sp|P40925|MDHC_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="KLSSAM[147]SAAK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="6" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="26.547" />
+<ns0:search_score name="nextscore" value="12.266" />
+<ns0:search_score name="expect" value="1.529038e-05" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2367" uncalibrated_precursor_neutral_mass="1674.844" assumed_charge="3" spectrum="HSA.2367.2367.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2367" end_scan="2367" index="139" precursor_neutral_mass="1674.8406" retention_time_sec="612.4155">
+<ns0:search_result>
+<ns0:search_hit peptide="AAGGCGLAFPPGPGPPPR" massdiff="0.0106201171875" calc_neutral_pep_mass="1674.83" peptide_next_aa="P" num_missed_cleavages="0" num_tol_term="2" protein_descr="Homeobox protein HMX1 OS=Homo sapiens OX=9606 GN=HMX1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="34" hit_rank="1" num_matched_ions="4" protein="rev_sp|Q9NP08|HMX1_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="AAGGCGLAFPPGPGPPPR">
+<ns0:mod_aminoacid_mass mass="160.03065" position="5" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.468" />
+<ns0:search_score name="nextscore" value="10.452" />
+<ns0:search_score name="expect" value="1.811340e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2371" uncalibrated_precursor_neutral_mass="807.381" assumed_charge="2" spectrum="HSA.2371.2371.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2371" end_scan="2371" index="140" precursor_neutral_mass="807.3796" retention_time_sec="613.34607">
+<ns0:search_result>
+<ns0:search_hit peptide="AGVEAMSK" massdiff="-6.103515625E-5" calc_neutral_pep_mass="807.37964" peptide_next_aa="S" num_missed_cleavages="0" num_tol_term="2" protein_descr="2,4-dienoyl-CoA reductase [(3E)-enoyl-CoA-producing], mitochondrial OS=Homo sapiens OX=9606 GN=DECR1 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="8" protein="sp|Q16698|DECR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="AGVEAM[147]SK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="6" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="16.043" />
+<ns0:search_score name="nextscore" value="9.924" />
+<ns0:search_score name="expect" value="8.010502e-03" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2373" uncalibrated_precursor_neutral_mass="1674.8441" assumed_charge="4" spectrum="HSA.2373.2373.4" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2373" end_scan="2373" index="141" precursor_neutral_mass="1674.841" retention_time_sec="613.7412">
+<ns0:search_result>
+<ns0:search_hit peptide="GRGSRGQHQAHSLER" massdiff="0.0" calc_neutral_pep_mass="1674.841" peptide_next_aa="V" num_missed_cleavages="2" num_tol_term="2" protein_descr="Myelin proteolipid protein OS=Homo sapiens OX=9606 GN=PLP1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="28" hit_rank="1" num_matched_ions="15" protein="sp|P60201|MYPR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="30.156" />
+<ns0:search_score name="nextscore" value="14.32" />
+<ns0:search_score name="expect" value="4.591843e-08" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2378" uncalibrated_precursor_neutral_mass="871.3364" assumed_charge="2" spectrum="HSA.2378.2378.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2378" end_scan="2378" index="143" precursor_neutral_mass="871.33514" retention_time_sec="614.7474">
+<ns0:search_result>
+<ns0:search_hit peptide="MMMQSGR" massdiff="1.220703125E-4" calc_neutral_pep_mass="871.335" peptide_next_aa="K" num_missed_cleavages="0" num_tol_term="2" protein_descr="ADP/ATP translocase 2 OS=Homo sapiens OX=9606 GN=SLC25A5 PE=1 SV=7" num_tot_proteins="3" tot_num_ions="12" hit_rank="1" num_matched_ions="6" protein="sp|P05141|ADT2_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 1 OS=Homo sapiens OX=9606 GN=SLC25A4 PE=1 SV=4" protein="sp|P12235|ADT1_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:alternative_protein protein_descr="ADP/ATP translocase 3 OS=Homo sapiens OX=9606 GN=SLC25A6 PE=1 SV=4" protein="sp|P12236|ADT3_HUMAN" peptide_prev_aa="R" peptide_next_aa="K" num_tol_term="2" />
+<ns0:modification_info modified_peptide="M[147]M[147]MQSGR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="13.274" />
+<ns0:search_score name="nextscore" value="9.051" />
+<ns0:search_score name="expect" value="2.025349e-01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2386" uncalibrated_precursor_neutral_mass="937.47095" assumed_charge="2" spectrum="HSA.2386.2386.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2386" end_scan="2386" index="144" precursor_neutral_mass="937.46924" retention_time_sec="616.7495">
+<ns0:search_result>
+<ns0:search_hit peptide="KMPQYQK" massdiff="1.220703125E-4" calc_neutral_pep_mass="937.4691" peptide_next_aa="E" num_missed_cleavages="1" num_tol_term="2" protein_descr="Syntaxin-binding protein 1 OS=Homo sapiens OX=9606 GN=STXBP1 PE=1 SV=1" num_tot_proteins="2" tot_num_ions="12" hit_rank="1" num_matched_ions="8" protein="sp|P61764|STXB1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:alternative_protein protein_descr="Syntaxin-binding protein 2 OS=Homo sapiens OX=9606 GN=STXBP2 PE=1 SV=2" protein="sp|Q15833|STXB2_HUMAN" peptide_prev_aa="K" peptide_next_aa="E" num_tol_term="2" />
+<ns0:modification_info modified_peptide="KM[147]PQYQK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="16.055" />
+<ns0:search_score name="nextscore" value="9.954" />
+<ns0:search_score name="expect" value="1.463994e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2393" uncalibrated_precursor_neutral_mass="984.5732" assumed_charge="2" spectrum="HSA.2393.2393.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2393" end_scan="2393" index="146" precursor_neutral_mass="984.5716" retention_time_sec="618.29095">
+<ns0:search_result>
+<ns0:search_hit peptide="MSIRIPPR" massdiff="0.01776123046875" calc_neutral_pep_mass="984.55383" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="PRAME family member 11 OS=Homo sapiens OX=9606 GN=PRAMEF11 PE=2 SV=5" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="4" protein="sp|O60813|PRA11_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="M[147]SIRIPPR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="10.351" />
+<ns0:search_score name="nextscore" value="10.015" />
+<ns0:search_score name="expect" value="1.000381e+01" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2398" uncalibrated_precursor_neutral_mass="1051.4435" assumed_charge="2" spectrum="HSA.2398.2398.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2398" end_scan="2398" index="147" precursor_neutral_mass="1051.4414" retention_time_sec="619.4891">
+<ns0:search_result>
+<ns0:search_hit peptide="MKQQMQDQ" massdiff="-0.001220703125" calc_neutral_pep_mass="1051.4426" peptide_next_aa="-" num_missed_cleavages="1" num_tol_term="2" protein_descr="Septin-5 OS=Homo sapiens OX=9606 GN=SEPTIN5 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="14" hit_rank="1" num_matched_ions="7" protein="sp|Q99719|SEPT5_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="M[147]KQQMQDQ">
+<ns0:mod_aminoacid_mass mass="147.03542" position="1" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="12.884" />
+<ns0:search_score name="nextscore" value="8.296" />
+<ns0:search_score name="expect" value="2.535129e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2400" uncalibrated_precursor_neutral_mass="1057.4641" assumed_charge="2" spectrum="HSA.2400.2400.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2400" end_scan="2400" index="148" precursor_neutral_mass="1057.462" retention_time_sec="619.8842">
+<ns0:search_result>
+<ns0:search_hit peptide="KMGGEEFSR" massdiff="1.9915771484375" calc_neutral_pep_mass="1055.4705" peptide_next_aa="R" num_missed_cleavages="1" num_tol_term="2" protein_descr="Atlastin-1 OS=Homo sapiens OX=9606 GN=ATL1 PE=1 SV=1" num_tot_proteins="1" tot_num_ions="16" hit_rank="1" num_matched_ions="4" protein="sp|Q8WXF7|ATLA1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:modification_info modified_peptide="KM[147]GGEEFSR">
+<ns0:mod_aminoacid_mass mass="147.03542" position="2" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="9.67" />
+<ns0:search_score name="nextscore" value="0.0" />
+<ns0:search_score name="expect" value="1.612501e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2402" uncalibrated_precursor_neutral_mass="1208.6396" assumed_charge="3" spectrum="HSA.2402.2402.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2402" end_scan="2402" index="149" precursor_neutral_mass="1208.6381" retention_time_sec="620.2794">
+<ns0:search_result>
+<ns0:search_hit peptide="TVEKLFEQSK" massdiff="0.9932861328125" calc_neutral_pep_mass="1207.6448" peptide_next_aa="L" num_missed_cleavages="1" num_tol_term="2" protein_descr="Spermatogenesis-associated protein 1 OS=Homo sapiens OX=9606 GN=SPATA1 PE=2 SV=4" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="5" protein="sp|Q5VX52|SPAT1_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="10.082" />
+<ns0:search_score name="nextscore" value="10.013" />
+<ns0:search_score name="expect" value="5.573695e+00" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2405" uncalibrated_precursor_neutral_mass="1314.614" assumed_charge="3" spectrum="HSA.2405.2405.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2405" end_scan="2405" index="150" precursor_neutral_mass="1314.6147" retention_time_sec="620.94226">
+<ns0:search_result>
+<ns0:search_hit peptide="HKETGNHYAMK" massdiff="9.765625E-4" calc_neutral_pep_mass="1314.6138" peptide_next_aa="I" num_missed_cleavages="1" num_tol_term="2" protein_descr="cAMP-dependent protein kinase catalytic subunit alpha OS=Homo sapiens OX=9606 GN=PRKACA PE=1 SV=2" num_tot_proteins="1" tot_num_ions="20" hit_rank="1" num_matched_ions="10" protein="sp|P17612|KAPCA_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="18.58" />
+<ns0:search_score name="nextscore" value="11.66" />
+<ns0:search_score name="expect" value="1.223101e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2412" uncalibrated_precursor_neutral_mass="1008.52844" assumed_charge="2" spectrum="HSA.2412.2412.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2412" end_scan="2412" index="151" precursor_neutral_mass="1008.52704" retention_time_sec="622.6761">
+<ns0:search_result>
+<ns0:search_hit peptide="KLSSAMSAAK" massdiff="-3.0517578125E-4" calc_neutral_pep_mass="1008.52734" peptide_next_aa="A" num_missed_cleavages="1" num_tol_term="2" protein_descr="Malate dehydrogenase, cytoplasmic OS=Homo sapiens OX=9606 GN=MDH1 PE=1 SV=4" num_tot_proteins="1" tot_num_ions="18" hit_rank="1" num_matched_ions="13" protein="sp|P40925|MDHC_HUMAN" peptide_prev_aa="R" is_rejected="0">
+<ns0:modification_info modified_peptide="KLSSAM[147]SAAK">
+<ns0:mod_aminoacid_mass mass="147.03542" position="6" />
+</ns0:modification_info>
+<ns0:search_score name="hyperscore" value="25.911" />
+<ns0:search_score name="nextscore" value="12.332" />
+<ns0:search_score name="expect" value="2.396044e-04" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+<ns0:spectrum_query start_scan="2414" uncalibrated_precursor_neutral_mass="1674.843" assumed_charge="3" spectrum="HSA.2414.2414.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=2414" end_scan="2414" index="152" precursor_neutral_mass="1674.8408" retention_time_sec="623.0193">
+<ns0:search_result>
+<ns0:search_hit peptide="GRGSRGQHQAHSLER" massdiff="-1.220703125E-4" calc_neutral_pep_mass="1674.841" peptide_next_aa="V" num_missed_cleavages="2" num_tol_term="2" protein_descr="Myelin proteolipid protein OS=Homo sapiens OX=9606 GN=PLP1 PE=1 SV=2" num_tot_proteins="1" tot_num_ions="28" hit_rank="1" num_matched_ions="9" protein="sp|P60201|MYPR_HUMAN" peptide_prev_aa="K" is_rejected="0">
+<ns0:search_score name="hyperscore" value="18.468" />
+<ns0:search_score name="nextscore" value="10.179" />
+<ns0:search_score name="expect" value="1.811340e-02" />
+</ns0:search_hit>
+</ns0:search_result>
+</ns0:spectrum_query>
+</ns0:msms_run_summary>
+</ns0:msms_pipeline_analysis>
