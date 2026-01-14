@@ -1,5 +1,35 @@
-# MSCompress
+# MSCompress Python Library
 
-MScompress is a multi-threaded lossless and lossy compression tool for Mass Spectrometry data. We introduce a novel compressed file format (`.msz`) which enables random-access to the compressed file without a full decompression.
+Python bindings for MSCompress, a high-performance compression library for mass spectrometry data.
 
-We include bindings for Python and NodeJS to utilize our `.msz` format and fast `.mzML` parser in your own applications. You can easily integrate MSCompress into your data processing workflows and take advantage of its efficient parsing and compression algorithms.
+## Features
+
+- 🚀 **High Performance**: Multi-threaded compression/decompression with state-of-the-art speeds
+- 📦 **MSZ Format**: Novel compressed format with random-access capabilities
+- 🔄 **Lossless & Lossy**: Support for both lossless and lossy compression modes
+- 🐍 **Pythonic API**: Clean, intuitive interface with NumPy integration
+- 🎯 **Direct Data Access**: Extract spectra, m/z arrays, and intensity data without full decompression
+
+## Installation
+
+### From PyPI
+
+```bash
+pip install mscompress
+```
+
+### From Source
+
+**Prerequisites:**
+- Python ≥ 3.9
+- NumPy
+- Cython
+- C compiler (GCC, Clang, or MSVC)
+
+**Build and install:**
+
+```bash
+git clone --recurse-submodules https://github.com/chrisagrams/mscompress.git
+cd mscompress/python
+pip install -e .
+```
