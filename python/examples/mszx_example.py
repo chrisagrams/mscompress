@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Create a new MSZX with extracted scans
     mszx_subset = mszx.extract(
-        output='/tmp/extracted.mszx',
+        output='../test/data/test.mszx',
         scan_numbers=annotated_scan_nums
     )
 

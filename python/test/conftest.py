@@ -12,3 +12,7 @@ def msz_file_path():
 @pytest.fixture
 def test_data_dir():
     return "test/data/"
+
+@pytest.fixture
+def mszx_file_path():
+    return "test/data/mszx/test.mszx"

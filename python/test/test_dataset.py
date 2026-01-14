@@ -1,6 +1,7 @@
 import pytest
 import torch
 from mscompress.datasets.torch import MSCompressDataset
+from mscompress.types import AnnotationFormat
 
 def test_mscompress_dataset_single_file(msz_file_path):
     dataset = MSCompressDataset(msz_file_path)
@@ -37,3 +38,25 @@ def test_mscompress_dataset_directory(test_data_dir):
     sample_1_repeat = dataset[50] # Will be index 0 from second file.
     assert torch.equal(sample_1[0], sample_1_repeat[0])
     assert torch.equal(sample_1[1], sample_1_repeat[1])
+
+
+def test_mscompress_dataset_w_annotations(mszx_file_path):
+    dataset = MSCompressDataset(
+        mszx_file_path,
+        load_annotations=[AnnotationFormat.PEPXML]
+    )
+    assert len(dataset.members) > 0
+    total_spectra = sum(len(member) for member in dataset.members.values())
+    assert total_spectra > 0
+    assert dataset._total_spectra == total_spectra
+
+    # Check that annotations are accessible
+    for member_name, member in dataset.members.items():
+        for i in range(len(member)):
+            sample = member[i]
+            assert isinstance(sample, tuple)
+            assert len(sample) == 3
+            mz, intensity, psm = sample
+            assert mz.ndim == 1
+            assert intensity.ndim == 1
+            assert psm is not None
