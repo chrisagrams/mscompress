@@ -5,6 +5,7 @@ import os
 import numpy as np
 import warnings
 import tempfile
+import ctypes
 cimport numpy as np
 from typing import Union
 from os import PathLike
@@ -18,6 +19,8 @@ import re
 
 np.import_array()
 
+# Create a numpy dtype that matches C long (32-bit on Windows, typically 64-bit on Linux/Mac)
+_c_long_dtype = np.dtype(np.int32 if ctypes.sizeof(ctypes.c_long) == 4 else np.int64)
 include "_headers.pxi"
 
 # Global error/warning handler for Python
@@ -319,7 +322,7 @@ cdef class MZMLFile(BaseFile):
         cdef uint32_t* c_scans = NULL
         cdef long scans_length = 0
         cdef uint16_t c_ms_level = 0
-        cdef np.ndarray[np.int64_t, ndim=1] indicies_arr
+        cdef np.ndarray indicies_arr
         cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
 
         output = Path(output).resolve()
@@ -350,8 +353,9 @@ cdef class MZMLFile(BaseFile):
 
         elif output_ext == '.mzml':
              # Convert Python lists to C arrays
+            # Use _c_long_dtype to match C long type (32-bit on Windows, 64-bit on Linux)
             if indicies is not None:
-                indicies_arr = np.array(indicies, dtype=np.int64)
+                indicies_arr = np.array(indicies, dtype=_c_long_dtype)
                 c_indicies = <long*>indicies_arr.data
                 indicies_length = len(indicies)
             
@@ -563,7 +567,7 @@ cdef class MSZFile(BaseFile):
         cdef uint32_t* c_scans = NULL
         cdef long scans_length = 0
         cdef uint16_t c_ms_level = 0
-        cdef np.ndarray[np.int64_t, ndim=1] indicies_arr
+        cdef np.ndarray indicies_arr
         cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
         
         # Determine if output will be mzML or MSZ based on file extension
@@ -597,8 +601,9 @@ cdef class MSZFile(BaseFile):
         
         elif output_ext == '.mzml':
             # Convert Python lists to C arrays
+            # Use _c_long_dtype to match C long type (32-bit on Windows, 64-bit on Linux)
             if indicies is not None:
-                indicies_arr = np.array(indicies, dtype=np.int64)
+                indicies_arr = np.array(indicies, dtype=_c_long_dtype)
                 c_indicies = <long*>indicies_arr.data
                 indicies_length = len(indicies)
             
@@ -822,16 +827,26 @@ cdef class BaseFile:
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
+        # Initialize pointers to NULL to prevent undefined behavior
+        self._df = NULL
+        self._divisions = NULL
+        self._positions = NULL
 
 
     def __enter__(self):
-        self.filesize = _get_filesize(self._path)
-        self._fd = _open_input_file(self._path)
-        self._mapping = _get_mapping(self._fd)
+        # Only open if not already open (e.g., from __init__)
+        if self._fd <= 0 or self._mapping == NULL:
+            self.filesize = _get_filesize(self._path)
+            self._fd = _open_input_file(self._path)
+            self._mapping = _get_mapping(self._fd)
         return self
     
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self._cleanup()
+    
+    def __del__(self):
+        # Ensure file handles are released when object is garbage collected
         self._cleanup()
     
     def __reduce__(self):
@@ -844,14 +859,18 @@ cdef class BaseFile:
         return BaseFile(path)
 
     def _cleanup(self):
-        if self._fd is not None and self._fd > 0:
-            _close_file(self._fd)
-
+        # On Windows, unmap must happen before closing the file descriptor
         if self._mapping != NULL: 
             _remove_mapping(self._mapping, self.filesize)
+            self._mapping = NULL
+        
+        if self._fd > 0:
+            _close_file(self._fd)
+            self._fd = -1
 
-        if self.output_fd is not None and self.output_fd > 0:
+        if self.output_fd > 0:
             _close_file(self.output_fd)
+            self.output_fd = -1
     
 
     @property
@@ -936,28 +955,48 @@ cdef class BaseFile:
         cdef char* header_data = NULL
         cdef size_t header_len = 0
         cdef division_t* first_division = NULL
+        cdef bint use_positions = False
+        cdef bytes header_bytes
+        
+        # Validate mapping is available
+        if self._mapping == NULL:
+            raise RuntimeError("File mapping is not available. File may be closed.")
         
         try:
-            if self._divisions == NULL or self._divisions.n_divisions == 0:
+            # Check if we should use _positions (MZMLFile) or _divisions (MSZFile)
+            if self._divisions == NULL:
+                use_positions = True
+            elif self._divisions.n_divisions == 0:
+                use_positions = True
+            
+            if use_positions:
                 # For MZMLFile, use _positions and mapping directly
-                if self._positions != NULL:
-                    first_division = self._positions
-                    header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
-                else:
-                    raise RuntimeError("Failed to access division information.")
+                if self._positions == NULL:
+                    raise RuntimeError("Failed to access division information (_positions is NULL).")
+                first_division = self._positions
             else:
                 # For MSZFile, use first division from divisions array
+                if self._divisions.divisions == NULL:
+                    raise RuntimeError("Failed to access divisions array.")
                 first_division = self._divisions.divisions[0]
-                header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
             
             if first_division == NULL:
-                raise RuntimeError("Failed to access first division.")
+                raise RuntimeError("Failed to access first division (first_division is NULL).")
+            
+            # Validate first_division has required fields
+            if first_division.spectra == NULL:
+                raise RuntimeError("first_division.spectra is NULL")
+            if first_division.xml == NULL:
+                raise RuntimeError("first_division.xml is NULL")
+            
+            header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
             
             if header_data == NULL:
                 raise RuntimeError("Failed to extract mzML header.")
             
-            # Convert to Python string
-            header_str = header_data[:header_len].decode('utf-8', errors='replace')
+            # Convert to Python bytes then string
+            header_bytes = header_data[:header_len]
+            header_str = header_bytes.decode('utf-8', errors='replace')
             
             return header_str
         

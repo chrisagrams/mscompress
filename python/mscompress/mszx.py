@@ -658,39 +658,43 @@ class MSZXFile:
             
             extracted_msz = MSZFile(str(temp_msz_path).encode('utf-8'))
             
-            # Create new MSZX archive
-            builder = MSZXBuilder(extracted_msz, compression=True)
-            builder.set_description(self.manifest.description or "")
-            
-            # Copy extra metadata
-            for k, v in self.manifest.extra.items():
-                builder.set_extra(k, v)
+            try:
+                # Create new MSZX archive
+                builder = MSZXBuilder(extracted_msz, compression=True)
+                builder.set_description(self.manifest.description or "")
                 
-            # Filter and add annotations
-            for filename, reader in self._annotations.items():
-                # Create temp file for filtered annotation
-                fname_path = Path(filename)
-                if fname_path.suffix.lower() == '.zst':
-                    temp_filename = fname_path.stem
-                else:
-                    temp_filename = filename
+                # Copy extra metadata
+                for k, v in self.manifest.extra.items():
+                    builder.set_extra(k, v)
                     
-                temp_ann_path = temp_path / temp_filename
-                
-                # Check directly if supported
-                try:
-                    reader.filter_to_file(temp_ann_path, target_scans)
+                # Filter and add annotations
+                for filename, reader in self._annotations.items():
+                    # Create temp file for filtered annotation
+                    fname_path = Path(filename)
+                    if fname_path.suffix.lower() == '.zst':
+                        temp_filename = fname_path.stem
+                    else:
+                        temp_filename = filename
+                        
+                    temp_ann_path = temp_path / temp_filename
                     
-                    # Add to builder
-                    # Create a new reader for the filtered file
-                    new_reader = PSMReader(temp_ann_path)
-                    builder.add_annotations(new_reader)
-                    
-                except Exception as e:
-                        warnings.warn(f"Failed to filter annotation {filename}: {e}")
-    
-            # Save final archive
-            builder.save(output_path)
+                    # Check directly if supported
+                    try:
+                        reader.filter_to_file(temp_ann_path, target_scans)
+                        
+                        # Add to builder
+                        # Create a new reader for the filtered file
+                        new_reader = PSMReader(temp_ann_path)
+                        builder.add_annotations(new_reader)
+                        
+                    except Exception as e:
+                            warnings.warn(f"Failed to filter annotation {filename}: {e}")
+        
+                # Save final archive
+                builder.save(output_path)
+            finally:
+                # Ensure extracted_msz is closed before temp directory cleanup (important on Windows)
+                extracted_msz._cleanup()
             
             # Return new instance
             return MSZXFile.open(output_path)
