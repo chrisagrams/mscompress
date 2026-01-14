@@ -52,7 +52,7 @@ from .psms._base import BasePSMReader
 from .psms.reader import PSMReader
 
 # Specific PSM readers
-from .psms.percolator import PINReader
+from .psms.percolator import TSVReader
 from .psms.pepxml import PepXMLReader
 
 # Annotation file abstraction
@@ -71,7 +71,7 @@ __all__ = [
     # Generic PSM reader
     "PSMReader",
     # Specific PSM readers
-    "PINReader",
+    "TSVReader",
     "PepXMLReader",
     # Annotation file abstraction
     "BaseAnnotationFile",

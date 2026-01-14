@@ -52,7 +52,7 @@ from .mszx import (
 from .annotations import (
     # Search results types
     PSM,
-    PINReader,
+    TSVReader,
     PepXMLReader,
 )
 
@@ -98,7 +98,7 @@ __all__ = [
     "create_mszx",
     # Search results types
     "PSM",
-    "PINReader",
+    "TSVReader",
     "PepXMLReader",
 ]
 

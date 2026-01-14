@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from mscompress.annotations.psms._base import BasePSMReader, BaseAnnotationFile, PathAnnotationFile
-from mscompress.annotations.psms.percolator import PINReader
+from mscompress.annotations.psms.percolator import TSVReader
 from mscompress.annotations.psms.pepxml import PepXMLReader
 
 
@@ -20,6 +20,8 @@ def _detect_format_from_name(name: str) -> Optional[str]:
     
     if name_lower.endswith(".pin"):
         return "pin"
+    elif name_lower.endswith(".tsv"):
+        return "pin" # Use TSVReader for percolator TSV files
     elif name_lower.endswith(".pepxml") or name_lower.endswith(".pep.xml"):
         return "pepxml"
     elif name_lower.endswith(".xml"):
@@ -35,7 +37,7 @@ def _detect_format_from_content(data: bytes) -> Optional[str]:
     
     if "pepXML" in header or "spectrum_query" in header:
         return "pepxml"
-    elif "SpecId" in header or "ScanNr" in header:
+    elif "SpecId" in header or "PSMId" in header or "ScanNr" in header:
         return "pin"
     
     return None
@@ -108,7 +110,7 @@ class PSMReader:
                 format = _detect_format_from_content(data)
 
         if format == "pin":
-            return PINReader(ann_source, **kwargs)
+            return TSVReader(ann_source, **kwargs)
         elif format == "pepxml":
             return PepXMLReader(ann_source, **kwargs)
         else:

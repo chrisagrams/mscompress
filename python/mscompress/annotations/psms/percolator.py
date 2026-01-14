@@ -17,21 +17,18 @@ from mscompress.annotations.psms._types import PSM
 from mscompress.types import AnnotationFormat
 
 
-class PINReader(BasePSMReader):
+class TSVReader(BasePSMReader):
     """
-    Reader for Percolator PIN (input) files.
+    Reader for Percolator TSV/PIN files.
 
-    PIN files are tab-separated with a header row containing column names.
-    Standard columns include: SpecId, Label, ScanNr, Peptide, Proteins
-    Additional columns are features used by Percolator.
-    
     Supports reading from file paths (compressed or uncompressed), 
     tar archive members, or raw bytes via BaseAnnotationFile.
 
     Example:
-        >>> reader = PINReader("results.pin")
+        >>> reader = TSVReader("results.pin")
         >>> for psm in reader:
         ...     print(psm.peptide, psm.score)
+
         >>>
         >>> # Read from tar archive
         >>> import tarfile
@@ -42,7 +39,10 @@ class PINReader(BasePSMReader):
     """
 
     # Regex to parse SpecId format: file.scan.scan.charge
-    SPECID_PATTERN = re.compile(r".*?\.(\d+)\.(\d+)\.(\d+)")
+    # Also handles _rank suffix seen in some outputs (e.g. _1)
+    SPECID_PATTERN = re.compile(r".*?\.(\d+)\.(\d+)\.(\d+)(?:_(\d+))?")
+    # Regex for format PSMId: file.scan.scan.charge_rank
+    PSMID_PATTERN = re.compile(r".*?\.(\d+)\.(\d+)\.(\d+)_(\d+)")
 
     def __init__(
         self,
@@ -79,13 +79,23 @@ class PINReader(BasePSMReader):
         header_line = lines[0].strip()
         if header_line.startswith("SpecId"):
             headers = header_line.split("\t")
+            delimiter = "\t"
+        elif header_line.startswith("PSMId"):
+            headers = header_line.split("\t")
+            delimiter = "\t"
         else:
             # Try to detect delimiter
-            dialect = csv.Sniffer().sniff(text[:4096])
-            headers = header_line.split(dialect.delimiter)
+            try:
+                dialect = csv.Sniffer().sniff(text[:4096])
+                headers = header_line.split(dialect.delimiter)
+                delimiter = dialect.delimiter
+            except csv.Error:
+                # Fallback to tab
+                headers = header_line.split("\t")
+                delimiter = "\t"
 
         # Create reader for remaining lines
-        reader = csv.DictReader(lines[1:], fieldnames=headers, delimiter="\t")
+        reader = csv.DictReader(lines[1:], fieldnames=headers, delimiter=delimiter)
 
         for row in reader:
             psm = self._parse_row(row, headers)
@@ -96,49 +106,91 @@ class PINReader(BasePSMReader):
         """Parse a single row into a PSM."""
         try:
             # Parse SpecId for scan and charge
-            spec_id = row.get("SpecId", "")
+            # Check for standard PIN "SpecId" first, then Percolator TSV "PSMId"
+            spec_id = row.get("SpecId", row.get("PSMId", ""))
+            
+            scan_number = 0
+            charge = 0
+            
+            # Try standard pattern first
             match = self.SPECID_PATTERN.match(spec_id)
             if match:
                 scan_number = int(match.group(1))
                 charge = int(match.group(3))
             else:
-                # Fallback to ScanNr column
-                scan_number = int(row.get("ScanNr", 0))
-                charge = int(row.get("Charge", row.get("charge", 2)))
+                # Fallback to ScanNr column if present
+                if "ScanNr" in row:
+                    scan_number = int(row.get("ScanNr", 0))
+                
+                # Fallback to Charge column if present
+                if "Charge" in row:
+                    charge = int(row["Charge"])
+                elif "charge" in row:
+                    charge = int(row["charge"])
+                else:
+                    charge = 2 # Default fallback
 
             # Get peptide
-            peptide = row.get("Peptide", "")
+            # Standard PIN: Peptide, TSV: peptide
+            peptide = row.get("Peptide", row.get("peptide", ""))
+            
             # Clean up peptide format (remove flanking residues like K.PEPTIDE.R)
-            if "." in peptide:
+            if "." in peptide and len(peptide.split(".")) >= 3:
                 parts = peptide.split(".")
-                if len(parts) >= 3:
-                    peptide = parts[1]
+                # Check if flanking residues are single letters (standard format)
+                if len(parts[0]) <= 1 and len(parts[-1]) <= 1:
+                     peptide = parts[1]
+                # If it matches X.PEPTIDE.X format, take middle. 
+                # Note: Some formats might be deeper, but this is standard.
 
             # Get label (1 = target, -1 = decoy)
-            label = int(row.get("Label", 1))
-            is_decoy = label == -1
+            # Standard PIN: Label
+            label_str = row.get("Label")
+            if label_str is not None:
+                label = int(label_str)
+                is_decoy = label == -1
+            else:
+                is_decoy = False
 
             # Get proteins
-            proteins_str = row.get("Proteins", "")
-            proteins = [p.strip() for p in proteins_str.split(",") if p.strip()]
+            # Standard PIN: Proteins, TSV: proteinIds
+            proteins_str = row.get("Proteins", row.get("proteinIds", ""))
+            if ";" in proteins_str:
+                proteins = [p.strip() for p in proteins_str.split(";") if p.strip()]
+            else:
+                proteins = [p.strip() for p in proteins_str.split(",") if p.strip()]
 
-            # If no proteins found, check for decoy prefix in any column
-            if not proteins and not is_decoy:
-                is_decoy = any(self._decoy_prefix in str(v) for v in row.values())
+            # If no Label column, check decoy prefix
+            if label_str is None:
+                 is_decoy = any(self._decoy_prefix in str(v) for v in row.values())
+                 # Also check protein names
+                 if not is_decoy and proteins:
+                     is_decoy = any(self._decoy_prefix in p for p in proteins)
 
-            # Collect feature scores - use first numeric feature as score
+            # Collect feature scores
             score = 0.0
             extra: Dict[str, Any] = {}
+            
+            # Columns to exclude from extra
+            exclude_cols = {"SpecId", "PSMId", "Label", "ScanNr", "Peptide", "peptide", "Proteins", "proteinIds"}
 
             for h in headers:
-                if h in ("SpecId", "Label", "ScanNr", "Peptide", "Proteins"):
+                if h in exclude_cols:
                     continue
                 val = row.get(h, "")
                 try:
                     num_val = float(val)
                     extra[h] = num_val
-                    if score == 0.0 and h not in ("ExpMass", "CalcMass", "deltCn"):
+                    
+                    # Heuristics for score
+                    # Standard PIN often uses first feature.
+                    # TSV has 'score' column.
+                    if h.lower() == "score":
                         score = num_val
+                    elif score == 0.0 and h not in ("ExpMass", "CalcMass", "deltCn", "q-value", "posterior_error_prob", "ScanNr", "Charge", "charge"):
+                         # Only use first feature if we haven't found a 'score' column yet
+                         # AND it's not a metadata column
+                         score = num_val
                 except ValueError:
                     extra[h] = val
 
@@ -181,11 +233,18 @@ class PINReader(BasePSMReader):
             if header_line.startswith("SpecId"):
                 headers = header_line.split("\t")
                 delimiter = "\t"
+            elif header_line.startswith("PSMId"):
+                headers = header_line.split("\t")
+                delimiter = "\t"
             else:
-                dialect = csv.Sniffer().sniff(text[:4096])
-                headers = header_line.split(dialect.delimiter)
-                delimiter = dialect.delimiter
-
+                try:
+                    dialect = csv.Sniffer().sniff(text[:4096])
+                    headers = header_line.split(dialect.delimiter)
+                    delimiter = dialect.delimiter
+                except csv.Error:
+                     headers = header_line.split("\t")
+                     delimiter = "\t"
+    
             # Write matching rows            
             for line in lines[1:]:
                 row = line.strip().split(delimiter)
@@ -196,7 +255,7 @@ class PINReader(BasePSMReader):
                 
                 # Extract scan number
                 try:
-                    spec_id = row_dict.get("SpecId", "")
+                    spec_id = row_dict.get("SpecId", row_dict.get("PSMId", ""))
                     match = self.SPECID_PATTERN.match(spec_id)
                     if match:
                         scan = int(match.group(1))
