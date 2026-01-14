@@ -125,16 +125,71 @@ class BaseFile:
     
     def describe(self) -> Dict[str, Any]: ...
     
-    def compress(self, output: Union[str, PathLike]) -> None: ...
+    def compress(self, output: Union[str, PathLike]) -> MSZFile: ...
     
-    def decompress(self, output: Union[str, PathLike]) -> None: ...
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile: ...
+
+    def extract(
+            self,
+            output: Union[str, PathLike],
+            indicies: Optional[list[int]] = None,
+            scan_numbers: Optional[list[int]] = None,
+            ms_level: Optional[int] = None
+    ) -> Union[MZMLFile, MSZFile]:
+        """
+        Extract specific spectra from a file to a new mzML or MSZ file.
+
+        Parameters:
+            output: Output file path (string or path-like), must end in .msz or .mzML.
+            indicies: List of spectrum indices to extract (optional).
+            scan_numbers: List of scan numbers to extract (optional).
+            ms_level: MS level to extract (optional).
+        """
+        ...
+
+    
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string.
+        
+        This function extracts the header portion of an mzML file (everything from the start
+        of the file to the first spectrum element).
+        
+        Returns:
+            The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        ...
+    
+    def extract_metadata(self, tag_name: str) -> Element:
+        """
+        Extract and parse a specific XML tag from the mzML file header.
+        
+        This method extracts the header portion of an mzML file, searches for a specific
+        XML tag (e.g., 'referenceableParamGroupList', 'cvList', 'fileDescription'), 
+        strips any content outside of it, and parses that XML element.
+        
+        Parameters:
+            tag_name: The name of the XML tag to extract (without namespace).
+            
+        Returns:
+            An xml.etree.ElementTree.Element containing the parsed XML tag.
+            
+        Raises:
+            ValueError: If the tag is not found in the header.
+            RuntimeError: If header extraction fails.
+            ParseError: If XML parsing fails.
+        """
+        ...
 
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""
     
-    def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
+    def __init__(self, path: bytes) -> None: ...
     
-    def compress(self, output: Union[str, PathLike]) -> None:
+    def compress(self, output: Union[str, PathLike]) -> MSZFile:
         """
         Compress an mzML file to MSZ format.
         
@@ -143,6 +198,17 @@ class MZMLFile(BaseFile):
         """
         ...
     
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> Union[MZMLFile, MSZFile]: ...
+    """
+    Extract specific spectra from an mzML file to a new mzML or MSZ file.
+
+    Parameters:
+        output: Output file path (string or path-like), must end in .msz or .mzML.
+        indicies: List of spectrum indices to extract (optional).
+        scan_numbers: List of scan numbers to extract (optional).
+        ms_level: MS level to extract (optional).
+    """
+
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
         Extract m/z binary array for a spectrum at the given index.
@@ -182,9 +248,9 @@ class MZMLFile(BaseFile):
 class MSZFile(BaseFile):
     """Handler for MSZ (compressed) format files."""
     
-    def __init__(self, path: bytes, filesize: int, fd: int) -> None: ...
+    def __init__(self, path: bytes) -> None: ...
     
-    def decompress(self, output: Union[str, PathLike]) -> None:
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         """
         Decompress an MSZ file to mzML format.
         
@@ -192,6 +258,16 @@ class MSZFile(BaseFile):
             output: Output file path (string or path-like).
         """
         ...
+
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> Union[MZMLFile, MSZFile]: ...
+    """
+    Extract specific spectra from an MSZ file to a new mzML or MSZ file.
+    Parameters:
+        output: Output file path (string or path-like).
+        indicies: List of spectrum indices to extract (optional).
+        scan_numbers: List of scan numbers to extract (optional).
+        ms_level: MS level to extract (optional).
+    """
     
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
@@ -298,23 +374,6 @@ class Spectra:
     def __getitem__(self, index: int) -> Spectrum: ...
     
     def __len__(self) -> int: ...
-
-def read(path: Union[str, PathLike]) -> Union[MZMLFile, MSZFile]:
-    """
-    Opens and parses mzML or MSZ file.
-    
-    Parameters:
-        path: Path to file (string or path-like).
-        
-    Returns:
-        MZMLFile or MSZFile object depending on file type.
-        
-    Raises:
-        FileNotFoundError: If file does not exist.
-        IsADirectoryError: If path points to a directory.
-        OSError: If file type cannot be determined.
-    """
-    ...
 
 def get_num_threads() -> int:
     """
