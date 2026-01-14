@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 from xml.etree import ElementTree as ET
 
 from mscompress.annotations._base import BaseAnnotationFile
@@ -254,3 +254,50 @@ class PepXMLReader(BasePSMReader):
 
         except (ValueError, KeyError):
             return None
+
+    def filter_to_file(self, output_path: Union[str, Path], scan_numbers: Set[int]) -> None:
+        """
+        Write a subset of PSMs matching the given scan numbers to a new file.
+
+        Args:
+            output_path: Path to the output file.
+            scan_numbers: Set of scan numbers to include.
+        """
+        # Get decompressed data from source
+        data = self._source.read()
+        
+        # Use iterparse of XML data
+        context = ET.iterparse(io.BytesIO(data), events=("start", "end"))
+        context = iter(context)
+        event, root = next(context) # get root element
+        
+        with open(output_path, 'wb') as f:
+            # Parse the whole tree to handle filtering
+            tree = ET.parse(io.BytesIO(data))
+            root = tree.getroot()
+            
+            # Helper to check scan number
+            def get_scan(elem):
+                spectrum = elem.get("spectrum", "")
+                scan_match = re.search(r"\.(\d+)\.", spectrum)
+                if scan_match:
+                    return int(scan_match.group(1))
+                return int(elem.get("start_scan", 0))
+
+            def strip_ns(tag):
+                return tag.split("}")[-1] if "}" in tag else tag
+                
+            # Iterate over parents that can contain spectrum_query (usually msms_run_summary)
+            for parent in root.iter():
+                # Find children to remove
+                to_remove = []
+                for child in parent:
+                    if strip_ns(child.tag) == "spectrum_query":
+                        scan = get_scan(child)
+                        if scan not in scan_numbers:
+                            to_remove.append(child)
+                
+                for child in to_remove:
+                    parent.remove(child)
+            
+            tree.write(f, encoding='UTF-8', xml_declaration=True)

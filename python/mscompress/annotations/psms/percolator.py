@@ -9,7 +9,7 @@ from __future__ import annotations
 import csv
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from mscompress.annotations._base import BaseAnnotationFile
 from mscompress.annotations.psms._base import BasePSMReader
@@ -155,3 +155,55 @@ class PINReader(BasePSMReader):
         except (ValueError, KeyError):
             # Skip malformed rows
             return None
+
+    def filter_to_file(self, output_path: Union[str, Path], scan_numbers: Set[int]) -> None:
+        """
+        Write a subset of PSMs matching the given scan numbers to a new file.
+
+        Args:
+            output_path: Path to the output file.
+            scan_numbers: Set of scan numbers to include.
+        """
+        # Get decompressed data from source
+        data = self._source.read()
+        text = data.decode("utf-8")
+        
+        lines = text.splitlines()
+        if not lines:
+            return
+            
+        with open(output_path, 'w', newline='') as f:
+            # Write header
+            f.write(lines[0] + '\n')
+            
+            # Identify scan number logic (similar to _parse_row)
+            header_line = lines[0].strip()
+            if header_line.startswith("SpecId"):
+                headers = header_line.split("\t")
+                delimiter = "\t"
+            else:
+                dialect = csv.Sniffer().sniff(text[:4096])
+                headers = header_line.split(dialect.delimiter)
+                delimiter = dialect.delimiter
+
+            # Write matching rows            
+            for line in lines[1:]:
+                row = line.strip().split(delimiter)
+                if len(row) != len(headers):
+                    continue
+                    
+                row_dict = dict(zip(headers, row))
+                
+                # Extract scan number
+                try:
+                    spec_id = row_dict.get("SpecId", "")
+                    match = self.SPECID_PATTERN.match(spec_id)
+                    if match:
+                        scan = int(match.group(1))
+                    else:
+                        scan = int(row_dict.get("ScanNr", 0))
+                    
+                    if scan in scan_numbers:
+                        f.write(line + '\n')
+                except (ValueError, IndexError):
+                    continue

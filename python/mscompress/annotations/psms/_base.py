@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     TypeVar,
     Union,
     overload,
@@ -110,6 +111,17 @@ class BasePSMReader(ABC):
         Parse the file and populate self._psms.
 
         Must be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def filter_to_file(self, output_path: Union[str, Path], scan_numbers: Set[int]) -> None:
+        """
+        Write a subset of PSMs matching the given scan numbers to a new file.
+
+        Args:
+            output_path: Path to the output file.
+            scan_numbers: Set of scan numbers to include.
         """
         ...
 

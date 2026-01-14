@@ -562,6 +562,139 @@ class MSZXFile:
         """Decompress the MSZ file to mzML format."""
         self.msz.decompress(output)
 
+    def extract(
+        self,
+        output: Union[str, Path],
+        indicies: Optional[List[int]] = None,
+        scan_numbers: Optional[List[int]] = None,
+        ms_level: Optional[int] = None,
+    ) -> MSZXFile:
+        """
+        Extract a subset of spectra and annotations to a new MSZX archive.
+
+        Args:
+            output: Path to the output .mszx file.
+            indicies: List of spectrum indices to extract.
+            scan_numbers: List of scan numbers to extract.
+            ms_level: Filter by MS level.
+
+        Returns:
+            New MSZXFile instance for the created archive.
+        """
+        output_path = Path(output)
+        if not output_path.suffix:
+            output_path = output_path.with_suffix(".mszx")
+
+        # Set containing scans based on filters
+        target_scans: set[int] = set()
+
+        # If scan numbers provided, populate target_scans
+        if scan_numbers:
+            target_scans.update(scan_numbers)
+        
+        # If indices provided, map to scan numbers
+        if indicies:
+            all_scans = self.msz.positions.scans
+            for idx in indicies:
+                if 0 <= idx < len(all_scans):
+                    target_scans.add(int(all_scans[idx]))
+
+        # If ms_level provided, filter all spectra
+        if ms_level is not None:
+            all_scans = self.msz.positions.scans
+            all_levels = self.msz.positions.ms_levels
+             
+            for i in range(len(all_scans)):
+                # Check ms_level match
+                if all_levels[i] == ms_level:
+                    # Check if it also matches index/scan constraints if they exist
+                    scan = int(all_scans[i])
+                    is_match = True
+                    
+                    if indicies and i not in indicies:
+                        is_match = False
+                
+                    if scan_numbers and scan not in scan_numbers:
+                        is_match = False
+                        
+                    if is_match:
+                        target_scans.add(scan)
+                        
+
+            # If both indicies and scan_numbers provided, we need to intersect
+            if indicies or scan_numbers:
+                valid_scans_by_level = set()
+                for i in range(len(all_scans)):
+                    if all_levels[i] == ms_level:
+                        valid_scans_by_level.add(int(all_scans[i]))
+                        
+                target_scans.intersection_update(valid_scans_by_level)
+        
+            else:
+                # No indices/scans provided, so we take ALL with matching ms_level
+                for i in range(len(all_scans)):
+                    if all_levels[i] == ms_level:
+                        target_scans.add(int(all_scans[i]))
+
+        # If no filters provided at all, we extract everything
+        if not indicies and not scan_numbers and ms_level is None:
+            all_scans = self.msz.positions.scans
+            target_scans.update([int(s) for s in all_scans])
+
+        # Convert final target list back to list for C function
+        final_scan_list = list(target_scans)
+        final_scan_list.sort() # Sort for deterministic behavior
+
+        # Extract MSZ to temp file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            temp_msz_path = temp_path / "temp.msz"
+            
+            # Use the MSZ extract w/ final scan list
+            self.msz.extract(
+                output=str(temp_msz_path),
+                scan_numbers=final_scan_list
+            )
+            
+            extracted_msz = MSZFile(str(temp_msz_path).encode('utf-8'))
+            
+            # Create new MSZX archive
+            builder = MSZXBuilder(extracted_msz, compression=True)
+            builder.set_description(self.manifest.description or "")
+            
+            # Copy extra metadata
+            for k, v in self.manifest.extra.items():
+                builder.set_extra(k, v)
+                
+            # Filter and add annotations
+            for filename, reader in self._annotations.items():
+                # Create temp file for filtered annotation
+                fname_path = Path(filename)
+                if fname_path.suffix.lower() == '.zst':
+                    temp_filename = fname_path.stem
+                else:
+                    temp_filename = filename
+                    
+                temp_ann_path = temp_path / temp_filename
+                
+                # Check directly if supported
+                try:
+                    reader.filter_to_file(temp_ann_path, target_scans)
+                    
+                    # Add to builder
+                    # Create a new reader for the filtered file
+                    new_reader = PSMReader(temp_ann_path)
+                    builder.add_annotations(new_reader)
+                    
+                except Exception as e:
+                        warnings.warn(f"Failed to filter annotation {filename}: {e}")
+    
+            # Save final archive
+            builder.save(output_path)
+            
+            # Return new instance
+            return MSZXFile.open(output_path)
+
 
 def create_mszx(
     msz: MSZFile,
