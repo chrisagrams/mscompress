@@ -628,6 +628,11 @@ void decompress_msz(char* input_map, size_t input_filesize,
    free(ptid);
 }
 
+/**
+ * @brief Sets the decompression function based on the accession integer.
+ * @param accession An integer representing the compression type.
+ * @return A function pointer to the corresponding decompression function on success. NULL on error.
+ */
 decompression_fun set_decompress_fun(int accession) {
    switch (accession) {
       case _ZSTD_compression_:

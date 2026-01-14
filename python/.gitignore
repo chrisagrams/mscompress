@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+mscompress/_core.c
 
 # Distribution / packaging
 .Python
@@ -75,9 +76,6 @@ target/
 # IPython
 profile_default/
 ipython_config.py
-
-# pyenv
-.python-version
 
 # pipenv
 Pipfile.lock

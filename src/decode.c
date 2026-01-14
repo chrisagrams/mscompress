@@ -247,20 +247,23 @@ void decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len,
    *dest = b64_out_buff;
 }
 
-decode_fun set_decode_fun(int compression_method, int algo, int accession)
 /**
- * @brief Returns appropriate decode function based on mzML file binary
- * compression method.
+ * @brief Sets the decode function based on the compression method, lossy
+ * algorithm, and accession type.
  *
- * @param compression_method Integer representing accession value of binary
- * compression method.
+ * @param compression_method The compression method used (e.g., _zlib_, _no_comp_).
+ * @param algo The lossy algorithm used (e.g., _lossless_, _cast_64_to_32_).
+ * @param accession The accession type (e.g., _32f_).
  *
- * @return A decode_fun_ptr representing a function pointer to appropriate
- * decoding function. Exits program on failure.
+ * @return A pointer to the appropriate decode function, or NULL if an error
+ * occurs.
  */
+decode_fun set_decode_fun(int compression_method, int algo, int accession)
 {
-   if (algo == 0)
+   if (algo == 0) {
       error("set_decode_fun: lossy is 0.\n");
+      return NULL;
+   }
    switch (compression_method) {
       case _zlib_:
          if (algo == _lossless_ ||

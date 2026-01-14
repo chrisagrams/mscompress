@@ -392,16 +392,39 @@ long get_scan(char* spectrum_start) {
    return strtol(ptr, &e, 10);
 }
 
+/**
+ * @brief Extract retention time (in seconds) from spectrum XML block.
+ * @param spectrum_start Pointer to the start of the spectrum XML block.
+ * @return Retention time as a float. Returns 0 on failure.
+ */
 float get_ret_time(char* spectrum_start) {
+   // Find the position of the retention time cvParam
    char* ptr = strstr(spectrum_start, "accession=\"MS:1000016\"") +
                sizeof("accession=\"MS:1000016\"");
+   // Return 0 if not found
    if (ptr == NULL)
       return 0;
+
+   // Move the pointer to the value attribute
    ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
    char* e = strstr(ptr, "\"");
    if (e == NULL)
       return 0;
-   return strtof(ptr, &e);
+
+   // Convert the retention time string to float
+   float retention_time = strtof(ptr, &e);
+
+   // Find the unit of the retention time
+   ptr = strstr(e, "unitAccession=\"") + sizeof("unitAccession=\"") - 1;
+   e = strstr(ptr, "\"");
+   if (e == NULL)
+      return 0;
+
+   // Check if the unit is minutes and convert to seconds if necessary
+   if (strncmp(ptr, "UO:0000031", e - ptr) == 0) {
+      retention_time *= 60.0f;  // Convert minutes to seconds
+   }
+   return retention_time;
 }
 
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
@@ -555,8 +578,10 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
        validate_positions(inten_dp->start_positions, inten_dp->total_spec) ||
        validate_positions(inten_dp->end_positions, inten_dp->total_spec) ||
        validate_positions(xml_dp->start_positions, xml_dp->total_spec) ||
-       validate_positions(xml_dp->end_positions, xml_dp->total_spec))
+       validate_positions(xml_dp->end_positions, xml_dp->total_spec)) {
+      warning("scan_mzml: validate_positions failed.\n");
       return NULL;
+   }
 
    // Create division_t
 
@@ -1167,6 +1192,8 @@ division_t* read_division(void* input_map, long* position) {
    r->scans = read_uint32_arr(input_map, position);
    r->ms_levels = read_uint16_arr(input_map, position);
 
+   r->ret_times = NULL;
+
    return r;
 }
 
@@ -1486,6 +1513,8 @@ int is_valid_input(char* str) {
    int i;
 
    for (i = 0; i < len; i++) {
+      // Allow digits, dash (for ranges), brackets, comma (for separating
+      // ranges), and whitespace Brackets are now optional
       if (!(str[i] >= '0' && str[i] <= '9') && str[i] != '-' && str[i] != '[' &&
           str[i] != ']' && str[i] != ',' && !isspace((unsigned char)str[i])) {
          return 0;
@@ -1498,7 +1527,8 @@ int is_valid_input(char* str) {
 long* string_to_array(char* str, long* size)
 /*
     This function converts a string of numbers into an array of numbers.
-    The function returns the array and sets the size of the array.
+    Supports both bracketed format [0-100,200-300] and non-bracketed format
+   0-100,200-300. The function returns the array and sets the size of the array.
 */
 {
    if (!is_valid_input(str))
@@ -1510,54 +1540,68 @@ long* string_to_array(char* str, long* size)
    long* arr = malloc(max * sizeof(long));
    *size = 0;
 
-   for (i = 0; i < len; i++) {
-      if (str[i] == ' ')
-         continue;  // Skip spaces
+   i = 0;
 
+   // Skip leading whitespace
+   while (i < len && isspace((unsigned char)str[i])) {
+      i++;
+   }
+
+   // Skip opening bracket if present
+   if (i < len && str[i] == '[') {
+      i++;
+   }
+
+   while (i < len) {
+      // Skip whitespace
+      while (i < len && isspace((unsigned char)str[i])) {
+         i++;
+      }
+
+      // Stop if we hit closing bracket or end of string
+      if (i >= len || str[i] == ']') {
+         break;
+      }
+
+      // Skip commas
+      if (str[i] == ',') {
+         i++;
+         continue;
+      }
+
+      // Parse a number or range
       if (str[i] >= '0' && str[i] <= '9') {
-         long num = str[i] - '0';
-         for (j = i + 1; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
-            num = num * 10 + (str[j] - '0');
+         long start = 0;
+         for (j = i; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
+            start = start * 10 + (str[j] - '0');
          }
-         if (*size >= max)
-            error("Too many spectra specified.\n");
-         arr[*size] = num;
-         (*size)++;
-         i = j - 1;
-      } else if (str[i] == '[') {
-         i++;  // Move past the '['
-         while (i < len && str[i] != ']') {
-            if (str[i] == ' ') {  // Skip spaces
-               i++;
-               continue;
-            }
+         i = j;
 
-            long start = 0;
-            for (j = i; j < len && str[j] != '-' && str[j] != ']' &&
-                        str[j] != ',' && str[j] != ' ';
-                 j++) {
-               start = start * 10 + (str[j] - '0');
-            }
-            long end = start;     // Initialize end to start
-            if (str[j] == '-') {  // if there is a range
+         long end = start;  // Initialize end to start
+
+         // Check for range (dash followed by a number)
+         if (i < len && str[i] == '-') {
+            // Look ahead to distinguish between minus sign and range separator
+            // If next char is a digit, it's a range
+            if (i + 1 < len && str[i + 1] >= '0' && str[i + 1] <= '9') {
+               i++;  // Skip the dash
                end = 0;
-               for (j = j + 1;
-                    j < len && str[j] != ']' && str[j] != ',' && str[j] != ' ';
-                    j++) {
+               for (j = i; j < len && str[j] >= '0' && str[j] <= '9'; j++) {
                   end = end * 10 + (str[j] - '0');
                }
-            }
-            for (long num = start; num <= end; num++) {
-               if (*size >= max)
-                  error("Too many spectra specified.\n");
-               arr[*size] = num;
-               (*size)++;
-            }
-            i = j;
-            while (str[i] == ' ' || str[i] == ',') {  // Skip spaces and commas
-               i++;
+               i = j;
             }
          }
+
+         // Add all numbers in the range [start, end]
+         for (long num = start; num <= end; num++) {
+            if (*size >= max)
+               error("Too many spectra specified.\n");
+            arr[*size] = num;
+            (*size)++;
+         }
+      } else {
+         i++;
       }
    }
 
@@ -1620,9 +1664,7 @@ long* map_ms_level_to_index(uint16_t ms_level, division_t* div,
    if (!is_monotonically_increasing(indicies, j))
       error("map_ms_level_to_index: Scans must be monotonically increasing.\n");
 
-   *indices_length = j - 1;
-
-   print("Found %ld spectra with ms level %ld.\n", j, ms_level);
+   *indices_length = j;
 
    return indicies;
 }
@@ -1666,6 +1708,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
    }
 
    *indicies_length = total_len;
+   
    return result;
 }
 
