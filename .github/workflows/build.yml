@@ -169,6 +169,9 @@ jobs:
           # This avoids glob pattern issues and lets pip find the right one
           python -m pip install --find-links=. mscompress
       
+      - name: Install optional dependencies for tests
+        run: python -m pip install torch
+      
       - name: Run pytest
         working-directory: ./python
         run: pytest test -v
