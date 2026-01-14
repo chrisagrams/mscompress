@@ -35,13 +35,6 @@ class PepXMLReader(BasePSMReader):
         >>>
         >>> # Get PSMs for a specific scan
         >>> psms = reader.get_by_scan(1234)
-        >>>
-        >>> # Read from tar archive
-        >>> import tarfile
-        >>> with tarfile.open("archive.tar") as tar:
-        ...     reader = PepXMLReader.from_tar(tar, "results.pepXML")
-        ...     for psm in reader:
-        ...         print(psm.peptide)
     """
 
     # pepXML namespace

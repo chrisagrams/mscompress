@@ -16,3 +16,11 @@ def test_data_dir():
 @pytest.fixture
 def mszx_file_path():
     return "test/data/mszx/test.mszx"
+
+@pytest.fixture
+def pepxml_file_path():
+    return "test/data/pepXML/test.pepXML"
+
+@pytest.fixture
+def percolator_tsv_file_path():
+    return "test/data/percolator/test.tsv"
