@@ -8,7 +8,7 @@ from enum import Enum
 class AnnotationFormat(Enum):
     """Supported annotation formats."""
 
-    PIN = "pin"
+    PERCOLATOR_TSV = "percolator_tsv"
     PEPXML = "pepxml"
     TSV = "tsv"
 

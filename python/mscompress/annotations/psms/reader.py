@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from mscompress.annotations.psms._base import BasePSMReader, BaseAnnotationFile, PathAnnotationFile
+from mscompress.types import AnnotationFormat
 from mscompress.annotations.psms.percolator import TSVReader
 from mscompress.annotations.psms.pepxml import PepXMLReader
 
 
-def _detect_format_from_name(name: str) -> Optional[str]:
+def _detect_format_from_name(name: str) -> Optional[AnnotationFormat]:
     """Detect format from filename/suffix."""
     name_lower = name.lower()
     
@@ -19,26 +20,26 @@ def _detect_format_from_name(name: str) -> Optional[str]:
         name_lower = name_lower[:-4]
     
     if name_lower.endswith(".pin"):
-        return "pin"
+        return AnnotationFormat.PERCOLATOR_TSV
     elif name_lower.endswith(".tsv"):
-        return "pin" # Use TSVReader for percolator TSV files
+        return AnnotationFormat.PERCOLATOR_TSV
     elif name_lower.endswith(".pepxml") or name_lower.endswith(".pep.xml"):
-        return "pepxml"
+        return AnnotationFormat.PEPXML
     elif name_lower.endswith(".xml"):
         return None  # Need to check content
     
     return None
 
 
-def _detect_format_from_content(data: bytes) -> Optional[str]:
+def _detect_format_from_content(data: bytes) -> Optional[AnnotationFormat]:
     """Detect format from file content."""
     # Check first KB for format hints
     header = data[:1024].decode("utf-8", errors="ignore")
     
     if "pepXML" in header or "spectrum_query" in header:
-        return "pepxml"
+        return AnnotationFormat.PEPXML
     elif "SpecId" in header or "PSMId" in header or "ScanNr" in header:
-        return "pin"
+        return AnnotationFormat.PERCOLATOR_TSV
     
     return None
 
@@ -52,25 +53,19 @@ class PSMReader:
     and raw bytes with transparent zstd decompression.
 
     Example:
-        >>> reader = PSMReader("results.pin")
+        >>> reader = PSMReader("results.tsv")
         >>> for psm in reader:
         ...     print(psm.peptide, psm.score)
         >>>
         >>> with PSMReader("results.pepXML") as reader:
         ...     psms = reader.get_by_scan(1234)
         >>>
-        >>> # Read from tar archive
-        >>> import tarfile
-        >>> with tarfile.open("archive.mszx") as tar:
-        ...     reader = PSMReader.from_tar(tar, "results.pin")
-        ...     for psm in reader:
-        ...         print(psm.peptide)
     """
 
     def __new__(
         cls,
         source: Union[str, Path, BaseAnnotationFile],
-        format: Optional[str] = None,
+        format: Optional[AnnotationFormat] = None,
         **kwargs: Any,
     ) -> BasePSMReader:
         """
@@ -109,13 +104,13 @@ class PSMReader:
                 data = ann_source.read()
                 format = _detect_format_from_content(data)
 
-        if format == "pin":
+        if format == AnnotationFormat.PERCOLATOR_TSV:
             return TSVReader(ann_source, **kwargs)
-        elif format == "pepxml":
+        elif format == AnnotationFormat.PEPXML:
             return PepXMLReader(ann_source, **kwargs)
         else:
             name = ann_source.name or "unknown"
             raise ValueError(
                 f"Cannot determine format for {name}. "
-                "Please specify format='pin' or 'pepxml'."
+                "Please specify format='percolator_tsv' or 'pepxml'."
             )

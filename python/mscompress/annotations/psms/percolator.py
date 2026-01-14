@@ -62,7 +62,7 @@ class TSVReader(BasePSMReader):
     @property
     def format(self) -> AnnotationFormat:
         """Return the format identifier."""
-        return AnnotationFormat.PIN
+        return AnnotationFormat.PERCOLATOR_TSV
 
     def _parse(self) -> None:
         """Parse the PIN file."""
