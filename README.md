@@ -1,5 +1,10 @@
 # MScompress
+
 <img src="electron/assets/logos/msc_logo.svg" width=200px>
+
+[![Build and Test](https://github.com/chrisagrams/mscompress/actions/workflows/build.yml/badge.svg?branch=stage)](https://github.com/chrisagrams/mscompress/actions/workflows/build.yml)
+![PyPI - Version](https://img.shields.io/pypi/v/mscompress?logo=python)
+![Docker Image Version](https://img.shields.io/docker/v/chrisagrams/mscompress?logo=docker)
 
 
 MScompress is a multi-threaded lossless and lossy compression tool for Mass Spectrometry data. We introduce a novel compressed file format, *.msz*, which enables random-access to the compressed file without a full decompression.
