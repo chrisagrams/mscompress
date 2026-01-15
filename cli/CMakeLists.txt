@@ -81,3 +81,6 @@ if(WIN32)
 else()
     target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m) # need math library
 endif()
+
+# Add the test subdirectory
+add_subdirectory(test)
