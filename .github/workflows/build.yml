@@ -74,6 +74,16 @@ jobs:
           } elseif (Test-Path "./mscompress.exe") {
             ./mscompress.exe --help
           }
+
+      - name: Run CTest (Unix)
+        if: runner.os != 'Windows'
+        working-directory: ./cli
+        run: ctest --output-on-failure
+
+      - name: Run CTest (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./cli/build
+        run: ctest -C Release --output-on-failure
       
       - name: Upload CLI artifact (Unix)
         if: runner.os != 'Windows'
