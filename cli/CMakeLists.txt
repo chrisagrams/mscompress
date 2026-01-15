@@ -12,6 +12,8 @@ option(ENABLE_DEBUG_SYMBOLS "Enable debugging symbols" OFF)
 # add_compile_options(-fsanitize=address)
 # add_link_options(-fsanitize=address)
 
+option(CODE_COVERAGE "Enable coverage reporting" OFF)
+
 # Set the build type based on the CMAKE_BUILD_TYPE variable
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of build.")
 
@@ -80,6 +82,12 @@ if(WIN32)
     target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
 else()
     target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m) # need math library
+endif()
+
+if(CODE_COVERAGE)
+    message(STATUS "Applying coverage flags to mscompress target")
+    target_compile_options(mscompress PRIVATE --coverage -O0 -g)
+    target_link_options(mscompress PRIVATE --coverage)
 endif()
 
 # Add the test subdirectory
