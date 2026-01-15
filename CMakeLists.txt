@@ -7,6 +7,7 @@ option(BUILD_NODE "Build node library" ON)
 option(BUILD_MODULE "Build python module" ON )
 
 if(BUILD_CLI)
+    enable_testing()
     add_subdirectory(cli)
 endif()
 
