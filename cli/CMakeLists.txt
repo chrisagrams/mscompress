@@ -90,5 +90,9 @@ if(CODE_COVERAGE)
     target_link_options(mscompress PRIVATE --coverage)
 endif()
 
+
+# Enable testing
+enable_testing()
+
 # Add the test subdirectory
 add_subdirectory(test)
