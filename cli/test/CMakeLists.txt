@@ -1,6 +1,6 @@
 # CMake Tests for mscompress CLI
 
-set(TEST_DATA_DIR ${CMAKE_SOURCE_DIR}/python/test/data)
+set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../python/test/data)
 
 # Simple test to run the executable with --version and --help
 add_test(NAME VersionTest COMMAND mscompress --version)
