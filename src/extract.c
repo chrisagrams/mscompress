@@ -13,6 +13,8 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       long j = 0;
 
       char* buff = malloc(division->size);
+      if (buff == NULL)
+         return;
 
       long len = 0;
 
@@ -65,6 +67,7 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       xml_i++;
 
       write_to_file(output_fd, buff, out_len);
+      free(buff);
    }
    return;
 }
@@ -574,6 +577,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
              "encode_binary_block: Failed to encode binary block for spectrum "
              "%d.\n",
              i);
+         dealloc_z_stream(a_args->z);
          free(a_args);
          free(buff);
          free(res_lens);
@@ -584,7 +588,8 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       buff_off += *a_args->dest_len;
    }
 
-   // free(a_args);
+   dealloc_z_stream(a_args->z);
+   free(a_args);
 
    // Update the block structure with the encoded data and its format
    blk->encoded_cache = buff;

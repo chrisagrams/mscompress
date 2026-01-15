@@ -367,11 +367,34 @@ int main(int argc, char* argv[]) {
    }
    print("\nCleaning up...\n");
 
-   // free_ddp(xml_divisions, divisions);
-   // free_ddp(mz_binary_divisions, divisions);
-   // free_ddp(inten_binary_divisions, divisions);
+   if (divisions) {
+      for (int i = 0; i < divisions->n_divisions; i++) {
+         if (divisions->divisions[i]) {
+            division_t* div = divisions->divisions[i];
+            if (div->spectra)
+               dealloc_dp(div->spectra);
+            if (div->xml)
+               dealloc_dp(div->xml);
+            if (div->mz)
+               dealloc_dp(div->mz);
+            if (div->inten)
+               dealloc_dp(div->inten);
+            if (div->scans)
+               free(div->scans);
+            if (div->ms_levels)
+               free(div->ms_levels);
+            if (div->ret_times)
+               free(div->ret_times);
+            free(div);
+         }
+      }
+      if (divisions->divisions)
+         free(divisions->divisions);
+      free(divisions);
+   }
 
-   // dealloc_df(df);
+   if (df)
+      free(df);
 
    remove_mapping(input_map, fds[0]);
 

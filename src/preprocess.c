@@ -439,6 +439,8 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
+   division_t* div = NULL;
+
    spectra_dp = alloc_dp(df->source_total_spec);
    xml_dp = alloc_dp(df->source_total_spec * 2);
    mz_dp = alloc_dp(df->source_total_spec);
@@ -451,6 +453,21 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
    if (xml_dp == NULL || mz_dp == NULL || inten_dp == NULL) {
       warning("scan_mzml: failed to allocate memory.\n");
+      // Need to free whatever was allocated
+      if (spectra_dp)
+         dealloc_dp(spectra_dp);
+      if (xml_dp)
+         dealloc_dp(xml_dp);
+      if (mz_dp)
+         dealloc_dp(mz_dp);
+      if (inten_dp)
+         dealloc_dp(inten_dp);
+      if (scans)
+         free(scans);
+      if (ms_levels)
+         free(ms_levels);
+      if (ret_times)
+         free(ret_times);
       return NULL;
    }
 
@@ -495,31 +512,31 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
       if (flags & SCANNUM) {  // If we want to extract scan numbers
          scans[spec_curr] = get_scan(ptr);
          if (ptr == NULL)
-            return NULL;
+            goto cleanup;
       }
 
       if (flags & MSLEVEL) {  // If we want to extract ms levels
          ms_levels[spec_curr] = get_ms_level(ptr);
          if (ptr == NULL)
-            return NULL;
+            goto cleanup;
       }
 
       if (flags & RETTIME) {  // If we want to extract ret_times
          ret_times[spec_curr] = get_ret_time(ptr);
          if (ptr == NULL)
-            return NULL;
+            goto cleanup;
       }
 
       // Now, get the binaries and set the start and end positions
       ptr = get_binary_start(ptr);
       if (ptr == NULL)
-         return NULL;
+         goto cleanup;
       mz_dp->start_positions[mz_curr] = ptr - input_map;
       xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
       ptr = get_binary_end(ptr);
       if (ptr == NULL)
-         return NULL;
+         goto cleanup;
       mz_dp->end_positions[mz_curr] = ptr - input_map;
       xml_dp->start_positions[xml_curr] = mz_dp->end_positions[mz_curr];
 
@@ -527,13 +544,13 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
       ptr = get_binary_start(ptr);
       if (ptr == NULL)
-         return NULL;
+         goto cleanup;
       inten_dp->start_positions[inten_curr] = ptr - input_map;
       xml_dp->end_positions[xml_curr++] = inten_dp->start_positions[inten_curr];
 
       ptr = get_binary_end(ptr);
       if (ptr == NULL)
-         return NULL;
+         goto cleanup;
       inten_dp->end_positions[inten_curr] = ptr - input_map;
       xml_dp->start_positions[xml_curr] = inten_dp->end_positions[inten_curr];
 
@@ -541,7 +558,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
       ptr = get_spectrum_end(ptr);
       if (ptr == NULL)
-         return NULL;
+         goto cleanup;
 
       spectra_dp->end_positions[spec_curr] = ptr - input_map;
       spec_curr++;
@@ -580,15 +597,15 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
        validate_positions(xml_dp->start_positions, xml_dp->total_spec) ||
        validate_positions(xml_dp->end_positions, xml_dp->total_spec)) {
       warning("scan_mzml: validate_positions failed.\n");
-      return NULL;
+      goto cleanup;
    }
 
    // Create division_t
 
-   division_t* div = (division_t*)malloc(sizeof(division_t));
+   div = (division_t*)malloc(sizeof(division_t));
    if (div == NULL) {
       warning("scan_mzml: failed to allocate division_t.\n");
-      return NULL;
+      goto cleanup;
    }
    div->spectra = spectra_dp;
    div->xml = xml_dp;
@@ -601,6 +618,25 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
    div->ret_times = ret_times;
 
    return div;
+
+cleanup:
+   if (spectra_dp)
+      dealloc_dp(spectra_dp);
+   if (xml_dp)
+      dealloc_dp(xml_dp);
+   if (mz_dp)
+      dealloc_dp(mz_dp);
+   if (inten_dp)
+      dealloc_dp(inten_dp);
+   if (scans)
+      free(scans);
+   if (ms_levels)
+      free(ms_levels);
+   if (ret_times)
+      free(ret_times);
+   if (div)
+      free(div);
+   return NULL;
 }
 
 division_t* extract_one_spectra(division_t* div, long index) {
@@ -1708,7 +1744,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
    }
 
    *indicies_length = total_len;
-   
+
    return result;
 }
 
@@ -1853,6 +1889,23 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
          *blocksize = get_division_size_max(
              *divisions);  // If we have more threads than divisions, we need to
                            // increase the blocksize to the max division size
+      }
+      if (div) {
+         if (div->spectra)
+            dealloc_dp(div->spectra);
+         if (div->xml)
+            dealloc_dp(div->xml);
+         if (div->mz)
+            dealloc_dp(div->mz);
+         if (div->inten)
+            dealloc_dp(div->inten);
+         if (div->scans)
+            free(div->scans);
+         if (div->ms_levels)
+            free(div->ms_levels);
+         if (div->ret_times)
+            free(div->ret_times);
+         free(div);
       }
    }
 

@@ -581,6 +581,8 @@ void* compress_routine(void* args)
       error("compress_routine: Failed to allocate z_stream.\n");
       dealloc_data_block(a_args->tmp);
       free(a_args);
+      if (a_args)
+         free(a_args);
       return NULL;
    }
 
@@ -589,8 +591,13 @@ void* compress_routine(void* args)
    if (cb_args == NULL)
       error("compress_routine: Invalid compress_args_t\n");
 
-   if (cb_args->dp->total_spec == 0)
+   if (cb_args->dp->total_spec == 0) {
+      dealloc_cctx(czstd);
+      dealloc_data_block(a_args->tmp);
+      dealloc_z_stream(a_args->z);
+      free(a_args);
       return NULL;  // No data to compress.
+   }
 
    cmp_blk_queue_t* cmp_buff = alloc_cmp_buff();
    data_block_t* curr_block = alloc_data_block(
@@ -653,6 +660,7 @@ void* compress_routine(void* args)
    dealloc_cctx(czstd);
    dealloc_data_block(a_args->tmp);
    dealloc_z_stream(a_args->z);
+   free(a_args);
 
    cb_args->ret = cmp_buff;
 
@@ -686,6 +694,10 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
           input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
       if (i_args == NULL) {
          error("compress_parallel: Failed to allocate compress_args_t.\n");
+         if (args)
+            free(args);
+         if (ptid)
+            free(ptid);
          return NULL;
       }
       args[i] = i_args;
@@ -732,6 +744,10 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
       divisions_used += threads;
       divisions_left -= threads;
    }
+   if (args)
+      free(args);
+   if (ptid)
+      free(ptid);
    return blk_len_queue;
 }
 

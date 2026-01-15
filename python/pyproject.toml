@@ -21,7 +21,8 @@ dev = [
     "numpy",
     "pytest",
     "pytest-cov",
-    "tomli"
+    "tomli",
+    "memray",
 ]
 
 pytorch = ["torch>=2.0"]

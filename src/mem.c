@@ -5,10 +5,10 @@
 /**
  * @brief Allocates a data_block_t struct with a specified maximum size.
  * @param max_size The maximum size of the data block.
- * @return A pointer to the allocated data_block_t struct on success. NULL on error.
+ * @return A pointer to the allocated data_block_t struct on success. NULL on
+ * error.
  */
-data_block_t* alloc_data_block(size_t max_size)
-{
+data_block_t* alloc_data_block(size_t max_size) {
    if (max_size <= 0) {
       error("alloc_data_block: invalid max_size for data block.\n");
       return NULL;
@@ -39,7 +39,8 @@ data_block_t* alloc_data_block(size_t max_size)
  * @brief Reallocates a `data_block_t` struct to a new size.
  * @param db A pointer to the `data_block_t` struct to be reallocated.
  * @param new_size The new size for the data block.
- * @return A pointer to the reallocated data_block_t struct on success. NULL on error.
+ * @return A pointer to the reallocated data_block_t struct on success. NULL on
+ * error.
  */
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
    if (db == NULL) {
@@ -52,7 +53,8 @@ data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
    }
 
    if (new_size <= db->max_size) {
-      // No need to reallocate if the new size is less than or equal to the current max size
+      // No need to reallocate if the new size is less than or equal to the
+      // current max size
       return db;
    }
 
@@ -73,24 +75,22 @@ data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
  * @param db A pointer to the `data_block_t` struct to be deallocated.
  * @return 0 on success, -1 on error.
  */
-int dealloc_data_block(data_block_t* db)
-{
+int dealloc_data_block(data_block_t* db) {
    if (db) {
       if (db->mem)
          free(db->mem);
       else {
          error("dealloc_data_block: db's mem is NULL\n");
+         free(db);
          return -1;
       }
       free(db);
-   }
-   else {
+   } else {
       error("dealloc_data_block: NULL pointer passed to dealloc_data_block.\n");
       return -1;
    }
    return 0;
 }
-
 
 /**
  * @brief Allocates and populates a `cmp_block_t` struct to store a compressed
@@ -98,10 +98,10 @@ int dealloc_data_block(data_block_t* db)
  * @param mem Contents of compressed block.
  * @param size Length of the compressed block.
  * @param original_size The original size of the data before compression.
- * @return A populated `cmp_block_t` struct with contents of compressed block on success. NULL on error.
+ * @return A populated `cmp_block_t` struct with contents of compressed block on
+ * success. NULL on error.
  */
-cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size)
-{
+cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size) {
    cmp_block_t* r = malloc(sizeof(cmp_block_t));
 
    if (r == NULL) {
