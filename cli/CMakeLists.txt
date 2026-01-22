@@ -50,6 +50,11 @@ if(WIN32)
     NOMINMAX
     _CRT_SECURE_NO_WARNINGS
   )
+else()
+    # Find Threads package for non-Windows systems
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
+
 endif()
 
 target_include_directories(mscompress PUBLIC 
@@ -81,7 +86,7 @@ include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 if(WIN32)
     target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
 else()
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m) # need math library
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads) # need math library and pthreads on Linux/Mac
 endif()
 
 if(CODE_COVERAGE)
