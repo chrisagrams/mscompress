@@ -4,6 +4,99 @@
 
 #include "mscompress.h"
 
+/**
+ * @brief Updates the spectrumList count value in an mzML header.
+ * @param header The header buffer to modify.
+ * @param header_len Current header length.
+ * @param new_count The new spectrum count to set.
+ * @param out_len Pointer to store the updated header length.
+ * @return New header buffer with updated count (caller must free), or NULL on
+ * error.
+ */
+char* update_spectrum_list_count(char* header, size_t header_len,
+                                 long new_count, size_t* out_len) {
+   if (!header || header_len == 0) {
+      return NULL;
+   }
+
+   // Find spectrumList tag
+   char* spectrum_list = strstr(header, "spectrumList");
+   if (!spectrum_list || (spectrum_list - header) >= (long)header_len) {
+      // No spectrumList found, return copy of original
+      char* result = malloc(header_len);
+      if (result) {
+         memcpy(result, header, header_len);
+         *out_len = header_len;
+      }
+      return result;
+   }
+
+   // Find count=" within spectrumList tag (before the closing >)
+   char* tag_end = strstr(spectrum_list, ">");
+   if (!tag_end) {
+      char* result = malloc(header_len);
+      if (result) {
+         memcpy(result, header, header_len);
+         *out_len = header_len;
+      }
+      return result;
+   }
+
+   char* count_attr = strstr(spectrum_list, "count=\"");
+   if (!count_attr || count_attr > tag_end) {
+      // count attribute not found in spectrumList tag
+      char* result = malloc(header_len);
+      if (result) {
+         memcpy(result, header, header_len);
+         *out_len = header_len;
+      }
+      return result;
+   }
+
+   // Move to the start of the count value
+   char* count_value_start = count_attr + 7;  // strlen("count=\"") = 7
+   char* count_value_end = strstr(count_value_start, "\"");
+   if (!count_value_end) {
+      char* result = malloc(header_len);
+      if (result) {
+         memcpy(result, header, header_len);
+         *out_len = header_len;
+      }
+      return result;
+   }
+
+   // Calculate old value length
+   size_t old_value_len = count_value_end - count_value_start;
+
+   // Convert new count to string
+   char new_count_str[32];
+   int new_value_len =
+       snprintf(new_count_str, sizeof(new_count_str), "%ld", new_count);
+
+   // Calculate new header length
+   size_t prefix_len = count_value_start - header;
+   size_t suffix_len = header_len - (count_value_end - header);
+   size_t new_header_len = prefix_len + new_value_len + suffix_len;
+
+   // Allocate new buffer
+   char* result = malloc(new_header_len);
+   if (!result) {
+      return NULL;
+   }
+
+   // Copy prefix (everything before the old count value)
+   memcpy(result, header, prefix_len);
+
+   // Copy new count value
+   memcpy(result + prefix_len, new_count_str, new_value_len);
+
+   // Copy suffix (everything after the old count value)
+   memcpy(result + prefix_len + new_value_len, count_value_end, suffix_len);
+
+   *out_len = new_header_len;
+   return result;
+}
+
 void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
    for (int i = 0; i < divisions->n_divisions; i++) {
       division_t* division = divisions->divisions[i];
@@ -986,8 +1079,19 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_header =
        extract_mzml_header(decmp_xml, curr_division, &header_len);
-   // print("%s\n", mzml_header);
-   write_to_file(output_fd, mzml_header, header_len);
+
+   // Update spectrumList count attribute to match extracted spectra count
+   size_t updated_header_len = 0;
+   char* updated_header = update_spectrum_list_count(
+       mzml_header, header_len, indicies_length, &updated_header_len);
+   if (updated_header) {
+      write_to_file(output_fd, updated_header, updated_header_len);
+      free(updated_header);
+   } else {
+      // Fallback: write original header
+      write_to_file(output_fd, mzml_header, header_len);
+   }
+   free(mzml_header);
 
    // Get spectra
    for (long i = 0; i < indicies_length; i++) {
@@ -1032,9 +1136,18 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
           map_scan_to_index(scans, scans_length, division, 0, &indicies_length);
    }
 
-   // Write header
+   // Write header with updated spectrumList count
    size_t header_len = division->spectra->start_positions[0];
-   write_to_file(output_fd, input_map, header_len);
+   size_t updated_header_len = 0;
+   char* updated_header = update_spectrum_list_count(
+       input_map, header_len, indicies_length, &updated_header_len);
+   if (updated_header) {
+      write_to_file(output_fd, updated_header, updated_header_len);
+      free(updated_header);
+   } else {
+      // Fallback: write original header
+      write_to_file(output_fd, input_map, header_len);
+   }
 
    // Write spectra
    for (long i = 0; i < indicies_length; i++) {
