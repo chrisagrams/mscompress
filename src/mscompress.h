@@ -460,6 +460,9 @@ char* extract_mzml_header(char* blk, division_t* first_division,
 
 char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len);
 
+char* update_spectrum_list_count(char* header, size_t header_len,
+                                 long new_count, size_t* out_len);
+
 /* compress.c */
 typedef struct {
    char* input_map;
