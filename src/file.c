@@ -38,13 +38,13 @@
 /**
  * @brief A memory mapping wrapper. Implements mmap() syscall on POSIX systems
  * and MapViewOfFile on Windows platform.
- * 
+ *
  * @param fd File descriptor to be mapped.
- * 
- * @return `void*` Pointer to the mapped memory region on success. NULL on error.
+ *
+ * @return `void*` Pointer to the mapped memory region on success. NULL on
+ * error.
  */
-void* get_mapping(int fd)
-{
+void* get_mapping(int fd) {
    int status;
 
    struct stat buff;
@@ -84,7 +84,7 @@ void* get_mapping(int fd)
  * @brief Unmaps a memory-mapped region.
  * @param addr Pointer to the mapped memory region.
  * @param length Length of the mapped memory region.
- * 
+ *
  * @return int 0 on success, -1 on error.
  */
 int remove_mapping(void* addr, size_t length) {
@@ -103,11 +103,11 @@ int remove_mapping(void* addr, size_t length) {
    return result;
 }
 
-
 /**
- * @brief Removes a file from the filesystem. Primarily used for cleanup on error.
+ * @brief Removes a file from the filesystem. Primarily used for cleanup on
+ * error.
  * @param path Path to the file to be removed.
- * 
+ *
  * @return int 0 on success, non-zero on error.
  */
 int remove_file(char* path) {
@@ -127,8 +127,9 @@ int remove_file(char* path) {
 /**
  * @brief Gets the filesize of a file at path.
  * @param path Path to the file.
- * 
- * @return size_t Size of the file in bytes. Returns 0 if the path is a directory or an error occurs.
+ *
+ * @return size_t Size of the file in bytes. Returns 0 if the path is a
+ * directory or an error occurs.
  */
 size_t get_filesize(char* path) {
    struct stat fi;
@@ -150,8 +151,9 @@ size_t get_filesize(char* path) {
  * @brief Updates the current position of a file descriptor by increment.
  * @param fd File descriptor whose position is to be updated.
  * @param increment Amount by which to update the file descriptor's position.
- * 
- * @return long Updated position of the file descriptor. Returns 0 if fd is not tracked.
+ *
+ * @return long Updated position of the file descriptor. Returns 0 if fd is not
+ * tracked.
  */
 long update_fd_pos(int fd, long increment) {
    for (int i = 0; i < 3; i++) {
@@ -168,7 +170,7 @@ long update_fd_pos(int fd, long increment) {
  * @param fd File descriptor to write to.
  * @param buff Buffer containing data to write.
  * @param n Number of bytes to write.
- * 
+ *
  * @return size_t Number of bytes actually written.
  */
 size_t write_to_file(int fd, char* buff, size_t n) {
@@ -200,7 +202,7 @@ size_t write_to_file(int fd, char* buff, size_t n) {
  * @param fd File descriptor to read from.
  * @param buff Buffer to store the read data.
  * @param n Number of bytes to read.
- * 
+ *
  * @return size_t Number of bytes actually read.
  */
 size_t read_from_file(int fd, void* buff, size_t n) {
@@ -237,29 +239,21 @@ size_t read_from_file(int fd, void* buff, size_t n) {
 /**
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
- * 
+ *
  * @return long Current offset of the file descriptor.
  */
 long get_offset(int fd) {
-   // long ret = (long)lseek64(fd, 0, SEEK_CUR);
-   // if (ret == -1)
-   // {
-   //   perror("lseek64");
-   //   exit(-1);
-   // }
-   // return ret;
-   for (int i = 0; i < 3; i++) {
-      if (fds[i] == fd)
-         return fd_pos[i];
-   }
-   error("get_offset: invalid fd\n");
-   exit(-1);
+#ifdef _WIN32
+   return _lseeki64(fd, 0, SEEK_CUR);
+#else
+   return lseek(fd, 0, SEEK_CUR);
+#endif
 }
 
 /**
  * @brief Serializes a `data_format_t` struct into a byte buffer.
  * @param df Pointer to the `data_format_t` struct to serialize.
- * 
+ *
  * @return char* Pointer to the serialized byte buffer.
  */
 char* serialize_df(data_format_t* df) {
@@ -299,7 +293,7 @@ char* serialize_df(data_format_t* df) {
 /**
  * @brief Deserializes a byte buffer into a `data_format_t` struct.
  * @param buff Pointer to the byte buffer to deserialize.
- * 
+ *
  * @return data_format_t* Pointer to the deserialized `data_format_t` struct.
  */
 data_format_t* deserialize_df(char* buff) {
@@ -362,12 +356,12 @@ data_format_t* deserialize_df(char* buff) {
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|
  * @param fd File descriptor to write to.
- * @param df Pointer to the `data_format_t` struct containing header information.
+ * @param df Pointer to the `data_format_t` struct containing header
+ * information.
  * @param blocksize Blocksize to write to header.
  * @param md5 MD5 checksum to write to header.
  */
-void write_header(int fd, data_format_t* df, long blocksize, char* md5)
-{
+void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Allocate header_buff
    char header_buff[HEADER_SIZE] = "";
 
@@ -402,8 +396,7 @@ void write_header(int fd, data_format_t* df, long blocksize, char* md5)
  *
  * @return long value representing blocksize.
  */
-long get_header_blocksize(void* input_map)
-{
+long get_header_blocksize(void* input_map) {
    long* r;
    r = (long*)((uint8_t*)input_map + BLOCKSIZE_OFFSET);
    return *r;
@@ -411,9 +404,9 @@ long get_header_blocksize(void* input_map)
 
 /**
  * @brief Gets `data_format_t` struct stored in header.
- * 
+ *
  * @param input_map mmap'ed input file.
- * 
+ *
  * @return data_format_t* Pointer to `data_format_t` struct.
  */
 data_format_t* get_header_df(void* input_map) {
@@ -431,12 +424,10 @@ data_format_t* get_header_df(void* input_map) {
  * @param footer Pointer to `footer_t` struct to write.
  * @param fd File descriptor to write to.
  */
-void write_footer(footer_t* footer, int fd)
-{
+void write_footer(footer_t* footer, int fd) {
    footer->magic_tag = MAGIC_TAG;  // Set magic tag
    write_to_file(fd, (char*)footer, sizeof(footer_t));
 }
-
 
 /**
  * @brief Reads `footer_t` struct from mmap'ed input file.
@@ -444,8 +435,7 @@ void write_footer(footer_t* footer, int fd)
  * @param filesize Size of the input file.
  * @return footer_t* Pointer to `footer_t` struct.
  */
-footer_t* read_footer(void* input_map, long filesize)
-{
+footer_t* read_footer(void* input_map, long filesize) {
    footer_t* footer;
 
    if (filesize <= 0) {
@@ -493,8 +483,7 @@ void print_footer_csv(footer_t* footer) {
  *
  * @return 1 if file is a msz file. 0 otherwise.
  */
-int is_msz(void* input_map, size_t input_length)
-{
+int is_msz(void* input_map, size_t input_length) {
    if (input_length <
        4) {  // If there's less than 4 bytes, it can't match the MAGIC_TAG
       return 0;
@@ -519,8 +508,7 @@ int is_msz(void* input_map, size_t input_length)
  *
  * @return 1 if file is a mzML file. 0 otherwise.
  */
-int is_mzml(void* input_map, size_t input_length)
-{
+int is_mzml(void* input_map, size_t input_length) {
    char buffer[513];  // 512 for data + 1 for null-terminator
    size_t check_length = (input_length > 512) ? 512 : input_length;
 
@@ -538,14 +526,13 @@ int is_mzml(void* input_map, size_t input_length)
  *
  * @param input_map Pointer to the memory-mapped file.
  * @param input_length Length of the memory-mapped file.
- * 
+ *
  * @return COMPRESS (1) if file is a mzML file.
  *         DECOMPRESS (2) if file is a msz file.
  *         EXTERNAL (5) if file is not mzML or msz.
  *         -1 on error.
  */
-int determine_filetype(void* input_map, size_t input_length)
-{
+int determine_filetype(void* input_map, size_t input_length) {
    if (is_mzml(input_map, input_length)) {
       print("\t.mzML file detected.\n");
       return COMPRESS;
@@ -569,8 +556,7 @@ int determine_filetype(void* input_map, size_t input_length)
  *
  * @return Malloc'd char array with new path string.
  */
-char* change_extension(char* input, char* extension)
-{
+char* change_extension(char* input, char* extension) {
    if (input == NULL)
       error("change_extension: input is NULL.\n");
    if (extension == NULL)
@@ -645,8 +631,9 @@ char* strip_or_append_extension(char* input) {
 
 /**
  * @brief Opens output file at path for writing.
- *        Sets correct flags when opening in Windows to avoid newline translation.
- * 
+ *        Sets correct flags when opening in Windows to avoid newline
+ * translation.
+ *
  * @param path Path of output file.
  * @return int File descriptor (integer) on success. Value < 0 on error.
  */
@@ -673,9 +660,9 @@ int open_output_file(char* path) {
 
 /**
  * @brief Closes a file descriptor.
- * 
+ *
  * @param fd File descriptor to close.
- * 
+ *
  * @return int 0 on success, non-zero on error.
  */
 int close_file(int fd) {
@@ -691,9 +678,9 @@ int close_file(int fd) {
 
 /**
  * @brief Flushes a file descriptor's buffers to disk.
- * 
+ *
  * @param fd File descriptor to flush.
- * 
+ *
  * @return int 0 on success, non-zero on error.
  */
 int flush(int fd) {
@@ -721,8 +708,7 @@ int flush(int fd) {
  *
  *  @return File descriptor (integer) on success. Value < 0 on error.
  */
-int open_input_file(char* input_path)
-{
+int open_input_file(char* input_path) {
    int input_fd = -1;
 
    if (input_path) {
@@ -773,8 +759,7 @@ int open_input_file(char* input_path)
  *         -1 on error.
  */
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
-   char** input_map, long* input_filesize, int* fds)
-{
+                char** input_map, long* input_filesize, int* fds) {
    int input_fd;
    int output_fd;
    int type;

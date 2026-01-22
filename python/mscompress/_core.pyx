@@ -4,17 +4,23 @@
 import os 
 import numpy as np
 import warnings
+import tempfile
+import ctypes
 cimport numpy as np
 from typing import Union
 from os import PathLike
+from pathlib import Path
 from xml.etree.ElementTree import fromstring, Element, ParseError
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, const_char
 from libc.math cimport nan
 import math
+import re
 
 np.import_array()
 
+# Create a numpy dtype that matches C long (32-bit on Windows, typically 64-bit on Linux/Mac)
+_c_long_dtype = np.dtype(np.int32 if ctypes.sizeof(ctypes.c_long) == 4 else np.int64)
 include "_headers.pxi"
 
 # Global error/warning handler for Python
@@ -246,55 +252,23 @@ cdef class Division:
             return np.asarray(<float[:shape[0]]>self._division.ret_times)
 
 
-def read(path: Union[str, bytes]) -> Union[MZMLFile, MSZFile]:
-    """
-    Opens and parses mzML or msz file.
-
-    Parameters:
-    path (Union[str, bytes]): Path to file. Can be a string or bytes.
-
-    Returns:
-    Union[MZMLFile, MSZFile]: An MZMLFile or MSZFile class object, depending on file contents.
-    """
-    if not isinstance(path, str) and not isinstance(path, bytes):
-        raise ValueError("Path must be a string or bytes.")
-    
-    if isinstance(path, str):
-        path = path.encode('utf-8')
-    path = os.path.expanduser(path)
-    path = os.path.abspath(path)
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
-    
-    if os.path.isdir(path):
-        raise IsADirectoryError(f"{path} is a directory.")
-    
-    filesize = _get_filesize(path)
-    fd = _open_input_file(path)
-    mapping = _get_mapping(fd)
-    filetype = _determine_filetype(mapping, filesize)
-    if filetype == 1: # mzML
-        ret = MZMLFile(path, filesize, fd)
-    elif filetype == 2: # msz
-        ret = MSZFile(path, filesize, fd)
-    else:
-        raise OSError(f"Error processing file {path}")
-    return ret
-
-
 cdef class MZMLFile(BaseFile):
-    def __init__(self, bytes path, size_t filesize, int fd):
-        super(MZMLFile, self).__init__(path, filesize, fd)
+    def __init__(self, bytes path):
+        super(MZMLFile, self).__init__(path)
+        if self._mapping is NULL:
+             raise RuntimeError("File mapping is NULL. Filesize might be 0.")
         self._df = _pattern_detect(<char*> self._mapping)
+        if self._df is NULL:
+             raise RuntimeError("pattern_detect returned NULL. Failed to detect mzML pattern.")
+        
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
+        if self._positions is NULL:
+             raise RuntimeError("scan_mzml returned NULL. The file might be empty or invalid.")
         _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
 
     @staticmethod
     def _reopen(path: bytes):
-        fs = _get_filesize(path)
-        fd = _open_input_file(path)
-        return MZMLFile(path, fs, fd)
+        return MZMLFile(path)
 
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
@@ -303,6 +277,10 @@ cdef class MZMLFile(BaseFile):
                 f"n_divisions ({n_divisions}) > total_spec ({self._positions.mz.total_spec}). "
                 f"Setting n_divisions to {self._positions.mz.total_spec}"
             )
+            n_divisions = self._positions.mz.total_spec
+            if n_divisions == 0:
+                n_divisions = 1
+            self._divisions = _create_divisions(self._positions, n_divisions)
         elif n_divisions >= self._arguments.threads:
             self._divisions = _create_divisions(self._positions, n_divisions)
         else:
@@ -310,14 +288,107 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
-    def compress(self, output: Union[str, PathLike]):
+    def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)
         self._prepare_divisions()
-        self.output_fd = self._prepare_output_fd(output) 
+        self.output_fd = self._prepare_output_fd(output)
         _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        return MSZFile(output.encode('utf-8'))
+
+    def extract(
+        self,
+        output: Union[str, PathLike],
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None
+    ) -> Union[MZMLFile, MSZFile]:
+        """
+        Extract spectra from an mzML file to mzML format with optional filtering.
+        
+        Args:
+            output: Path to the output file. Must have .mzml extension (or .msz).
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+        
+        Raises:
+            ValueError: If output file extension is not supported.
+        """
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef uint16_t c_ms_level = 0
+        cdef np.ndarray indicies_arr
+        cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
+
+        output = Path(output).resolve()
+        output_ext = output.suffix.lower()
+
+        if output_ext == '.msz':
+            # Output as MSZ (compressed)
+            # Create a temporary mzML file path, extract to it, then compress to MSZ
+            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
+            
+            # Delete output file if it already exists
+            if output.exists():
+                output.unlink()
+            
+            # Extract to temporary mzML file
+            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+            
+            # Compress the temporary mzML to MSZ
+            temp_mzml = None
+            try:
+                temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
+                return temp_mzml.compress(str(output))
+            finally:
+                if temp_mzml is not None:
+                    temp_mzml._cleanup()
+                if temp_mzml_path.exists():
+                    temp_mzml_path.unlink()
+
+        elif output_ext == '.mzml':
+             # Convert Python lists to C arrays
+            # Use _c_long_dtype to match C long type (32-bit on Windows, 64-bit on Linux)
+            if indicies is not None:
+                indicies_arr = np.array(indicies, dtype=_c_long_dtype)
+                c_indicies = <long*>indicies_arr.data
+                indicies_length = len(indicies)
+            
+            if scan_numbers is not None:
+                scans_arr = np.array(scan_numbers, dtype=np.uint32)
+                c_scans = <uint32_t*>scans_arr.data
+                scans_length = len(scan_numbers)
+            
+            if ms_level is not None:
+                c_ms_level = <uint16_t>ms_level
+
+            # Prepare output file
+            self.output_fd = self._prepare_output_fd(str(output))
+
+            _extract_mzml_filtered(
+                <char*>self._mapping,
+                self.filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                self._positions, 
+                self.output_fd
+            )
+
+            # Flush and close output
+            _flush(self.output_fd)
+            _close_file(self.output_fd)
+            self.output_fd = -1
+            return MZMLFile(str(output).encode('utf-8'))
+        else:
+            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
@@ -446,8 +517,8 @@ cdef class MSZFile(BaseFile):
     cdef block_len_queue_t* _mz_binary_block_lens
     cdef block_len_queue_t* _inten_binary_block_lens
 
-    def __init__(self, bytes path, size_t filesize, int fd):
-        super(MSZFile, self).__init__(path, filesize, fd)
+    def __init__(self, bytes path):
+        super(MSZFile, self).__init__(path)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -460,18 +531,113 @@ cdef class MSZFile(BaseFile):
 
     @staticmethod
     def _reopen(path: bytes):
-        fs = _get_filesize(path)
-        fd = _open_input_file(path)
-        return MSZFile(path, fs, fd)
+        return MSZFile(path)
     
-    def decompress(self, output: Union[str, PathLike]):
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
         _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        return MZMLFile(output.encode('utf-8'))
 
+    def extract(
+        self,
+        output: Union[str, PathLike],
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None
+    ) -> Union[MZMLFile, MSZFile]:
+        """
+        Extract spectra from an MSZ file to mzML format with optional filtering.
+        
+        Args:
+            output: Path to the output file. Must have .mzml extension.
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+        
+        Raises:
+            ValueError: If output file extension is not supported.
+            NotImplementedError: If MSZ output format is requested.
+        """
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef uint16_t c_ms_level = 0
+        cdef np.ndarray indicies_arr
+        cdef np.ndarray[np.uint32_t, ndim=1] scans_arr
+        
+        # Determine if output will be mzML or MSZ based on file extension
+        output = Path(output).resolve()  # Convert to absolute path
+        output_ext = output.suffix.lower()
+        
+        if output_ext == '.msz':
+            # Output as MSZ (compressed)
+            # Create a temporary mzML file path, extract to it, then compress to MSZ
+            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
+            
+            # Delete output file if it already exists to avoid stale data
+            if output.exists():
+                output.unlink()
+            
+            # Extract to temporary mzML file
+            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+            
+            # Compress the temporary mzML to MSZ
+            temp_mzml = None
+            try:
+                temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
+                return temp_mzml.compress(str(output))
+            finally:
+                # Clean up MZMLFile's memory mapping before deleting the file
+                if temp_mzml is not None:
+                    temp_mzml._cleanup()
+                # Clean up temporary file
+                if temp_mzml_path.exists():
+                    temp_mzml_path.unlink()
+        
+        elif output_ext == '.mzml':
+            # Convert Python lists to C arrays
+            # Use _c_long_dtype to match C long type (32-bit on Windows, 64-bit on Linux)
+            if indicies is not None:
+                indicies_arr = np.array(indicies, dtype=_c_long_dtype)
+                c_indicies = <long*>indicies_arr.data
+                indicies_length = len(indicies)
+            
+            if scan_numbers is not None:
+                scans_arr = np.array(scan_numbers, dtype=np.uint32)
+                c_scans = <uint32_t*>scans_arr.data
+                scans_length = len(scan_numbers)
+            
+            if ms_level is not None:
+                c_ms_level = <uint16_t>ms_level
+            
+            # Prepare output file
+            self.output_fd = self._prepare_output_fd(str(output))
+            
+            # Call the C extraction function
+            _extract_msz(
+                <char*>self._mapping,
+                self.filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                self.output_fd
+            )
+            
+            # Flush and close output
+            _flush(self.output_fd)
+            _close_file(self.output_fd)
+            self.output_fd = -1
+            return MZMLFile(str(output).encode('utf-8'))
+        else:
+            raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
+        
 
     def get_mz_binary(self, size_t index):
         cdef char* res = NULL
@@ -561,6 +727,62 @@ cdef class MSZFile(BaseFile):
 
         return element
     
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string from MSZ file.
+        
+        This function decompresses the first XML block and extracts the header portion
+        (everything from the start of the file to the first spectrum element).
+        
+        Returns:
+            str: The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        cdef char* header_data = NULL
+        cdef char* decmp_xml = NULL
+        cdef size_t header_len = 0
+        cdef division_t* first_division = NULL
+        cdef block_len_t* xml_blk_len = NULL
+        cdef long xml_blk_offset = 0
+        
+        try:
+            # Get the first division
+            first_division = self._divisions.divisions[0]
+            
+            if first_division == NULL:
+                raise RuntimeError("Failed to access first division.")
+            
+            # Get the first XML block
+            xml_blk_len = _get_block_by_index(self._xml_block_lens, 0)
+            xml_blk_offset = self._footer.xml_pos
+            
+            # Decompress the XML block
+            decmp_xml = <char*>_decmp_block(self._df.xml_decompression_fun, self._dctx, 
+                                             self._mapping, xml_blk_offset, xml_blk_len)
+            
+            if decmp_xml == NULL:
+                raise RuntimeError("Failed to decompress XML block for mzML header.")
+            
+            # Extract the header from decompressed XML
+            header_data = _extract_mzml_header(decmp_xml, first_division, &header_len)
+            
+            if header_data == NULL:
+                raise RuntimeError("Failed to extract mzML header.")
+            
+            # Convert to Python string
+            header_str = header_data[:header_len].decode('utf-8', errors='replace')
+            
+            return header_str
+        
+        finally:
+            # Free the allocated memory
+            if header_data != NULL:
+                free(header_data)
+            if decmp_xml != NULL:
+                free(decmp_xml)
+    
 
 cdef class BaseFile:
     """
@@ -596,25 +818,35 @@ cdef class BaseFile:
     cdef int output_fd
 
 
-    def __init__(self, bytes path, size_t filesize, int fd):
+    def __init__(self, bytes path):
         self._path = path
-        self.filesize = filesize
-        self._fd = fd
+        self.filesize = _get_filesize(self._path)
+        self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
+        # Initialize pointers to NULL to prevent undefined behavior
+        self._df = NULL
+        self._divisions = NULL
+        self._positions = NULL
 
 
     def __enter__(self):
-        self.filesize = _get_filesize(self._path)
-        self._fd = _open_input_file(self._path)
-        self._mapping = _get_mapping(self._fd)
+        # Only open if not already open (e.g., from __init__)
+        if self._fd <= 0 or self._mapping == NULL:
+            self.filesize = _get_filesize(self._path)
+            self._fd = _open_input_file(self._path)
+            self._mapping = _get_mapping(self._fd)
         return self
     
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self._cleanup()
+    
+    def __del__(self):
+        # Ensure file handles are released when object is garbage collected
         self._cleanup()
     
     def __reduce__(self):
@@ -624,17 +856,21 @@ cdef class BaseFile:
     def _reopen(path: bytes):
         fs = _get_filesize(path)
         fd = _open_input_file(path)
-        return BaseFile(path, fs, fd)
+        return BaseFile(path)
 
     def _cleanup(self):
-        if self._fd is not None and self._fd > 0:
-            _close_file(self._fd)
-
+        # On Windows, unmap must happen before closing the file descriptor
         if self._mapping != NULL: 
             _remove_mapping(self._mapping, self.filesize)
+            self._mapping = NULL
+        
+        if self._fd > 0:
+            _close_file(self._fd)
+            self._fd = -1
 
-        if self.output_fd is not None and self.output_fd > 0:
+        if self.output_fd > 0:
             _close_file(self.output_fd)
+            self.output_fd = -1
     
 
     @property
@@ -668,7 +904,15 @@ cdef class BaseFile:
         # Use os.fspath() to handle path-like objects (PEP 519)
         path = os.fspath(path)
         if isinstance(path, str):
+            path = os.path.expanduser(path)
+            path = os.path.abspath(path)
             path = path.encode('utf-8')
+        elif isinstance(path, bytes):
+            # Handle bytes path - decode, expand, encode back
+            path_str = path.decode('utf-8')
+            path_str = os.path.expanduser(path_str)
+            path_str = os.path.abspath(path_str)
+            path = path_str.encode('utf-8')
         cdef int output_fd = _open_output_file(path)
         return output_fd 
 
@@ -694,6 +938,143 @@ cdef class BaseFile:
     
     def decompress(self, output):
         raise NotImplementedError("Cannot decompress this file type.")
+    
+    def get_header(self) -> str:
+        """
+        Extract the complete mzML header as a raw string.
+        
+        This function extracts the header portion of an mzML file (everything from the start
+        of the file to the first spectrum element).
+        
+        Returns:
+            str: The raw XML header string.
+            
+        Raises:
+            RuntimeError: If header extraction fails.
+        """
+        cdef char* header_data = NULL
+        cdef size_t header_len = 0
+        cdef division_t* first_division = NULL
+        cdef bint use_positions = False
+        cdef bytes header_bytes
+        
+        # Validate mapping is available
+        if self._mapping == NULL:
+            raise RuntimeError("File mapping is not available. File may be closed.")
+        
+        try:
+            # Check if we should use _positions (MZMLFile) or _divisions (MSZFile)
+            if self._divisions == NULL:
+                use_positions = True
+            elif self._divisions.n_divisions == 0:
+                use_positions = True
+            
+            if use_positions:
+                # For MZMLFile, use _positions and mapping directly
+                if self._positions == NULL:
+                    raise RuntimeError("Failed to access division information (_positions is NULL).")
+                first_division = self._positions
+            else:
+                # For MSZFile, use first division from divisions array
+                if self._divisions.divisions == NULL:
+                    raise RuntimeError("Failed to access divisions array.")
+                first_division = self._divisions.divisions[0]
+            
+            if first_division == NULL:
+                raise RuntimeError("Failed to access first division (first_division is NULL).")
+            
+            # Validate first_division has required fields
+            if first_division.spectra == NULL:
+                raise RuntimeError("first_division.spectra is NULL")
+            if first_division.xml == NULL:
+                raise RuntimeError("first_division.xml is NULL")
+            
+            header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
+            
+            if header_data == NULL:
+                raise RuntimeError("Failed to extract mzML header.")
+            
+            # Convert to Python bytes then string
+            header_bytes = header_data[:header_len]
+            header_str = header_bytes.decode('utf-8', errors='replace')
+            
+            return header_str
+        
+        finally:
+            # Free the allocated memory
+            if header_data != NULL:
+                free(header_data)
+    
+    def extract_metadata(self, tag_name: str) -> Element:
+        """
+        Extract and parse a specific XML tag from the mzML file header.
+        
+        This method extracts the header portion of an mzML file, searches for a specific
+        XML tag (e.g., 'referenceableParamGroupList', 'cvList', 'fileDescription'), 
+        strips any content outside of it, and parses that XML element.
+        
+        Parameters:
+            tag_name (str): The name of the XML tag to extract (without namespace).
+            
+        Returns:
+            Element: An xml.etree.ElementTree.Element containing the parsed XML tag.
+            
+        Raises:
+            ValueError: If the tag is not found in the header.
+            RuntimeError: If header extraction fails.
+            ParseError: If XML parsing fails.
+            
+        Examples:
+            >>> with mscompress.read('data.mzml') as f:
+            ...     param_groups = f.extract_metadata('referenceableParamGroupList')
+            ...     for group in param_groups:
+            ...         print(group.attrib)
+        """
+        header_str = self.get_header()
+        
+        # Find the tag in the header
+        # We need to handle namespace-aware searching
+        tag_pattern = f'<{tag_name}'
+        tag_start = header_str.find(tag_pattern)
+        
+        if tag_start == -1:
+            raise ValueError(f"Tag '{tag_name}' not found in mzML header.")
+        
+        # Find the closing tag
+        closing_tag = f'</{tag_name}>'
+        tag_end = header_str.find(closing_tag, tag_start)
+        
+        if tag_end == -1:
+            raise ValueError(f"Closing tag for '{tag_name}' not found in mzML header.")
+        
+        # Extract the tag with its closing tag
+        tag_end += len(closing_tag)
+        tag_content = header_str[tag_start:tag_end]
+        
+        # Wrap in a minimal XML document to handle namespaces properly
+        # Extract namespace declarations from the header
+        mzml_start = header_str.find('<mzML')
+        if mzml_start != -1:
+            mzml_tag_end = header_str.find('>', mzml_start)
+            mzml_tag = header_str[mzml_start:mzml_tag_end + 1]
+            
+            # Extract namespace attributes
+            ns_attrs = re.findall(r'xmlns[^=]*="[^"]*"', mzml_tag)
+            ns_declaration = ' '.join(ns_attrs) if ns_attrs else ''
+            
+            # Create a wrapper with proper namespace
+            wrapped_xml = f'<root {ns_declaration}>{tag_content}</root>'
+        else:
+            wrapped_xml = f'<root>{tag_content}</root>'
+        
+        # Parse the XML
+        root = fromstring(wrapped_xml)
+        
+        # Return the first child (the actual tag we want)
+        if len(root) > 0:
+            return root[0]
+        else:
+            raise ValueError(f"Failed to parse '{tag_name}' from header.")
 
 
 cdef class Spectra:
@@ -837,7 +1218,10 @@ cdef class Spectrum:
                     scan = self._xml.find('scanList/scan')
                     for param in scan.findall("cvParam"):
                         if param.attrib['accession'] == 'MS:1000016':
-                            return float(param.attrib['value'])
+                            if param.attrib.get('unitAccession', '') == 'UO:0000031':  # minutes
+                                return float(param.attrib['value']) * 60.0
+                            else:  # seconds
+                                return float(param.attrib['value'])
                 except ParseError as e:
                     return nan("1")
             else:

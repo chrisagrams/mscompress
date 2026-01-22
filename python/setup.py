@@ -377,7 +377,13 @@ setup(
     description=description,
     author="Chris Grams",
     author_email="chrisagrams@gmail.com",
-    packages=["mscompress"],
+    packages=[
+        "mscompress",
+        "mscompress.annotations",
+        "mscompress.annotations.psms",
+        "mscompress.datasets",
+        "mscompress.metadata",
+    ],
     ext_modules=cythonize(
         extensions,
         compiler_directives={'linetrace': linetrace},

@@ -10,12 +10,29 @@ on:
 
 jobs:
   build-cli:
-    name: Build CLI - ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build CLI - ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            arch: x86_64
+          - platform: linux
+            runner: ubuntu-24.04-arm
+            arch: arm64
+          - platform: windows
+            runner: windows-latest
+            arch: x86_64
+          - platform: macos
+            runner: macos-15-intel
+            arch: x86_64
+          - platform: macos
+            runner: macos-latest
+            arch: arm64
     
     steps:
       - name: Checkout code
@@ -23,46 +40,41 @@ jobs:
         with:
           submodules: recursive
       
-      - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: 'latest'
-      
       - name: Setup MSVC Developer Command Prompt (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
       
       - name: Configure CMake (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.platform != 'windows'
         working-directory: ./cli
         run: cmake -DENABLE_DEBUG_SYMBOLS=ON .
       
       - name: Configure CMake (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         working-directory: ./cli
         run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
       
       - name: Build CLI (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.platform != 'windows'
         working-directory: ./cli
         run: cmake --build . --config Release
       
       - name: Build CLI (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         working-directory: ./cli
         run: cmake --build build --config Release
       
       - name: Test CLI exists (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.platform != 'windows'
         working-directory: ./cli
         run: |
           ls -la mscompress || ls -la ./mscompress
           ./mscompress --help || true
       
       - name: Test CLI exists (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         working-directory: ./cli
         shell: pwsh
         run: |
@@ -74,23 +86,64 @@ jobs:
           } elseif (Test-Path "./mscompress.exe") {
             ./mscompress.exe --help
           }
+
+      - name: Run CTest (Unix)
+        if: matrix.platform != 'windows'
+        working-directory: ./cli
+        run: ctest --output-on-failure
+
+      - name: Run CTest (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: ./cli/build
+        run: ctest -C Release --output-on-failure
       
       - name: Upload CLI artifact (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.platform != 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: mscompress-cli-${{ runner.os }}
+          name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./cli/mscompress
       
       - name: Upload CLI artifact (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: mscompress-cli-${{ runner.os }}
+          name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             ./cli/build/Release/mscompress.exe
             ./cli/Release/mscompress.exe
             ./cli/mscompress.exe
+
+      - name: Prepare release binary (Unix)
+        if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/v')
+        working-directory: ./cli
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          mkdir -p release
+          cp mscompress release/mscompress-cli-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}
+
+      - name: Prepare release binary (Windows)
+        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        working-directory: ./cli
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          New-Item -ItemType Directory -Force -Path release
+          if (Test-Path "./build/Release/mscompress.exe") {
+            Copy-Item "./build/Release/mscompress.exe" "release/mscompress-cli-${version}-${{ matrix.platform }}-${{ matrix.arch }}.exe"
+          } elseif (Test-Path "./Release/mscompress.exe") {
+            Copy-Item "./Release/mscompress.exe" "release/mscompress-cli-${version}-${{ matrix.platform }}-${{ matrix.arch }}.exe"
+          } elseif (Test-Path "./mscompress.exe") {
+            Copy-Item "./mscompress.exe" "release/mscompress-cli-${version}-${{ matrix.platform }}-${{ matrix.arch }}.exe"
+          }
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./cli/release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-python:
     name: Build Python - ${{ matrix.os }}
@@ -168,6 +221,9 @@ jobs:
           # Use pip's wheel discovery to find the compatible wheel
           # This avoids glob pattern issues and lets pip find the right one
           python -m pip install --find-links=. mscompress
+      
+      - name: Install optional dependencies for tests
+        run: python -m pip install torch
       
       - name: Run pytest
         working-directory: ./python

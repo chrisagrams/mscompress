@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 
-project (mscompress  VERSION 1.0.5)
+project (mscompress  VERSION 1.0.7)
 
 option(BUILD_CLI "Build command line application" ON)
 option(BUILD_NODE "Build node library" ON)
 option(BUILD_MODULE "Build python module" ON )
 
 if(BUILD_CLI)
+    enable_testing()
     add_subdirectory(cli)
 endif()
 

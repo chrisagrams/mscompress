@@ -4,7 +4,7 @@ import tempfile
 import pytest
 import numpy as np
 from xml.etree.ElementTree import Element
-from mscompress import MSZFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
+from mscompress import MSZFile, MZMLFile, DataFormat, Division, read, Spectra, Spectrum, DataPositions
 
 def test_read_msz_file(msz_file_path):
     msz = read(msz_file_path)
@@ -161,11 +161,27 @@ def test_decompress_msz_file(msz_file_path, tmp_path):
     output_path = tmp_path / "test_output.mzML"
     with read(msz_file_path) as msz:
         # Decompress the MSZ file to mzML
-        msz.decompress(output_path)
+        mzml = msz.decompress(output_path)
         assert os.path.exists(output_path)
         assert os.path.getsize(output_path) > 0
+        assert isinstance(mzml, MZMLFile)
 
 def test_compress_msz_file(msz_file_path):
     with pytest.raises(NotImplementedError):
         msz = read(msz_file_path)
         msz.compress("test.out")
+
+def test_retention_time(msz_file_path):
+    msz = read(msz_file_path)
+    spectra = msz.spectra
+    for spectrum in spectra:
+        rt = spectrum.retention_time
+        assert isinstance(rt, float)
+        assert rt >= 0
+    
+    ## Test specific known retention time
+    spectrum = spectra[0]
+    assert abs(spectrum.retention_time - 0.21442476) < 1e-6
+
+    spectrum = spectra[10]
+    assert abs(spectrum.retention_time - 1.15352136) < 1e-6
