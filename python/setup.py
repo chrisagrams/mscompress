@@ -101,6 +101,7 @@ class build_ext_with_stubs(_build_ext):
                     'sse42': ['-msse4.2'] if target_arch == 'x86_64' else [],
                     'neon32': [] if target_arch == 'arm32' else [],  # Enabled by default on ARM
                     'neon64': [] if target_arch == 'arm64' else [],
+                    'crc32': ['-march=armv8-a+crc'] if target_arch == 'arm64' and sys.platform != 'darwin' else [],
                 }
             
             # Apply flags to matching source files
