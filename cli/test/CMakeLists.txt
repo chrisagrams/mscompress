@@ -79,3 +79,12 @@ add_cli_test(CompressDecompressIntLossy_vdelta16 "--int-lossy;vdelta16")
 add_cli_test(CompressDecompressIntLossy_vdelta24 "--int-lossy;vdelta24")
 add_cli_test(CompressDecompressIntLossy_vbr "--int-lossy;vbr")
 add_cli_test(CompressDecompressIntLossy_bitpack "--int-lossy;bitpack")
+
+# Extract tests
+add_test(NAME ExtractTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_extract
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/check_extract.cmake
+)

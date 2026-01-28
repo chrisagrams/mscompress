@@ -254,13 +254,29 @@ int main(int argc, char* argv[]) {
    void* input_map = NULL;
    size_t input_filesize = 0;
    int operation = -1;
+
    int error_status = 0;  // If error occurred, indicate cleanup and non-zero
                           // exit code on exit.
+
+   int extract_to_compress = 0;
+   char* original_output_file = NULL;
+   char* temp_output_file = NULL;
 
    if (parse_arguments(argc, argv, &arguments))
       print_usage(stderr, 1);
 
    verbose = arguments.verbose;
+
+   if (arguments.extract_only && arguments.output_file) {
+      size_t len = strlen(arguments.output_file);
+      if (len > 4 && strcmp(arguments.output_file + len - 4, ".msz") == 0) {
+         extract_to_compress = 1;
+         original_output_file = arguments.output_file;
+         temp_output_file = malloc(len + 10);
+         sprintf(temp_output_file, "%s.tmp", original_output_file);
+         arguments.output_file = temp_output_file;
+      }
+   }
 
    abs_start = get_time();
 
@@ -340,7 +356,15 @@ int main(int argc, char* argv[]) {
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
 
-         extract_mzml((char*)input_map, divisions, fds[1]);
+         if (arguments.indices_length > 0 || arguments.scans_length > 0 ||
+             arguments.ms_level != 0)
+            extract_mzml_filtered((char*)input_map, input_filesize,
+                                  arguments.indices, arguments.indices_length,
+                                  arguments.scans, arguments.scans_length,
+                                  arguments.ms_level, divisions->divisions[0],
+                                  fds[1]);
+         else
+            extract_mzml((char*)input_map, divisions, fds[1]);
          break;
       };
       case EXTRACT_MSZ: {
@@ -365,6 +389,51 @@ int main(int argc, char* argv[]) {
          break;
       };
    }
+
+   if (extract_to_compress) {
+      close_file(fds[1]);  // Close temp extract output
+
+      print("\nCompressing extracted content to %s...\n", original_output_file);
+
+      int temp_fd = open_input_file(temp_output_file);
+      void* temp_map = get_mapping(temp_fd);
+      size_t temp_size = get_filesize(temp_output_file);
+
+      int final_fd = open_output_file(original_output_file);
+
+      divisions_t* div_c = NULL;
+      data_format_t* df_c = NULL;
+
+      if (temp_size > 0) {
+         // Reset threads arg if needed, but it should be fine
+
+         // Reset filtering args so we compress the whole temp file
+         arguments.indices = NULL;
+         arguments.indices_length = 0;
+         arguments.scans = NULL;
+         arguments.scans_length = 0;
+         arguments.ms_level = 0;
+
+         if (preprocess_mzml((char*)temp_map, temp_size, &(arguments.blocksize),
+                             &arguments, &df_c, &div_c) == 0) {
+            compress_mzml((char*)temp_map, temp_size, &arguments, df_c, div_c,
+                          final_fd);
+         } else {
+            error_status = 1;
+         }
+
+         remove_mapping(temp_map, temp_size);
+      }
+
+      close_file(temp_fd);
+      close_file(final_fd);
+      remove_file(temp_output_file);
+
+      arguments.output_file = original_output_file;
+      free(temp_output_file);
+      fds[1] = -1;  // Prevent double close
+   }
+
    print("\nCleaning up...\n");
 
    // free_ddp(xml_divisions, divisions);
@@ -376,7 +445,8 @@ int main(int argc, char* argv[]) {
    remove_mapping(input_map, fds[0]);
 
    close_file(fds[0]);
-   close_file(fds[1]);
+   if (fds[1] != -1)
+      close_file(fds[1]);
    print("\tClosed file descriptors\n");
 
    abs_stop = get_time();

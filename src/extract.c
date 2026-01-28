@@ -4,6 +4,61 @@
 
 #include "mscompress.h"
 
+// Helper to find a string in a memory buffer
+char* find_str_in_mem(const char* haystack, size_t haystack_len,
+                      const char* needle) {
+   size_t needle_len = strlen(needle);
+   if (needle_len > haystack_len)
+      return NULL;
+   for (size_t i = 0; i <= haystack_len - needle_len; i++) {
+      if (memcmp(haystack + i, needle, needle_len) == 0) {
+         return (char*)(haystack + i);
+      }
+   }
+   return NULL;
+}
+
+// Helper to update spectrum count in XML header
+char* update_spectrum_count(char* header, size_t len, long new_count,
+                            size_t* new_len) {
+   char* spectrum_list = find_str_in_mem(header, len, "<spectrumList");
+   if (!spectrum_list)
+      return NULL;
+
+   // Search within reasonable bounds, or up to end of buffer
+   size_t remaining = len - (spectrum_list - header);
+   char* count_attr = find_str_in_mem(spectrum_list, remaining, "count=\"");
+   if (!count_attr)
+      return NULL;
+
+   char* start_val = count_attr + 7;  // "count=\"" len is 7
+   remaining = len - (start_val - header);
+   char* end_val = find_str_in_mem(start_val, remaining, "\"");
+   if (!end_val)
+      return NULL;
+
+   long old_len = end_val - start_val;
+
+   char new_count_str[32];
+   sprintf(new_count_str, "%ld", new_count);
+   long new_count_len = strlen(new_count_str);
+
+   long diff = new_count_len - old_len;
+   *new_len = len + diff;
+
+   char* new_header = malloc(*new_len);
+   if (!new_header)
+      return NULL;
+
+   long prefix_len = start_val - header;
+   memcpy(new_header, header, prefix_len);
+   memcpy(new_header + prefix_len, new_count_str, new_count_len);
+   memcpy(new_header + prefix_len + new_count_len, end_val,
+          len - (end_val - header));
+
+   return new_header;
+}
+
 void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
    for (int i = 0; i < divisions->n_divisions; i++) {
       division_t* division = divisions->divisions[i];
@@ -987,7 +1042,18 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    char* mzml_header =
        extract_mzml_header(decmp_xml, curr_division, &header_len);
    // print("%s\n", mzml_header);
-   write_to_file(output_fd, mzml_header, header_len);
+
+   size_t new_header_len = 0;
+   char* new_header = update_spectrum_count(mzml_header, header_len,
+                                            indicies_length, &new_header_len);
+
+   if (new_header) {
+      write_to_file(output_fd, new_header, new_header_len);
+      free(new_header);
+   } else {
+      write_to_file(output_fd, mzml_header, header_len);
+   }
+   free(mzml_header);
 
    // Get spectra
    for (long i = 0; i < indicies_length; i++) {
@@ -1034,7 +1100,26 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
 
    // Write header
    size_t header_len = division->spectra->start_positions[0];
-   write_to_file(output_fd, input_map, header_len);
+
+   // Create a copy of the header to modify the count
+   size_t new_header_len = 0;
+   char* header_copy = malloc(header_len);
+   if (header_copy) {
+      memcpy(header_copy, input_map, header_len);
+      char* new_header = update_spectrum_count(
+          header_copy, header_len, indicies_length, &new_header_len);
+
+      if (new_header) {
+         write_to_file(output_fd, new_header, new_header_len);
+         free(new_header);
+      } else {
+         write_to_file(output_fd, header_copy, header_len);
+      }
+      free(header_copy);
+   } else {
+      // Fallback if malloc fails (unlikely)
+      write_to_file(output_fd, input_map, header_len);
+   }
 
    // Write spectra
    for (long i = 0; i < indicies_length; i++) {
