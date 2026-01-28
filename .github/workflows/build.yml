@@ -164,7 +164,7 @@ jobs:
           - runner: macos-latest
             cibw_arch: arm64
             os_name: macOS
-          - runner: macos-13
+          - runner: macos-15-intel
             cibw_arch: x86_64
             os_name: macOS
     
