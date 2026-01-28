@@ -1189,6 +1189,9 @@ division_t* read_division(void* input_map, long* position) {
    r->size = *((uint64_t*)((uint8_t*)input_map + *position));
    *position += sizeof(uint64_t);
 
+
+
+
    r->scans = read_uint32_arr(input_map, position);
    r->ms_levels = read_uint16_arr(input_map, position);
 
@@ -1337,6 +1340,9 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
    // r->n_divisions = n_threads;
    r->n_divisions = n_divisions + 1;  // n_divisions + 1 for the last division
                                       // containing only remaining XML.
+
+
+
 
    //  Determine roughly how many spectra each division will contain
    long n_spec_per_div = div->mz->total_spec / n_divisions;
@@ -1810,6 +1816,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
    if (div == NULL)
       return 1;
 
+
+
    if (arguments->threads == -1)  // force divisions to be only 1
    {
       arguments->threads = 1;
@@ -1849,7 +1857,10 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                                       // n_threads, whichever is greater
          *divisions = create_divisions(div, n_divisions);
       else {
+         if (arguments->threads > div->mz->total_spec)
+             arguments->threads = div->mz->total_spec;
          *divisions = create_divisions(div, arguments->threads);
+
          *blocksize = get_division_size_max(
              *divisions);  // If we have more threads than divisions, we need to
                            // increase the blocksize to the max division size
