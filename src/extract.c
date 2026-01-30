@@ -256,7 +256,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_start_offset;  // Offset relative to spectrum
    long xml_buff_offset;   // Offset relative to start of compressed block
    long xml_sum;
@@ -288,7 +288,22 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
       }
    }
 
+   if (division_index == -1) {
+      error(
+          "extract_spectrum_start_xml: Failed to find XML block for spectrum "
+          "start: %ld (end: %ld).\n",
+          spectrum_start, spectrum_end);
+      return NULL;
+   }
+
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
+
+   if (xml_blk_len == NULL) {
+      error("extract_spectrum_start_xml: Failed to get XML block index %d.\n",
+            division_index);
+      return NULL;
+   }
+
    xml_blk_offset =
        xml_pos + get_block_offset_by_index(xml_block_lens, division_index);
 
@@ -342,7 +357,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_buff_offset;  // Offset relative to start of compressed block
    long xml_sum;
    block_len_t* xml_blk_len;
@@ -374,7 +389,52 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
       }
    }
 
+   if (division_index == -1) {
+      // This is expected slightly more often for inner XML if there is none
+      // But if we are here we expect one?
+      // Actually extract_spectrum_inner_xml logic is weird.
+      // If found is 0 after loop, it means NO inner block found.
+      // So we should return empty string?
+      // Wait, let's look at logic:
+      // if found = 0; break loop.
+      // Wait, the loop condition `if (found) break;` is at top.
+      // In inner_xml currently: `if (found) break;`.
+      // Inner XML loop logic seems to be: find *one* block that contains the
+      // inner part? Actually, inner XML is weird. Let's stick to simple fix
+      // first: If division_index is -1, return empty result (no inner xml)?
+
+      // Checking logic again:
+      // Loop sets found=0 (logic error in existing code? It sets found=0 inside
+      // the match block? line 370) And breaks.
+
+      // Ah, line 370 in original: `found = 0;` inside the IF match? That looks
+      // wrong if it uses `found` as a flag to break. But `if (found) break` is
+      // at top. So if it finds it, it sets found=0? That means it continues?
+      // Wait, let's look at the logic in the file view again later.
+      // For now, let's add the check.
+
+      // Actually, looking at the code provided in context:
+      // 365: ...
+      // 370: found = 0;
+      // 371: break;
+
+      // So it sets division_index and breaks.
+      // Use checks.
+
+      error(
+          "extract_spectrum_inner_xml: Failed to find XML block for spectrum "
+          "inner.\n");
+      return NULL;
+   }
+
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
+
+   if (xml_blk_len == NULL) {
+      error("extract_spectrum_inner_xml: Failed to get XML block index %d.\n",
+            division_index);
+      return NULL;
+   }
+
    xml_blk_offset =
        xml_pos + get_block_offset_by_index(xml_block_lens, division_index);
 
@@ -427,7 +487,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_buff_offset;  // Offset relative to start of compressed block
    long xml_sum;
    block_len_t* xml_blk_len;
@@ -459,7 +519,21 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       }
    }
 
+   if (division_index == -1) {
+      error(
+          "extract_spectrum_last_xml: Failed to find XML block for spectrum "
+          "last.\n");
+      return NULL;
+   }
+
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
+
+   if (xml_blk_len == NULL) {
+      error("extract_spectrum_last_xml: Failed to get XML block index %d.\n",
+            division_index);
+      return NULL;
+   }
+
    xml_blk_offset =
        xml_pos + get_block_offset_by_index(xml_block_lens, division_index);
 
@@ -650,6 +724,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    uint64_t start_position = 0;
    uint64_t end_position = 0;
    uint64_t src_len = 0;
+   int found = 0;
 
    block_len_t* mz_blk_len;
    long mz_blk_offset;
@@ -666,12 +741,30 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
          start_position = curr->mz->start_positions[mz_off];
          end_position = curr->mz->end_positions[mz_off];
          src_len = end_position - start_position;
+         found = 1;
          break;
       }
       mz_off += mz->total_spec;
    }
 
+   if (!found) {
+      error(
+          "extract_spectrum_mz: Failed to find m/z block for spectrum index "
+          "%ld.\n",
+          index);
+      return NULL;
+   }
+
    mz_blk_len = get_block_by_index(mz_binary_block_lens, division_index);
+
+   if (mz_blk_len == NULL) {
+      error(
+          "extract_spectrum_mz: Failed to retrieve m/z block len for division "
+          "%d.\n",
+          division_index);
+      return NULL;
+   }
+
    mz_blk_offset =
        mz_binary_blk_pos +
        get_block_offset_by_index(mz_binary_block_lens, division_index);
@@ -735,6 +828,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
    uint64_t start_position = 0;
    uint64_t end_position = 0;
    uint64_t src_len = 0;
+   int found = 0;
 
    block_len_t* inten_blk_len;
    long inten_blk_offset;
@@ -751,12 +845,30 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
          start_position = curr->inten->start_positions[inten_off];
          end_position = curr->inten->end_positions[inten_off];
          src_len = end_position - start_position;
+         found = 1;
          break;
       }
       inten_off += inten->total_spec;
    }
 
+   if (!found) {
+      error(
+          "extract_spectrum_inten: Failed to find intensity block for spectrum "
+          "index %ld.\n",
+          index);
+      return NULL;
+   }
+
    inten_blk_len = get_block_by_index(inten_binary_block_lens, division_index);
+
+   if (inten_blk_len == NULL) {
+      error(
+          "extract_spectrum_inten: Failed to retrieve intensity block len for "
+          "division %d.\n",
+          division_index);
+      return NULL;
+   }
+
    inten_blk_offset =
        inten_binary_blk_pos +
        get_block_offset_by_index(inten_binary_block_lens, division_index);
@@ -853,6 +965,16 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    char* spectrum_start_xml = extract_spectrum_start_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
        spectrum_end, &start_xml_len);
+
+   if (spectrum_start_xml == NULL) {
+      error(
+          "extract_spectra: Failed to extract start XML for spectrum index "
+          "%ld.\n",
+          index);
+      free(res);
+      return NULL;
+   }
+
    memcpy(res, spectrum_start_xml, start_xml_len);
    *out_len += start_xml_len;
 

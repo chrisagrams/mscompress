@@ -373,7 +373,7 @@ int main(int argc, char* argv[]) {
 
    // dealloc_df(df);
 
-   remove_mapping(input_map, fds[0]);
+   remove_mapping(input_map, input_filesize);
 
    close_file(fds[0]);
    close_file(fds[1]);
