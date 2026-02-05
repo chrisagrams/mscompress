@@ -1849,7 +1849,10 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                                       // n_threads, whichever is greater
          *divisions = create_divisions(div, n_divisions);
       else {
-         *divisions = create_divisions(div, arguments->threads);
+         long n_divs = arguments->threads;
+         if (n_divs > div->mz->total_spec)
+            n_divs = div->mz->total_spec;
+         *divisions = create_divisions(div, n_divs);
          *blocksize = get_division_size_max(
              *divisions);  // If we have more threads than divisions, we need to
                            // increase the blocksize to the max division size
