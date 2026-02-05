@@ -67,5 +67,7 @@
         "xhash": "cpp",
         "stat.h": "c"
     },
-    "editor.bracketPairColorization.enabled": true
+    "editor.bracketPairColorization.enabled": true,
+    "python.defaultInterpreterPath": "${workspaceFolder}/python/.venv/bin/python",
+    "python.terminal.activateEnvironment": true
 }

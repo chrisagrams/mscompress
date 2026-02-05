@@ -9,8 +9,11 @@ from setuptools.command.build_ext import build_ext as _build_ext
 from Cython.Build import cythonize
 import numpy
 
-debug = False 
-linetrace = True
+# Build configuration via environment variables:
+#   MSCOMPRESS_DEBUG=1     - Enable debug symbols (-g flag)
+#   MSCOMPRESS_LINETRACE=1 - Enable Cython linetrace (Python-level debugging)
+debug = os.environ.get('MSCOMPRESS_DEBUG', '0').lower() in ('1', 'true', 'yes')
+linetrace = os.environ.get('MSCOMPRESS_LINETRACE', '0').lower() in ('1', 'true', 'yes')
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -387,7 +390,8 @@ setup(
     ext_modules=cythonize(
         extensions,
         compiler_directives={'linetrace': linetrace},
-        compile_time_env={'MSC_VERSION': version}
+        compile_time_env={'MSC_VERSION': version},
+        gdb_debug=debug,
     ),
     include_dirs=[numpy.get_include()],
     cmdclass={
