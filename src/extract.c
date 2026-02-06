@@ -677,7 +677,8 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       buff_off += *a_args->dest_len;
    }
 
-   // free(a_args);
+   dealloc_z_stream(a_args->z);
+   free(a_args);
 
    // Update the block structure with the encoded data and its format
    blk->encoded_cache = buff;
@@ -1070,13 +1071,17 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    size_t header_len = 0;
    xml_blk_len = get_block_by_index(xml_block_lens, 0);
    xml_blk_offset = msz_footer->xml_pos;
-   decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
-                                  xml_blk_offset, xml_blk_len);
-   if (decmp_xml == NULL) {
-      error("extract_msz: Failed to decompress XML block for mzML header.\n");
-      return;
+   if (!xml_blk_len->cache) {
+      decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
+                                     xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_msz: Failed to decompress XML block for mzML header.\n");
+         return;
+      }
+      xml_blk_len->cache = decmp_xml;
+   } else {
+      decmp_xml = xml_blk_len->cache;
    }
-   xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_header =
        extract_mzml_header(decmp_xml, curr_division, &header_len);
 
@@ -1112,16 +1117,33 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    xml_blk_offset =
        msz_footer->xml_pos +
        get_block_offset_by_index(xml_block_lens, divisions->n_divisions - 1);
-   decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
-                                  xml_blk_offset, xml_blk_len);
-   if (decmp_xml == NULL) {
-      error("extract_msz: Failed to decompress XML block for mzML footer.\n");
-      return;
+   if (!xml_blk_len->cache) {
+      decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
+                                     xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_msz: Failed to decompress XML block for mzML footer.\n");
+         return;
+      }
+      xml_blk_len->cache = decmp_xml;
+   } else {
+      decmp_xml = xml_blk_len->cache;
    }
-   xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_footer = extract_mzml_footer(decmp_xml, divisions, &footer_len);
    // print("%s\n", mzml_footer);
    write_to_file(output_fd, mzml_footer, footer_len);
+   free(mzml_footer);
+
+   // Free indicies if allocated by ms_level or scan mapping
+   if (ms_level != 0 || scans_length > 0) {
+      free(indicies);
+   }
+
+   ZSTD_freeDCtx(dctx);
+   dealloc_block_len_queue(xml_block_lens);
+   dealloc_block_len_queue(mz_binary_block_lens);
+   dealloc_block_len_queue(inten_binary_block_lens);
+   dealloc_df(df);
+   dealloc_read_divisions(divisions);
 }
 
 void extract_mzml_filtered(char* input_map, size_t input_filesize,

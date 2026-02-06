@@ -270,6 +270,15 @@ cdef class MZMLFile(BaseFile):
     def _reopen(path: bytes):
         return MZMLFile(path)
 
+    def _cleanup(self):
+        """Free MZMLFile-specific resources before calling parent cleanup"""
+        # Free divisions created by _prepare_divisions (fully malloc'd)
+        if self._divisions != NULL:
+            _dealloc_divisions(self._divisions)
+            self._divisions = NULL
+        # Call parent cleanup
+        super(MZMLFile, self)._cleanup()
+
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
         if n_divisions > self._positions.mz.total_spec:  # If we have more divisions than spectra, decrease number of divisions
@@ -554,6 +563,35 @@ cdef class MSZFile(BaseFile):
     @staticmethod
     def _reopen(path: bytes):
         return MSZFile(path)
+
+    def _cleanup(self):
+        """Free MSZFile-specific resources before calling parent cleanup"""
+
+        # Free ZSTD_DCtx
+        if self._dctx != NULL:
+            ZSTD_freeDCtx(self._dctx)
+            self._dctx = NULL
+
+        # Free block length queues
+        if self._xml_block_lens != NULL:
+            _dealloc_block_len_queue(self._xml_block_lens)
+            self._xml_block_lens = NULL
+        if self._mz_binary_block_lens != NULL:
+            _dealloc_block_len_queue(self._mz_binary_block_lens)
+            self._mz_binary_block_lens = NULL
+        if self._inten_binary_block_lens != NULL:
+            _dealloc_block_len_queue(self._inten_binary_block_lens)
+            self._inten_binary_block_lens = NULL
+
+        # Free divisions from read_divisions (mmap-backed, only free struct wrappers)
+        if self._divisions != NULL:
+            _dealloc_read_divisions(self._divisions)
+            self._divisions = NULL
+
+        # _footer points to mmap'd memory, don't free
+
+        # Call parent cleanup
+        super(MSZFile, self)._cleanup()
     
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
@@ -904,18 +942,35 @@ cdef class BaseFile:
 
     def _cleanup(self):
         # On Windows, unmap must happen before closing the file descriptor
-        if self._mapping != NULL: 
+        # Unmap file mapping if exists
+        if self._mapping != NULL:
             _remove_mapping(self._mapping, self.filesize)
             self._mapping = NULL
-        
+
+        # Close input file descriptor if open
         if self._fd > 0:
             _close_file(self._fd)
             self._fd = -1
 
+        # Close output file descriptor if open
         if self.output_fd > 0:
             _close_file(self.output_fd)
             self.output_fd = -1
-    
+
+        # Free zlib z_stream
+        if self._z != NULL:
+            _dealloc_z_stream(self._z)
+            self._z = NULL
+
+        # Free data_format_t
+        if self._df != NULL:
+            _dealloc_df(self._df)
+            self._df = NULL
+
+        # Free division_t _positions (always fully malloc'd from scan_mzml or flatten_divisions)
+        if self._positions != NULL:
+            _dealloc_division(self._positions)
+            self._positions = NULL
 
     @property
     def path(self) -> bytes:
