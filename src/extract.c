@@ -158,6 +158,7 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       xml_i++;
 
       write_to_file(output_fd, buff, out_len);
+      free(buff);
    }
    return;
 }
@@ -949,6 +950,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
        spectrum_end, &start_xml_len);
    memcpy(res, spectrum_start_xml, start_xml_len);
    *out_len += start_xml_len;
+   free(spectrum_start_xml);
 
    size_t mz_len = 0;
    char* spectrum_mz =
@@ -965,6 +967,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    }
    memcpy(res + *out_len, spectrum_mz, mz_len);
    *out_len += mz_len;
+   free(spectrum_mz);
 
    size_t inner_xml_len = 0;
    char* spectrum_inner_xml = extract_spectrum_inner_xml(
@@ -982,6 +985,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_inner_xml, inner_xml_len);
    *out_len += inner_xml_len;
+   free(spectrum_inner_xml);
 
    size_t inten_len = 0;
    char* spectrum_inten =
@@ -998,6 +1002,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_inten, inten_len);
    *out_len += inten_len;
+   free(spectrum_inten);
 
    size_t last_xml_len = 0;
    char* spectrum_last_xml = extract_spectrum_last_xml(
@@ -1014,6 +1019,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_last_xml, last_xml_len);
    *out_len += last_xml_len;
+   free(spectrum_last_xml);
 
    print("Extracted spectrum index %ld\n", index);
    return res;
