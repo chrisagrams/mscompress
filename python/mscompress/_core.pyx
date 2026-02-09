@@ -293,7 +293,16 @@ cdef class MZMLFile(BaseFile):
         elif n_divisions >= self._arguments.threads:
             self._divisions = _create_divisions(self._positions, n_divisions)
         else:
-            self._divisions = _create_divisions(self._positions, self._arguments.threads)
+            effective_divisions = self._arguments.threads
+            if effective_divisions > self._positions.mz.total_spec:
+                warnings.warn(
+                    f"n_threads ({effective_divisions}) > total_spec ({self._positions.mz.total_spec}). "
+                    f"Setting n_divisions to {self._positions.mz.total_spec}"
+                )
+                effective_divisions = self._positions.mz.total_spec
+                if effective_divisions == 0:
+                    effective_divisions = 1
+            self._divisions = _create_divisions(self._positions, effective_divisions)
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
