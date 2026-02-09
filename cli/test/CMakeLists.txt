@@ -68,6 +68,8 @@ add_cli_test(CompressDecompressMZLossy_vdelta24 "--mz-lossy;vdelta24")
 add_cli_test(CompressDecompressMZLossy_vbr "--mz-lossy;vbr")
 add_cli_test(CompressDecompressMZLossy_bitpack "--mz-lossy;bitpack")
 
+add_cli_test(CompressDecompressThreadsExceedSpectra "--threads;100")
+
 # --int-lossy tests
 add_cli_test(CompressDecompressIntLossy_cast "--int-lossy;cast")
 add_cli_test(CompressDecompressIntLossy_cast16 "--int-lossy;cast16")
