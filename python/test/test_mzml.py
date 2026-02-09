@@ -151,12 +151,31 @@ def test_mzml_arguments_zstd_level(mzml_file_path):
 
 def test_compress_mzml_file(mzml_file_path, tmp_path):
     output_path = tmp_path / "test_output.msz"
-    with read(mzml_file_path) as mzml:    
+    with read(mzml_file_path) as mzml:
         # Compress the mzML file to MSZ
         msz = mzml.compress(output_path)
         assert output_path.exists()
         assert output_path.stat().st_size > 0
         assert isinstance(msz, MSZFile)
+
+def test_compress_mzml_threads_exceed_spectra(mzml_file_path, tmp_path):
+    """Test that compression succeeds when num_threads > num_spectra (issue #68)."""
+    output_path = tmp_path / "test_output_threads.msz"
+    with read(mzml_file_path) as mzml:
+        # Test file has 50 spectra; set threads to 100 to exceed spectra count
+        mzml.arguments.threads = 100
+        msz = mzml.compress(output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+        assert isinstance(msz, MSZFile)
+
+        # Verify decompression of the resulting file also succeeds
+        decomp_path = tmp_path / "test_output_threads.mzML"
+        with read(output_path) as msz_file:
+            mzml_result = msz_file.decompress(decomp_path)
+            assert os.path.exists(decomp_path)
+            assert os.path.getsize(decomp_path) > 0
+            assert isinstance(mzml_result, MZMLFile)
 
 def test_decompress_mzml_file(mzml_file_path):
     with pytest.raises(NotImplementedError):
