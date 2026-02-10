@@ -1,7 +1,4 @@
-# cython: linetrace=True
-# cython: binding=True
-
-import os 
+import os
 import numpy as np
 import warnings
 import tempfile

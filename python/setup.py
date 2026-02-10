@@ -267,11 +267,15 @@ if debug:
         extra_compile_args = ["/Zi", "/Od"]  # "/Zi" generates debugging information, "/Od" disables optimization
         extra_link_args = ["/DEBUG"]
     else:
-        extra_compile_args = ["-g"]
+        extra_compile_args = ["-g", "-O0"]
         extra_link_args = ["-g"]
 else:
-    extra_compile_args = []
-    extra_link_args = []
+    if sys.platform == 'win32':
+        extra_compile_args = ["/O2"]
+        extra_link_args = []
+    else:
+        extra_compile_args = ["-O3"]
+        extra_link_args = []
 
 
 # TODO: Ideally we don't need to disable assembly optimizations, but for now we do.
@@ -409,7 +413,7 @@ setup(
     ],
     ext_modules=cythonize(
         extensions,
-        compiler_directives={'linetrace': linetrace},
+        compiler_directives={'linetrace': linetrace, 'binding': linetrace},
         compile_time_env={'MSC_VERSION': version},
         gdb_debug=debug,
     ),
