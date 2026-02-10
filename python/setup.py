@@ -325,6 +325,11 @@ def get_target_arch():
 target_arch = get_target_arch()
 print(f"Target architecture detected: {target_arch}")
 
+# On ARM64 Linux, enable CRC instructions for zlib's hardware-accelerated CRC32
+# This is needed because zlib uses ARM CRC intrinsics that require explicit CPU feature flags
+if target_arch == 'arm64' and sys.platform != 'darwin':
+    extra_compile_args.append('-march=armv8-a+crc')
+
 if target_arch == 'arm64':
     # ARM64 architecture
     config_h_content = """
