@@ -166,3 +166,7 @@ vendor/
 src/
 bindings/mscompress.c
 cli/
+
+# Logs and reports
+*.txt
+*.log
