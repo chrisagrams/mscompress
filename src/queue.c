@@ -128,6 +128,12 @@ void dealloc_block_len(block_len_t* blk) {
       if (blk->cache) {
          free(blk->cache);
       }
+      if (blk->encoded_cache) {
+         free(blk->encoded_cache);
+      }
+      if (blk->encoded_cache_lens) {
+         free(blk->encoded_cache_lens);
+      }
       free(blk);
    }
 }
@@ -151,14 +157,11 @@ block_len_queue_t* alloc_block_len_queue() {
 
 void dealloc_block_len_queue(block_len_queue_t* queue) {
    if (queue) {
-      if (queue->head) {
-         block_len_t* curr_head = queue->head;
-         block_len_t* new_head = curr_head->next;
-         while (new_head) {
-            free(curr_head);
-            curr_head = new_head;
-            new_head = curr_head->next;
-         }
+      block_len_t* curr = queue->head;
+      while (curr) {
+         block_len_t* next = curr->next;
+         dealloc_block_len(curr);
+         curr = next;
       }
       free(queue);
    }

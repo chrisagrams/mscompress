@@ -234,6 +234,12 @@ void dealloc_decompress_args(decompress_args_t* args) {
    if (args) {
       if (args->ret)
          free(args->ret);
+      if (args->xml_blk)
+         dealloc_block_len(args->xml_blk);
+      if (args->mz_binary_blk)
+         dealloc_block_len(args->mz_binary_blk);
+      if (args->inten_binary_blk)
+         dealloc_block_len(args->inten_binary_blk);
       free(args);
    }
 }
@@ -318,6 +324,10 @@ void* decompress_routine(void* args) {
         *decmp_inten_binary = (char*)decmp_block(
             db_args->df->inten_decompression_fun, dctx, db_args->input_map,
             db_args->footer_inten_bin_off, db_args->inten_binary_blk);
+
+   // Save original pointers for cleanup (encode functions advance mz/inten pointers)
+   char *orig_decmp_mz_binary = decmp_mz_binary,
+        *orig_decmp_inten_binary = decmp_inten_binary;
 
    size_t binary_len = 0;
 
@@ -486,7 +496,13 @@ void* decompress_routine(void* args) {
 
    db_args->ret_len = buff_off;
 
+   /* Cleanup */
+   ZSTD_freeDCtx(dctx);
+   free(decmp_xml);
+   free(orig_decmp_mz_binary);
+   free(orig_decmp_inten_binary);
    dealloc_z_stream(a_args->z);
+   free(a_args);
 
    return NULL;
 }
@@ -626,6 +642,12 @@ void decompress_msz(char* input_map, size_t input_filesize,
 
    free(args);
    free(ptid);
+
+   dealloc_block_len_queue(xml_block_lens);
+   dealloc_block_len_queue(mz_binary_block_lens);
+   dealloc_block_len_queue(inten_binary_block_lens);
+   dealloc_df(df);
+   dealloc_read_divisions(divisions);
 }
 
 /**

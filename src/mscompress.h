@@ -360,6 +360,10 @@ void dump_ddp(data_positions_t** ddp, int divisions, int fd);
 data_positions_t** read_ddp(void* input_map, long position);
 void dealloc_df(data_format_t* df);
 void dealloc_dp(data_positions_t* dp);
+void dealloc_division(division_t* div);
+void dealloc_divisions(divisions_t* divisions);
+void dealloc_read_division(division_t* div);
+void dealloc_read_divisions(divisions_t* divisions);
 void write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
 division_t* flatten_divisions(divisions_t* divisions);
@@ -459,6 +463,9 @@ char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len);
 
 char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len);
+
+char* update_spectrum_list_count(char* header, size_t header_len,
+                                 long new_count, size_t* out_len);
 
 /* compress.c */
 typedef struct {
