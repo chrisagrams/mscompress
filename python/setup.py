@@ -2,6 +2,7 @@ import os
 import sys
 import platform
 import shutil
+import atexit
 import tomli
 from setuptools import setup, Extension
 from setuptools.command.sdist import sdist as _sdist
@@ -9,14 +10,25 @@ from setuptools.command.build_ext import build_ext as _build_ext
 from Cython.Build import cythonize
 import numpy
 
-debug = False 
-linetrace = True
+# Build configuration via environment variables:
+#   MSCOMPRESS_DEBUG=1     - Enable debug symbols (-g flag)
+#   MSCOMPRESS_LINETRACE=1 - Enable Cython linetrace (Python-level debugging)
+debug = os.environ.get('MSCOMPRESS_DEBUG', '0').lower() in ('1', 'true', 'yes')
+linetrace = os.environ.get('MSCOMPRESS_LINETRACE', '0').lower() in ('1', 'true', 'yes')
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Copy vendor/src/cli directories if they don't exist locally (for sdist)
 # This needs to happen early, before any file discovery
 _CLEANUP_DIRS = []
+
+def _cleanup_vendored_files():
+    """Clean up copied vendor/src/cli directories on process exit."""
+    for d in _CLEANUP_DIRS:
+        if os.path.exists(d):
+            print(f"Cleaning up {d}")
+            shutil.rmtree(d)
+
 def _ensure_vendored_files():
     """Copy vendor/src/cli into package directory if building from git repo."""
     vendor_src = os.path.normpath(os.path.join(BASE_DIR, '../vendor'))
@@ -42,6 +54,10 @@ def _ensure_vendored_files():
         print(f"Copying {cli_src} to {cli_dst}")
         shutil.copytree(cli_src, cli_dst, dirs_exist_ok=True)
         _CLEANUP_DIRS.append(cli_dst)
+    
+    # Register cleanup to run when Python process exits
+    if _CLEANUP_DIRS:
+        atexit.register(_cleanup_vendored_files)
 
 # Ensure files are present before any other setup code runs
 _ensure_vendored_files()
@@ -144,29 +160,36 @@ class build_ext_with_stubs(_build_ext):
             self.compiler.compile = original_compile
     
     def run(self):
-        # Run the standard build
-        _build_ext.run(self)
-        
-        # Copy stub files to the build directory where the .so file is
-        if self.inplace:
-            build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
-        else:
-            build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
-        
-        # Source files
-        stub_file = _abs('bindings/mscompress.pyi')
-        py_typed = _abs('bindings/py.typed')
-        
-        # Copy if they exist
-        if os.path.exists(stub_file):
-            dest = os.path.join(build_dir, 'mscompress.pyi')
-            print(f"Copying {stub_file} to {dest}")
-            shutil.copy2(stub_file, dest)
-        
-        if os.path.exists(py_typed):
-            dest = os.path.join(build_dir, 'py.typed')
-            print(f"Copying {py_typed} to {dest}")
-            shutil.copy2(py_typed, dest)
+        try:
+            # Run the standard build
+            _build_ext.run(self)
+            
+            # Copy stub files to the build directory where the .so file is
+            if self.inplace:
+                build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
+            else:
+                build_dir = os.path.dirname(self.get_ext_fullpath('mscompress'))
+            
+            # Source files
+            stub_file = _abs('bindings/mscompress.pyi')
+            py_typed = _abs('bindings/py.typed')
+            
+            # Copy if they exist
+            if os.path.exists(stub_file):
+                dest = os.path.join(build_dir, 'mscompress.pyi')
+                print(f"Copying {stub_file} to {dest}")
+                shutil.copy2(stub_file, dest)
+            
+            if os.path.exists(py_typed):
+                dest = os.path.join(build_dir, 'py.typed')
+                print(f"Copying {py_typed} to {dest}")
+                shutil.copy2(py_typed, dest)
+        finally:
+            # Clean up copied directories (vendor/, src/, cli/) after build is complete
+            for d in _CLEANUP_DIRS:
+                if os.path.exists(d):
+                    print(f"Cleaning up {d}")
+                    shutil.rmtree(d)
 
 
 class sdist_with_vendor(_sdist):
@@ -244,11 +267,15 @@ if debug:
         extra_compile_args = ["/Zi", "/Od"]  # "/Zi" generates debugging information, "/Od" disables optimization
         extra_link_args = ["/DEBUG"]
     else:
-        extra_compile_args = ["-g"]
+        extra_compile_args = ["-g", "-O0"]
         extra_link_args = ["-g"]
 else:
-    extra_compile_args = []
-    extra_link_args = []
+    if sys.platform == 'win32':
+        extra_compile_args = ["/O2"]
+        extra_link_args = []
+    else:
+        extra_compile_args = ["-O3"]
+        extra_link_args = []
 
 
 # TODO: Ideally we don't need to disable assembly optimizations, but for now we do.
@@ -386,8 +413,9 @@ setup(
     ],
     ext_modules=cythonize(
         extensions,
-        compiler_directives={'linetrace': linetrace},
-        compile_time_env={'MSC_VERSION': version}
+        compiler_directives={'linetrace': linetrace, 'binding': linetrace},
+        compile_time_env={'MSC_VERSION': version},
+        gdb_debug=debug,
     ),
     include_dirs=[numpy.get_include()],
     cmdclass={

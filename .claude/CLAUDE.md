@@ -36,11 +36,26 @@ cd python && uv run pytest
 cd python && uv run pytest test/test_mzml.py
 cd python && uv run pytest test/test_mzml.py::test_mzml_open -v
 
-# Memory leak checking with Valgrind
+# Memory leak checking with Valgrind (build with debug symbols first)
+cd python && MSCOMPRESS_DEBUG=1 uv sync --all-extras --reinstall
 cd python && valgrind --tool=memcheck --leak-check=full --log-file=leak-check.txt $(uv run which python) -m pytest
 ```
 
 Test data lives in `python/test/data/` and is shared by both C and Python tests.
+
+### Python build modes
+
+Build behavior is controlled via environment variables in `setup.py`:
+
+| Mode | Command | Compile flags | Cython directives |
+|------|---------|---------------|--------------------|
+| Release | `uv sync --all-extras --reinstall` | `-O3` | none |
+| Debug | `MSCOMPRESS_DEBUG=1 uv sync ...` | `-g -O0` | `gdb_debug=True` |
+| Linetrace | `MSCOMPRESS_LINETRACE=1 uv sync ...` | `-O3` | `linetrace`, `binding` |
+| Debug + Linetrace | `MSCOMPRESS_DEBUG=1 MSCOMPRESS_LINETRACE=1 uv sync ...` | `-g -O0` | `gdb_debug=True`, `linetrace`, `binding` |
+
+- **`MSCOMPRESS_DEBUG=1`** — Adds `-g` debug symbols and disables optimization (`-O0`). Use before Valgrind or GDB.
+- **`MSCOMPRESS_LINETRACE=1`** — Enables Cython linetrace + binding for Python-level profiling/coverage. Adds runtime overhead.
 
 ## Architecture
 

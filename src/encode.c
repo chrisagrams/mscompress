@@ -160,6 +160,7 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
    if (zlib_len == 0) {
       error("encode_zlib_fun: zlib_compress error\n");
       free(decmp_input);
+      free(decmp_header);
       free(cmp_output);
       // Continue to move forward
       *src += org_len + ZLIB_SIZE_OFFSET;
@@ -200,9 +201,13 @@ void encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len,
    decmp_input->offset = ZLIB_SIZE_OFFSET;
    decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-   ZLIB_TYPE org_len = *(ZLIB_TYPE*)zlib_pop_header(decmp_input);
+   //TODO: Ensure if we need this free in other functions
+   // i.e. encode_zlib_fun_w_header, encode_no_comp_fun_no_header, no_encode_w_header
+   void* header = zlib_pop_header(decmp_input);
+   ZLIB_TYPE org_len = *(ZLIB_TYPE*)header;
+   free(header);
 
-   encode_base64(decmp_input, dest, org_len, out_len);
+   encode_base64(decmp_input, dest, org_len, out_len);  /* encode_base64 frees decmp_input */
 
    *src += org_len + ZLIB_SIZE_OFFSET;
 }
@@ -252,12 +257,15 @@ void no_encode_w_header(z_stream* z, char** src, size_t src_len, char* dest,
    decmp_input->offset = ZLIB_SIZE_OFFSET;
    decmp_input->buff = decmp_input->mem + decmp_input->offset;
 
-   ZLIB_TYPE org_len = *(ZLIB_TYPE*)zlib_pop_header(decmp_input);
+   void* header = zlib_pop_header(decmp_input);
+   ZLIB_TYPE org_len = *(ZLIB_TYPE*)header;
+   free(header);
 
    *out_len = org_len;
 
    memcpy(dest, decmp_input->buff, org_len);
 
+   free(decmp_input);
    *src += org_len + ZLIB_SIZE_OFFSET;
 }
 

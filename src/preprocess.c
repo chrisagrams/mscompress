@@ -27,6 +27,7 @@
 
 /* === Start of allocation and deallocation helper functions === */
 
+// TODO: Remove yxml dependency since we no longer use it.
 yxml_t* alloc_yxml() {
    yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
 
@@ -46,6 +47,12 @@ data_format_t* alloc_df() {
    return df;
 }
 
+/**
+ * @brief Deallocates a `data_format_t` struct and its memory.
+ * @param df A pointer to the `data_format_t` struct to be deallocated.
+ * 
+ * TODO: return value for error handling?
+ */
 void dealloc_df(data_format_t* df) {
    if (df)
       free(df);
@@ -53,17 +60,25 @@ void dealloc_df(data_format_t* df) {
       error("dealloc_df: df is NULL.\n");
 }
 
+/**
+ * @brief Populates the target fields of a `data_format_t` struct.
+ * @param df A pointer to the `data_format_t` struct to be populated.
+ * @param target_xml_format The target XML format to be set in the `data_format_t` struct.
+ * @param target_mz_format The target m/z format to be set in the `data_format_t` struct.
+ * @param target_inten_format The target intensity format to be set in the `data_format_t` struct.
+ */
 void populate_df_target(data_format_t* df, int target_xml_format,
                         int target_mz_format, int target_inten_format) {
    df->target_xml_format = target_xml_format;
    df->target_mz_format = target_mz_format;
    df->target_inten_format = target_inten_format;
-
-   // df->target_xml_fun = map_fun(target_xml_format);
-   // df->target_mz_fun = map_fun(target_mz_format);
-   // df->target_inten_fun = map_fun(target_inten_format);
 }
 
+/**
+ * @brief Allocates and populates a `data_positions_t` struct to store the start and end positions of spectra, XML, m/z, or intensity data within the .mzML file.
+ * @param total_spec The total number of spectra in the .mzML file, used to determine the size of the start and end position arrays.
+ * @return A populated `data_positions_t` struct with allocated start and end position arrays on success. NULL on error.
+ */
 data_positions_t* alloc_dp(int total_spec) {
    if (total_spec < 0)
       error("alloc_dp: total_spec is less than 0!\n");
@@ -89,12 +104,18 @@ data_positions_t* alloc_dp(int total_spec) {
    dp->start_positions = malloc(sizeof(uint64_t) * total_spec * 2);
    dp->end_positions = malloc(sizeof(uint64_t) * total_spec * 2);
 
-   if (dp->start_positions == NULL || dp->end_positions == NULL)
+   if (dp->start_positions == NULL || dp->end_positions == NULL) {
       error("alloc_dp: malloc failure.\n");
+      return NULL;
+   }
 
    return dp;
 }
 
+/**
+ * @brief Deallocates a `data_positions_t` struct and its memory.
+ * @param dp A pointer to the `data_positions_t` struct to be deallocated.
+ */
 void dealloc_dp(data_positions_t* dp) {
    if (dp) {
       if (dp->start_positions)
@@ -108,6 +129,72 @@ void dealloc_dp(data_positions_t* dp) {
       free(dp);
    } else
       error("dealloc_dp: dp is null.\n");
+}
+
+/**
+ * @brief Deallocates a `division_t` struct and its memory / internal structures.
+ * @param div A pointer to the `division_t` struct to be deallocated.
+ */
+void dealloc_division(division_t* div) {
+   if (div == NULL) return;
+   if (div->spectra != NULL) { dealloc_dp(div->spectra); div->spectra = NULL; }
+   if (div->xml != NULL) { dealloc_dp(div->xml); div->xml = NULL; }
+   if (div->mz != NULL) { dealloc_dp(div->mz); div->mz = NULL; }
+   if (div->inten != NULL) { dealloc_dp(div->inten); div->inten = NULL; }
+   if (div->scans != NULL) { free(div->scans); div->scans = NULL; }
+   if (div->ms_levels != NULL) { free(div->ms_levels); div->ms_levels = NULL; }
+   if (div->ret_times != NULL) { free(div->ret_times); div->ret_times = NULL; }
+   free(div);
+}
+
+/**
+ * @brief Deallocates a `divisions_t` struct and its children `division_t` structs.
+ * @param divisions A pointer to the `divisions_t` struct to be deallocated.
+ */
+void dealloc_divisions(divisions_t* divisions) {
+   if (divisions == NULL) return;
+   if (divisions->divisions != NULL) {
+      for (int i = 0; i < divisions->n_divisions; i++) {
+         if (divisions->divisions[i] != NULL)
+            dealloc_division(divisions->divisions[i]);
+      }
+      free(divisions->divisions);
+      divisions->divisions = NULL;
+   }
+   free(divisions);
+}
+
+/**
+ * @brief Deallocates a `division_t` struct and its memory / internal structures, without deallocating the arrays within the `data_positions_t` structs (those reference mmap'd memory from read_dp/read_uint*_arr).
+ * @param div A pointer to the `division_t` struct to be deallocated.
+ */
+void dealloc_read_division(division_t* div) {
+   if (div == NULL) return;
+   /* Only free the data_positions_t structs, not the arrays they point to
+      (those reference mmap'd memory from read_dp/read_uint*_arr). */
+   if (div->spectra != NULL) { free(div->spectra); div->spectra = NULL; }
+   if (div->xml != NULL) { free(div->xml); div->xml = NULL; }
+   if (div->mz != NULL) { free(div->mz); div->mz = NULL; }
+   if (div->inten != NULL) { free(div->inten); div->inten = NULL; }
+   /* scans, ms_levels, ret_times point to mmap'd data - don't free */
+   free(div);
+}
+
+/**
+ * @brief Deallocates a `divisions_t` struct and its children `division_t` structs, without deallocating the arrays within the `data_positions_t` structs (those reference mmap'd memory from read_dp/read_uint*_arr).
+ * @param divisions A pointer to the `divisions_t` struct to be deallocated.  
+ */
+void dealloc_read_divisions(divisions_t* divisions) {
+   if (divisions == NULL) return;
+   if (divisions->divisions != NULL) {
+      for (int i = 0; i < divisions->n_divisions; i++) {
+         if (divisions->divisions[i] != NULL)
+            dealloc_read_division(divisions->divisions[i]);
+      }
+      free(divisions->divisions);
+      divisions->divisions = NULL;
+   }
+   free(divisions);
 }
 
 data_positions_t** alloc_ddp(int len, int total_spec) {
@@ -1699,16 +1786,24 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
          index++;
       }
    }
+   // Free intermediate arrays
+   for (int i = 0; i < divisions->n_divisions; i++) {
+      free(indicies[i]);
+   }
+   free(indicies);
+   free(indicies_lens);
+
    if (!is_monotonically_increasing(result, total_len)) {
       warning(
           "map_ms_level_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
+      free(result);
       return NULL;
    }
 
    *indicies_length = total_len;
-   
+
    return result;
 }
 
@@ -1743,11 +1838,20 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
          index++;
       }
    }
+
+   // Free intermediate arrays
+   for (int i = 0; i < divisions->n_divisions; i++) {
+      free(indicies[i]);
+   }
+   free(indicies);
+   free(indicies_lens);
+
    if (!is_monotonically_increasing(result, total_len)) {
       warning(
           "map_scans_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
+      free(result);
       return NULL;
    }
 

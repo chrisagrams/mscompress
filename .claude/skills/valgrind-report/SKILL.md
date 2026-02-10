@@ -10,6 +10,14 @@ Produce a minimal-token Markdown summary of Valgrind Memcheck reports by running
 ## Workflow
 
 1. Identify the valgrind log file (uploaded or at a given path).
+   - If no log file exists yet and the user wants to run Valgrind, build with debug symbols first:
+     ```bash
+     cd python && MSCOMPRESS_DEBUG=1 uv sync --all-extras --reinstall
+     ```
+     Then run Valgrind:
+     ```bash
+     cd python && valgrind --tool=memcheck --leak-check=full --log-file=leak-check.txt $(uv run which python) -m pytest
+     ```
 2. Run the parser:
    ```bash
    python3 /path/to/this/skill/scripts/parse_valgrind.py <input_file> <output.md>

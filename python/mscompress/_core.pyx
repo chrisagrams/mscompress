@@ -1,7 +1,4 @@
-# cython: linetrace=True
-# cython: binding=True
-
-import os 
+import os
 import numpy as np
 import warnings
 import tempfile
@@ -270,6 +267,15 @@ cdef class MZMLFile(BaseFile):
     def _reopen(path: bytes):
         return MZMLFile(path)
 
+    def _cleanup(self):
+        """Free MZMLFile-specific resources before calling parent cleanup"""
+        # Free divisions created by _prepare_divisions (fully malloc'd)
+        if self._divisions != NULL:
+            _dealloc_divisions(self._divisions)
+            self._divisions = NULL
+        # Call parent cleanup
+        super(MZMLFile, self)._cleanup()
+
     def _prepare_divisions(self):
         cdef long n_divisions = _determine_n_divisions(self._positions.size, self._arguments.blocksize)
         if n_divisions > self._positions.mz.total_spec:  # If we have more divisions than spectra, decrease number of divisions
@@ -401,95 +407,107 @@ cdef class MZMLFile(BaseFile):
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
+        cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
         cdef size_t start, end
-        cdef object mz_array
+        cdef np.ndarray[np.float64_t, ndim=1] mz_array_64
+        cdef np.ndarray[np.float32_t, ndim=1] mz_array_32
         cdef double* double_ptr
         cdef float* float_ptr
 
         start = self._positions.mz.start_positions[index]
         end = self._positions.mz.end_positions[index]
 
-        dest = <char*>malloc((end - start) * 2)
-        if not dest:
-            raise MemoryError("Failed to allocate memory for dest")
-
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
         self._df.decode_source_compression_mz_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
 
-        if self._df.source_mz_fmt == _64d_:
-            count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
-            double_ptr = <double*>dest
+        try:
+            if self._df.source_mz_fmt == _64d_:
+                count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
+                double_ptr = <double*>dest
 
-            if out_len > 0:
-                mz_array = np.asarray(<np.float64_t[:count]>double_ptr)
-            else:
-                mz_array = np.array([], dtype=np.float64)
-        elif self._df.source_mz_fmt == _32f_:
-            count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
-            float_ptr = <float*>dest
+                if out_len > 0:
+                    # Copy data into numpy-owned array
+                    mz_array_64 = np.empty(count, dtype=np.float64)
+                    memcpy(<void*>mz_array_64.data, <void*>double_ptr, count * 8)
+                    return mz_array_64
+                else:
+                    return np.array([], dtype=np.float64)
+            elif self._df.source_mz_fmt == _32f_:
+                count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
+                float_ptr = <float*>dest
 
-            if out_len > 0:
-                mz_array = np.asarray(<np.float32_t[:count]>float_ptr)
+                if out_len > 0:
+                    # Copy data into numpy-owned array
+                    mz_array_32 = np.empty(count, dtype=np.float32)
+                    memcpy(<void*>mz_array_32.data, <void*>float_ptr, count * 4)
+                    return mz_array_32
+                else:
+                    return np.array([], dtype=np.float32)
             else:
-                mz_array = np.array([], dtype=np.float32)
-        else:
-            raise NotImplementedError("Data format not implemented.")
-     
-        _dealloc_data_block(tmp)
-        return mz_array
+                raise NotImplementedError("Data format not implemented.")
+        finally:
+            free(decode_output)
+            _dealloc_data_block(tmp)
 
     def get_inten_binary(self, size_t index):
         cdef char* dest = NULL
+        cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
         cdef size_t start, end
-        cdef object inten_array
+        cdef np.ndarray[np.float64_t, ndim=1] inten_array_64
+        cdef np.ndarray[np.float32_t, ndim=1] inten_array_32
         cdef double* double_ptr
         cdef float* float_ptr
 
         start = self._positions.inten.start_positions[index]
         end = self._positions.inten.end_positions[index]
 
-        dest = <char*>malloc((end - start) * 2)
-        if not dest:
-            raise MemoryError("Failed to allocate memory for dest")
-
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
         self._df.decode_source_compression_inten_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
 
-        if self._df.source_inten_fmt == _64d_:
-            count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
-            double_ptr = <double*>dest
+        try:
+            if self._df.source_inten_fmt == _64d_:
+                count = int((out_len - ZLIB_SIZE_OFFSET) / 8)
+                double_ptr = <double*>dest
 
-            if out_len > 0:
-                inten_array = np.asarray(<np.float64_t[:count]>double_ptr)
-            else:
-                inten_array = np.array([], dtype=np.float64)
-        elif self._df.source_inten_fmt == _32f_:
-            count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
-            float_ptr = <float*>dest
+                if out_len > 0:
+                    # Copy data into numpy-owned array
+                    inten_array_64 = np.empty(count, dtype=np.float64)
+                    memcpy(<void*>inten_array_64.data, <void*>double_ptr, count * 8)
+                    return inten_array_64
+                else:
+                    return np.array([], dtype=np.float64)
+            elif self._df.source_inten_fmt == _32f_:
+                count = int((out_len - ZLIB_SIZE_OFFSET) / 4)
+                float_ptr = <float*>dest
 
-            if out_len > 0:
-                inten_array = np.asarray(<np.float32_t[:count]>float_ptr)
+                if out_len > 0:
+                    # Copy data into numpy-owned array
+                    inten_array_32 = np.empty(count, dtype=np.float32)
+                    memcpy(<void*>inten_array_32.data, <void*>float_ptr, count * 4)
+                    return inten_array_32
+                else:
+                    return np.array([], dtype=np.float32)
             else:
-                inten_array = np.array([], dtype=np.float32)
-        else:
-            raise NotImplementedError("Data format not implemented.")
-     
-        _dealloc_data_block(tmp)
-        return inten_array
+                raise NotImplementedError("Data format not implemented.")
+        finally:
+            free(decode_output)
+            _dealloc_data_block(tmp)
 
     
     def get_xml(self, size_t index):
@@ -541,6 +559,35 @@ cdef class MSZFile(BaseFile):
     @staticmethod
     def _reopen(path: bytes):
         return MSZFile(path)
+
+    def _cleanup(self):
+        """Free MSZFile-specific resources before calling parent cleanup"""
+
+        # Free ZSTD_DCtx
+        if self._dctx != NULL:
+            ZSTD_freeDCtx(self._dctx)
+            self._dctx = NULL
+
+        # Free block length queues
+        if self._xml_block_lens != NULL:
+            _dealloc_block_len_queue(self._xml_block_lens)
+            self._xml_block_lens = NULL
+        if self._mz_binary_block_lens != NULL:
+            _dealloc_block_len_queue(self._mz_binary_block_lens)
+            self._mz_binary_block_lens = NULL
+        if self._inten_binary_block_lens != NULL:
+            _dealloc_block_len_queue(self._inten_binary_block_lens)
+            self._inten_binary_block_lens = NULL
+
+        # Free divisions from read_divisions (mmap-backed, only free struct wrappers)
+        if self._divisions != NULL:
+            _dealloc_read_divisions(self._divisions)
+            self._divisions = NULL
+
+        # _footer points to mmap'd memory, don't free
+
+        # Call parent cleanup
+        super(MSZFile, self)._cleanup()
     
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
@@ -651,61 +698,79 @@ cdef class MSZFile(BaseFile):
     def get_mz_binary(self, size_t index):
         cdef char* res = NULL
         cdef size_t out_len = 0
-        cdef object mz_array
+        cdef np.ndarray[np.float64_t, ndim=1] mz_array_64
+        cdef np.ndarray[np.float32_t, ndim=1] mz_array_32
         cdef double* double_ptr
         cdef float* float_ptr
-        
+
         res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE)
-        
+
         if res == NULL:
             raise ValueError(f"Failed to extract m/z binary for index {index}")
-        
-        if self._df.source_mz_fmt == _64d_:
-            count = int((out_len) / 8)
-            double_ptr = <double*>res
-            if out_len > 0:
-                mz_array = np.asarray(<np.float64_t[:count]>double_ptr)
-            else:
-                mz_array = np.array([], dtype=np.float64)
-        elif self._df.source_mz_fmt == _32f_:
-            count = int((out_len) / 4)
-            float_ptr = <float*>res
-            if out_len > 0:
-                mz_array = np.asarray(<np.float32_t[:count]>float_ptr)
-            else:
-                mz_array = np.array([], dtype=np.float32)
-        
-        return mz_array
+
+        try:
+            if self._df.source_mz_fmt == _64d_:
+                count = int((out_len) / 8)
+                double_ptr = <double*>res
+                if out_len > 0:
+                    # Copy data into numpy-owned array to avoid memory leak
+                    mz_array_64 = np.empty(count, dtype=np.float64)
+                    memcpy(<void*>mz_array_64.data, <void*>double_ptr, count * 8)
+                    return mz_array_64
+                else:
+                    return np.array([], dtype=np.float64)
+            elif self._df.source_mz_fmt == _32f_:
+                count = int((out_len) / 4)
+                float_ptr = <float*>res
+                if out_len > 0:
+                    # Copy data into numpy-owned array to avoid memory leak
+                    mz_array_32 = np.empty(count, dtype=np.float32)
+                    memcpy(<void*>mz_array_32.data, <void*>float_ptr, count * 4)
+                    return mz_array_32
+                else:
+                    return np.array([], dtype=np.float32)
+        finally:
+            # Free the C buffer returned by _extract_spectrum_mz
+            free(res)
     
     
     def get_inten_binary(self, size_t index):
         cdef char* res = NULL
         cdef size_t out_len = 0
-        cdef object inten_array
+        cdef np.ndarray[np.float64_t, ndim=1] inten_array_64
+        cdef np.ndarray[np.float32_t, ndim=1] inten_array_32
         cdef double* double_ptr
         cdef float* float_ptr
-        
+
         res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE)
 
         if res == NULL:
             raise ValueError(f"Failed to extract intensity binary for index {index}")
 
-        if self._df.source_inten_fmt == _64d_:
-            count = int((out_len) / 8)
-            double_ptr = <double*>res
-            if out_len > 0:
-                inten_array = np.asarray(<np.float64_t[:count]>double_ptr)
-            else:
-                inten_array = np.array([], dtype=np.float64)
-        elif self._df.source_inten_fmt == _32f_:
-            count = int((out_len) / 4)
-            float_ptr = <float*>res
-            if out_len > 0:
-                inten_array = np.asarray(<np.float32_t[:count]>float_ptr)
-            else:
-                inten_array = np.array([], dtype=np.float32)
-        
-        return inten_array
+        try:
+            if self._df.source_inten_fmt == _64d_:
+                count = int((out_len) / 8)
+                double_ptr = <double*>res
+                if out_len > 0:
+                    # Copy data into numpy-owned array to avoid memory leak
+                    inten_array_64 = np.empty(count, dtype=np.float64)
+                    memcpy(<void*>inten_array_64.data, <void*>double_ptr, count * 8)
+                    return inten_array_64
+                else:
+                    return np.array([], dtype=np.float64)
+            elif self._df.source_inten_fmt == _32f_:
+                count = int((out_len) / 4)
+                float_ptr = <float*>res
+                if out_len > 0:
+                    # Copy data into numpy-owned array to avoid memory leak
+                    inten_array_32 = np.empty(count, dtype=np.float32)
+                    memcpy(<void*>inten_array_32.data, <void*>float_ptr, count * 4)
+                    return inten_array_32
+                else:
+                    return np.array([], dtype=np.float32)
+        finally:
+            # Free the C buffer returned by _extract_spectrum_inten
+            free(res)
 
     
     def get_xml(self, size_t index):
@@ -730,7 +795,11 @@ cdef class MSZFile(BaseFile):
         if res == NULL:
             raise ValueError(f"Failed to extract XML for index {index}")
 
-        result_str = res.decode('utf-8')
+        try:
+            result_str = res.decode('utf-8')
+        finally:
+            # Free the C buffer returned by _extract_spectra
+            free(res)
 
         element = fromstring(result_str)
 
@@ -869,18 +938,35 @@ cdef class BaseFile:
 
     def _cleanup(self):
         # On Windows, unmap must happen before closing the file descriptor
-        if self._mapping != NULL: 
+        # Unmap file mapping if exists
+        if self._mapping != NULL:
             _remove_mapping(self._mapping, self.filesize)
             self._mapping = NULL
-        
-        if self._fd > 0:
+
+        # Close input file descriptor if open
+        if self._fd >= 0:
             _close_file(self._fd)
             self._fd = -1
 
-        if self.output_fd > 0:
+        # Close output file descriptor if open
+        if self.output_fd >= 0:
             _close_file(self.output_fd)
             self.output_fd = -1
-    
+
+        # Free zlib z_stream
+        if self._z != NULL:
+            _dealloc_z_stream(self._z)
+            self._z = NULL
+
+        # Free data_format_t
+        if self._df != NULL:
+            _dealloc_df(self._df)
+            self._df = NULL
+
+        # Free division_t _positions (always fully malloc'd from scan_mzml or flatten_divisions)
+        if self._positions != NULL:
+            _dealloc_division(self._positions)
+            self._positions = NULL
 
     @property
     def path(self) -> bytes:

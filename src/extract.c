@@ -158,6 +158,7 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       xml_i++;
 
       write_to_file(output_fd, buff, out_len);
+      free(buff);
    }
    return;
 }
@@ -677,7 +678,12 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       buff_off += *a_args->dest_len;
    }
 
-   // free(a_args);
+   dealloc_z_stream(a_args->z);
+   free(a_args);
+
+   // Free previous encoded cache if present (avoid leak on re-encode)
+   if (blk->encoded_cache) free(blk->encoded_cache);
+   if (blk->encoded_cache_lens) free(blk->encoded_cache_lens);
 
    // Update the block structure with the encoded data and its format
    blk->encoded_cache = buff;
@@ -948,6 +954,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
        spectrum_end, &start_xml_len);
    memcpy(res, spectrum_start_xml, start_xml_len);
    *out_len += start_xml_len;
+   free(spectrum_start_xml);
 
    size_t mz_len = 0;
    char* spectrum_mz =
@@ -964,6 +971,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    }
    memcpy(res + *out_len, spectrum_mz, mz_len);
    *out_len += mz_len;
+   free(spectrum_mz);
 
    size_t inner_xml_len = 0;
    char* spectrum_inner_xml = extract_spectrum_inner_xml(
@@ -981,6 +989,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_inner_xml, inner_xml_len);
    *out_len += inner_xml_len;
+   free(spectrum_inner_xml);
 
    size_t inten_len = 0;
    char* spectrum_inten =
@@ -997,6 +1006,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_inten, inten_len);
    *out_len += inten_len;
+   free(spectrum_inten);
 
    size_t last_xml_len = 0;
    char* spectrum_last_xml = extract_spectrum_last_xml(
@@ -1013,6 +1023,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
 
    memcpy(res + *out_len, spectrum_last_xml, last_xml_len);
    *out_len += last_xml_len;
+   free(spectrum_last_xml);
 
    print("Extracted spectrum index %ld\n", index);
    return res;
@@ -1070,13 +1081,17 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    size_t header_len = 0;
    xml_blk_len = get_block_by_index(xml_block_lens, 0);
    xml_blk_offset = msz_footer->xml_pos;
-   decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
-                                  xml_blk_offset, xml_blk_len);
-   if (decmp_xml == NULL) {
-      error("extract_msz: Failed to decompress XML block for mzML header.\n");
-      return;
+   if (!xml_blk_len->cache) {
+      decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
+                                     xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_msz: Failed to decompress XML block for mzML header.\n");
+         return;
+      }
+      xml_blk_len->cache = decmp_xml;
+   } else {
+      decmp_xml = xml_blk_len->cache;
    }
-   xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_header =
        extract_mzml_header(decmp_xml, curr_division, &header_len);
 
@@ -1112,16 +1127,33 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    xml_blk_offset =
        msz_footer->xml_pos +
        get_block_offset_by_index(xml_block_lens, divisions->n_divisions - 1);
-   decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
-                                  xml_blk_offset, xml_blk_len);
-   if (decmp_xml == NULL) {
-      error("extract_msz: Failed to decompress XML block for mzML footer.\n");
-      return;
+   if (!xml_blk_len->cache) {
+      decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
+                                     xml_blk_offset, xml_blk_len);
+      if (decmp_xml == NULL) {
+         error("extract_msz: Failed to decompress XML block for mzML footer.\n");
+         return;
+      }
+      xml_blk_len->cache = decmp_xml;
+   } else {
+      decmp_xml = xml_blk_len->cache;
    }
-   xml_blk_len->cache = decmp_xml;  // Cache decompressed block
    char* mzml_footer = extract_mzml_footer(decmp_xml, divisions, &footer_len);
    // print("%s\n", mzml_footer);
    write_to_file(output_fd, mzml_footer, footer_len);
+   free(mzml_footer);
+
+   // Free indicies if allocated by ms_level or scan mapping
+   if (ms_level != 0 || scans_length > 0) {
+      free(indicies);
+   }
+
+   ZSTD_freeDCtx(dctx);
+   dealloc_block_len_queue(xml_block_lens);
+   dealloc_block_len_queue(mz_binary_block_lens);
+   dealloc_block_len_queue(inten_binary_block_lens);
+   dealloc_df(df);
+   dealloc_read_divisions(divisions);
 }
 
 void extract_mzml_filtered(char* input_map, size_t input_filesize,
