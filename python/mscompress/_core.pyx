@@ -947,12 +947,12 @@ cdef class BaseFile:
             self._mapping = NULL
 
         # Close input file descriptor if open
-        if self._fd > 0:
+        if self._fd >= 0:
             _close_file(self._fd)
             self._fd = -1
 
         # Close output file descriptor if open
-        if self.output_fd > 0:
+        if self.output_fd >= 0:
             _close_file(self.output_fd)
             self.output_fd = -1
 
