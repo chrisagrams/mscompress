@@ -410,7 +410,7 @@ cdef class MZMLFile(BaseFile):
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
-        cdef char* dest_original = NULL  # Keep original pointer for freeing
+        cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
@@ -423,15 +423,11 @@ cdef class MZMLFile(BaseFile):
         start = self._positions.mz.start_positions[index]
         end = self._positions.mz.end_positions[index]
 
-        dest = <char*>malloc((end - start) * 2)
-        if not dest:
-            raise MemoryError("Failed to allocate memory for dest")
-        dest_original = dest  # Save original pointer before advancing
-
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
         self._df.decode_source_compression_mz_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
 
@@ -461,13 +457,12 @@ cdef class MZMLFile(BaseFile):
             else:
                 raise NotImplementedError("Data format not implemented.")
         finally:
-            # Free the original C buffer
-            free(dest_original)
+            free(decode_output)
             _dealloc_data_block(tmp)
 
     def get_inten_binary(self, size_t index):
         cdef char* dest = NULL
-        cdef char* dest_original = NULL  # Keep original pointer for freeing
+        cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
         cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
         cdef char* mapping_ptr
@@ -480,15 +475,11 @@ cdef class MZMLFile(BaseFile):
         start = self._positions.inten.start_positions[index]
         end = self._positions.inten.end_positions[index]
 
-        dest = <char*>malloc((end - start) * 2)
-        if not dest:
-            raise MemoryError("Failed to allocate memory for dest")
-        dest_original = dest  # Save original pointer before advancing
-
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
         self._df.decode_source_compression_inten_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
 
@@ -518,8 +509,7 @@ cdef class MZMLFile(BaseFile):
             else:
                 raise NotImplementedError("Data format not implemented.")
         finally:
-            # Free the original C buffer
-            free(dest_original)
+            free(decode_output)
             _dealloc_data_block(tmp)
 
     

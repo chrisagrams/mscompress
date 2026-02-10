@@ -1786,16 +1786,24 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
          index++;
       }
    }
+   // Free intermediate arrays
+   for (int i = 0; i < divisions->n_divisions; i++) {
+      free(indicies[i]);
+   }
+   free(indicies);
+   free(indicies_lens);
+
    if (!is_monotonically_increasing(result, total_len)) {
       warning(
           "map_ms_level_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
+      free(result);
       return NULL;
    }
 
    *indicies_length = total_len;
-   
+
    return result;
 }
 
@@ -1830,11 +1838,20 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
          index++;
       }
    }
+
+   // Free intermediate arrays
+   for (int i = 0; i < divisions->n_divisions; i++) {
+      free(indicies[i]);
+   }
+   free(indicies);
+   free(indicies_lens);
+
    if (!is_monotonically_increasing(result, total_len)) {
       warning(
           "map_scans_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
+      free(result);
       return NULL;
    }
 

@@ -681,6 +681,10 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    dealloc_z_stream(a_args->z);
    free(a_args);
 
+   // Free previous encoded cache if present (avoid leak on re-encode)
+   if (blk->encoded_cache) free(blk->encoded_cache);
+   if (blk->encoded_cache_lens) free(blk->encoded_cache_lens);
+
    // Update the block structure with the encoded data and its format
    blk->encoded_cache = buff;
    blk->encoded_cache_fmt = target_fmt;
