@@ -414,9 +414,9 @@ class MSZXFile:
     def close(self) -> None:
         """Close the archive and clean up temporary files."""
         if not self._closed:
-            self._closed = True
             self.msz._cleanup()
             shutil.rmtree(self._temp_dir, ignore_errors=True)
+            self._closed = True
 
     def __enter__(self) -> MSZXFile:
         return self
