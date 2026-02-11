@@ -256,10 +256,10 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
 
 /**
  * @brief Sets the decompression runtime variables for the given data format and footer. This function initializes the decompression functions based on the target formats specified in the footer.
- * @param df A pointer to the data_format_t struct to set the decompression variables for
- * @param msz_footer A pointer to the footer_t struct containing the target formats for the decompression functions
+ * @param df A pointer to the `data_format_t` struct to set the decompression variables for
+ * @param msz_footer A pointer to the `footer_t` struct containing the target formats for the decompression functions
  * @return Returns 0 on success, 1 on error. If an error occurs, the function will print an error message to stderr.
- * Note: This function modifies the data_format_t struct in place.
+ * @note This function modifies the `data_format_t` struct in place.
  */
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    // Set target encoding and decompression functions.

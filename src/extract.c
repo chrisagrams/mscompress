@@ -10,8 +10,8 @@
  * @param header_len Current header length.
  * @param new_count The new spectrum count to set.
  * @param out_len Pointer to store the updated header length.
- * @return New header buffer with updated count (caller must free), or NULL on
- * error.
+ * @return New header buffer with updated count, or `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
  */
 char* update_spectrum_list_count(char* header, size_t header_len,
                                  long new_count, size_t* out_len) {
@@ -97,6 +97,12 @@ char* update_spectrum_list_count(char* header, size_t header_len,
    return result;
 }
 
+/**
+ * @brief Reconstructs and writes a complete mzML file from its divided streams.
+ * @param input_map The memory-mapped input buffer containing the original data.
+ * @param divisions The divisions containing XML, m/z, and intensity position mappings.
+ * @param output_fd The file descriptor to write the reconstructed mzML output to.
+ */
 void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
    for (int i = 0; i < divisions->n_divisions; i++) {
       division_t* division = divisions->divisions[i];
@@ -163,6 +169,12 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
    return;
 }
 
+/**
+ * @brief Determines which division contains a given spectrum index.
+ * @param divisions The divisions structure to search.
+ * @param index The global spectrum index to locate.
+ * @return The zero-based division index containing the spectrum, or -1 if not found.
+ */
 int determine_division_by_index(divisions_t* divisions, long index) {
    int i = 0;
    long sum = 0;
@@ -181,6 +193,13 @@ int determine_division_by_index(divisions_t* divisions, long index) {
    return -1;
 }
 
+/**
+ * @brief Resolves the byte start and end positions of a spectrum by its global index.
+ * @param divisions The divisions structure containing spectra position data.
+ * @param index The global spectrum index to look up.
+ * @param start Pointer to store the resolved start byte position.
+ * @param end Pointer to store the resolved end byte position.
+ */
 void determine_spectrum_start_end(divisions_t* divisions, long index,
                                   uint64_t* start, uint64_t* end) {
    division_t* curr;
@@ -206,6 +225,13 @@ void determine_spectrum_start_end(divisions_t* divisions, long index,
    return;
 }
 
+/**
+ * @brief Determines which division contains a given target spectrum offset.
+ * @param divisions The divisions structure to search.
+ * @param target The target spectrum offset (cumulative count) to locate.
+ * @return The zero-based division index containing the target, or 0 if not found.
+ * @note Returns -1 if a division or its spectra pointer is `NULL`.
+ */
 int determine_division(divisions_t* divisions, long target) {
    int i = 0;
    long sum = 0;
@@ -235,9 +261,10 @@ int determine_division(divisions_t* divisions, long target) {
  * first spectra start)
  * @param blk The input buffer containing the data.
  * @param first_divison The first division containing the header information.
- * @param out_len Pointer to a size_t where the length of the extracted header
+ * @param out_len Pointer to a `size_t` where the length of the extracted header
  * will be stored.
- * @return A pointer to the extracted mzML header on success. NULL on error.
+ * @return A pointer to the extracted mzML header on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
  */
 char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len) {
@@ -267,9 +294,10 @@ char* extract_mzml_header(char* blk, division_t* first_division,
  * end -> last XML end)
  * @param blk The input buffer containing the data.
  * @param divisions The divisions containing the footer information.
- * @param out_len Pointer to a size_t where the length of the extracted footer
+ * @param out_len Pointer to a `size_t` where the length of the extracted footer
  * will be stored.
- * @return A pointer to the extracted mzML footer on success. NULL on error.
+ * @return A pointer to the extracted mzML footer on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
  */
 char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len) {
    data_positions_t *spectra, *xml;
@@ -334,7 +362,9 @@ char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len) {
  * @param spectrum_end The ending position of the spectrum to extract.
  * @param out_len A pointer to a `size_t` where the length of the extracted XML
  * block will be stored.
- * @return A pointer to the extracted XML block on success. NULL on error
+ * @return A pointer to the extracted XML block on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
@@ -420,7 +450,9 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
  * @param spectrum_end The ending position of the spectrum to extract.
  * @param out_len A pointer to a `size_t` where the length of the extracted XML
  * block will be stored.
- * @return A pointer to the extracted XML block on success. NULL on error
+ * @return A pointer to the extracted XML block on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
@@ -506,7 +538,9 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
  * @param spectrum_end The ending position of the spectrum to extract.
  * @param out_len A pointer to a `size_t` where the length of the extracted XML
  * block will be stored.
- * @return A pointer to the extracted XML block on success. NULL on error.
+ * @return A pointer to the extracted XML block on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
                                 data_format_t* df,
@@ -593,8 +627,10 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
  * the data.
  * @return Returns 0 on success, and 1 on failure.
  *
- * Note: Caller is responsible for freeing the memory allocated for the encoded
- * cache and its lengths in the `block_len_t` structure after use.
+ * @warning Caller is responsible for freeing the encoded_cache and
+ *          encoded_cache_lens stored in the `block_len_t` structure after use.
+ *          Previously allocated encoded_cache and encoded_cache_lens are freed
+ *          internally before being overwritten.
  */
 int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
                         uint32_t source_fmt, uint32_t target_fmt,
@@ -702,7 +738,8 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
  * @param index The index of the block to extract.
  * @param out_len A pointer to a `size_t` variable where the length of the
  * extracted block will be stored.
- * @return A pointer to the extracted block on success, or NULL on failure.
+ * @return A pointer to the extracted block on success, or `NULL` on failure.
+ * @note The caller is responsible for freeing the returned buffer.
  */
 char* extract_from_encoded_block(block_len_t* blk, long index,
                                  size_t* out_len) {
@@ -737,7 +774,9 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
  * block will be stored.
  * @param encode An integer flag indicating whether to encode the extracted
  * block (1) or not (0).
- * @return A pointer to the extracted m/z block on success. NULL on error.
+ * @return A pointer to the extracted m/z block on success. `NULL` on error.
+ * @note The caller is responsible for freeing the returned buffer.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
@@ -821,7 +860,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
  * intensity block will be stored.
  * @param encode An integer flag indicating whether to encode the extracted
  * block (1) or not (0).
- * @return A pointer to the extracted intensity block on success. NULL on error.
+ * @return A pointer to the extracted intensity block on success. `NULL` on error.
  */
 char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
@@ -923,7 +962,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
  * @param index The index of the spectrum to extract.
  * @param out_len A pointer to a `size_t` where the length of the extracted
  * spectrum will be stored.
- * @return A pointer to the extracted spectrum on success. NULL on error.
+ * @return A pointer to the extracted spectrum on success. `NULL` on error.
  */
 char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* xml_block_lens,
@@ -1029,6 +1068,20 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    return res;
 }
 
+/**
+ * @brief Extracts selected spectra from an MSZ compressed file and writes them as mzML.
+ * @param input_map The memory-mapped MSZ input file buffer.
+ * @param input_filesize The total size of the input file in bytes.
+ * @param indicies Array of spectrum indices to extract (may be overridden by ms_level or scans).
+ * @param indicies_length Number of elements in the indicies array.
+ * @param scans Array of scan numbers to extract (used when scans_length > 0).
+ * @param scans_length Number of elements in the scans array.
+ * @param ms_level MS level to filter by (0 means no MS level filtering).
+ * @param output_fd The file descriptor to write the extracted mzML output to.
+ * @note When ms_level != 0 or scans_length > 0, this function allocates a new
+ *       indicies array internally and frees it before returning. The original
+ *       indicies parameter is not freed in that case.
+ */
 void extract_msz(char* input_map, size_t input_filesize, long* indicies,
                  long indicies_length, uint32_t* scans, long scans_length,
                  uint16_t ms_level, int output_fd) {
@@ -1156,6 +1209,20 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    dealloc_read_divisions(divisions);
 }
 
+/**
+ * @brief Extracts selected spectra from an mzML file and writes the filtered output.
+ * @param input_map The memory-mapped mzML input file buffer.
+ * @param input_filesize The total size of the input file in bytes.
+ * @param indicies Array of spectrum indices to extract (may be overridden by ms_level or scans).
+ * @param indicies_length Number of elements in the indicies array.
+ * @param scans Array of scan numbers to extract (used when scans_length > 0).
+ * @param scans_length Number of elements in the scans array.
+ * @param ms_level MS level to filter by (0 means no MS level filtering).
+ * @param division The division containing the mzML file's position data.
+ * @param output_fd The file descriptor to write the filtered mzML output to.
+ * @note When `ms_level != 0` or `scans_length > 0`, this function allocates a new
+ *       indicies array internally and frees it before returning.
+ */
 void extract_mzml_filtered(char* input_map, size_t input_filesize,
                            long* indicies, long indicies_length,
                            uint32_t* scans, long scans_length,
