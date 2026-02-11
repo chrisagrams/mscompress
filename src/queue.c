@@ -11,7 +11,7 @@
  *
  * @return A pointer to a newly allocated cmp_blk_queue_t struct.
  *
- * @note The caller is responsible for freeing the returned queue via dealloc_cmp_buff().
+ * @note The caller is responsible for freeing the returned queue via `dealloc_cmp_buff()`.
  * @warning Terminates the program if malloc fails.
  */
 cmp_blk_queue_t* alloc_cmp_buff()
@@ -84,10 +84,10 @@ void append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk)
  * @brief Removes and returns the compressed block at the front of the queue.
  *
  * Removes the head node from the queue and returns it. If the queue is empty,
- * returns NULL. The returned block's next pointer is set to NULL.
+ * returns `NULL`. The returned block's next pointer is set to `NULL`.
  *
- * @param queue A pointer to the cmp_blk_queue_t queue.
- * @return A pointer to the removed cmp_block_t, or NULL if the queue is empty.
+ * @param queue A pointer to the `cmp_blk_queue_t` queue.
+ * @return A pointer to the removed `cmp_block_t`, or `NULL` if the queue is empty.
  *
  * @note The caller takes ownership of the returned block and is responsible for freeing it.
  */
@@ -124,7 +124,7 @@ cmp_block_t* pop_cmp_block(cmp_blk_queue_t* queue)
  * @param compressed_size The compressed size of the data block in bytes.
  * @return A pointer to a newly allocated block_len_t struct.
  *
- * @note The caller is responsible for freeing the returned struct via dealloc_block_len().
+ * @note The caller is responsible for freeing the returned struct via `dealloc_block_len()`.
  */
 block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    block_len_t* r;
@@ -175,7 +175,7 @@ void dealloc_block_len(block_len_t* blk) {
  *
  * @return A pointer to a newly allocated block_len_queue_t struct.
  *
- * @note The caller is responsible for freeing the returned queue via dealloc_block_len_queue().
+ * @note The caller is responsible for freeing the returned queue via `dealloc_block_len_queue()`.
  * @warning Terminates the program if malloc fails.
  */
 block_len_queue_t* alloc_block_len_queue() {
@@ -256,7 +256,7 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
  *
  * @param queue A pointer to the block_len_queue_t to search.
  * @param index The zero-based index of the desired node.
- * @return A pointer to the block_len_t at the given index, or NULL if not found.
+ * @return A pointer to the `block_len_t` at the given index, or `NULL` if not found.
  *
  * @note Returns a pointer to the existing node within the queue, not a copy.
  *       The caller must not free the returned pointer independently of the queue.
@@ -311,10 +311,10 @@ long get_block_offset_by_index(block_len_queue_t* queue, int index)
  * @brief Removes and returns the block length node at the front of the queue.
  *
  * Removes the head node from the queue and returns it. If the queue is empty,
- * returns NULL. The returned node's next pointer is set to NULL.
+ * returns `NULL`. The returned node's next pointer is set to `NULL`.
  *
- * @param queue A pointer to the block_len_queue_t to pop from.
- * @return A pointer to the removed block_len_t, or NULL if the queue is empty.
+ * @param queue A pointer to the `block_len_queue_t` to pop from.
+ * @return A pointer to the removed `block_len_t`, or `NULL` if the queue is empty.
  *
  * @note The caller takes ownership of the returned node and is responsible
  *       for freeing it via dealloc_block_len().
@@ -391,8 +391,8 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd) {
  * @param end The byte offset from input_map where the block length data ends.
  * @return A pointer to a newly allocated block_len_queue_t containing the parsed nodes.
  *
- * @note The caller is responsible for freeing the returned queue via dealloc_block_len_queue().
- * @warning Calls error() and may terminate if input_map is NULL or offsets are negative.
+ * @note The caller is responsible for freeing the returned queue via `dealloc_block_len_queue()`.
+ * @warning Calls `error()` and may terminate if `input_map` is `NULL` or offsets are negative.
  */
 block_len_queue_t* read_block_len_queue(void* input_map, long offset,
                                         long end) {

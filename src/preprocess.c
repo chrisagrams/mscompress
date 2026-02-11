@@ -30,8 +30,8 @@
 /**
  * @brief Allocates and initializes a yxml parser instance with an internal buffer.
  * @return A pointer to the initialized yxml_t parser.
- * @note The caller is responsible for freeing the returned pointer with free().
- * @warning Calls error() and aborts on malloc failure.
+ * @note The caller is responsible for freeing the returned pointer with `free()`.
+ * @warning Calls `error()` and aborts on `malloc` failure.
  */
 // TODO: Remove yxml dependency since we no longer use it.
 yxml_t* alloc_yxml() {
@@ -46,9 +46,9 @@ yxml_t* alloc_yxml() {
 
 /**
  * @brief Allocates a zeroed data_format_t struct with populated field set to 0.
- * @return A pointer to the newly allocated data_format_t struct.
- * @note The caller is responsible for freeing the returned pointer with dealloc_df().
- * @warning Calls error() and aborts on malloc failure.
+ * @return A pointer to the newly allocated `data_format_t` struct.
+ * @note The caller is responsible for freeing the returned pointer with `dealloc_df()`.
+ * @warning Calls `error()` and aborts on `malloc` failure.
  */
 data_format_t* alloc_df() {
    data_format_t* df = malloc(sizeof(data_format_t));
@@ -89,7 +89,7 @@ void populate_df_target(data_format_t* df, int target_xml_format,
 /**
  * @brief Allocates and populates a `data_positions_t` struct to store the start and end positions of spectra, XML, m/z, or intensity data within the .mzML file.
  * @param total_spec The total number of spectra in the .mzML file, used to determine the size of the start and end position arrays.
- * @return A populated `data_positions_t` struct with allocated start and end position arrays on success. NULL on error.
+ * @return A populated `data_positions_t` struct with allocated start and end position arrays on success. `NULL` on error.
  */
 data_positions_t* alloc_dp(int total_spec) {
    if (total_spec < 0)
@@ -213,9 +213,9 @@ void dealloc_read_divisions(divisions_t* divisions) {
  * @brief Allocates an array of data_positions_t pointers, each initialized via alloc_dp with total_spec set to 0.
  * @param len The number of data_positions_t pointers to allocate (must be >= 1).
  * @param total_spec The capacity of each data_positions_t (must be >= 1).
- * @return A pointer to the array of data_positions_t pointers.
- * @note The caller is responsible for freeing the returned array with free_ddp().
- * @warning Calls error() and aborts on invalid arguments or malloc failure.
+ * @return A pointer to the array of `data_positions_t` pointers.
+ * @note The caller is responsible for freeing the returned array with `free_ddp()`.
+ * @warning Calls `error()` and aborts on invalid arguments or `malloc` failure.
  */
 data_positions_t** alloc_ddp(int len, int total_spec) {
    if (len < 1)
@@ -244,9 +244,9 @@ data_positions_t** alloc_ddp(int len, int total_spec) {
 
 /**
  * @brief Frees an array of data_positions_t pointers and their contents.
- * @param ddp The array of data_positions_t pointers to free.
- * @param divisions The number of elements in the ddp array (must be >= 1).
- * @warning Calls error() and aborts if ddp is NULL or divisions < 1.
+ * @param ddp The array of `data_positions_t` pointers to free.
+ * @param divisions The number of elements in the `ddp` array (must be >= 1).
+ * @warning Calls `error()` and aborts if `ddp` is `NULL` or `divisions` < 1.
  */
 void free_ddp(data_positions_t** ddp, int divisions) {
    int i;
@@ -268,9 +268,9 @@ void free_ddp(data_positions_t** ddp, int divisions) {
  * @param n_mz The number of m/z position entries to allocate (also used for spectra, scans, and ms_levels).
  * @param n_inten The number of intensity position entries to allocate.
  * @return A pointer to the newly allocated division_t struct with all total_spec counters set to 0.
- * @note The caller is responsible for freeing the returned struct with dealloc_division().
- * @note ret_times is initialized to NULL; the caller must allocate it separately if needed.
- * @warning Calls error() and aborts on malloc failure.
+ * @note The caller is responsible for freeing the returned struct with `dealloc_division()`.
+ * @note `ret_times` is initialized to `NULL`; the caller must allocate it separately if needed.
+ * @warning Calls `error()` and aborts on `malloc` failure.
  */
 division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
    division_t* d = malloc(sizeof(division_t));
@@ -363,7 +363,7 @@ int map_to_df(int acc, int* current_type, data_format_t* df)
  *
  * @param input_map A memory-mapped pointer to the .mzML file contents.
  * @return A populated data_format_t struct on success, NULL on failure (parse error or incomplete data).
- * @note The caller is responsible for freeing the returned pointer with dealloc_df().
+ * @note The caller is responsible for freeing the returned pointer with `dealloc_df()`.
  * @note Returns a malloc'd data_format_t that the caller owns.
  */
 data_format_t* pattern_detect(char* input_map)
@@ -477,7 +477,7 @@ int validate_positions(uint64_t* arr, int len) {
 /**
  * @brief Finds the start of the next <spectrum> XML element in the input.
  * @param ptr A pointer into the mzML file content to search from.
- * @return A pointer to the beginning of the "<spectrum " tag, or NULL if not found.
+ * @return A pointer to the beginning of the "<spectrum " tag, or `NULL` if not found.
  */
 char* get_spectrum_start(char* ptr) {
    char* res = strstr(ptr, "<spectrum ");
@@ -489,7 +489,7 @@ char* get_spectrum_start(char* ptr) {
 /**
  * @brief Finds the end of the current </spectrum> XML element in the input.
  * @param ptr A pointer into the mzML file content to search from.
- * @return A pointer to the character immediately after the "</spectrum>" closing tag, or NULL if not found.
+ * @return A pointer to the character immediately after the "</spectrum>" closing tag, or `NULL` if not found.
  */
 char* get_spectrum_end(char* ptr) {
    char* res = strstr(ptr, "</spectrum>") + strlen("</spectrum>");
@@ -501,7 +501,7 @@ char* get_spectrum_end(char* ptr) {
 /**
  * @brief Finds the start of the binary data content within a <binary> XML element.
  * @param ptr A pointer into the mzML file content to search from.
- * @return A pointer to the first character after the "<binary>" opening tag, or NULL if not found.
+ * @return A pointer to the first character after the "<binary>" opening tag, or `NULL` if not found.
  */
 char* get_binary_start(char* ptr) {
    char* res = strstr(ptr, "<binary>") + strlen("<binary>");
@@ -513,7 +513,7 @@ char* get_binary_start(char* ptr) {
 /**
  * @brief Finds the end of the binary data content at the </binary> XML closing tag.
  * @param ptr A pointer into the mzML file content to search from.
- * @return A pointer to the start of the "</binary>" closing tag, or NULL if not found.
+ * @return A pointer to the start of the "</binary>" closing tag, or `NULL` if not found.
  */
 char* get_binary_end(char* ptr) {
    char* res = strstr(ptr, "</binary>");
@@ -598,9 +598,9 @@ float get_ret_time(char* spectrum_start) {
  * @param df A populated data_format_t struct containing the expected total spectrum count.
  *           May be modified (source_total_spec reduced) if fewer spectra are found.
  * @param end The byte offset of the end of the file (used as the final XML end position).
- * @param flags Bitmask of extraction flags: SCANNUM, MSLEVEL, RETTIME.
- * @return A malloc'd division_t containing all position data and metadata arrays, or NULL on error.
- * @note The caller is responsible for freeing the returned struct with dealloc_division().
+ * @param flags Bitmask of extraction flags: `SCANNUM`, `MSLEVEL`, `RETTIME`.
+ * @return A malloc'd `division_t` containing all position data and metadata arrays, or `NULL` on error.
+ * @note The caller is responsible for freeing the returned struct with `dealloc_division()`.
  */
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
    if (input_map == NULL || df == NULL) {
@@ -863,7 +863,7 @@ division_t* extract_one_spectra(division_t* div, long index) {
  * @param div The source division to extract from.
  * @param indicies An array of spectrum indices to extract.
  * @param n The number of indices in the array.
- * @return A newly allocated division_t containing only the selected spectra, or NULL on error.
+ * @return A newly allocated division_t containing only the selected spectra, or `NULL` on error.
  *
  * @note The output layout interleaves XML, m/z, and intensity positions with
  *       zero-padded entries so the downstream pipeline sees [xml, mz, xml, inten].
@@ -1138,7 +1138,7 @@ data_positions_t*** new_get_binary_divisions(data_positions_t** ddp,
  * @param dp The source data positions containing all XML spectra.
  * @param divisions The number of divisions to create.
  * @return A newly allocated array of data_positions_t pointers, one per division.
- * @note The caller must free the returned array via free_ddp().
+ * @note The caller must free the returned array via `free_ddp()`.
  */
 data_positions_t** new_get_xml_divisions(data_positions_t* dp, int divisions) {
    data_positions_t** r;
@@ -1191,7 +1191,7 @@ data_positions_t** new_get_xml_divisions(data_positions_t* dp, int divisions) {
  * @param binary_divisions The binary division boundaries to align with.
  * @param divisions The number of divisions.
  * @return A newly allocated array of data_positions_t pointers, one per division.
- * @note The caller must free the returned array via free_ddp().
+ * @note The caller must free the returned array via `free_ddp()`.
  */
 data_positions_t** get_xml_divisions(data_positions_t* dp,
                                      data_positions_t** binary_divisions,
@@ -1342,11 +1342,11 @@ void write_uint16_arr(uint16_t* arr, uint32_t len, int fd) {
  * @brief Deserializes a data_positions_t struct from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer to a newly allocated data_positions_t, or NULL on allocation failure.
+ * @return Pointer to a newly allocated `data_positions_t`, or `NULL` on allocation failure.
  *
  * @note The returned struct's start_positions and end_positions point directly into the
  *       mmap'd region and must not be freed independently.
- * @warning The caller must free the returned struct wrapper with free().
+ * @warning The caller must free the returned struct wrapper with `free()`.
  */
 data_positions_t* read_dp(void* input_map, long* position) {
    data_positions_t* r = malloc(sizeof(data_positions_t));
@@ -1450,10 +1450,10 @@ void write_divisions(divisions_t* divisions, int fd) {
  * @brief Deserializes a single division_t from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer to a newly allocated division_t, or NULL on allocation failure.
+ * @return Pointer to a newly allocated `division_t`, or `NULL` on allocation failure.
  *
  * @note The internal arrays (scans, ms_levels, position arrays) point into the mmap'd region.
- * @warning Free with dealloc_read_division() to avoid freeing mmap'd data.
+ * @warning Free with `dealloc_read_division()` to avoid freeing mmap'd data.
  */
 division_t* read_division(void* input_map, long* position) {
    division_t* r;
@@ -1482,9 +1482,9 @@ division_t* read_division(void* input_map, long* position) {
  * @param input_map Pointer to the memory-mapped input file.
  * @param position The byte offset where division data begins.
  * @param n_divisions Number of divisions to read.
- * @return Pointer to a newly allocated divisions_t, or NULL on allocation failure.
+ * @return Pointer to a newly allocated `divisions_t`, or `NULL` on allocation failure.
  *
- * @warning Free with dealloc_read_divisions() to avoid freeing mmap'd data.
+ * @warning Free with `dealloc_read_divisions()` to avoid freeing mmap'd data.
  */
 divisions_t* read_divisions(void* input_map, long position, int n_divisions) {
    divisions_t* r;
@@ -1507,12 +1507,12 @@ divisions_t* read_divisions(void* input_map, long position, int n_divisions) {
 /**
  * @brief Merges all divisions into a single flat division_t.
  * @param divisions Pointer to the divisions_t containing multiple divisions.
- * @return Pointer to a newly allocated division_t containing all spectra, or NULL on error.
+ * @return Pointer to a newly allocated division_t containing all spectra, or `NULL` on error.
  *
  * Concatenates all spectra, xml, mz, inten positions, scans, and ms_levels from
  * every division into one contiguous division.
  *
- * @warning The caller must free the returned division with dealloc_division().
+ * @warning The caller must free the returned division with `dealloc_division()`.
  */
 division_t* flatten_divisions(divisions_t* divisions) {
    size_t spectra_size = 0;
@@ -1595,7 +1595,7 @@ division_t* flatten_divisions(divisions_t* divisions) {
 /**
  * @brief Extracts an array of XML data_positions_t pointers from all divisions.
  * @param divisions Pointer to the divisions_t.
- * @return Array of data_positions_t pointers (one per division), or NULL on allocation failure.
+ * @return Array of `data_positions_t` pointers (one per division), or `NULL` on allocation failure.
  *
  * @warning The caller must free the returned array (but not the individual pointers,
  *          which are owned by the divisions).
@@ -1613,7 +1613,7 @@ data_positions_t** join_xml(divisions_t* divisions) {
 /**
  * @brief Extracts an array of m/z data_positions_t pointers from all divisions.
  * @param divisions Pointer to the divisions_t.
- * @return Array of data_positions_t pointers (one per division), or NULL on allocation failure.
+ * @return Array of `data_positions_t` pointers (one per division), or `NULL` on allocation failure.
  *
  * @warning The caller must free the returned array (but not the individual pointers,
  *          which are owned by the divisions).
@@ -1631,7 +1631,7 @@ data_positions_t** join_mz(divisions_t* divisions) {
 /**
  * @brief Extracts an array of intensity data_positions_t pointers from all divisions.
  * @param divisions Pointer to the divisions_t.
- * @return Array of data_positions_t pointers (one per division), or NULL on allocation failure.
+ * @return Array of `data_positions_t` pointers (one per division), or `NULL` on allocation failure.
  *
  * @warning The caller must free the returned array (but not the individual pointers,
  *          which are owned by the divisions).
@@ -1651,12 +1651,12 @@ data_positions_t** join_inten(divisions_t* divisions) {
  * @param div Pointer to the source division_t containing all spectra.
  * @param n_divisions Number of divisions to create (actual count will be n_divisions + 1
  *                    to hold any remaining XML).
- * @return Pointer to a newly allocated divisions_t, or NULL on allocation failure.
+ * @return Pointer to a newly allocated `divisions_t`, or `NULL` on allocation failure.
  *
  * Distributes spectra evenly across n_divisions, with leftover spectra assigned to the
  * last division. An extra division is appended for any trailing XML data.
  *
- * @warning The caller must free with dealloc_divisions().
+ * @warning The caller must free with `dealloc_divisions()`.
  */
 divisions_t* create_divisions(division_t* div, long n_divisions) {
    divisions_t* r;
@@ -1975,7 +1975,7 @@ long* string_to_array(char* str, long* size) {
  * @param div Pointer to the division_t to search.
  * @param index_offset Offset added to each matched index (for multi-division indexing).
  * @param indices_length Pointer set to the number of matched indices on return.
- * @return Pointer to a malloc'd array of matched indices, or NULL if not monotonically increasing.
+ * @return Pointer to a malloc'd array of matched indices, or `NULL` if not monotonically increasing.
  *
  * @note Scans not found in the division are silently skipped.
  * @warning The caller must free the returned array.
@@ -2053,7 +2053,7 @@ long* map_ms_level_to_index(uint16_t ms_level, division_t* div,
  * @param ms_level The MS level to filter by, or -1 to select MS levels > 2.
  * @param divisions Pointer to the divisions_t containing all divisions.
  * @param indicies_length Pointer set to the total number of matched indices on return.
- * @return Pointer to a malloc'd merged array of indices, or NULL if not monotonically increasing.
+ * @return Pointer to a malloc'd merged array of indices, or `NULL` if not monotonically increasing.
  *
  * Queries each division via map_ms_level_to_index() and merges the results into
  * a single contiguous array with correct global offsets.
@@ -2117,7 +2117,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
  * @param scans_length Number of scans in the array.
  * @param divisions Pointer to the divisions_t containing all divisions.
  * @param indicies_length Pointer set to the total number of matched indices on return.
- * @return Pointer to a malloc'd merged array of indices, or NULL if not monotonically increasing.
+ * @return Pointer to a malloc'd merged array of indices, or `NULL` if not monotonically increasing.
  *
  * Queries each division via map_scan_to_index() and merges the results into
  * a single contiguous array with correct global offsets.
@@ -2320,7 +2320,7 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
  * Each division covers a contiguous byte range of the file, stored as a single
  * XML data_positions_t entry. The last division extends to the end of the file.
  *
- * @warning The caller must free with dealloc_divisions().
+ * @warning The caller must free with `dealloc_divisions()`.
  */
 divisions_t* divide_external(long input_filesize, int n_divisions) {
    divisions_t* r = malloc(sizeof(divisions_t));
@@ -2356,7 +2356,7 @@ divisions_t* divide_external(long input_filesize, int n_divisions) {
  * Sets the XML format to ZSTD. The m/z and intensity formats are set to ZSTD
  * as placeholders required for a valid MSZ file, but are unused for external files.
  *
- * @warning The caller must free with dealloc_df().
+ * @warning The caller must free with `dealloc_df()`.
  */
 data_format_t* create_external_df() {
    data_format_t* df = calloc(1, sizeof(data_format_t));

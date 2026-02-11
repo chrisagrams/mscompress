@@ -198,7 +198,7 @@ int warning(const char* format, ...) {
 
 /**
  * @brief Registers a custom error callback to replace stderr output.
- * @param callback The callback function to invoke on error, or NULL to disable.
+ * @param callback The callback function to invoke on error, or `NULL` to disable.
  */
 void set_error_callback(error_callback_t callback) {
    custom_error_callback = callback;
@@ -206,7 +206,7 @@ void set_error_callback(error_callback_t callback) {
 
 /**
  * @brief Registers a custom warning callback to replace stderr output.
- * @param callback The callback function to invoke on warning, or NULL to disable.
+ * @param callback The callback function to invoke on warning, or `NULL` to disable.
  */
 void set_warning_callback(warning_callback_t callback) {
    custom_warning_callback = callback;

@@ -84,7 +84,7 @@ int zlib_append_header(zlib_block_t* blk, void* content, size_t size) {
 /**
  * @brief Extracts and returns a copy of the header region from a zlib_block_t.
  * @param blk A pointer to the zlib_block_t struct to extract the header from.
- * @return A pointer to a newly allocated buffer containing the header, or NULL on error.
+ * @return A pointer to a newly allocated buffer containing the header, or `NULL` on error.
  * @note The caller must free the returned pointer.
  */
 void* zlib_pop_header(zlib_block_t* blk) {
@@ -101,7 +101,7 @@ void* zlib_pop_header(zlib_block_t* blk) {
 /**
  * @brief Allocates and initializes a z_stream struct for zlib compression.
  * @return A pointer to the allocated z_stream on success, NULL on error.
- * @note The caller is responsible for freeing via dealloc_z_stream().
+ * @note The caller is responsible for freeing via `dealloc_z_stream()`.
  */
 z_stream* alloc_z_stream() {
    z_stream* z;

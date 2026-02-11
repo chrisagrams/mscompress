@@ -258,11 +258,11 @@ void decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len,
  * @brief Sets the decode function based on the compression method, lossy
  * algorithm, and accession type.
  *
- * @param compression_method The compression method used (e.g., _zlib_, _no_comp_).
- * @param algo The lossy algorithm used (e.g., _lossless_, _cast_64_to_32_).
- * @param accession The accession type (e.g., _32f_).
+ * @param compression_method The compression method used (e.g., `_zlib_`, `_no_comp_`).
+ * @param algo The lossy algorithm used (e.g., `_lossless_`, `_cast_64_to_32_`).
+ * @param accession The accession type (e.g., `_32f_`).
  *
- * @return A pointer to the appropriate decode function, or NULL if an error
+ * @return A pointer to the appropriate decode function, or `NULL` if an error
  * occurs.
  */
 decode_fun set_decode_fun(int compression_method, int algo, int accession)

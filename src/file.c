@@ -42,7 +42,7 @@
  *
  * @param fd File descriptor to be mapped.
  *
- * @return Pointer to the mapped memory region on success. NULL on error.
+ * @return Pointer to the mapped memory region on success. `NULL` on error.
  *
  * @note The returned memory is mmap'd. The caller must release it with
  *       remove_mapping() when done.
@@ -473,7 +473,7 @@ void write_footer(footer_t* footer, int fd) {
  * @param input_map Pointer to the mmap'd input file.
  * @param filesize Size of the input file in bytes.
  *
- * @return Pointer to the `footer_t` struct within the mmap'd region, or NULL on error.
+ * @return Pointer to the `footer_t` struct within the mmap'd region, or `NULL` on error.
  *
  * @warning The returned pointer points into the mmap'd region (not malloc'd).
  *          Do NOT free it directly. It is valid only as long as the mapping exists.
@@ -603,7 +603,7 @@ int determine_filetype(void* input_map, size_t input_length) {
  * point with the new extension.
  *
  * @param input Original path string.
- * @param extension Desired extension to replace with (e.g., ".msz"). Must be NULL terminated.
+ * @param extension Desired extension to replace with (e.g., ".msz"). Must be `NULL` terminated.
  *
  * @return New path string with the replaced extension.
  *
@@ -637,7 +637,7 @@ char* change_extension(char* input, char* extension) {
  * removing any existing extension.
  *
  * @param input Original path string.
- * @param extension Desired extension to append (e.g., ".msz"). Must be NULL terminated.
+ * @param extension Desired extension to append (e.g., ".msz"). Must be `NULL` terminated.
  *
  * @return New path string with the appended extension.
  *
