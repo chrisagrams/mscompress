@@ -67,11 +67,11 @@ void zlib_dealloc(zlib_block_t* blk) {
 }
 
 /**
- * @brief Appends a buffer to a `zlib_block_t` struct, reallocating if necessary.
- * @param data_block A pointer to the `zlib_block_t` struct to append to.
- * @param mem A pointer to the buffer to append.
- * @param buff_len The length of the buffer to append.
- * @return 0 on success, 1 on error.
+ * @brief Writes content into the header region (offset area) of a zlib_block_t.
+ * @param blk A pointer to the zlib_block_t struct.
+ * @param content A pointer to the content to write into the header region.
+ * @param size The size of the content in bytes. Must not exceed blk->offset.
+ * @return 0 on success, 1 if the content exceeds the header space.
  */
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size) {
    if (size > blk->offset)
@@ -82,9 +82,10 @@ int zlib_append_header(zlib_block_t* blk, void* content, size_t size) {
 
 
 /**
- * @brief Pops the header from a `zlib_block_t` struct and returns it as a void pointer.
- * @param blk A pointer to the `zlib_block_t` struct to pop the header from.
- * @return A pointer to the header content on success, NULL on error.
+ * @brief Extracts and returns a copy of the header region from a zlib_block_t.
+ * @param blk A pointer to the zlib_block_t struct to extract the header from.
+ * @return A pointer to a newly allocated buffer containing the header, or NULL on error.
+ * @note The caller must free the returned pointer.
  */
 void* zlib_pop_header(zlib_block_t* blk) {
    void* r;
@@ -98,9 +99,10 @@ void* zlib_pop_header(zlib_block_t* blk) {
 }
 
 /**
-* @brief Compresses a buffer using zlib and returns the compressed buffer on success, NULL on error.
-* @return A pointer to the compressed buffer on success. NULL on error.
-*/
+ * @brief Allocates and initializes a z_stream struct for zlib compression.
+ * @return A pointer to the allocated z_stream on success, NULL on error.
+ * @note The caller is responsible for freeing via dealloc_z_stream().
+ */
 z_stream* alloc_z_stream() {
    z_stream* z;
 
@@ -131,10 +133,13 @@ void dealloc_z_stream(z_stream* z) {
 
 
 /**
- * @brief Reallocates a `zlib_block_t` struct to a new size.
- * @param old_block A pointer to the `zlib_block_t` struct to be reallocated.
- * @param new_size The new size for the block. Must be non-negative.
- * @return 0 on error, output size on success.
+ * @brief Compresses input data using zlib deflate into a zlib_block_t output buffer.
+ * @param z A pointer to an initialized z_stream struct.
+ * @param input A pointer to the uncompressed input data.
+ * @param output A pointer to the zlib_block_t struct to store compressed output.
+ *               May be reallocated if the output exceeds the current buffer size.
+ * @param input_len The length of the input data in bytes.
+ * @return The size of the compressed output on success, 0 on error.
  */
 uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
                    uInt input_len) {

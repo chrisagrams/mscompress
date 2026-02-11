@@ -228,19 +228,15 @@ void* no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
    return out_buff;
 }
 
-int append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 /**
- * @brief Appends data to a data block.
- *
+ * @brief Appends data to a data block, reallocating if necessary.
  * @param data_block Data block struct to append to.
- *
  * @param mem Desired contents to append.
- *
- * @param buff_len Length of contents to append
- *
- * @return 1 on success, 0 if there is not enough space in data_block to append.
- *
+ * @param buff_len Length of contents to append.
+ * @return 1 on success. Calls error() and aborts on NULL pointer or memcpy failure.
+ * @note The data block is grown by REALLOC_FACTOR if there is not enough space.
  */
+int append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 {
    while (buff_len + data_block->size >=
           data_block->max_size)  // Not enough space in data block
@@ -302,6 +298,12 @@ compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
    return r;
 }
 
+/**
+ * @brief Deallocates a compress_args_t struct and its associated compressed buffer.
+ * @param args A pointer to the compress_args_t struct to be deallocated.
+ * @note If args->ret is non-NULL, the compressed buffer queue is freed via dealloc_cmp_buff
+ *       before freeing the struct itself.
+ */
 void dealloc_compress_args(compress_args_t* args) {
    if (args) {
       if (args->ret)
@@ -310,38 +312,29 @@ void dealloc_compress_args(compress_args_t* args) {
    }
 }
 
+/**
+ * @brief Appends data to a data block and compresses when full.
+ *
+ * Given an offset within an .mzML document and length, this function will
+ * append the text data to a data block until it is full. Once a data block is
+ * full, the data block will be compressed and a cmp_block will be allocated,
+ * populated, and appended to the cmp_buff. After compression, the old data
+ * block will be deallocated and a new one allocated.
+ *
+ * @param compression_fun A function pointer to the compression function to use.
+ * @param czstd A ZSTD compression context allocated by alloc_cctx() (one per thread).
+ * @param compression_level An integer representing the ZSTD compression level.
+ * @param cmp_buff A pointer to the compressed block queue to append results to.
+ * @param curr_block Pointer to the current data block; replaced with a new block after compression.
+ * @param input A pointer within the .mzML document to the data to compress.
+ * @param len The length of the data to compress.
+ * @param tot_size A pass-by-reference accumulator for total uncompressed bytes processed.
+ * @param tot_cmp A pass-by-reference accumulator for total compressed bytes produced.
+ */
 void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
                  int compression_level, cmp_blk_queue_t* cmp_buff,
                  data_block_t** curr_block, char* input, size_t len,
                  size_t* tot_size, size_t* tot_cmp)
-/**
- * @brief A routine to compress an XML block.
- * Given an offset within an .mzML document and length, this function will
- * append the text data to a data block until it is full. Once a data block is
- * full, the data block will be compressed using zstd_compress() and a cmp_block
- * will be allocated, populated, and appened to the cmp_buff. After compression,
- * the old data block will be deallocated.
- *
- * @param czstd A ZSTD compression context allocated by alloc_cctx() (one per
- * thread).
- *
- * @param cmp_buff A dereferenced pointer to the cmp_buff vector.
- *
- * @param curr_block Current data block to append to and/or compress.
- *
- * @param input A pointer within the .mzML document to store within a data
- * block.
- *
- * @param len The length of the desired substring to compress within the .mzML
- * document.
- *
- * @param tot_size A pass-by-reference variable to bookkeep total number of XML
- * bytes processed.
- *
- * @param tot_cmp A pass-by-reference variable to bookkeep total compressed size
- * of XML.
- *
- */
 {
    void* cmp;
    cmp_block_t* cmp_block;
@@ -426,15 +419,15 @@ int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
    dealloc_data_block(*curr_block);
 }
 
-void write_cmp_blk(cmp_block_t* blk, int fd)
 /**
- * @brief Writes cmp_block_t block to file. Program exits if writing to file
- * fails.
+ * @brief Writes a compressed block to file.
+ *
+ * Program exits via error() if writing to file fails.
  *
  * @param blk A cmp_block_t with mem and size populated.
- *
  * @param fd File descriptor to write to.
  */
+void write_cmp_blk(cmp_block_t* blk, int fd)
 {
    int rv;
 
@@ -444,18 +437,19 @@ void write_cmp_blk(cmp_block_t* blk, int fd)
       error("write_cmp_blk: Did not write all bytes to disk.\n");
 }
 
+/**
+ * @brief Drains the compressed block queue, writing each block to file.
+ *
+ * Pops each cmp_block_t from the queue, records its block length metadata in
+ * blk_len_queue, writes the compressed data to file, and deallocates the block.
+ * Write speed is timed and printed.
+ *
+ * @param cmp_buff A cmp_blk_queue_t to pop compressed blocks from.
+ * @param blk_len_queue A block_len_queue_t to append block length metadata to.
+ * @param fd File descriptor to write compressed data to.
+ */
 void cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue,
               int fd)
-/**
- * @brief Pops cmp_block_t from queue, appends block_len to block_len_queue, and
- * writes cmp_block_t to file. Write to disk is timed to display write speed.
- *
- * @param cmp_buff A cmp_blk_queue_t to pop from.
- *
- * @param blk_len_queue A block_len_queue_t to append a block_len_t to.
- *
- * @param fd File descriptor to write cmp_blk to.
- */
 {
    cmp_block_t* front;
    double start, end;
@@ -485,28 +479,55 @@ typedef void (*cmp_routine_func)(compression_fun compression_fun, ZSTD_CCtx*,
                                  size_t*);
 typedef cmp_routine_func (*cmp_routine_func_ptr)();
 
+/**
+ * @brief Compression routine wrapper for XML data.
+ *
+ * Delegates to cmp_routine using the compression level from the data format.
+ *
+ * @param compression_fun A function pointer to the compression function to use.
+ * @param czstd A ZSTD compression context allocated by alloc_cctx().
+ * @param a_args Algorithm arguments (unused for XML, included for interface consistency).
+ * @param cmp_buff A pointer to the compressed block queue.
+ * @param curr_block Pointer to the current data block being filled.
+ * @param df A pointer to the data_format_t struct containing compression settings.
+ * @param input A pointer to the XML data to compress.
+ * @param len The length of the XML data.
+ * @param tot_size A pass-by-reference accumulator for total uncompressed bytes.
+ * @param tot_cmp A pass-by-reference accumulator for total compressed bytes.
+ */
 void cmp_xml_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
                      algo_args* a_args, cmp_blk_queue_t* cmp_buff,
                      data_block_t** curr_block, data_format_t* df, char* input,
                      size_t len, size_t* tot_size, size_t* tot_cmp)
-/**
- * @brief cmp_routine wrapper for XML data.
- */
 {
    cmp_routine(compression_fun, czstd, df->zstd_compression_level, cmp_buff,
                curr_block, input, len, tot_size, tot_cmp);
 }
 
+/**
+ * @brief Compression routine wrapper for binary (m/z or intensity) data.
+ *
+ * Decodes the source binary encoding (e.g., base64 + zlib) using the algorithm
+ * function pointer in df->target_mz_fun, then delegates to cmp_routine for
+ * block-based compression.
+ *
+ * @param compression_fun A function pointer to the compression function to use.
+ * @param czstd A ZSTD compression context allocated by alloc_cctx().
+ * @param a_args Algorithm arguments struct used for decoding the source binary format.
+ * @param cmp_buff A pointer to the compressed block queue.
+ * @param curr_block Pointer to the current data block being filled.
+ * @param df A pointer to the data_format_t struct containing format and compression settings.
+ * @param input A pointer to the encoded binary data to decode and compress.
+ * @param len The length of the encoded binary data.
+ * @param tot_size A pass-by-reference accumulator for total uncompressed bytes.
+ * @param tot_cmp A pass-by-reference accumulator for total compressed bytes.
+ * @note The decoded binary buffer is freed after compression.
+ */
 void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
                         algo_args* a_args, cmp_blk_queue_t* cmp_buff,
                         data_block_t** curr_block, data_format_t* df,
                         char* input, size_t len, size_t* tot_size,
                         size_t* tot_cmp)
-/**
- * @brief cmp_routine wrapper for binary data.
- *        Decodes base64 binary with encoding specified within df->compression
- * before compression.
- */
 {
    size_t binary_len = 0;
    char* binary_buff = NULL;
@@ -535,6 +556,11 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
 }
 
 #ifdef _WIN32
+/**
+ * @brief Windows thread entry point for the compression routine.
+ * @param lpParam A pointer to a compress_args_t struct containing compression arguments.
+ * @return 0 on completion.
+ */
 DWORD WINAPI compress_routine_win(LPVOID lpParam) {
    compress_args_t* args = (compress_args_t*)lpParam;
    compress_routine(args);
@@ -542,16 +568,22 @@ DWORD WINAPI compress_routine_win(LPVOID lpParam) {
 }
 #endif
 
-void* compress_routine(void* args)
 /**
- * @brief Compress routine. Iterates through data_positions and compresses XML
- * and binary with a single pass. Returns a cmp_blk_queue containing a
- * linked-list queue of compressed blocks. Return value is stored within
- * args->ret.
+ * @brief Thread entry point for the compression pipeline.
  *
- * @param args Function arguments allocated and populated by alloc_compress_args
+ * Iterates through data_positions and compresses XML or binary data in a single
+ * pass. Selects cmp_xml_routine or cmp_binary_routine based on the mode field
+ * in the arguments. Produces a cmp_blk_queue containing a linked-list of
+ * compressed blocks stored in args->ret.
+ *
+ * @param args A void pointer to a compress_args_t struct allocated by alloc_compress_args().
+ * @return Always returns NULL. The compressed output is stored in ((compress_args_t*)args)->ret.
+ * @note Allocates and frees its own ZSTD compression context, algo_args, and temporary buffers.
+ *       The caller is responsible for freeing args->ret via dealloc_cmp_buff().
+ * @warning This function is a pthread/Windows thread entry point. Do not call directly
+ *          unless single-threaded execution is intended.
  */
-
+void* compress_routine(void* args)
 {
    int tid = get_thread_id();
 
@@ -665,6 +697,29 @@ void* compress_routine(void* args)
    return NULL;
 }
 
+/**
+ * @brief Compresses data in parallel across multiple divisions using thread pools.
+ *
+ * Spawns compression threads (up to the thread limit) for each division, waits
+ * for completion, then writes the compressed output to the file descriptor via
+ * cmp_dump. Returns a block_len_queue_t containing the metadata for all
+ * compressed blocks.
+ *
+ * @param input_map The memory-mapped input mzML file.
+ * @param ddp An array of data_positions_t pointers, one per division.
+ * @param df A pointer to the data_format_t struct with compression settings.
+ * @param comp_fun A function pointer to the compression function (e.g., zstd_compress).
+ * @param cmp_blk_size The target size for compression blocks.
+ * @param blocksize The size of the data block buffer for accumulating data.
+ * @param mode The stream type to compress (_xml_, _mass_, or _intensity_).
+ * @param divisions The total number of divisions to process.
+ * @param threads The maximum number of concurrent threads.
+ * @param fd The output file descriptor to write compressed data to.
+ * @return A pointer to the block_len_queue_t containing block length metadata for all
+ *         compressed blocks. The caller is responsible for freeing this via
+ *         dealloc_block_len_queue().
+ * @note Each compress_args_t and its compressed output are freed after writing to disk.
+ */
 block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
                                      data_format_t* df,
                                      compression_fun comp_fun,
@@ -743,6 +798,23 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
    return blk_len_queue;
 }
 
+/**
+ * @brief Main entry point for compressing an mzML file into the MSZ format.
+ *
+ * Orchestrates the full compression pipeline: sets runtime compression variables,
+ * writes the MSZ header, compresses XML/m\/z/intensity streams in parallel,
+ * writes block length metadata, division metadata, and the footer to the output file.
+ *
+ * @param input_map The memory-mapped input mzML file.
+ * @param input_filesize The size in bytes of the input mzML file.
+ * @param arguments A pointer to the parsed command-line Arguments struct.
+ * @param df A pointer to the data_format_t struct with source format and compression settings.
+ * @param divisions A pointer to the divisions_t struct describing how the input was partitioned.
+ * @param output_fd The file descriptor for the output .msz file.
+ * @note This function writes the complete MSZ file (header, compressed streams,
+ *       block lengths, divisions, footer). The caller is responsible for opening
+ *       and closing the file descriptors.
+ */
 void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
                    data_format_t* df, divisions_t* divisions, int output_fd) {
    // Initialize footer to all 0's to not write garbage to file.

@@ -20,6 +20,11 @@
 #include "libbase64.h"
 #include "mscompress.h"
 
+/**
+ * @brief Allocates a character buffer for base64 decoding output.
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated buffer. Terminates with an error if allocation fails.
+ */
 char* base64_alloc(size_t size) {
    char* r;
 
@@ -31,20 +36,15 @@ char* base64_alloc(size_t size) {
    return r;
 }
 
-void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 /**
- * @brief Wrapper function for base64 libary.
- * Allocates memory for base64_decode function call and takes care of errors.
- *
- * @param src Pointer to beginning of base64 string (can be a substring within
- * another string).
- *
- * @param src_len Length of base64 string (not NULL terminated).
- *
- * @param out_len Pass-by-reference return value of length of decoded string.
- *
- * @return Decoded string.
+ * @brief Decodes a base64-encoded string into a destination buffer.
+ * @param src Pointer to the beginning of the base64 string (may be a substring
+ *            within a larger buffer; not required to be null-terminated).
+ * @param dest Pre-allocated destination buffer for the decoded binary output.
+ * @param src_len Length of the base64 string in bytes.
+ * @param out_len Pointer to a variable that receives the length of the decoded output.
  */
+void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 {
    int b64_ret = base64_decode(src, src_len, dest, out_len, 0);
 
@@ -53,28 +53,27 @@ void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
             b64_ret);
 }
 
+/**
+ * @brief Decodes a base64+zlib encoded binary block with a size header prepended.
+ *
+ * Decodes the base64 string, zlib-decompresses the result, and prepends a
+ * ZLIB_SIZE_OFFSET-byte header containing the decompressed data length.
+ * The decoded binary data in the output starts at (*dest + ZLIB_SIZE_OFFSET).
+ *
+ * @param z Pointer to an initialized z_stream used for zlib decompression.
+ * @param src Pointer to the base64-encoded source string.
+ * @param src_len Length of the source string in bytes.
+ * @param dest Pointer to a char pointer that receives a newly malloc'd buffer.
+ *             The first ZLIB_SIZE_OFFSET bytes contain the decompressed length,
+ *             followed by the decompressed binary data.
+ * @param out_len Pointer to a variable that receives the total output size
+ *                (decompressed data length + ZLIB_SIZE_OFFSET).
+ * @param tmp Pointer to a data_block_t used as a reusable temporary buffer for
+ *            base64 decoding. Will be reallocated if too small.
+ * @note The caller is responsible for freeing the buffer returned via *dest.
+ */
 void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
                      size_t* out_len, data_block_t* tmp)
-/**
- * @brief Decodes an mzML binary block with "zlib" encoding.
- *        Decodes base64 string, zlib decodes the string, and appends resulting
- * binary buffer with the length of the buffer stored within the first
- * ZLIB_SIZE_OFFSET bytes of the buffer. Decoded binary data starts at
- * b64_out_buff + ZLIB_SIZE_OFFSET.
- *
- * @param input_map Pointer representing mmap'ed mzML file.
- *
- * @param start_position Position of first byte of <binary> block.
- *
- * @param end_position Position of last byte of </binary> block.
- *
- * @param out_len Contains resulting buffer size on return.
- *
- * @param tmp Pointer to data_block_t struct used for temporary storage.
- *
- * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing
- * length of decoded binary and resulting decoded binary buffer.
- */
 {
    if (src == NULL)
       error("decode_zlib_fun: src is NULL.\n");
@@ -126,35 +125,25 @@ void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
    free(decmp_output);
 }
 
+/**
+ * @brief Decodes a base64+zlib encoded binary block without prepending a size header.
+ *
+ * Decodes the base64 string, zlib-decompresses the result, and stores the
+ * raw decompressed data directly in the output buffer (no header prepended).
+ *
+ * @param z Pointer to an initialized z_stream used for zlib decompression.
+ * @param src Pointer to the base64-encoded source string.
+ * @param src_len Length of the source string in bytes.
+ * @param dest Pointer to a char pointer that receives a newly malloc'd buffer
+ *             containing the decompressed binary data.
+ * @param out_len Pointer to a variable that receives the decompressed data size.
+ * @param tmp Pointer to a data_block_t used as a reusable temporary buffer for
+ *            base64 decoding. Will be reallocated if too small.
+ * @note The caller is responsible for freeing the buffer returned via *dest.
+ */
 void decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len,
                                char** dest, size_t* out_len,
                                data_block_t* tmp) {
-   /**
-    * @brief Decodes a zlib compressed buffer without header and stores the
-    * output in a new buffer.
-    *
-    * This function takes a zlib compressed buffer without header, decodes it,
-    * and stores the output in a newly allocated buffer. The input buffer must
-    * be a base64 encoded string, which will be decoded before decompression.
-    *
-    * @param z Pointer to a zlib stream object.
-    * @param src Pointer to the source buffer containing the compressed data.
-    * @param src_len Length of the source buffer in bytes.
-    * @param dest Pointer to the destination buffer where the decompressed data
-    * will be stored.
-    * @param out_len Pointer to a variable where the size of the decompressed
-    * data will be stored.
-    * @param tmp Pointer to a data_block_t object used as a temporary buffer.
-    *
-    * @return None.
-    *
-    * @note The caller is responsible for freeing the destination buffer after
-    * use.
-    * @note The temporary buffer will be reallocated if its size is smaller than
-    * the size of the source buffer.
-    * @note This function will terminate the program with an error message if
-    * any of the input parameters are NULL or invalid.
-    */
    if (src == NULL)
       error("decode_zlib_fun_no_header: src is NULL.\n");
 
@@ -197,26 +186,28 @@ void decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len,
    free(decmp_output);
 }
 
+/**
+ * @brief Decodes a base64-encoded (but not zlib-compressed) binary block with a
+ *        size header prepended.
+ *
+ * Decodes the base64 string and prepends a ZLIB_SIZE_OFFSET-byte header
+ * containing the decoded data length. The decoded binary data in the output
+ * starts at (*dest + ZLIB_SIZE_OFFSET).
+ *
+ * @param z Pointer to a z_stream (unused, present for function pointer compatibility).
+ * @param src Pointer to the base64-encoded source string.
+ * @param src_len Length of the source string in bytes.
+ * @param dest Pointer to a char pointer that receives a newly malloc'd buffer.
+ *             The first ZLIB_SIZE_OFFSET bytes contain the decoded length,
+ *             followed by the decoded binary data.
+ * @param out_len Pointer to a variable that receives the total output size
+ *                (decoded data length + ZLIB_SIZE_OFFSET).
+ * @param tmp Pointer to a data_block_t (unused, present for function pointer compatibility).
+ * @note The caller is responsible for freeing the buffer returned via *dest.
+ */
 void decode_no_comp_fun_w_header(z_stream* z, char* src, size_t src_len,
                                  char** dest, size_t* out_len,
                                  data_block_t* tmp)
-/**
- * @brief Decodes an mzML binary block with "no comp" encoding.
- *        Decodes base64 string and appends a binary buffer with the length of
- * the buffer stored within the first ZLIB_SIZE_OFFSET bytes of the buffer.
- *        Decoded binary data starts at b64_out_buff + ZLIB_SIZE_OFFSET.
- *
- * @param input_map Pointer representing mmap'ed mzML file.
- *
- * @param start_position Position of first byte of <binary> block.
- *
- * @param end_position Position of last byte of </binary> block.
- *
- * @param out_len Contains resulting buffer size on return.
- *
- * @return A malloc'ed buffer with first ZLIB_SIZE_OFFSET bytes containing
- * length of decoded binary and resulting decoded binary buffer.
- */
 {
    char* b64_out_buff;
 
@@ -235,6 +226,22 @@ void decode_no_comp_fun_w_header(z_stream* z, char* src, size_t src_len,
    *dest = b64_out_buff;
 }
 
+/**
+ * @brief Decodes a base64-encoded (but not zlib-compressed) binary block without
+ *        prepending a size header.
+ *
+ * Decodes the base64 string and stores the raw decoded data directly in the
+ * output buffer (no header prepended).
+ *
+ * @param z Pointer to a z_stream (unused, present for function pointer compatibility).
+ * @param src Pointer to the base64-encoded source string.
+ * @param src_len Length of the source string in bytes.
+ * @param dest Pointer to a char pointer that receives a newly malloc'd buffer
+ *             containing the decoded binary data.
+ * @param out_len Pointer to a variable that receives the decoded data size.
+ * @param tmp Pointer to a data_block_t (unused, present for function pointer compatibility).
+ * @note The caller is responsible for freeing the buffer returned via *dest.
+ */
 void decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len,
                                   char** dest, size_t* out_len,
                                   data_block_t* tmp) {

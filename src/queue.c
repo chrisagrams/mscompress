@@ -3,14 +3,18 @@
 
 #include "mscompress.h"
 
-cmp_blk_queue_t* alloc_cmp_buff()
 /**
- * @brief Allocates a cmp_blk_queue struct that represents a double-linked-list
- * of compressed blocks (cmp_block_t) to write to disk as a LIFO queue.
+ * @brief Allocates a compressed block queue for buffering compressed blocks to write to disk.
  *
- * @return An allocated cmp_blk_queue_t struct.
+ * Allocates and initializes a cmp_blk_queue_t struct representing a linked list
+ * of compressed blocks (cmp_block_t). The queue starts empty with no head or tail.
  *
+ * @return A pointer to a newly allocated cmp_blk_queue_t struct.
+ *
+ * @note The caller is responsible for freeing the returned queue via dealloc_cmp_buff().
+ * @warning Terminates the program if malloc fails.
  */
+cmp_blk_queue_t* alloc_cmp_buff()
 {
    cmp_blk_queue_t* r;
 
@@ -26,16 +30,15 @@ cmp_blk_queue_t* alloc_cmp_buff()
    return r;
 }
 
-void dealloc_cmp_buff(cmp_blk_queue_t* queue)
 /**
- * @brief Deallocates a cmp_blk_queue and all of its children.
- * Traverses through double-linked-list and frees all cmp_block_t.
+ * @brief Deallocates a compressed block queue and all of its child nodes.
  *
- * @param queue A cmp_blk_queue_t to deallocate
+ * Traverses the linked list from head to tail, freeing each cmp_block_t node,
+ * then frees the queue struct itself. Safe to call with a NULL queue.
  *
- * @return None.
- *
+ * @param queue A pointer to the cmp_blk_queue_t to deallocate.
  */
+void dealloc_cmp_buff(cmp_blk_queue_t* queue)
 {
    if (queue) {
       if (queue->head) {
@@ -51,18 +54,16 @@ void dealloc_cmp_buff(cmp_blk_queue_t* queue)
    }
 }
 
-void append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk)
 /**
- * @brief Append a compressed block to the queue.
- * Appends to end of double-linked-list in O(1).
+ * @brief Appends a compressed block to the tail of the queue in O(1) time.
  *
- * @param queue A cmp_blk_queue_t queue.
+ * If the queue is empty, the block becomes both the head and tail.
+ * Otherwise, the block is linked after the current tail.
  *
- * @param blk A compressed block to append.
- *
- * @return None.
- *
+ * @param queue A pointer to the cmp_blk_queue_t queue.
+ * @param blk A pointer to the cmp_block_t to append.
  */
+void append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk)
 {
    cmp_block_t* old_tail;
 
@@ -79,11 +80,18 @@ void append_cmp_block(cmp_blk_queue_t* queue, cmp_block_t* blk)
    return;
 }
 
-cmp_block_t* pop_cmp_block(cmp_blk_queue_t* queue)
 /**
- * @brief Removes a compressed block from the front of the queue.
+ * @brief Removes and returns the compressed block at the front of the queue.
  *
+ * Removes the head node from the queue and returns it. If the queue is empty,
+ * returns NULL. The returned block's next pointer is set to NULL.
+ *
+ * @param queue A pointer to the cmp_blk_queue_t queue.
+ * @return A pointer to the removed cmp_block_t, or NULL if the queue is empty.
+ *
+ * @note The caller takes ownership of the returned block and is responsible for freeing it.
  */
+cmp_block_t* pop_cmp_block(cmp_blk_queue_t* queue)
 {
    cmp_block_t* old_head;
 
@@ -105,6 +113,19 @@ cmp_block_t* pop_cmp_block(cmp_blk_queue_t* queue)
    return old_head;
 }
 
+/**
+ * @brief Allocates and initializes a block length tracking node.
+ *
+ * Creates a new block_len_t node that records the original and compressed sizes
+ * of a data block. All cache fields (cache, encoded_cache, encoded_cache_lens)
+ * are initialized to NULL/zero.
+ *
+ * @param original_size The uncompressed size of the data block in bytes.
+ * @param compressed_size The compressed size of the data block in bytes.
+ * @return A pointer to a newly allocated block_len_t struct.
+ *
+ * @note The caller is responsible for freeing the returned struct via dealloc_block_len().
+ */
 block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    block_len_t* r;
 
@@ -123,6 +144,14 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    return r;
 }
 
+/**
+ * @brief Deallocates a block_len_t node and all of its owned memory.
+ *
+ * Frees the cache, encoded_cache, and encoded_cache_lens fields if they are
+ * non-NULL, then frees the block_len_t struct itself. Safe to call with NULL.
+ *
+ * @param blk A pointer to the block_len_t to deallocate.
+ */
 void dealloc_block_len(block_len_t* blk) {
    if (blk) {
       if (blk->cache) {
@@ -138,6 +167,17 @@ void dealloc_block_len(block_len_t* blk) {
    }
 }
 
+/**
+ * @brief Allocates and initializes an empty block length queue.
+ *
+ * Creates a new block_len_queue_t struct with head and tail set to NULL
+ * and populated count set to 0.
+ *
+ * @return A pointer to a newly allocated block_len_queue_t struct.
+ *
+ * @note The caller is responsible for freeing the returned queue via dealloc_block_len_queue().
+ * @warning Terminates the program if malloc fails.
+ */
 block_len_queue_t* alloc_block_len_queue() {
    block_len_queue_t* r;
 
@@ -155,6 +195,15 @@ block_len_queue_t* alloc_block_len_queue() {
    return r;
 }
 
+/**
+ * @brief Deallocates a block length queue and all of its child nodes.
+ *
+ * Traverses the linked list from head to tail, calling dealloc_block_len()
+ * on each node to free its cache and struct memory, then frees the queue
+ * struct itself. Safe to call with NULL.
+ *
+ * @param queue A pointer to the block_len_queue_t to deallocate.
+ */
 void dealloc_block_len_queue(block_len_queue_t* queue) {
    if (queue) {
       block_len_t* curr = queue->head;
@@ -167,6 +216,17 @@ void dealloc_block_len_queue(block_len_queue_t* queue) {
    }
 }
 
+/**
+ * @brief Appends a new block length node to the tail of the queue.
+ *
+ * Allocates a new block_len_t node via alloc_block_len() with the given sizes
+ * and appends it to the end of the queue. If the queue is empty, the new node
+ * becomes both the head and tail.
+ *
+ * @param queue A pointer to the block_len_queue_t to append to.
+ * @param original_size The uncompressed size of the data block in bytes.
+ * @param compressed_size The compressed size of the data block in bytes.
+ */
 void append_block_len(block_len_queue_t* queue, size_t original_size,
                       size_t compressed_size) {
    block_len_t* old_tail;
@@ -187,6 +247,20 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
    return;
 }
 
+/**
+ * @brief Retrieves a block length node by its zero-based index in the queue.
+ *
+ * Traverses the linked list from the head up to the given index and returns
+ * a pointer to the node at that position. Returns NULL if the index is out
+ * of bounds.
+ *
+ * @param queue A pointer to the block_len_queue_t to search.
+ * @param index The zero-based index of the desired node.
+ * @return A pointer to the block_len_t at the given index, or NULL if not found.
+ *
+ * @note Returns a pointer to the existing node within the queue, not a copy.
+ *       The caller must not free the returned pointer independently of the queue.
+ */
 block_len_t* get_block_by_index(block_len_queue_t* queue, int index) {
    block_len_t* current = queue->head;
    int i = 0;
@@ -203,10 +277,18 @@ block_len_t* get_block_by_index(block_len_queue_t* queue, int index) {
    return current;
 }
 
+/**
+ * @brief Computes the byte offset of a block at the given index within its stream section.
+ *
+ * Traverses the queue from the head, summing the compressed sizes of all blocks
+ * before the given index to compute the cumulative byte offset. The offset is
+ * relative to the start of the respective block section (XML, m/z, or intensity).
+ *
+ * @param queue A pointer to the block_len_queue_t to search.
+ * @param index The zero-based index of the target block.
+ * @return The byte offset of the block at the given index, or -1 if the index is out of bounds.
+ */
 long get_block_offset_by_index(block_len_queue_t* queue, int index)
-/*
-    Note: These offsets are from the start of respective block section.
-*/
 {
    block_len_t* current = queue->head;
    int i = 0;
@@ -225,6 +307,18 @@ long get_block_offset_by_index(block_len_queue_t* queue, int index)
    return offset;
 }
 
+/**
+ * @brief Removes and returns the block length node at the front of the queue.
+ *
+ * Removes the head node from the queue and returns it. If the queue is empty,
+ * returns NULL. The returned node's next pointer is set to NULL.
+ *
+ * @param queue A pointer to the block_len_queue_t to pop from.
+ * @return A pointer to the removed block_len_t, or NULL if the queue is empty.
+ *
+ * @note The caller takes ownership of the returned node and is responsible
+ *       for freeing it via dealloc_block_len().
+ */
 block_len_t* pop_block_len(block_len_queue_t* queue) {
    block_len_t* old_head;
 
@@ -246,6 +340,19 @@ block_len_t* pop_block_len(block_len_queue_t* queue) {
    return old_head;
 }
 
+/**
+ * @brief Serializes and writes a block length queue to a file descriptor, then frees the queue.
+ *
+ * Iterates through each block_len_t node in the queue, writing the original_size
+ * and compressed_size as raw size_t values to the given file descriptor. Each node
+ * is deallocated via dealloc_block_len() after being written. The queue struct
+ * itself is freed at the end.
+ *
+ * @param queue A pointer to the block_len_queue_t to dump and deallocate.
+ * @param fd The file descriptor to write the serialized data to.
+ *
+ * @warning This function consumes and frees the queue. The pointer is invalid after return.
+ */
 void dump_block_len_queue(block_len_queue_t* queue, int fd) {
    block_len_t* curr;
    block_len_t* prev;
@@ -272,6 +379,21 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd) {
    // dealloc_block_len_queue(queue);
 }
 
+/**
+ * @brief Reads and reconstructs a block length queue from a memory-mapped region.
+ *
+ * Parses pairs of size_t values (original_size, compressed_size) from the memory
+ * region between offset and end, creating a block_len_t node for each pair and
+ * appending it to a newly allocated queue.
+ *
+ * @param input_map A pointer to the start of the memory-mapped file.
+ * @param offset The byte offset from input_map where the block length data begins.
+ * @param end The byte offset from input_map where the block length data ends.
+ * @return A pointer to a newly allocated block_len_queue_t containing the parsed nodes.
+ *
+ * @note The caller is responsible for freeing the returned queue via dealloc_block_len_queue().
+ * @warning Calls error() and may terminate if input_map is NULL or offsets are negative.
+ */
 block_len_queue_t* read_block_len_queue(void* input_map, long offset,
                                         long end) {
    if (input_map == NULL)

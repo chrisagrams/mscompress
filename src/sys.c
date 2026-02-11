@@ -21,6 +21,10 @@
 
 #include "mscompress.h"
 
+/**
+ * @brief Returns the number of available CPU threads on the current system.
+ * @return The number of available processors/threads.
+ */
 int get_num_threads() {
    int np;
 
@@ -67,6 +71,11 @@ int get_num_threads() {
 //     print("\tUsing %d threads.\n", *n_threads);
 // }
 
+/**
+ * @brief Detects available CPUs and sets the thread count in args.
+ * @param args A pointer to the Arguments struct. If args->threads is 0, it is
+ *             set to the number of available processors.
+ */
 void prepare_threads(Arguments* args) {
    int np;
 
@@ -80,6 +89,10 @@ void prepare_threads(Arguments* args) {
    print("\tUsing %d threads.\n", args->threads);
 }
 
+/**
+ * @brief Returns the OS-level thread ID of the calling thread.
+ * @return The thread ID as an integer.
+ */
 int get_thread_id() {
    uint64_t tid;
 
@@ -100,6 +113,10 @@ int get_thread_id() {
    return (int)tid;
 }
 
+/**
+ * @brief Returns the current wall-clock time in seconds with microsecond precision.
+ * @return The current time as a double (seconds since epoch).
+ */
 double get_time() {
 #ifdef _WIN32
    LARGE_INTEGER frequency, counter;
@@ -117,11 +134,13 @@ double get_time() {
 static error_callback_t custom_error_callback = NULL;
 static warning_callback_t custom_warning_callback = NULL;
 
-int print(const char* format, ...)
 /**
- * @brief printf() wrapper to print to console. Checks if program is running in
- * verbose mode before printing. Drop-in replacement to printf().
+ * @brief Verbose-mode printf wrapper. Only prints when the global verbose flag is set.
+ * @param format The printf-style format string.
+ * @param ... Variable arguments matching the format string.
+ * @return The number of characters printed, or -1 if not in verbose mode.
  */
+int print(const char* format, ...)
 {
    int ret = -1;
    if (verbose) {
@@ -134,9 +153,10 @@ int print(const char* format, ...)
 }
 
 /**
- * @brief error() wrapper to print error messages to stderr. Always prints the
- * message regardless of the verbose flag. Drop-in replacement to fprintf(stderr, ...).
- * If a custom callback is set, it will be used instead of stderr.
+ * @brief Prints an error message to stderr or invokes a custom error callback.
+ * @param format The printf-style format string.
+ * @param ... Variable arguments matching the format string.
+ * @return Always returns 0.
  */
 int error(const char* format, ...) {
    va_list args;
@@ -154,6 +174,12 @@ int error(const char* format, ...) {
    return 0;
 }
 
+/**
+ * @brief Prints a warning message to stderr or invokes a custom warning callback.
+ * @param format The printf-style format string.
+ * @param ... Variable arguments matching the format string.
+ * @return Always returns 0.
+ */
 int warning(const char* format, ...) {
    va_list args;
    va_start(args, format);
@@ -170,22 +196,41 @@ int warning(const char* format, ...) {
    return 0;
 }
 
+/**
+ * @brief Registers a custom error callback to replace stderr output.
+ * @param callback The callback function to invoke on error, or NULL to disable.
+ */
 void set_error_callback(error_callback_t callback) {
    custom_error_callback = callback;
 }
 
+/**
+ * @brief Registers a custom warning callback to replace stderr output.
+ * @param callback The callback function to invoke on warning, or NULL to disable.
+ */
 void set_warning_callback(warning_callback_t callback) {
    custom_warning_callback = callback;
 }
 
+/**
+ * @brief Resets the error callback to the default (stderr output).
+ */
 void reset_error_callback(void) {
    custom_error_callback = NULL;
 }
 
+/**
+ * @brief Resets the warning callback to the default (stderr output).
+ */
 void reset_warning_callback(void) {
    custom_warning_callback = NULL;
 }
 
+/**
+ * @brief Parses a human-readable block size string (e.g., "100MB") into bytes.
+ * @param arg The block size string with a KB, MB, or GB suffix.
+ * @return The block size in bytes, or -1 if the suffix is unrecognized.
+ */
 long parse_blocksize(char* arg) {
    int num;
    int len;
