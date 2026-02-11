@@ -3,7 +3,7 @@
 #include "mscompress.h"
 
 /**
- * @brief Allocates a data_block_t struct with a specified maximum size.
+ * @brief Allocates a `data_block_t` struct with a specified maximum size.
  * @param max_size The maximum size of the data block.
  * @return A pointer to the allocated data_block_t struct on success. `NULL` on error.
  */
@@ -39,7 +39,7 @@ data_block_t* alloc_data_block(size_t max_size)
  * @brief Reallocates a `data_block_t` struct to a new size.
  * @param db A pointer to the `data_block_t` struct to be reallocated.
  * @param new_size The new size for the data block.
- * @return A pointer to the reallocated data_block_t struct on success. `NULL` on error.
+ * @return A pointer to the reallocated `data_block_t` struct on success. `NULL` on error.
  */
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
    if (db == NULL) {

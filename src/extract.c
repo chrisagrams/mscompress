@@ -261,7 +261,7 @@ int determine_division(divisions_t* divisions, long target) {
  * first spectra start)
  * @param blk The input buffer containing the data.
  * @param first_divison The first division containing the header information.
- * @param out_len Pointer to a size_t where the length of the extracted header
+ * @param out_len Pointer to a `size_t` where the length of the extracted header
  * will be stored.
  * @return A pointer to the extracted mzML header on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
@@ -294,7 +294,7 @@ char* extract_mzml_header(char* blk, division_t* first_division,
  * end -> last XML end)
  * @param blk The input buffer containing the data.
  * @param divisions The divisions containing the footer information.
- * @param out_len Pointer to a size_t where the length of the extracted footer
+ * @param out_len Pointer to a `size_t` where the length of the extracted footer
  * will be stored.
  * @return A pointer to the extracted mzML footer on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
@@ -364,7 +364,7 @@ char* extract_mzml_footer(char* blk, divisions_t* divisions, size_t* out_len) {
  * block will be stored.
  * @return A pointer to the extracted XML block on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
- * @note Decompressed data is cached in the block_len_t node to avoid redundant decompression.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
@@ -452,7 +452,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
  * block will be stored.
  * @return A pointer to the extracted XML block on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
- * @note Decompressed data is cached in the block_len_t node to avoid redundant decompression.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
                                  data_format_t* df,
@@ -540,7 +540,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
  * block will be stored.
  * @return A pointer to the extracted XML block on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
- * @note Decompressed data is cached in the block_len_t node to avoid redundant decompression.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
                                 data_format_t* df,
@@ -628,7 +628,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
  * @return Returns 0 on success, and 1 on failure.
  *
  * @warning Caller is responsible for freeing the encoded_cache and
- *          encoded_cache_lens stored in the block_len_t structure after use.
+ *          encoded_cache_lens stored in the `block_len_t` structure after use.
  *          Previously allocated encoded_cache and encoded_cache_lens are freed
  *          internally before being overwritten.
  */
@@ -776,7 +776,7 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
  * block (1) or not (0).
  * @return A pointer to the extracted m/z block on success. `NULL` on error.
  * @note The caller is responsible for freeing the returned buffer.
- * @note Decompressed data is cached in the block_len_t node to avoid redundant decompression.
+ * @note Decompressed data is cached in the `block_len_t` node to avoid redundant decompression.
  */
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
@@ -1220,7 +1220,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
  * @param ms_level MS level to filter by (0 means no MS level filtering).
  * @param division The division containing the mzML file's position data.
  * @param output_fd The file descriptor to write the filtered mzML output to.
- * @note When ms_level != 0 or scans_length > 0, this function allocates a new
+ * @note When `ms_level != 0` or `scans_length > 0`, this function allocates a new
  *       indicies array internally and frees it before returning.
  */
 void extract_mzml_filtered(char* input_map, size_t input_filesize,

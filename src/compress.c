@@ -27,7 +27,7 @@ ZSTD_CCtx* alloc_cctx() {
 
 /**
  * @brief Deallocates a ZSTD compression context.
- * @param cctx A pointer to the ZSTD_CCtx to be deallocated.
+ * @param cctx A pointer to the `ZSTD_CCtx` to be deallocated.
  */
 void dealloc_cctx(ZSTD_CCtx* cctx) {
    ZSTD_freeCCtx(cctx); /* Never fails. */
@@ -423,6 +423,7 @@ int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
  * @brief Writes a compressed block to file.
  *
  * Program exits via `error()` if writing to file fails.
+ * TODO: This no longer exits. This should return an error code.
  *
  * @param blk A `cmp_block_t` with `mem` and `size` populated.
  * @param fd File descriptor to write to.

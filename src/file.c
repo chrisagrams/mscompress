@@ -38,7 +38,7 @@
 /**
  * @brief Maps a file into memory using platform-specific APIs.
  *
- * Implements mmap() on POSIX systems and MapViewOfFile on Windows.
+ * Implements `mmap()` on POSIX systems and MapViewOfFile on Windows.
  *
  * @param fd File descriptor to be mapped.
  *
@@ -111,7 +111,7 @@ int remove_mapping(void* addr, size_t length) {
  * error.
  * @param path Path to the file to be removed.
  *
- * @return int 0 on success, non-zero on error.
+ * @return `int` 0 on success, non-zero on error.
  */
 int remove_file(char* path) {
    if (!path) {
@@ -131,7 +131,7 @@ int remove_file(char* path) {
  * @brief Gets the filesize of a file at path.
  * @param path Path to the file.
  *
- * @return size_t Size of the file in bytes. Returns 0 if the path is a
+ * @return `size_t` Size of the file in bytes. Returns 0 if the path is a
  * directory or an error occurs.
  */
 size_t get_filesize(char* path) {
@@ -153,14 +153,14 @@ size_t get_filesize(char* path) {
 /**
  * @brief Updates the tracked position of a file descriptor by a given increment.
  *
- * Searches the global fds[] array for the given file descriptor and updates
- * the corresponding entry in fd_pos[] by adding the increment.
+ * Searches the global `fds[]` array for the given file descriptor and updates
+ * the corresponding entry in `fd_pos[]` by adding the increment.
  *
  * @param fd File descriptor whose tracked position is to be updated.
  * @param increment Number of bytes by which to advance the position (may be negative).
  *
- * @return Updated position of the file descriptor, or 0 if fd is not tracked
- *         in the global fds[] array.
+ * @return Updated position of the file descriptor, or 0 if `fd` is not tracked
+ *         in the global `fds[]` array.
  */
 long update_fd_pos(int fd, long increment) {
    for (int i = 0; i < 3; i++) {
@@ -178,7 +178,7 @@ long update_fd_pos(int fd, long increment) {
  * @param buff Buffer containing data to write.
  * @param n Number of bytes to write.
  *
- * @return size_t Number of bytes actually written.
+ * @return `size_t` Number of bytes actually written.
  */
 size_t write_to_file(int fd, char* buff, size_t n) {
    if (fd < 0)
@@ -205,12 +205,12 @@ size_t write_to_file(int fd, char* buff, size_t n) {
 }
 
 /**
- * @brief Reads n bytes from file descriptor fd into buff.
+ * @brief Reads n bytes from file descriptor `fd` into buff.
  * @param fd File descriptor to read from.
  * @param buff Buffer to store the read data.
  * @param n Number of bytes to read.
  *
- * @return size_t Number of bytes actually read.
+ * @return `size_t` Number of bytes actually read.
  */
 size_t read_from_file(int fd, void* buff, size_t n) {
    if (fd < 0)
@@ -247,7 +247,7 @@ size_t read_from_file(int fd, void* buff, size_t n) {
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
  *
- * @return long Current offset of the file descriptor.
+ * @return `long` Current offset of the file descriptor.
  */
 long get_offset(int fd) {
 #ifdef _WIN32
@@ -260,8 +260,8 @@ long get_offset(int fd) {
 /**
  * @brief Serializes a `data_format_t` struct into a byte buffer.
  *
- * Copies the serializable fields of the data_format_t struct into a
- * contiguous calloc'd buffer of DATA_FORMAT_T_SIZE bytes.
+ * Copies the serializable fields of the `data_format_t` struct into a
+ * contiguous calloc'd buffer of `DATA_FORMAT_T_SIZE` bytes.
  *
  * @param df Pointer to the `data_format_t` struct to serialize.
  *
@@ -414,7 +414,7 @@ void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
  * @brief Reads the blocksize value stored in the MSZ file header.
  *
  * Extracts the blocksize directly from the mmap'd file at the
- * BLOCKSIZE_OFFSET position within the 512-byte header.
+ * `BLOCKSIZE_OFFSET` position within the 512-byte header.
  *
  * @param input_map Pointer to the mmap'd input file.
  *
@@ -438,7 +438,7 @@ long get_header_blocksize(void* input_map) {
  * @return Pointer to a newly allocated `data_format_t` struct.
  *
  * @note The returned data_format_t is malloc'd. The caller must free it
- *       (e.g., via dealloc_df()).
+ *       (e.g., via `dealloc_df()`).
  */
 data_format_t* get_header_df(void* input_map) {
    data_format_t* r;
@@ -467,7 +467,7 @@ void write_footer(footer_t* footer, int fd) {
 /**
  * @brief Reads the `footer_t` struct from the end of an mmap'd MSZ file.
  *
- * The footer is located at the last sizeof(footer_t) bytes of the file.
+ * The footer is located at the last `sizeof(footer_t)` bytes of the file.
  * Validates the magic tag to ensure the footer is valid.
  *
  * @param input_map Pointer to the mmap'd input file.
@@ -525,7 +525,7 @@ void print_footer_csv(footer_t* footer) {
 /**
  * @brief Determines if a memory-mapped file is an MSZ file.
  *
- * Checks whether the first 4 bytes of the file match the MAGIC_TAG constant.
+ * Checks whether the first 4 bytes of the file match the `MAGIC_TAG` constant.
  *
  * @param input_map Pointer to the memory-mapped file.
  * @param input_length Length of the memory-mapped file in bytes.
@@ -576,9 +576,9 @@ int is_mzml(void* input_map, size_t input_length) {
  * @param input_map Pointer to the memory-mapped file.
  * @param input_length Length of the memory-mapped file.
  *
- * @return COMPRESS (1) if file is a mzML file.
- *         DECOMPRESS (2) if file is a msz file.
- *         EXTERNAL (5) if file is not mzML or msz.
+ * @return `COMPRESS` (1) if file is a mzML file.
+ *         `DECOMPRESS` (2) if file is a msz file.
+ *         `EXTERNAL` (5) if file is not mzML or msz.
  *         -1 on error.
  */
 int determine_filetype(void* input_map, size_t input_length) {
@@ -818,11 +818,11 @@ int open_input_file(char* input_path) {
  *
  * @param fds An array of (3) file descriptors.
  *            On success, will contain non-negative values.
- *            fds[3] = {input_fd, output_fd, debug_fd}
+ *            `fds[3] = {input_fd, output_fd, debug_fd}`
  *
- * @return COMPRESS (1) if file is a mzML file.
- *         DECOMPRESS (2) if file is a msz file.
- *         EXTERNAL (5) if file is not mzML or msz.
+ * @return `COMPRESS` (1) if file is a mzML file.
+ *         `DECOMPRESS` (2) if file is a msz file.
+ *         `EXTERNAL` (5) if file is not mzML or msz.
  *         -1 on error.
  */
 int prepare_fds(char* input_path, char** output_path, char* debug_output,

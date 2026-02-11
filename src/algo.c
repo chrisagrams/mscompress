@@ -15,11 +15,11 @@
 
 /**
  * @brief Decode binary data without any lossy transformation (passthrough).
- * @param args Pointer to `algo_args` struct containing source data, decode function, and output pointers.
  *
  * Decodes the source buffer using the configured encoding format (e.g., base64+zlib)
  * but applies no further data transformation, preserving the original binary values exactly.
  *
+ * @param args Pointer to `algo_args` struct containing source data, decode function, and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_decode_lossless(void* args)
@@ -44,12 +44,14 @@ void algo_decode_lossless(void* args)
 
 /**
  * @brief Decode and downcast a 64-bit double array to a 32-bit float array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer, then casts each 64-bit double element to a 32-bit float.
+ * 
  * The output array is prefixed with a float header storing the element count.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -109,13 +111,15 @@ void algo_decode_cast32_64d(void* args) {
 
 /**
  * @brief Decode and downcast a 32-bit float array to a 16-bit unsigned integer array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer, then scales each 32-bit float by `a_args->scale_factor`
- * and casts to uint16_t, clamping values that exceed UINT16_MAX. The output array is
- * prefixed with a uint16_t header storing the element count.
+ * and casts to `uint16_t`, clamping values that exceed `UINT16_MAX`. 
+ * 
+ * The output array is prefixed with a `uint16_t` header storing the element count.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -184,13 +188,15 @@ void algo_decode_cast16_32f(void* args) {
 
 /**
  * @brief Decode and downcast a 64-bit double array to a 16-bit unsigned integer array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer, then scales each 64-bit double by `a_args->scale_factor`
- * and casts to uint16_t, clamping values that exceed UINT16_MAX. The output array is
- * prefixed with a uint16_t header storing the element count.
+ * and casts to `uint16_t`, clamping values that exceed `UINT16_MAX`. 
+ * 
+ * The output array is prefixed with a `uint16_t` header storing the element count.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -257,14 +263,16 @@ void algo_decode_cast16_64d(void* args) {
 }
 
 /**
- * @brief Decode and apply log2 transform to a 32-bit float array, producing uint16_t output.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
+ * @brief Decode and apply log2 transform to a 32-bit float array, producing `uint16_t` output.
  *
  * Decodes the source buffer of 32-bit floats, then applies `floor(log2(x + 1) * scale_factor)`
- * to each element, storing the result as a uint16_t array. The +1 offset avoids log2(0) = -inf.
- * The output array is prefixed with a uint16_t header storing the element count.
+ * to each element, storing the result as a `uint16_t array`. The +1 offset avoids `log2(0) = -inf`.
+ * 
+ * The output array is prefixed with a `uint16_t` header storing the element count.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -334,14 +342,16 @@ void algo_decode_log_2_transform_32f(void* args)
 }
 
 /**
- * @brief Decode and apply log2 transform to a 64-bit double array, producing uint16_t output.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
+ * @brief Decode and apply log2 transform to a 64-bit double array, producing `uint16_t` output.
  *
  * Decodes the source buffer of 64-bit doubles, then applies `floor(log2(x + 1) * scale_factor)`
- * to each element, storing the result as a uint16_t array. The +1 offset avoids log2(0) = -inf.
- * The output array is prefixed with a uint16_t header storing the element count.
+ * to each element, storing the result as a `uint16_t` array. The +1 offset avoids `log2(0) = -inf`.
+ * 
+ * The output array is prefixed with a `uint16_t` header storing the element count.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -413,13 +423,17 @@ void algo_decode_log_2_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 32-bit float array, producing 16-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, then computes consecutive differences
- * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a uint16_t. The first value
- * is preserved at full 32-bit float precision. Output layout: [uint16_t len][float first_val][uint16_t deltas...].
+ * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a `uint16_t`.
+ * 
+ * The first value is preserved at full 32-bit float precision.
+ * 
+ * Output layout: `[uint16_t len][float first_val][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -500,14 +514,19 @@ void algo_decode_delta16_transform_32f(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 64-bit double array, producing 16-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, then computes consecutive differences
- * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a uint16_t. Values exceeding
- * UINT16_MAX are clamped. The first value is preserved at full 64-bit double precision.
- * Output layout: [uint16_t len][double first_val][uint16_t deltas...].
+ * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a `uint16_t`. 
+ * 
+ * Values exceeding `UINT16_MAX` are clamped. 
+ * 
+ * The first value is preserved at full 64-bit double precision.
+ * 
+ * Output layout: `[uint16_t len][double first_val][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -594,15 +613,20 @@ void algo_decode_delta16_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 32-bit float array, producing 24-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, then computes consecutive differences
  * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a packed 24-bit (3-byte)
- * unsigned integer in big-endian order. Values exceeding 16777215 (UINT24_MAX) are clamped.
+ * unsigned integer in big-endian order. 
+ * 
+ * Values exceeding 16777215 (`UINT24_MAX`) are clamped.
+ * 
  * The first value is preserved at full 32-bit float precision.
- * Output layout: [uint16_t len][float first_val][uint8_t[3] deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -694,15 +718,18 @@ void algo_decode_delta24_transform_32f(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 64-bit double array, producing 24-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, then computes consecutive differences
  * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a packed 24-bit (3-byte)
- * unsigned integer in big-endian order. Values exceeding 16777215 (UINT24_MAX) are clamped.
+ * unsigned integer in big-endian order. Values exceeding 16777215 (`UINT24_MAX`) are clamped.
+ * 
  * The first value is preserved at full 64-bit double precision.
- * Output layout: [uint16_t len][double first_val][uint8_t[3] deltas...].
+ * 
+ * Output layout: `[uint16_t len][double first_val][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -793,14 +820,16 @@ void algo_decode_delta24_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 32-bit float array, producing 32-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, then computes consecutive differences
- * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a uint32_t. The first value
+ * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a `uint32_t`. The first value
  * is preserved at full 32-bit float precision.
- * Output layout: [uint16_t len][float first_val][uint32_t deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][uint32_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -880,14 +909,16 @@ void algo_decode_delta32_transform_32f(void* args) {
 
 /**
  * @brief Decode and apply delta encoding to a 64-bit double array, producing 32-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, then computes consecutive differences
- * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a uint32_t. The first value
+ * `(f[i] - f[i-1]) * scale_factor`, storing each delta as a `uint32_t`. The first value
  * is preserved at full 64-bit double precision.
- * Output layout: [uint16_t len][double first_val][uint32_t deltas...].
+ * 
+ * Output layout: `[uint16_t len][double first_val][uint32_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -969,15 +1000,17 @@ void algo_decode_delta32_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply variable-scale delta encoding to a 32-bit float array, producing 16-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, computes the maximum consecutive difference,
  * and derives a per-spectrum scale factor as `UINT16_MAX / max_diff`. Each delta is then
- * stored as a uint16_t. The first value and the computed scale factor are both stored
+ * stored as a `uint16_t`. The first value and the computed scale factor are both stored
  * at 32-bit float precision in the header.
- * Output layout: [uint16_t len][float first_val][float scale_factor][uint16_t deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][float scale_factor][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -1075,15 +1108,17 @@ void algo_decode_vdelta16_transform_32f(void* args) {
 
 /**
  * @brief Decode and apply variable-scale delta encoding to a 64-bit double array, producing 16-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, computes the maximum consecutive difference,
  * and derives a per-spectrum scale factor as `UINT16_MAX / max_diff`. Each delta is then
- * stored as a uint16_t. The first value and the computed scale factor are both stored
+ * stored as a `uint16_t`. The first value and the computed scale factor are both stored
  * at 32-bit float precision in the header.
- * Output layout: [uint16_t len][float first_val][float scale_factor][uint16_t deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][float scale_factor][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -1182,14 +1217,16 @@ void algo_decode_vdelta16_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply variable-scale delta encoding to a 32-bit float array, producing 24-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, computes the maximum consecutive difference,
  * and derives a per-spectrum scale factor as `UINT24_MAX / max_diff`. Each delta is stored
  * as a packed 24-bit (3-byte) unsigned integer in big-endian order.
- * Output layout: [uint16_t len][float first_val][float scale_factor][uint8_t[3] deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][float scale_factor][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -1297,14 +1334,16 @@ void algo_decode_vdelta24_transform_32f(void* args) {
 
 /**
  * @brief Decode and apply variable-scale delta encoding to a 64-bit double array, producing 24-bit deltas.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, computes the maximum consecutive difference,
  * and derives a per-spectrum scale factor as `UINT24_MAX / max_diff`. Each delta is stored
  * as a packed 24-bit (3-byte) unsigned integer in big-endian order.
- * Output layout: [uint16_t len][float first_val][float scale_factor][uint8_t[3] deltas...].
+ * 
+ * Output layout: `[uint16_t len][float first_val][float scale_factor][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  *          The intermediate decoded buffer is freed internally.
@@ -1413,14 +1452,16 @@ void algo_decode_vdelta24_transform_64d(void* args) {
 
 /**
  * @brief Decode and apply variable bit-rate (VBR) compression to a 32-bit float array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, determines the base peak intensity and
  * the minimum number of bits needed to represent values at the given threshold
  * (`scale_factor`), then packs each value into a variable-width bitstream.
- * Output layout: [uint32_t orig_len][float base_peak][uint32_t bytes_used][packed bits...].
+ * 
+ * Output layout: `[uint32_t orig_len][float base_peak][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -1562,14 +1603,16 @@ void algo_decode_vbr_32f(void* args) {
 
 /**
  * @brief Decode and apply variable bit-rate (VBR) compression to a 64-bit double array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, determines the base peak intensity and
  * the minimum number of bits needed to represent values at the given threshold
  * (`scale_factor`), then packs each value into a variable-width bitstream.
- * Output layout: [uint32_t orig_len][double base_peak][uint32_t bytes_used][packed bits...].
+ * 
+ * Output layout: `[uint32_t orig_len][double base_peak][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -1712,13 +1755,14 @@ void algo_decode_vbr_64d(void* args) {
 
 /**
  * @brief Decode and apply bit-packing compression to a 32-bit float array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 32-bit floats, normalizes each value to the range
  * [0, 1] relative to `scale_factor`, then packs each normalized value into a fixed
  * number of bits (currently 27). Expects `a_args->src_format` to be `_32f_`.
- * Output layout: [uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...].
+ * 
+ * Output layout: `[uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...]`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -1829,13 +1873,14 @@ void algo_decode_bitpack_32f(void* args) {
 
 /**
  * @brief Decode and apply bit-packing compression to a 64-bit double array.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Decodes the source buffer of 64-bit doubles, normalizes each value to the range
  * [0, 1] relative to `scale_factor`, then packs each normalized value into a fixed
  * number of bits (currently 27). Expects `a_args->src_format` to be `_64d_`.
- * Output layout: [uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...].
+ * 
+ * Output layout: `[uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...]`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  * @warning The caller owns the allocated result buffer stored in `*a_args->dest`.
  */
@@ -1950,11 +1995,11 @@ void algo_decode_bitpack_64d(void* args) {
 
 /**
  * @brief Encode binary data without any lossy transformation (passthrough).
- * @param args Pointer to `algo_args` struct containing source data and encoding parameters.
  *
  * Encodes the source buffer using the configured encoding format (e.g., zlib+base64)
  * but applies no data transformation, preserving the original binary values exactly.
  *
+ * @param args Pointer to `algo_args` struct containing source data and encoding parameters.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_lossless(void* args)
@@ -1979,12 +2024,13 @@ void algo_encode_lossless(void* args)
 
 /**
  * @brief Reconstruct a 64-bit double array from a 32-bit float compressed representation.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads a float array with a length header, upcasts each 32-bit float to a 64-bit double,
  * then encodes the result. Advances the source pointer past the consumed data.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_cast32_64d(void* args)
@@ -2045,12 +2091,14 @@ void algo_encode_cast32_64d(void* args)
 
 /**
  * @brief Reconstruct a 32-bit float array from a 16-bit unsigned integer compressed representation.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads a uint16_t array with a length header, divides each value by `scale_factor`
  * to recover the original float, then encodes the result. Advances the source pointer
- * past the consumed data. Expects `a_args->src_format` to be `_32f_`.
+ * past the consumed data. 
+ * 
+ * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_cast16_32f(void* args)
@@ -2117,12 +2165,14 @@ void algo_encode_cast16_32f(void* args)
 
 /**
  * @brief Reconstruct a 64-bit double array from a 16-bit unsigned integer compressed representation.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads a uint16_t array with a length header, divides each value by `scale_factor`
+ * Reads a `uint16_t` array with a length header, divides each value by `scale_factor`
  * to recover the original double, then encodes the result. Advances the source pointer
- * past the consumed data. Expects `a_args->src_format` to be `_64d_`.
+ * past the consumed data. 
+ * 
+ * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_cast16_64d(void* args)
@@ -2185,14 +2235,15 @@ void algo_encode_cast16_64d(void* args)
 }
 
 /**
- * @brief Reconstruct a 32-bit float array from log2-transformed uint16_t data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
+ * @brief Reconstruct a 32-bit float array from log2-transformed `uint16_t` data.
  *
- * Reads a uint16_t array with a length header, applies the inverse transform
+ * Reads a `uint16_t` array with a length header, applies the inverse transform
  * `exp2(value / scale_factor) - 1` to recover each original float, then encodes
  * the result. Advances the source pointer past the consumed data.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_log_2_transform_32f(void* args) {
@@ -2248,14 +2299,15 @@ void algo_encode_log_2_transform_32f(void* args) {
 }
 
 /**
- * @brief Reconstruct a 64-bit double array from log2-transformed uint16_t data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
+ * @brief Reconstruct a 64-bit double array from log2-transformed `uint16_t` data.
  *
- * Reads a uint16_t array with a length header, applies the inverse transform
+ * Reads a `uint16_t` array with a length header, applies the inverse transform
  * `exp2(value / scale_factor) - 1` to recover each original double, then encodes
  * the result. Advances the source pointer past the consumed data.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_log_2_transform_64d(void* args) {
@@ -2307,13 +2359,15 @@ void algo_encode_log_2_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from 16-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads the starting value and uint16_t deltas, reconstructs the original float array
+ * Reads the starting value and `uint16_t` deltas, reconstructs the original float array
  * by cumulative addition of `delta / scale_factor`, then encodes the result.
- * Input layout: [uint16_t len][float start][uint16_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta16_transform_32f(void* args) {
@@ -2375,13 +2429,15 @@ void algo_encode_delta16_transform_32f(void* args) {
 
 /**
  * @brief Reconstruct a 64-bit double array from 16-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads the starting value and uint16_t deltas, reconstructs the original double array
+ * Reads the starting value and `uint16_t` deltas, reconstructs the original double array
  * by cumulative addition of `delta / scale_factor`, then encodes the result.
- * Input layout: [uint16_t len][double start][uint16_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][double start][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta16_transform_64d(void* args) {
@@ -2443,13 +2499,15 @@ void algo_encode_delta16_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from variable-scale 16-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads the starting value, per-spectrum scale factor, and uint16_t deltas, then
+ * Reads the starting value, per-spectrum scale factor, and `uint16_t` deltas, then
  * reconstructs the original float array by cumulative addition of `delta / scale_factor`.
- * Input layout: [uint16_t len][float start][float scale_factor][uint16_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][float scale_factor][uint16_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vdelta16_transform_32f(void* args) {
@@ -2517,13 +2575,14 @@ void algo_encode_vdelta16_transform_32f(void* args) {
 
 /**
  * @brief Reconstruct a 64-bit double array from variable-scale 16-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads the starting value, per-spectrum scale factor, and uint16_t deltas, then
+ * Reads the starting value, per-spectrum scale factor, and `uint16_t` deltas, then
  * reconstructs the original double array by cumulative addition of `delta / scale_factor`.
- * Input layout: [uint16_t len][float start][float scale_factor][uint16_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][float scale_factor][uint16_t deltas...]`.
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vdelta16_transform_64d(void* args) {
@@ -2592,13 +2651,15 @@ void algo_encode_vdelta16_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from variable-scale 24-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the starting value, per-spectrum scale factor, and packed 24-bit deltas,
  * then reconstructs the original float array by cumulative addition of `delta / scale_factor`.
- * Input layout: [uint16_t len][float start][float scale_factor][uint8_t[3] deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][float scale_factor][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vdelta24_transform_32f(void* args) {
@@ -2677,13 +2738,14 @@ void algo_encode_vdelta24_transform_32f(void* args) {
 
 /**
  * @brief Reconstruct a 64-bit double array from variable-scale 24-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the starting value, per-spectrum scale factor, and packed 24-bit deltas,
  * then reconstructs the original double array by cumulative addition of `delta / scale_factor`.
- * Input layout: [uint16_t len][float start][float scale_factor][uint8_t[3] deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][float scale_factor][uint8_t[3] deltas...]`.
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vdelta24_transform_64d(void* args) {
@@ -2762,13 +2824,15 @@ void algo_encode_vdelta24_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from 24-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the starting value and packed 24-bit (3-byte big-endian) deltas, reconstructs
  * the original float array by cumulative addition of `delta / scale_factor`, then encodes.
- * Input layout: [uint16_t len][float start][uint8_t[3] deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta24_transform_32f(void* args) {
@@ -2842,13 +2906,15 @@ void algo_encode_delta24_transform_32f(void* args) {
 
 /**
  * @brief Reconstruct a 64-bit double array from 24-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the starting value and packed 24-bit (3-byte big-endian) deltas, reconstructs
  * the original double array by cumulative addition of `delta / scale_factor`, then encodes.
- * Input layout: [uint16_t len][double start][uint8_t[3] deltas...].
+ * 
+ * Input layout: `[uint16_t len][double start][uint8_t[3] deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta24_transform_64d(void* args) {
@@ -2922,13 +2988,15 @@ void algo_encode_delta24_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from 32-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the starting value and uint32_t deltas, reconstructs the original float array
  * by cumulative addition of `delta / scale_factor`, then encodes the result.
- * Input layout: [uint16_t len][float start][uint32_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][float start][uint32_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta32_transform_32f(void* args) {
@@ -2990,13 +3058,15 @@ void algo_encode_delta32_transform_32f(void* args) {
 
 /**
  * @brief Reconstruct a 64-bit double array from 32-bit delta-encoded data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
- * Reads the starting value and uint32_t deltas, reconstructs the original double array
+ * Reads the starting value and `uint32_t` deltas, reconstructs the original double array
  * by cumulative addition of `delta / scale_factor`, then encodes the result.
- * Input layout: [uint16_t len][double start][uint32_t deltas...].
+ * 
+ * Input layout: `[uint16_t len][double start][uint32_t deltas...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_delta32_transform_64d(void* args) {
@@ -3058,14 +3128,16 @@ void algo_encode_delta32_transform_64d(void* args) {
 
 /**
  * @brief Reconstruct a 32-bit float array from VBR-compressed bitstream data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the original length, base peak intensity, and byte count from the header,
  * then unpacks the variable-width bitstream to reconstruct each float as
  * `(packed_value * base_peak) / (2^num_bits - 1)`.
- * Input layout: [uint32_t orig_len][float base_peak][uint32_t bytes_used][packed bits...].
+ * 
+ * Input layout: `[uint32_t orig_len][float base_peak][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vbr_32f(void* args)
@@ -3170,14 +3242,16 @@ void algo_encode_vbr_32f(void* args)
 
 /**
  * @brief Reconstruct a 64-bit double array from VBR-compressed bitstream data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the original length, base peak intensity, and byte count from the header,
  * then unpacks the variable-width bitstream to reconstruct each double as
  * `(packed_value * base_peak) / (2^num_bits - 1)`.
- * Input layout: [uint32_t orig_len][double base_peak][uint32_t bytes_used][packed bits...].
+ * 
+ * Input layout: `[uint32_t orig_len][double base_peak][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_vbr_64d(void* args)
@@ -3282,14 +3356,16 @@ void algo_encode_vbr_64d(void* args)
 
 /**
  * @brief Reconstruct a 32-bit float array from bit-packed compressed data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the element count, bit width, and byte count from the header, then unpacks
  * the fixed-width bitstream to reconstruct each float as
  * `(packed_value * scale_factor) / (2^num_bits - 1)`.
- * Input layout: [uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...].
+ * 
+ * Input layout: `[uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_32f_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_bitpack_32f(void* args)
@@ -3386,14 +3462,16 @@ void algo_encode_bitpack_32f(void* args)
 
 /**
  * @brief Reconstruct a 64-bit double array from bit-packed compressed data.
- * @param args Pointer to `algo_args` struct containing source data and output pointers.
  *
  * Reads the element count, bit width, and byte count from the header, then unpacks
  * the fixed-width bitstream to reconstruct each double as
  * `(packed_value * scale_factor) / (2^num_bits - 1)`.
- * Input layout: [uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...].
+ * 
+ * Input layout: `[uint32_t len][uint8_t num_bits][uint32_t bytes_used][packed bits...]`.
+ * 
  * Expects `a_args->src_format` to be `_64d_`.
  *
+ * @param args Pointer to `algo_args` struct containing source data and output pointers.
  * @note Errors are reported via `a_args->ret_code` (-1 on error, 0 on success).
  */
 void algo_encode_bitpack_64d(void* args)

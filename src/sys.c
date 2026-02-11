@@ -73,7 +73,7 @@ int get_num_threads() {
 
 /**
  * @brief Detects available CPUs and sets the thread count in args.
- * @param args A pointer to the Arguments struct. If args->threads is 0, it is
+ * @param args A pointer to the Arguments struct. If `args->threads` is 0, it is
  *             set to the number of available processors.
  */
 void prepare_threads(Arguments* args) {
