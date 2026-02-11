@@ -611,10 +611,6 @@ uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
 uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
                      uInt input_len);
 
-/* debug.c */
-void dump_divisions_to_file(data_positions_t** ddp, int divisions, int threads,
-                            int fd);
-
 #ifdef __cplusplus
 }
 #endif
