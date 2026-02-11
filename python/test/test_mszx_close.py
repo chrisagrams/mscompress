@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
-from mscompress import MSZFile, read
+from mscompress import read
 
 
 DATA_DIR = Path(__file__).parent / "data"
