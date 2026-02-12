@@ -486,8 +486,8 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
                     size_t* out_len, int compression_level);
 void* compress_routine(void* args);
 void dump_block_len_queue(block_len_queue_t* queue, int fd);
-void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
-                   data_format_t* df, divisions_t* divisions, int output_fd);
+int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
+                  data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
@@ -539,8 +539,8 @@ void* zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
 void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk);
 void* decompress_routine(void* args);
-void decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
-                    int fd);
+int decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
+                   int fd);
 decompression_fun set_decompress_fun(int accession);
 
 /* algo.c */

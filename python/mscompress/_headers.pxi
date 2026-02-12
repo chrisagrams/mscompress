@@ -176,8 +176,8 @@ cdef extern from "../src/mscompress.h":
     char* _extract_mzml_header "extract_mzml_header"(char* blk, division_t* first_division, size_t* out_len)
     char* _extract_mzml_footer "extract_mzml_footer"(char* blk, divisions_t* divisions, size_t* out_len)
     void _extract_msz "extract_msz"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, int output_fd)
-    void _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
-    void _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
+    int _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
+    int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
     void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd)
 
     # Error/warning callback functions

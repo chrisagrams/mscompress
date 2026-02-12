@@ -514,9 +514,10 @@ void* decompress_routine(void* args) {
  * @param input_filesize The size of the input buffer.
  * @param arguments A pointer to an `Arguments` struct containing the command line arguments.
  * @param fd The file descriptor to write the decompressed data to.
+ * @return 0 on success, -1 on error.
  */
-void decompress_msz(char* input_map, size_t input_filesize,
-                    Arguments* arguments, int fd) {
+int decompress_msz(char* input_map, size_t input_filesize,
+                   Arguments* arguments, int fd) {
    block_len_queue_t *xml_block_lens, *mz_binary_block_lens,
        *inten_binary_block_lens;
    footer_t* msz_footer;
@@ -536,13 +537,13 @@ void decompress_msz(char* input_map, size_t input_filesize,
 
    if (n_divisions == 0) {
       warning("No divisions found in file, aborting...\n");
-      return;
+      return -1;
    }
 
    int ret = set_decompress_runtime_variables(df, msz_footer);
    if (ret != 0) {
       error("decompress_msz: Failed to set decompression runtime variables.\n");
-      return;
+      return -1;
    }
 
    decompress_args_t** args =
@@ -597,14 +598,14 @@ void decompress_msz(char* input_map, size_t input_filesize,
              CreateThread(NULL, 0, decompress_routine_win, args[i], 0, NULL);
          if (ptid[i] == NULL) {
             perror("CreateThread");
-            return;
+            return -1;
          }
 #else
          int ret =
              pthread_create(&ptid[i], NULL, decompress_routine, (void*)args[i]);
          if (ret != 0) {
             perror("pthread_create");
-            return;
+            return -1;
          }
 #endif
       }
@@ -616,7 +617,7 @@ void decompress_msz(char* input_map, size_t input_filesize,
          int ret = pthread_join(ptid[i], NULL);
          if (ret != 0) {
             perror("pthread_join");
-            return;
+            return -1;
          }
       }
 #endif
@@ -624,7 +625,7 @@ void decompress_msz(char* input_map, size_t input_filesize,
       for (i = divisions_used; i < divisions_used + threads; i++) {
          if (args[i]->ret == NULL || args[i]->ret_len == -1) {
             error("decompress_msz: Decompression failed for division %d.\n", i);
-            return;
+            return -1;
          }
          start = get_time();
          write_to_file(fd, args[i]->ret, args[i]->ret_len);
@@ -648,6 +649,8 @@ void decompress_msz(char* input_map, size_t input_filesize,
    dealloc_block_len_queue(inten_binary_block_lens);
    dealloc_df(df);
    dealloc_read_divisions(divisions);
+
+   return 0;
 }
 
 /**
