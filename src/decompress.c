@@ -16,7 +16,7 @@
 /**
  * @brief Creates a ZSTD decompression context and handles errors.
  *
- * @return A ZSTD decompression context on success. NULL on error.
+ * @return A ZSTD decompression context on success. `NULL` on error.
  *
  */
 ZSTD_DCtx* alloc_dctx()
@@ -28,7 +28,7 @@ ZSTD_DCtx* alloc_dctx()
 }
 
 /**
-* @brief Allocates a buffer for ZSTD decompression. Returns the buffer on success, NULL on error.
+* @brief Allocates a buffer for ZSTD decompression. Returns the buffer on success, `NULL` on error.
 */
 void* alloc_ztsd_dbuff(size_t buff_len) {
    void* r = malloc(buff_len);
@@ -39,12 +39,12 @@ void* alloc_ztsd_dbuff(size_t buff_len) {
 
 
 /**
- * @brief Decompresses a buffer using ZSTD returning the decompressed buffer on success, NULL on error.
+ * @brief Decompresses a buffer using ZSTD returning the decompressed buffer on success, `NULL` on error.
  * @param dctx A ZSTD decompression context.
  * @param src_buff The compressed buffer to be decompressed.
  * @param src_len The length of the compressed buffer.
  * @param org_len The expected length of the decompressed buffer.
- * @return A pointer to the decompressed buffer on success. NULL on error.
+ * @return A pointer to the decompressed buffer on success. `NULL` on error.
 */
 void* 
 zstd_decompress(
@@ -79,12 +79,12 @@ zstd_decompress(
 
 
 /**
- * @brief Decompresses a buffer using LZ4 returning the decompressed buffer on success, NULL on error.
+ * @brief Decompresses a buffer using LZ4 returning the decompressed buffer on success, `NULL` on error.
  * @param dctx A ZSTD decompression context (not used in this function, but included for consistency with other decompression functions).
  * @param src_buff The compressed buffer to be decompressed.
  * @param src_len The length of the compressed buffer.
  * @param org_len The expected length of the decompressed buffer.
- * @return A pointer to the decompressed buffer on success. NULL on error.
+ * @return A pointer to the decompressed buffer on success. `NULL` on error.
 */
 void* lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
                      size_t org_len) {
@@ -123,12 +123,12 @@ void* lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
 
 
 /**
- * @brief A no-op decompression function that simply copies the input buffer to the output buffer. Returns the output buffer on success, NULL on error.
+ * @brief A no-op decompression function that simply copies the input buffer to the output buffer. Returns the output buffer on success, `NULL` on error.
  * @param dctx A ZSTD decompression context (not used in this function, but included for consistency with other decompression functions).
  * @param src_buff The compressed buffer to be "decompressed".
  * @param src_len The length of the compressed buffer.
  * @param org_len The expected length of the "decompressed" buffer.
- * @return A pointer to the "decompressed" buffer on success. NULL on error.
+ * @return A pointer to the "decompressed" buffer on success. `NULL` on error.
  */
 void* no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
                     size_t org_len)
@@ -149,13 +149,13 @@ void* no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
 }
 
 /**
- * @brief Decompresses a block of data using the provided decompression function. Returns the decompressed buffer on success, NULL on error.
+ * @brief Decompresses a block of data using the provided decompression function. Returns the decompressed buffer on success, `NULL` on error.
  * @param decompress_fun The decompression function to use.
  * @param dctx A ZSTD decompression context.
  * @param input_map The input buffer containing the compressed data.
  * @param offset The offset within the input buffer where the compressed data starts.
- * @param blk A block_len_t struct containing the original and compressed sizes of the data block
- * @return A pointer to the decompressed buffer on success. Can return NULL if the block is empty or if decompression fails.
+ * @param blk A `block_len_t` struct containing the original and compressed sizes of the data block
+ * @return A pointer to the decompressed buffer on success. Can return `NULL` if the block is empty or if decompression fails.
  */
 void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk) {
@@ -179,17 +179,17 @@ void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
 
 
 /**
- * @brief Allocates a decompress_args_t struct and initializes its fields. Returns the struct on success, NULL on error.
+ * @brief Allocates a `decompress_args_t` struct and initializes its fields. Returns the struct on success, `NULL` on error.
  * @param input_map The input buffer containing the compressed data.
- * @param df A pointer to a data_format_t struct containing the data format information.
- * @param xml_blk A pointer to a block_len_t struct containing the original and compressed sizes
- * @param mz_binary_blk A pointer to a block_len_t struct containing the original and compressed sizes of the m/z binary block.
- * @param inten_binary_blk A pointer to a block_len_t struct containing the original and compressed
- * @param division A pointer to a division_t struct containing the division information.
+ * @param df A pointer to a `data_format_t` struct containing the data format information.
+ * @param xml_blk A pointer to a `block_len_t` struct containing the original and compressed sizes
+ * @param mz_binary_blk A pointer to a `block_len_t` struct containing the original and compressed sizes of the m/z binary block.
+ * @param inten_binary_blk A pointer to a `block_len_t` struct containing the original and compressed
+ * @param division A pointer to a `division_t` struct containing the division information.
  * @param footer_xml_off The offset within the input buffer where the XML block starts.
  * @param footer_mz_bin_off The offset within the input buffer where the m/z binary block starts.
  * @param footer_inten_bin_off The offset within the input buffer where the intensity binary block starts.
- * @return A pointer to the allocated decompress_args_t struct on success. NULL on error.
+ * @return A pointer to the allocated `decompress_args_t` struct on success. `NULL` on error.
  */
 decompress_args_t* alloc_decompress_args(
    char* input_map,
@@ -227,8 +227,8 @@ decompress_args_t* alloc_decompress_args(
 }
 
 /**
- * @brief Deallocates a decompress_args_t struct and its fields. Frees the memory allocated for the struct and its fields.
- * @param args A pointer to the decompress_args_t struct to be deallocated.
+ * @brief Deallocates a `decompress_args_t` struct and its fields. Frees the memory allocated for the struct and its fields.
+ * @param args A pointer to the `decompress_args_t` struct to be deallocated.
  */
 void dealloc_decompress_args(decompress_args_t* args) {
    if (args) {
@@ -266,8 +266,8 @@ int get_lowest(int i_0, int i_1, int i_2) {
 
 #ifdef _WIN32
 /**
- * @brief Windows thread routine for decompression. Calls the decompress_routine function with the provided arguments.
- * @param lpParam A pointer to the decompress_args_t struct containing the arguments for decompression
+ * @brief Windows thread routine for decompression. Calls the `decompress_routine` function with the provided arguments.
+ * @param lpParam A pointer to the `decompress_args_t` struct containing the arguments for decompression
  * @return 0 on success.
  */
 DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
@@ -278,10 +278,10 @@ DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
 #endif
 
 /**
- * @brief Thread routine for decompression. Calls the decmp_block function to decompress the data blocks and writes the decompressed data to the output buffer.
- * @param args A pointer to the decompress_args_t struct containing the arguments for decompression.
- * @return Always returns NULL. `args->ret` will contain the decompressed data and `args->ret_len` will contain the length of the decompressed data on success.
- * on error, `args->ret` will be NULL and `args->ret_len` will be -1.
+ * @brief Thread routine for decompression. Calls the `decmp_block` function to decompress the data blocks and writes the decompressed data to the output buffer.
+ * @param args A pointer to the `decompress_args_t` struct containing the arguments for decompression.
+ * @return Always returns `NULL`. `args->ret` will contain the decompressed data and `args->ret_len` will contain the length of the decompressed data on success.
+ * on error, `args->ret` will be `NULL` and `args->ret_len` will be -1.
  *
  * Note: The caller is responsible for freeing the memory allocated for `args->ret`.
  */
@@ -512,7 +512,7 @@ void* decompress_routine(void* args) {
  * @brief Decompresses an .msz file and writes the decompressed data to the provided file descriptor. Uses multiple threads to decompress the data in parallel.
  * @param input_map The input buffer containing the compressed data.
  * @param input_filesize The size of the input buffer.
- * @param arguments A pointer to an Arguments struct containing the command line arguments.
+ * @param arguments A pointer to an `Arguments` struct containing the command line arguments.
  * @param fd The file descriptor to write the decompressed data to.
  */
 void decompress_msz(char* input_map, size_t input_filesize,
@@ -653,7 +653,7 @@ void decompress_msz(char* input_map, size_t input_filesize,
 /**
  * @brief Sets the decompression function based on the accession integer.
  * @param accession An integer representing the compression type.
- * @return A function pointer to the corresponding decompression function on success. NULL on error.
+ * @return A function pointer to the corresponding decompression function on success. `NULL` on error.
  */
 decompression_fun set_decompress_fun(int accession) {
    switch (accession) {

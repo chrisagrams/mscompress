@@ -36,13 +36,16 @@
 #endif
 
 /**
- * @brief A memory mapping wrapper. Implements mmap() syscall on POSIX systems
- * and MapViewOfFile on Windows platform.
+ * @brief Maps a file into memory using platform-specific APIs.
+ *
+ * Implements `mmap()` on POSIX systems and MapViewOfFile on Windows.
  *
  * @param fd File descriptor to be mapped.
  *
- * @return `void*` Pointer to the mapped memory region on success. NULL on
- * error.
+ * @return Pointer to the mapped memory region on success. `NULL` on error.
+ *
+ * @note The returned memory is mmap'd. The caller must release it with
+ *       remove_mapping() when done.
  */
 void* get_mapping(int fd) {
    int status;
@@ -108,7 +111,7 @@ int remove_mapping(void* addr, size_t length) {
  * error.
  * @param path Path to the file to be removed.
  *
- * @return int 0 on success, non-zero on error.
+ * @return `int` 0 on success, non-zero on error.
  */
 int remove_file(char* path) {
    if (!path) {
@@ -128,7 +131,7 @@ int remove_file(char* path) {
  * @brief Gets the filesize of a file at path.
  * @param path Path to the file.
  *
- * @return size_t Size of the file in bytes. Returns 0 if the path is a
+ * @return `size_t` Size of the file in bytes. Returns 0 if the path is a
  * directory or an error occurs.
  */
 size_t get_filesize(char* path) {
@@ -148,12 +151,16 @@ size_t get_filesize(char* path) {
 }
 
 /**
- * @brief Updates the current position of a file descriptor by increment.
- * @param fd File descriptor whose position is to be updated.
- * @param increment Amount by which to update the file descriptor's position.
+ * @brief Updates the tracked position of a file descriptor by a given increment.
  *
- * @return long Updated position of the file descriptor. Returns 0 if fd is not
- * tracked.
+ * Searches the global `fds[]` array for the given file descriptor and updates
+ * the corresponding entry in `fd_pos[]` by adding the increment.
+ *
+ * @param fd File descriptor whose tracked position is to be updated.
+ * @param increment Number of bytes by which to advance the position (may be negative).
+ *
+ * @return Updated position of the file descriptor, or 0 if `fd` is not tracked
+ *         in the global `fds[]` array.
  */
 long update_fd_pos(int fd, long increment) {
    for (int i = 0; i < 3; i++) {
@@ -171,7 +178,7 @@ long update_fd_pos(int fd, long increment) {
  * @param buff Buffer containing data to write.
  * @param n Number of bytes to write.
  *
- * @return size_t Number of bytes actually written.
+ * @return `size_t` Number of bytes actually written.
  */
 size_t write_to_file(int fd, char* buff, size_t n) {
    if (fd < 0)
@@ -198,12 +205,12 @@ size_t write_to_file(int fd, char* buff, size_t n) {
 }
 
 /**
- * @brief Reads n bytes from file descriptor fd into buff.
+ * @brief Reads n bytes from file descriptor `fd` into buff.
  * @param fd File descriptor to read from.
  * @param buff Buffer to store the read data.
  * @param n Number of bytes to read.
  *
- * @return size_t Number of bytes actually read.
+ * @return `size_t` Number of bytes actually read.
  */
 size_t read_from_file(int fd, void* buff, size_t n) {
    if (fd < 0)
@@ -240,7 +247,7 @@ size_t read_from_file(int fd, void* buff, size_t n) {
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
  *
- * @return long Current offset of the file descriptor.
+ * @return `long` Current offset of the file descriptor.
  */
 long get_offset(int fd) {
 #ifdef _WIN32
@@ -252,9 +259,15 @@ long get_offset(int fd) {
 
 /**
  * @brief Serializes a `data_format_t` struct into a byte buffer.
+ *
+ * Copies the serializable fields of the `data_format_t` struct into a
+ * contiguous calloc'd buffer of `DATA_FORMAT_T_SIZE` bytes.
+ *
  * @param df Pointer to the `data_format_t` struct to serialize.
  *
- * @return char* Pointer to the serialized byte buffer.
+ * @return Pointer to the serialized byte buffer.
+ *
+ * @note The returned buffer is malloc'd (via calloc). The caller must free it.
  */
 char* serialize_df(data_format_t* df) {
    char* r = calloc(1, DATA_FORMAT_T_SIZE);
@@ -292,9 +305,16 @@ char* serialize_df(data_format_t* df) {
 
 /**
  * @brief Deserializes a byte buffer into a `data_format_t` struct.
+ *
+ * Reads serialized fields from the buffer and populates a newly allocated
+ * data_format_t struct. Runtime-only fields (function pointers, populated flag)
+ * are not set by this function.
+ *
  * @param buff Pointer to the byte buffer to deserialize.
  *
- * @return data_format_t* Pointer to the deserialized `data_format_t` struct.
+ * @return Pointer to the deserialized `data_format_t` struct.
+ *
+ * @note The returned data_format_t is malloc'd. The caller must free it.
  */
 data_format_t* deserialize_df(char* buff) {
    data_format_t* r = malloc(sizeof(data_format_t));
@@ -330,8 +350,9 @@ data_format_t* deserialize_df(char* buff) {
    return r;
 }
 
-/*
- * @brief Writes .msz header to file descriptor.
+/**
+ * @brief Writes the 512-byte .msz header to a file descriptor.
+ *
  * Header format:
  *              |====================================================|
  *              |        Content            |    Size    |  Offset   |
@@ -355,11 +376,11 @@ data_format_t* deserialize_df(char* buff) {
  *              |====================================================|
  *              | Total Size                |  512 bytes |           |
  *              |====================================================|
+ *
  * @param fd File descriptor to write to.
- * @param df Pointer to the `data_format_t` struct containing header
- * information.
+ * @param df Pointer to the `data_format_t` struct containing header information.
  * @param blocksize Blocksize to write to header.
- * @param md5 MD5 checksum to write to header.
+ * @param md5 MD5 checksum string to write to header.
  */
 void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Allocate header_buff
@@ -390,11 +411,14 @@ void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
 }
 
 /**
- * @brief Gets blocksize stored in header.
+ * @brief Reads the blocksize value stored in the MSZ file header.
  *
- * @param input_map mmap'ed input file.
+ * Extracts the blocksize directly from the mmap'd file at the
+ * `BLOCKSIZE_OFFSET` position within the 512-byte header.
  *
- * @return long value representing blocksize.
+ * @param input_map Pointer to the mmap'd input file.
+ *
+ * @return The blocksize value stored in the header.
  */
 long get_header_blocksize(void* input_map) {
    long* r;
@@ -403,11 +427,18 @@ long get_header_blocksize(void* input_map) {
 }
 
 /**
- * @brief Gets `data_format_t` struct stored in header.
+ * @brief Extracts and deserializes the `data_format_t` struct from the MSZ header.
  *
- * @param input_map mmap'ed input file.
+ * Reads the serialized data format information from the header region of the
+ * mmap'd input file and returns it as a newly allocated data_format_t struct
+ * with the `populated` flag set to 2.
  *
- * @return data_format_t* Pointer to `data_format_t` struct.
+ * @param input_map Pointer to the mmap'd input file.
+ *
+ * @return Pointer to a newly allocated `data_format_t` struct.
+ *
+ * @note The returned data_format_t is malloc'd. The caller must free it
+ *       (e.g., via `dealloc_df()`).
  */
 data_format_t* get_header_df(void* input_map) {
    data_format_t* r;
@@ -420,8 +451,12 @@ data_format_t* get_header_df(void* input_map) {
 }
 
 /**
- * @brief Writes `footer_t` struct to file descriptor.
- * @param footer Pointer to `footer_t` struct to write.
+ * @brief Writes a `footer_t` struct to a file descriptor.
+ *
+ * Sets the magic tag on the footer before writing the entire struct
+ * as raw bytes to the given file descriptor.
+ *
+ * @param footer Pointer to the `footer_t` struct to write.
  * @param fd File descriptor to write to.
  */
 void write_footer(footer_t* footer, int fd) {
@@ -430,10 +465,18 @@ void write_footer(footer_t* footer, int fd) {
 }
 
 /**
- * @brief Reads `footer_t` struct from mmap'ed input file.
- * @param input_map mmap'ed input file.
- * @param filesize Size of the input file.
- * @return footer_t* Pointer to `footer_t` struct.
+ * @brief Reads the `footer_t` struct from the end of an mmap'd MSZ file.
+ *
+ * The footer is located at the last `sizeof(footer_t)` bytes of the file.
+ * Validates the magic tag to ensure the footer is valid.
+ *
+ * @param input_map Pointer to the mmap'd input file.
+ * @param filesize Size of the input file in bytes.
+ *
+ * @return Pointer to the `footer_t` struct within the mmap'd region, or `NULL` on error.
+ *
+ * @warning The returned pointer points into the mmap'd region (not malloc'd).
+ *          Do NOT free it directly. It is valid only as long as the mapping exists.
  */
 footer_t* read_footer(void* input_map, long filesize) {
    footer_t* footer;
@@ -454,7 +497,11 @@ footer_t* read_footer(void* input_map, long filesize) {
 }
 
 /**
- * @brief Prints the contents of a `footer_t` struct in CSV format.
+ * @brief Prints the contents of a `footer_t` struct to stdout in CSV format.
+ *
+ * Outputs a CSV header line followed by a single data line containing all
+ * footer fields. Useful for debugging and inspection of MSZ file metadata.
+ *
  * @param footer Pointer to the `footer_t` struct to print.
  */
 void print_footer_csv(footer_t* footer) {
@@ -476,12 +523,14 @@ void print_footer_csv(footer_t* footer) {
 }
 
 /**
- * @brief Determines if file mapped in input_map is an msz file.
- *        Reads first 512 bytes of file and looks for MAGIC_TAG.
+ * @brief Determines if a memory-mapped file is an MSZ file.
+ *
+ * Checks whether the first 4 bytes of the file match the `MAGIC_TAG` constant.
  *
  * @param input_map Pointer to the memory-mapped file.
+ * @param input_length Length of the memory-mapped file in bytes.
  *
- * @return 1 if file is a msz file. 0 otherwise.
+ * @return 1 if the file is an MSZ file, 0 otherwise.
  */
 int is_msz(void* input_map, size_t input_length) {
    if (input_length <
@@ -527,9 +576,9 @@ int is_mzml(void* input_map, size_t input_length) {
  * @param input_map Pointer to the memory-mapped file.
  * @param input_length Length of the memory-mapped file.
  *
- * @return COMPRESS (1) if file is a mzML file.
- *         DECOMPRESS (2) if file is a msz file.
- *         EXTERNAL (5) if file is not mzML or msz.
+ * @return `COMPRESS` (1) if file is a mzML file.
+ *         `DECOMPRESS` (2) if file is a msz file.
+ *         `EXTERNAL` (5) if file is not mzML or msz.
  *         -1 on error.
  */
 int determine_filetype(void* input_map, size_t input_length) {
@@ -548,13 +597,18 @@ int determine_filetype(void* input_map, size_t input_length) {
 }
 
 /**
- * @brief Changes a path string's extension.
+ * @brief Replaces the file extension of a path string with a new extension.
+ *
+ * Finds the last '.' in the input path and replaces everything from that
+ * point with the new extension.
  *
  * @param input Original path string.
+ * @param extension Desired extension to replace with (e.g., ".msz"). Must be `NULL` terminated.
  *
- * @param extension Desired extension to append. MUST be NULL terminated.
+ * @return New path string with the replaced extension.
  *
- * @return Malloc'd char array with new path string.
+ * @note The returned string is malloc'd. The caller must free it.
+ * @warning Assumes the input path contains a '.' character (extension separator).
  */
 char* change_extension(char* input, char* extension) {
    if (input == NULL)
@@ -577,10 +631,17 @@ char* change_extension(char* input, char* extension) {
 }
 
 /**
- * @brief Appends an extension to a path string.
+ * @brief Appends an extension to the end of a path string.
+ *
+ * Concatenates the extension string to the end of the input path without
+ * removing any existing extension.
+ *
  * @param input Original path string.
- * @param extension Desired extension to append. MUST be NULL terminated.
- * @return Malloc'd char array with new path string.
+ * @param extension Desired extension to append (e.g., ".msz"). Must be `NULL` terminated.
+ *
+ * @return New path string with the appended extension.
+ *
+ * @note The returned string is malloc'd. The caller must free it.
  */
 char* append_extension(char* input, char* extension) {
    if (input == NULL)
@@ -605,8 +666,14 @@ char* append_extension(char* input, char* extension) {
 /**
  * @brief Strips the ".msz" extension from a path string if present,
  *        otherwise appends ".mzML" to the path string.
+ *
+ * Used to generate a default output path during decompression.
+ *
  * @param input Original path string.
- * @return Malloc'd char array with new path string.
+ *
+ * @return New path string with the ".msz" extension removed or ".mzML" appended.
+ *
+ * @note The returned string is malloc'd. The caller must free it.
  */
 char* strip_or_append_extension(char* input) {
    if (input == NULL)
@@ -751,11 +818,11 @@ int open_input_file(char* input_path) {
  *
  * @param fds An array of (3) file descriptors.
  *            On success, will contain non-negative values.
- *            fds[3] = {input_fd, output_fd, debug_fd}
+ *            `fds[3] = {input_fd, output_fd, debug_fd}`
  *
- * @return COMPRESS (1) if file is a mzML file.
- *         DECOMPRESS (2) if file is a msz file.
- *         EXTERNAL (5) if file is not mzML or msz.
+ * @return `COMPRESS` (1) if file is a mzML file.
+ *         `DECOMPRESS` (2) if file is a msz file.
+ *         `EXTERNAL` (5) if file is not mzML or msz.
  *         -1 on error.
  */
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
