@@ -71,7 +71,7 @@ A 512-byte header and a variable-length footer enable random access by storing b
 | File | Role |
 |------|------|
 | `mscompress.h` | All type definitions and function declarations |
-| `preprocess.c` | XML parsing (yxml), file division, spectrum scanning, format detection |
+| `preprocess.c` | XML parsing, file division, spectrum scanning, format detection |
 | `compress.c` | Multi-threaded compression pipeline |
 | `decompress.c` | Multi-threaded decompression |
 | `extract.c` | Spectrum extraction from mzML/MSZ with index-based filtering |
@@ -100,7 +100,6 @@ The Python build (`setup.py`) compiles all C sources + vendor libraries into a s
 ### Vendor libraries (`vendor/`)
 - **zlib** (Cloudflare fork), **zstd**, **lz4** — compression backends
 - **base64** — SIMD-optimized base64 codec (AVX2, SSSE3, SSE4, NEON)
-- **yxml** — lightweight streaming XML parser
 
 ## Memory Management Rules
 

@@ -13,7 +13,6 @@
 
 #include "../vendor/zstd/lib/zstd.h"
 #include "libbase64.h"
-#include "yxml.h"
 
 static const char* program_name = NULL;
 

@@ -19,30 +19,12 @@
 #include <string.h>
 
 #include "mscompress.h"
-#include "yxml.h"
 
 #define parse_acc_to_int(attrbuff)                                            \
    atoi(attrbuff + 3) /* Convert an accession to an integer by removing 'MS:' \
                          substring and calling atoi() */
 
 /* === Start of allocation and deallocation helper functions === */
-
-/**
- * @brief Allocates and initializes a yxml parser instance with an internal buffer.
- * @return A pointer to the initialized yxml_t parser.
- * @note The caller is responsible for freeing the returned pointer with `free()`.
- * @warning Calls `error()` and aborts on `malloc` failure.
- */
-// TODO: Remove yxml dependency since we no longer use it.
-yxml_t* alloc_yxml() {
-   yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
-
-   if (xml == NULL)
-      error("malloc failure in alloc_yxml().\n");
-
-   yxml_init(xml, xml + 1, BUFSIZE);
-   return xml;
-}
 
 /**
  * @brief Allocates a zeroed data_format_t struct with populated field set to 0.
@@ -358,92 +340,60 @@ int map_to_df(int acc, int* current_type, data_format_t* df)
 /**
  * @brief Detect the data type and encoding within a .mzML file.
  *
- * Traverses the XML structure of the mzML file using yxml to identify the source
- * compression method, m/z data format, intensity data format, and total spectrum count.
- * Since these data types and encodings are consistent throughout the entire .mzML
- * document, the function stops its traversal once all fields of the `data_format_t`
- * struct are filled.
+ * Scans the mzML file for accession attributes within cvParam elements to
+ * identify the source compression method, m/z data format, intensity data
+ * format, and total spectrum count. Since these data types and encodings are
+ * consistent throughout the entire .mzML document, the function only needs to
+ * inspect the first few spectra.
  *
  * @param input_map A memory-mapped pointer to the .mzML file contents.
- * @return A populated data_format_t struct on success, NULL on failure (parse error or incomplete data).
+ * @return A populated data_format_t struct on success, NULL on failure.
  * @note The caller is responsible for freeing the returned pointer with `dealloc_df()`.
  * @note Returns a malloc'd `data_format_t` that the caller owns.
  */
 data_format_t* pattern_detect(char* input_map)
 {
    data_format_t* df = alloc_df();
+   int current_type = 0;
+   char* ptr;
 
-   yxml_t* xml = alloc_yxml();
-
-   char attrbuf[11] = {'\0'}, *attrcur = NULL,
-        *tmp = NULL; /* Length of a accession tag is at most 10 characters,
-                        leave room for null terminator. */
-
-   int in_cvParam =
-       0; /* Boolean representing if currently inside of cvParam tag. */
-   int current_type =
-       0; /* A pass-by-reference variable to indicate to map_to_df of current
-             binary data array type (m/z or intensity) */
-
-   for (; *input_map; input_map++) {
-      yxml_ret_t r = yxml_parse(xml, *input_map);
-      if (r < 0) {
-         free(xml);
-         free(df);
-         return NULL;
-      }
-      switch (r) {
-         case YXML_ELEMSTART:
-            if (strcmp(xml->elem, "cvParam") == 0)
-               in_cvParam = 1;
-            break;
-
-         case YXML_ELEMEND:
-            if (strcmp(xml->elem, "cvParam") == 0)
-               in_cvParam = 0;
-            break;
-
-         case YXML_ATTRSTART:
-            if (in_cvParam && strcmp(xml->attr, "accession") == 0)
-               attrcur = attrbuf;
-            else if (strcmp(xml->attr, "count") == 0)
-               attrcur = attrbuf;
-            break;
-
-         case YXML_ATTRVAL:
-            if (!in_cvParam || !attrcur)
-               break;
-            tmp = xml->data;
-            while (*tmp && attrcur < attrbuf + sizeof(attrbuf))
-               *(attrcur++) = *(tmp++);
-            if (attrcur == attrbuf + sizeof(attrbuf)) {
-               free(xml);
-               free(df);
-               return NULL;
-            }
-            *attrcur = 0;
-            break;
-
-         case YXML_ATTREND:
-            if (attrcur && (strcmp(xml->elem, "spectrumList") == 0) &&
-                (strcmp(xml->attr, "count") == 0)) {
-               df->source_total_spec = atoi(attrbuf);
-               attrcur = NULL;
-            } else if (in_cvParam && attrcur) {
-               if (map_to_df(parse_acc_to_int(attrbuf), &current_type, df)) {
-                  free(xml);
-                  return df;
-               }
-               attrcur = NULL;
-            }
-            break;
-
-         default:
-            /* TODO: handle errors. */
-            break;
+   /* Extract spectrum count from <spectrumList count="N"> */
+   ptr = strstr(input_map, "<spectrumList");
+   if (ptr) {
+      char* tag_end = strstr(ptr, ">");
+      char* count_ptr = strstr(ptr, "count=\"");
+      if (count_ptr && tag_end && count_ptr < tag_end) {
+         count_ptr += sizeof("count=\"") - 1;
+         df->source_total_spec = atoi(count_ptr);
       }
    }
-   free(xml);
+
+   /* Find first spectrum to start scanning accessions */
+   ptr = strstr(input_map, "<spectrum ");
+   if (!ptr) {
+      free(df);
+      return NULL;
+   }
+
+   /* Scan for accession="MS:XXXXXXX" patterns starting from the first
+    * spectrum. map_to_df requires seeing accessions in document order
+    * (array type sets current_type for the next data format accession),
+    * so we may need to scan into the second spectrum. */
+   char* scan = ptr;
+   while (*scan) {
+      char* acc_ptr = strstr(scan, "accession=\"MS:");
+      if (!acc_ptr)
+         break;
+
+      acc_ptr += sizeof("accession=\"MS:") - 1;
+      int acc = atoi(acc_ptr);
+
+      if (map_to_df(acc, &current_type, df))
+         return df;
+
+      scan = acc_ptr;
+   }
+
    free(df);
    return NULL;
 }

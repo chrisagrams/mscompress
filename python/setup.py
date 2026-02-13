@@ -216,7 +216,6 @@ c_sources += get_all_c_files("../vendor/zstd")
 c_sources += get_all_c_files("../vendor/zstd/lib/common")
 c_sources += get_all_c_files("../vendor/zstd/lib/compress")
 c_sources += get_all_c_files("../vendor/zstd/lib/decompress")
-c_sources += get_all_c_files("../vendor/yxml")
 
 # Add base64 codecs
 c_sources.append(_abs("../vendor/base64/lib/arch/avx2/codec.c"))
@@ -252,7 +251,6 @@ include_dirs = [
     _abs("../vendor/base64/lib"),
     _abs("../vendor/base64/lib/tables"),
     _abs("../vendor/base64"),
-    _abs("../vendor/yxml"),
     _abs("../src"),
     _abs("../vendor/lz4/lib"),
     _abs("../vendor/zlib"),
