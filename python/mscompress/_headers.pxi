@@ -137,7 +137,7 @@ cdef extern from "../src/mscompress.h":
     int _open_output_file "open_output_file"(char* path)
     int _close_file "close_file"(int fd)
     int _remove_mapping "remove_mapping"(void* addr, size_t length)
-    int _flush "flush"(int fd)
+    int _flush "flush"(int fd) nogil
     size_t _get_filesize "get_filesize"(char* path)
     void* _get_mapping "get_mapping"(int fd)
     int _determine_filetype "determine_filetype"(void* input_map, size_t input_length)
@@ -175,10 +175,12 @@ cdef extern from "../src/mscompress.h":
     char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
     char* _extract_mzml_header "extract_mzml_header"(char* blk, division_t* first_division, size_t* out_len)
     char* _extract_mzml_footer "extract_mzml_footer"(char* blk, divisions_t* divisions, size_t* out_len)
-    void _extract_msz "extract_msz"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, int output_fd)
-    int _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd)
-    int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd)
-    void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd)
+    # `nogil` allows these to be called from `with nogil:` blocks in the streaming
+    # methods, which release the GIL to prevent pipe deadlocks between writer/reader threads.
+    void _extract_msz "extract_msz"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, int output_fd) nogil
+    int _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd) nogil
+    int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd) nogil
+    void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd) nogil
 
     # Error/warning callback functions
     ctypedef void (*error_callback_t)(const char* message)
