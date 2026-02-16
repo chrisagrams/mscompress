@@ -1273,26 +1273,29 @@ data_positions_t** get_xml_divisions(data_positions_t* dp,
  * @param fd The file descriptor to write to.
  *
  * Writes total_spec count followed by the start and end position arrays.
+ *
+ * @return Total number of bytes written to the file descriptor.
  */
-void write_dp(data_positions_t* dp, int fd) {
+size_t write_dp(data_positions_t* dp, int fd) {
    char *buff, *num_buff;
+   size_t total_written = 0;
 
    // Write total_spec (spectrum count)
    num_buff = malloc(sizeof(uint64_t));
    *((uint64_t*)num_buff) = dp->total_spec;
-   write_to_file(fd, num_buff, sizeof(uint64_t));
+   total_written += write_to_file(fd, num_buff, sizeof(uint64_t));
 
    // Write start positions
    buff = (char*)dp->start_positions;
-   write_to_file(fd, buff, sizeof(uint64_t) * dp->total_spec);
+   total_written += write_to_file(fd, buff, sizeof(uint64_t) * dp->total_spec);
 
    // Write end positions
    buff = (char*)dp->end_positions;
-   write_to_file(fd, buff, sizeof(uint64_t) * dp->total_spec);
+   total_written += write_to_file(fd, buff, sizeof(uint64_t) * dp->total_spec);
 
    free(num_buff);
 
-   return;
+   return total_written;
 }
 
 /**
@@ -1300,22 +1303,25 @@ void write_dp(data_positions_t* dp, int fd) {
  * @param arr Pointer to the `uint32_t` array.
  * @param len Number of elements in the array.
  * @param fd The file descriptor to write to.
+ *
+ * @return Total number of bytes written to the file descriptor.
  */
-void write_uint32_arr(uint32_t* arr, uint32_t len, int fd) {
+size_t write_uint32_arr(uint32_t* arr, uint32_t len, int fd) {
    char *buff, *num_buff;
+   size_t total_written = 0;
 
    // Write array length
    num_buff = malloc(sizeof(uint32_t));
    *((uint32_t*)num_buff) = len;
-   write_to_file(fd, num_buff, sizeof(uint32_t));
+   total_written += write_to_file(fd, num_buff, sizeof(uint32_t));
 
    // Write array
    buff = (char*)arr;
-   write_to_file(fd, buff, sizeof(uint32_t) * len);
+   total_written += write_to_file(fd, buff, sizeof(uint32_t) * len);
 
    free(num_buff);
 
-   return;
+   return total_written;
 }
 
 /**
@@ -1323,22 +1329,25 @@ void write_uint32_arr(uint32_t* arr, uint32_t len, int fd) {
  * @param arr Pointer to the `uint16_t` array.
  * @param len Number of elements in the array.
  * @param fd The file descriptor to write to.
+ *
+ * @return Total number of bytes written to the file descriptor.
  */
-void write_uint16_arr(uint16_t* arr, uint32_t len, int fd) {
+size_t write_uint16_arr(uint16_t* arr, uint32_t len, int fd) {
    char *buff, *num_buff;
+   size_t total_written = 0;
 
    // Write array length
    num_buff = malloc(sizeof(uint32_t));
    *((uint32_t*)num_buff) = len;
-   write_to_file(fd, num_buff, sizeof(uint32_t));
+   total_written += write_to_file(fd, num_buff, sizeof(uint32_t));
 
    // Write array
    buff = (char*)arr;
-   write_to_file(fd, buff, sizeof(uint16_t) * len);
+   total_written += write_to_file(fd, buff, sizeof(uint16_t) * len);
 
    free(num_buff);
 
-   return;
+   return total_written;
 }
 
 /**
@@ -1414,39 +1423,45 @@ uint16_t* read_uint16_arr(void* input_map, long* position) {
  *
  * Writes all four `data_positions_t` (spectra, xml, mz, inten), the division size,
  * and the scan/ms_level arrays.
+ *
+ * @return Total number of bytes written to the file descriptor.
  */
-void write_division(division_t* div, int fd) {
+size_t write_division(division_t* div, int fd) {
    char *buff, *num_buff;
+   size_t total_written = 0;
 
    // Write data_positions_t
-   write_dp(div->spectra, fd);
-   write_dp(div->xml, fd);
-   write_dp(div->mz, fd);
-   write_dp(div->inten, fd);
+   total_written += write_dp(div->spectra, fd);
+   total_written += write_dp(div->xml, fd);
+   total_written += write_dp(div->mz, fd);
+   total_written += write_dp(div->inten, fd);
 
    // Write size of division
    num_buff = malloc(sizeof(uint64_t));
    *((uint64_t*)num_buff) = (uint64_t)div->size;
-   write_to_file(fd, num_buff, sizeof(uint64_t));
+   total_written += write_to_file(fd, num_buff, sizeof(uint64_t));
    free(num_buff);
 
    // Write scans and MS levels
-   write_uint32_arr(div->scans, div->mz->total_spec, fd);
-   write_uint16_arr(div->ms_levels, div->mz->total_spec, fd);
+   total_written += write_uint32_arr(div->scans, div->mz->total_spec, fd);
+   total_written += write_uint16_arr(div->ms_levels, div->mz->total_spec, fd);
 
-   return;
+   return total_written;
 }
 
 /**
  * @brief Serializes all divisions in a `divisions_t` struct to a file descriptor.
  * @param divisions Pointer to the divisions_t containing the array of divisions.
  * @param fd The file descriptor to write to.
+ *
+ * @return Total number of bytes written to the file descriptor.
  */
-void write_divisions(divisions_t* divisions, int fd) {
+size_t write_divisions(divisions_t* divisions, int fd) {
+   size_t total_written = 0;
    for (int i = 0; i < divisions->n_divisions; i++)
-      write_division(divisions->divisions[i], fd);
+      total_written += write_division(divisions->divisions[i], fd);
 
-   return;
+   return total_written;
 }
 
 /**
