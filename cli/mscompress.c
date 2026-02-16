@@ -319,8 +319,11 @@ int main(int argc, char* argv[]) {
          }
 
          // Start compress routine.
-         compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                       divisions, fds[1]);
+         if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
+                           divisions, fds[1])) {
+            error_status = 1;
+            break;
+         }
 
          break;
       }
@@ -328,7 +331,10 @@ int main(int argc, char* argv[]) {
          print("\nDecompression and encoding...\n");
 
          // Start decompress routine.
-         decompress_msz(input_map, input_filesize, &arguments, fds[1]);
+         if (decompress_msz(input_map, input_filesize, &arguments, fds[1])) {
+            error_status = 1;
+            break;
+         }
 
          break;
       };
@@ -353,8 +359,11 @@ int main(int argc, char* argv[]) {
          preprocess_external((char*)input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
-         compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                       divisions, fds[1]);
+         if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
+                           divisions, fds[1])) {
+            error_status = 1;
+            break;
+         }
          break;
       }
       case DESCRIBE: {
