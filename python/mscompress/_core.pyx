@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 import warnings
 import tempfile
@@ -307,10 +308,12 @@ cdef class MZMLFile(BaseFile):
         output = os.fspath(output)
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
-        _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
+        cdef int rv = _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        if rv != 0:
+            raise RuntimeError("Compression failed: write error during compression.")
         return MSZFile(output.encode('utf-8'))
 
     def extract(
@@ -345,26 +348,26 @@ cdef class MZMLFile(BaseFile):
 
         if output_ext == '.msz':
             # Output as MSZ (compressed)
-            # Create a temporary mzML file path, extract to it, then compress to MSZ
-            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
-            
+            # Create a unique temporary directory to avoid collisions in concurrent extractions
+            temp_dir = tempfile.mkdtemp()
+            temp_mzml_path = Path(temp_dir) / f"{output.stem}_temp.mzML"
+
             # Delete output file if it already exists
             if output.exists():
                 output.unlink()
-            
+
             # Extract to temporary mzML file
-            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
-            
-            # Compress the temporary mzML to MSZ
             temp_mzml = None
             try:
+                self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+
+                # Compress the temporary mzML to MSZ
                 temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
                 return temp_mzml.compress(str(output))
             finally:
                 if temp_mzml is not None:
                     temp_mzml._cleanup()
-                if temp_mzml_path.exists():
-                    temp_mzml_path.unlink()
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
         elif output_ext == '.mzml':
              # Convert Python lists to C arrays
@@ -373,12 +376,12 @@ cdef class MZMLFile(BaseFile):
                 indicies_arr = np.array(indicies, dtype=_c_long_dtype)
                 c_indicies = <long*>indicies_arr.data
                 indicies_length = len(indicies)
-            
+
             if scan_numbers is not None:
                 scans_arr = np.array(scan_numbers, dtype=np.uint32)
                 c_scans = <uint32_t*>scans_arr.data
                 scans_length = len(scan_numbers)
-            
+
             if ms_level is not None:
                 c_ms_level = <uint16_t>ms_level
 
@@ -393,7 +396,7 @@ cdef class MZMLFile(BaseFile):
                 c_scans,
                 scans_length,
                 c_ms_level,
-                self._positions, 
+                self._positions,
                 self.output_fd
             )
 
@@ -592,10 +595,12 @@ cdef class MSZFile(BaseFile):
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
-        _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
+        cdef int rv = _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        if rv != 0:
+            raise RuntimeError("Decompression failed: error during decompression.")
         return MZMLFile(output.encode('utf-8'))
 
     def extract(
@@ -632,28 +637,27 @@ cdef class MSZFile(BaseFile):
         
         if output_ext == '.msz':
             # Output as MSZ (compressed)
-            # Create a temporary mzML file path, extract to it, then compress to MSZ
-            temp_mzml_path = Path(tempfile.gettempdir()) / f"{output.stem}_temp.mzML"
-            
+            # Create a unique temporary directory to avoid collisions in concurrent extractions
+            temp_dir = tempfile.mkdtemp()
+            temp_mzml_path = Path(temp_dir) / f"{output.stem}_temp.mzML"
+
             # Delete output file if it already exists to avoid stale data
             if output.exists():
                 output.unlink()
-            
+
             # Extract to temporary mzML file
-            self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
-            
-            # Compress the temporary mzML to MSZ
             temp_mzml = None
             try:
+                self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+
+                # Compress the temporary mzML to MSZ
                 temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
                 return temp_mzml.compress(str(output))
             finally:
-                # Clean up MZMLFile's memory mapping before deleting the file
+                # Clean up MZMLFile's memory mapping before deleting the temp directory
                 if temp_mzml is not None:
                     temp_mzml._cleanup()
-                # Clean up temporary file
-                if temp_mzml_path.exists():
-                    temp_mzml_path.unlink()
+                shutil.rmtree(temp_dir, ignore_errors=True)
         
         elif output_ext == '.mzml':
             # Convert Python lists to C arrays

@@ -422,20 +422,22 @@ int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
 /**
  * @brief Writes a compressed block to file.
  *
- * Program exits via `error()` if writing to file fails.
- * TODO: This no longer exits. This should return an error code.
- *
  * @param blk A `cmp_block_t` with `mem` and `size` populated.
  * @param fd File descriptor to write to.
+ * @return 0 on success, -1 on write failure.
  */
-void write_cmp_blk(cmp_block_t* blk, int fd)
+int write_cmp_blk(cmp_block_t* blk, int fd)
 {
-   int rv;
+   size_t rv;
 
    rv = write_to_file(fd, blk->mem, blk->size);
 
-   if (rv != blk->size)
+   if (rv != blk->size) {
       error("write_cmp_blk: Did not write all bytes to disk.\n");
+      return -1;
+   }
+
+   return 0;
 }
 
 /**
@@ -459,7 +461,7 @@ size_t cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue,
    size_t total_written = 0;
 
    if (cmp_buff == NULL)
-      return 0;
+      return 0;  // Nothing to do.
 
    while (cmp_buff->populated > 0) {
       front = pop_cmp_block(cmp_buff);
@@ -467,7 +469,10 @@ size_t cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue,
       append_block_len(blk_len_queue, front->original_size, front->size);
 
       start = get_time();
-      write_cmp_blk(front, fd);
+      if (write_cmp_blk(front, fd)) {
+         dealloc_cmp_block(front);
+         return -1;
+      }
       end = get_time();
 
       print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size,
@@ -725,8 +730,8 @@ void* compress_routine(void* args)
  * @param bytes_written Optional out-parameter. If non-NULL, receives the total number
  *        of compressed bytes written to the file descriptor.
  * @return A pointer to the `block_len_queue_t` containing block length metadata for all
- *         compressed blocks. The caller is responsible for freeing this via
- *         `dealloc_block_len_queue()`.
+ *         compressed blocks, or `NULL` on error. The caller is responsible for freeing
+ *         this via `dealloc_block_len_queue()`.
  * @note Each `compress_args_t` and its compressed output are freed after writing to disk.
  */
 block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
@@ -797,7 +802,16 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
 #endif
 
       for (i = divisions_used; i < divisions_used + threads; i++) {
-         total_written += cmp_dump(args[i]->ret, blk_len_queue, fd);
+         size_t written = cmp_dump(args[i]->ret, blk_len_queue, fd);
+         if (written == (size_t)-1) {
+            /* Clean up remaining args on write failure */
+            for (int j = i; j < divisions; j++)
+               dealloc_compress_args(args[j]);
+            free(args);
+            free(ptid);
+            return NULL;
+         }
+         total_written += written;
          dealloc_compress_args(args[i]);
       }
       divisions_used += threads;
@@ -825,12 +839,13 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
  * @param df A pointer to the `data_format_t` struct with source format and compression settings.
  * @param divisions A pointer to the `divisions_t` struct describing how the input was partitioned.
  * @param output_fd The file descriptor for the output .msz file.
+ * @return 0 on success, -1 on error.
  * @note This function writes the complete MSZ file (header, compressed streams,
  *       block lengths, divisions, footer). The caller is responsible for opening
  *       and closing the file descriptors.
  */
-void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
-                   data_format_t* df, divisions_t* divisions, int output_fd) {
+int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
+                  data_format_t* df, divisions_t* divisions, int output_fd) {
    // Initialize footer to all 0's to not write garbage to file.
    footer_t* footer = calloc(1, sizeof(footer_t));
 
@@ -872,6 +887,13 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
        &stream_bytes); /* Compress XML */
    output_pos += stream_bytes;
    free(xml_divisions);
+   if (xml_block_lens == NULL) {
+      error("compress_mzml: Failed to compress XML stream.\n");
+      free(footer);
+      free(mz_divisions);
+      free(inten_divisions);
+      return -1;
+   }
 
    print("\t===m/z binary===\n");
    footer->mz_binary_pos = output_pos;
@@ -883,6 +905,13 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
        &stream_bytes); /* Compress m/z binary */
    output_pos += stream_bytes;
    free(mz_divisions);
+   if (mz_binary_block_lens == NULL) {
+      error("compress_mzml: Failed to compress m/z binary stream.\n");
+      dealloc_block_len_queue(xml_block_lens);
+      free(footer);
+      free(inten_divisions);
+      return -1;
+   }
 
    print("\t===int binary===\n");
    footer->inten_binary_pos = output_pos;
@@ -894,6 +923,13 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
        output_fd, &stream_bytes); /* Compress int binary */
    output_pos += stream_bytes;
    free(inten_divisions);
+   if (inten_binary_block_lens == NULL) {
+      error("compress_mzml: Failed to compress intensity binary stream.\n");
+      dealloc_block_len_queue(xml_block_lens);
+      dealloc_block_len_queue(mz_binary_block_lens);
+      free(footer);
+      return -1;
+   }
 
    // Dump block_len_queue to msz file.
    footer->xml_blk_pos = output_pos;
@@ -923,6 +959,8 @@ void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    end = get_time();
 
    print("Decoding and compression time: %1.4fs\n", end - start);
+
+   return 0;
 }
 
 /**
