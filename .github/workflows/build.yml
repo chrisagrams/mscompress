@@ -195,9 +195,14 @@ jobs:
           CIBW_BUILD: ${{ github.ref == 'refs/heads/dev' && 'cp312-*' || 'cp39-* cp310-* cp311-* cp312-* cp313-*' }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ARCHS: "${{ matrix.cibw_arch }}"
+          # Use manylinux_2_28 so pre-built scipy wheels (required by mlcroissant) are available
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_BUILD: "python {package}/../vendor/generate_config.py"
+          # Run tests inside cibuildwheel so each Python version is tested with its own wheel
           CIBW_TEST_REQUIRES: "pytest torch"
-          CIBW_TEST_COMMAND: "pytest {package}/test -v"
+          CIBW_TEST_COMMAND: "cd {project}/python && pytest test -v"
+          CIBW_TEST_COMMAND_WINDOWS: "cd /d {project}\\python && pytest test -v"
           CIBW_BUILD_VERBOSITY: 1
         with:
           package-dir: ./python
