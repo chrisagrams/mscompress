@@ -351,12 +351,15 @@ block_len_t* pop_block_len(block_len_queue_t* queue) {
  * @param queue A pointer to the `block_len_queue_t` to dump and deallocate.
  * @param fd The file descriptor to write the serialized data to.
  *
+ * @return Total number of bytes written to the file descriptor.
+ *
  * @warning This function consumes and frees the queue. The pointer is invalid after return.
  */
-void dump_block_len_queue(block_len_queue_t* queue, int fd) {
+size_t dump_block_len_queue(block_len_queue_t* queue, int fd) {
    block_len_t* curr;
    block_len_t* prev;
    char buff[sizeof(size_t)];
+   size_t total_written = 0;
 
    size_t* buff_cast = (size_t*)(&buff[0]);
 
@@ -364,10 +367,10 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd) {
 
    while (curr != NULL) {
       *buff_cast = curr->original_size;
-      write_to_file(fd, buff, sizeof(size_t));
+      total_written += write_to_file(fd, buff, sizeof(size_t));
 
       *buff_cast = curr->compressed_size;
-      write_to_file(fd, buff, sizeof(size_t));
+      total_written += write_to_file(fd, buff, sizeof(size_t));
 
       prev = curr;
       curr = curr->next;
@@ -376,7 +379,7 @@ void dump_block_len_queue(block_len_queue_t* queue, int fd) {
 
    free(queue);
 
-   // dealloc_block_len_queue(queue);
+   return total_written;
 }
 
 /**

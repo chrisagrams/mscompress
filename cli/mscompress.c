@@ -253,6 +253,7 @@ int main(int argc, char* argv[]) {
 
    void* input_map = NULL;
    size_t input_filesize = 0;
+   int local_fds[3] = {-1, -1, -1};
    int operation = -1;
    int error_status = 0;  // If error occurred, indicate cleanup and non-zero
                           // exit code on exit.
@@ -272,16 +273,17 @@ int main(int argc, char* argv[]) {
 
    // Open file descriptors and mmap.
    if (arguments.describe_only) {
-      fds[0] = open_input_file(arguments.input_file);
-      input_map = get_mapping(fds[0]);
+      local_fds[0] = open_input_file(arguments.input_file);
+      input_map = get_mapping(local_fds[0]);
       input_filesize = get_filesize(arguments.input_file);
       if (input_filesize == 0) {
          warning("Error in opening input file. Is it a directory?\n");
          exit(1);
       }
    } else {
-      operation = prepare_fds(arguments.input_file, &arguments.output_file,
-                              NULL, &input_map, &input_filesize, &fds);
+      operation =
+          prepare_fds(arguments.input_file, &arguments.output_file, NULL,
+                      &input_map, &input_filesize, local_fds);
 
       // If error occurred during prepare_fds, exit.
       if (operation < 0) {
@@ -320,7 +322,7 @@ int main(int argc, char* argv[]) {
 
          // Start compress routine.
          if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                           divisions, fds[1])) {
+                           divisions, local_fds[1])) {
             error_status = 1;
             break;
          }
@@ -331,7 +333,7 @@ int main(int argc, char* argv[]) {
          print("\nDecompression and encoding...\n");
 
          // Start decompress routine.
-         if (decompress_msz(input_map, input_filesize, &arguments, fds[1])) {
+         if (decompress_msz(input_map, input_filesize, &arguments, local_fds[1])) {
             error_status = 1;
             break;
          }
@@ -346,21 +348,23 @@ int main(int argc, char* argv[]) {
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
 
-         extract_mzml((char*)input_map, divisions, fds[1]);
+         extract_mzml((char*)input_map, divisions, local_fds[1]);
          break;
       };
       case EXTRACT_MSZ: {
          extract_msz((char*)input_map, input_filesize, arguments.indices,
                      arguments.indices_length, arguments.scans,
-                     arguments.scans_length, arguments.ms_level, fds[1]);
+                     arguments.scans_length, arguments.ms_level,
+                     local_fds[1]);
          break;
       };
       case EXTERNAL: {
          preprocess_external((char*)input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
+         
          if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
-                           divisions, fds[1])) {
+                           divisions, local_fds[1])) {
             error_status = 1;
             break;
          }
@@ -382,10 +386,10 @@ int main(int argc, char* argv[]) {
 
    // dealloc_df(df);
 
-   remove_mapping(input_map, fds[0]);
+   remove_mapping(input_map, input_filesize);
 
-   close_file(fds[0]);
-   close_file(fds[1]);
+   close_file(local_fds[0]);
+   close_file(local_fds[1]);
    print("\tClosed file descriptors\n");
 
    abs_stop = get_time();
