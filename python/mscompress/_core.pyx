@@ -4,8 +4,9 @@ import numpy as np
 import warnings
 import tempfile
 import ctypes
+import threading
 cimport numpy as np
-from typing import Union
+from typing import Union, Iterator, Optional
 from os import PathLike
 from pathlib import Path
 from xml.etree.ElementTree import fromstring, Element, ParseError
@@ -29,12 +30,14 @@ def _install_mscompress_warning_formatter():
     warnings.formatwarning = _mscompress_formatwarning
 
 _install_mscompress_warning_formatter()
-cdef void _python_error_handler(const char* message) noexcept:
+# `with gil` is required because these callbacks may be invoked from C code
+# running without the GIL (e.g., streaming methods release the GIL for I/O).
+cdef void _python_error_handler(const char* message) noexcept with gil:
     """Callback function to handle C errors in Python"""
     msg = message.decode('utf-8') if isinstance(message, bytes) else message
     warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
 
-cdef void _python_warning_handler(const char* message) noexcept:
+cdef void _python_warning_handler(const char* message) noexcept with gil:
     """Callback function to handle C warnings in Python"""
     msg = message.decode('utf-8') if isinstance(message, bytes) else message
     warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
@@ -42,6 +45,58 @@ cdef void _python_warning_handler(const char* message) noexcept:
 # Initialize callbacks when module is imported
 _set_error_callback(_python_error_handler)
 _set_warning_callback(_python_warning_handler)
+
+
+def _pipe_stream(c_func, args, chunk_size=1_048_576):
+    """
+    Pipe-based streaming bridge between C fd-oriented writes and Python iterators.
+
+    Creates an OS pipe, runs the C function in a background thread writing to the
+    pipe's write end, and yields bytes chunks read from the pipe's read end.
+
+    Args:
+        c_func: Callable that accepts (*args, write_fd) and writes output to the fd.
+        args: Tuple of arguments to pass to c_func before the write_fd.
+        chunk_size: Number of bytes to read per iteration (default 1MB).
+
+    Yields:
+        bytes: Chunks of output data from the C function.
+
+    Raises:
+        RuntimeError: If the C function raises an exception in the background thread.
+    """
+    read_fd, write_fd = os.pipe()
+    exc_holder = [None]
+
+    def _worker():
+        try:
+            c_func(*args, write_fd)
+        except Exception as e:
+            exc_holder[0] = e
+        finally:
+            os.close(write_fd)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+    reader = os.fdopen(read_fd, 'rb')
+    try:
+        while True:
+            chunk = reader.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    except GeneratorExit:
+        reader.close()
+        t.join()
+        return
+    finally:
+        reader.close()
+
+    t.join()
+    if exc_holder[0] is not None:
+        raise exc_holder[0]
+
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
@@ -316,6 +371,34 @@ cdef class MZMLFile(BaseFile):
             raise RuntimeError("Compression failed: write error during compression.")
         return MSZFile(output.encode('utf-8'))
 
+    def _compress_to_fd(self, int write_fd):
+        """Internal helper: run compression pipeline writing to the given fd."""
+        cdef int rv
+        cdef char* mapping = <char*> self._mapping
+        cdef size_t filesize = self.filesize
+        cdef Arguments* args = self._arguments.get_ptr()
+        cdef data_format_t* df = self._df
+        cdef divisions_t* divisions = self._divisions
+        # Release the GIL so the reader thread can drain the pipe; without this,
+        # write() blocks on a full pipe while holding the GIL → deadlock.
+        with nogil:
+            rv = _compress_mzml(mapping, filesize, args, df, divisions, write_fd)
+            _flush(write_fd)
+        if rv != 0:
+            raise RuntimeError("Compression failed: write error during compression.")
+
+    def compress_stream(self, chunk_size: int = 1_048_576) -> Iterator[bytes]:
+        """Compress this mzML file and yield the MSZ output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            bytes: Chunks of compressed MSZ data.
+        """
+        self._prepare_divisions()
+        return _pipe_stream(self._compress_to_fd, (), chunk_size=chunk_size)
+
     def extract(
         self,
         output: Union[str, PathLike],
@@ -407,6 +490,70 @@ cdef class MZMLFile(BaseFile):
             return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
+
+    def _extract_mzml_to_fd(self, indicies_arr, scans_arr, uint16_t c_ms_level, int write_fd):
+        """Internal helper: run mzML extraction writing to the given fd."""
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef char* mapping = <char*>self._mapping
+        cdef size_t filesize = self.filesize
+        cdef division_t* positions = self._positions
+
+        if indicies_arr is not None:
+            c_indicies = <long*>(<np.ndarray>indicies_arr).data
+            indicies_length = len(indicies_arr)
+
+        if scans_arr is not None:
+            c_scans = <uint32_t*>(<np.ndarray[np.uint32_t, ndim=1]>scans_arr).data
+            scans_length = len(scans_arr)
+
+        # Release the GIL so the reader thread can drain the pipe.
+        with nogil:
+            _extract_mzml_filtered(
+                mapping,
+                filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                positions,
+                write_fd
+            )
+            _flush(write_fd)
+
+    def extract_stream(
+        self,
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None,
+        chunk_size: int = 1_048_576
+    ) -> Iterator[bytes]:
+        """Extract spectra from this mzML file and yield mzML output as byte chunks.
+
+        Args:
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            bytes: Chunks of extracted mzML data.
+        """
+        indicies_arr = None
+        scans_arr = None
+        cdef uint16_t c_ms_level = 0
+
+        if indicies is not None:
+            indicies_arr = np.array(indicies, dtype=_c_long_dtype)
+        if scan_numbers is not None:
+            scans_arr = np.array(scan_numbers, dtype=np.uint32)
+        if ms_level is not None:
+            c_ms_level = <uint16_t>ms_level
+
+        return _pipe_stream(self._extract_mzml_to_fd, (indicies_arr, scans_arr, c_ms_level), chunk_size=chunk_size)
 
     def get_mz_binary(self, size_t index):
         cdef char* dest = NULL
@@ -603,6 +750,30 @@ cdef class MSZFile(BaseFile):
             raise RuntimeError("Decompression failed: error during decompression.")
         return MZMLFile(output.encode('utf-8'))
 
+    def _decompress_to_fd(self, int write_fd):
+        """Internal helper: run decompression pipeline writing to the given fd."""
+        cdef int rv
+        cdef char* mapping = <char*>self._mapping
+        cdef size_t filesize = self.filesize
+        cdef Arguments* args = self._arguments.get_ptr()
+        # Release the GIL so the reader thread can drain the pipe.
+        with nogil:
+            rv = _decompress_msz(mapping, filesize, args, write_fd)
+            _flush(write_fd)
+        if rv != 0:
+            raise RuntimeError("Decompression failed: error during decompression.")
+
+    def decompress_stream(self, chunk_size: int = 1_048_576) -> Iterator[bytes]:
+        """Decompress this MSZ file and yield the mzML output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            bytes: Chunks of decompressed mzML data.
+        """
+        return _pipe_stream(self._decompress_to_fd, (), chunk_size=chunk_size)
+
     def extract(
         self,
         output: Union[str, PathLike],
@@ -697,7 +868,68 @@ cdef class MSZFile(BaseFile):
             return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
-        
+
+    def _extract_msz_to_fd(self, indicies_arr, scans_arr, uint16_t c_ms_level, int write_fd):
+        """Internal helper: run MSZ extraction writing to the given fd."""
+        cdef long* c_indicies = NULL
+        cdef long indicies_length = 0
+        cdef uint32_t* c_scans = NULL
+        cdef long scans_length = 0
+        cdef char* mapping = <char*>self._mapping
+        cdef size_t filesize = self.filesize
+
+        if indicies_arr is not None:
+            c_indicies = <long*>(<np.ndarray>indicies_arr).data
+            indicies_length = len(indicies_arr)
+
+        if scans_arr is not None:
+            c_scans = <uint32_t*>(<np.ndarray[np.uint32_t, ndim=1]>scans_arr).data
+            scans_length = len(scans_arr)
+
+        # Release the GIL so the reader thread can drain the pipe.
+        with nogil:
+            _extract_msz(
+                mapping,
+                filesize,
+                c_indicies,
+                indicies_length,
+                c_scans,
+                scans_length,
+                c_ms_level,
+                write_fd
+            )
+            _flush(write_fd)
+
+    def extract_stream(
+        self,
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None,
+        chunk_size: int = 1_048_576
+    ) -> Iterator[bytes]:
+        """Extract spectra from this MSZ file and yield mzML output as byte chunks.
+
+        Args:
+            indicies: Optional list of spectrum indices to extract.
+            scan_numbers: Optional list of scan numbers to extract.
+            ms_level: Optional MS level to filter by (e.g., 1 for MS1, 2 for MS2).
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            bytes: Chunks of extracted mzML data.
+        """
+        indicies_arr = None
+        scans_arr = None
+        cdef uint16_t c_ms_level = 0
+
+        if indicies is not None:
+            indicies_arr = np.array(indicies, dtype=_c_long_dtype)
+        if scan_numbers is not None:
+            scans_arr = np.array(scan_numbers, dtype=np.uint32)
+        if ms_level is not None:
+            c_ms_level = <uint16_t>ms_level
+
+        return _pipe_stream(self._extract_msz_to_fd, (indicies_arr, scans_arr, c_ms_level), chunk_size=chunk_size)
 
     def get_mz_binary(self, size_t index):
         cdef char* res = NULL

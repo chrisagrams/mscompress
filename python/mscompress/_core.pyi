@@ -126,8 +126,50 @@ class BaseFile:
     def describe(self) -> Dict[str, Any]: ...
     
     def compress(self, output: Union[str, PathLike]) -> MSZFile: ...
-    
+
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile: ...
+
+    def compress_stream(self, chunk_size: int = ...) -> Iterator[bytes]:
+        """Compress this file and yield the MSZ output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of compressed MSZ data.
+        """
+        ...
+
+    def decompress_stream(self, chunk_size: int = ...) -> Iterator[bytes]:
+        """Decompress this file and yield the mzML output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of decompressed mzML data.
+        """
+        ...
+
+    def extract_stream(
+        self,
+        indicies: Optional[list[int]] = None,
+        scan_numbers: Optional[list[int]] = None,
+        ms_level: Optional[int] = None,
+        chunk_size: int = ...,
+    ) -> Iterator[bytes]:
+        """Extract spectra and yield the mzML output as byte chunks.
+
+        Args:
+            indicies: List of spectrum indices to extract (optional).
+            scan_numbers: List of scan numbers to extract (optional).
+            ms_level: MS level to extract (optional).
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of extracted mzML data.
+        """
+        ...
 
     def extract(
             self,
@@ -186,18 +228,29 @@ class BaseFile:
 
 class MZMLFile(BaseFile):
     """Handler for mzML format files."""
-    
+
     def __init__(self, path: bytes) -> None: ...
-    
+
     def compress(self, output: Union[str, PathLike]) -> MSZFile:
         """
         Compress an mzML file to MSZ format.
-        
+
         Parameters:
             output: Output file path (string or path-like).
         """
         ...
-    
+
+    def compress_stream(self, chunk_size: int = ...) -> Iterator[bytes]:
+        """Compress this mzML file and yield the MSZ output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of compressed MSZ data.
+        """
+        ...
+
     def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> Union[MZMLFile, MSZFile]: ...
     """
     Extract specific spectra from an mzML file to a new mzML or MSZ file.
@@ -208,6 +261,20 @@ class MZMLFile(BaseFile):
         scan_numbers: List of scan numbers to extract (optional).
         ms_level: MS level to extract (optional).
     """
+
+    def extract_stream(self, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ..., chunk_size: int = ...) -> Iterator[bytes]:
+        """Extract spectra from this mzML file and yield mzML output as byte chunks.
+
+        Args:
+            indicies: List of spectrum indices to extract (optional).
+            scan_numbers: List of scan numbers to extract (optional).
+            ms_level: MS level to extract (optional).
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of extracted mzML data.
+        """
+        ...
 
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
@@ -247,15 +314,26 @@ class MZMLFile(BaseFile):
 
 class MSZFile(BaseFile):
     """Handler for MSZ (compressed) format files."""
-    
+
     def __init__(self, path: bytes) -> None: ...
-    
+
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         """
         Decompress an MSZ file to mzML format.
-        
+
         Parameters:
             output: Output file path (string or path-like).
+        """
+        ...
+
+    def decompress_stream(self, chunk_size: int = ...) -> Iterator[bytes]:
+        """Decompress this MSZ file and yield the mzML output as byte chunks.
+
+        Args:
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of decompressed mzML data.
         """
         ...
 
@@ -268,6 +346,20 @@ class MSZFile(BaseFile):
         scan_numbers: List of scan numbers to extract (optional).
         ms_level: MS level to extract (optional).
     """
+
+    def extract_stream(self, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ..., chunk_size: int = ...) -> Iterator[bytes]:
+        """Extract spectra from this MSZ file and yield mzML output as byte chunks.
+
+        Args:
+            indicies: List of spectrum indices to extract (optional).
+            scan_numbers: List of scan numbers to extract (optional).
+            ms_level: MS level to extract (optional).
+            chunk_size: Number of bytes to read per iteration (default 1MB).
+
+        Yields:
+            Chunks of extracted mzML data.
+        """
+        ...
     
     def get_mz_binary(self, index: int) -> npt.NDArray[Union[np.float32, np.float64]]:
         """
