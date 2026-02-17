@@ -29,7 +29,7 @@ export class MSZXBuilder {
   private description?: string;
   private sourceName: string;
   private joinKey: string = "scan_number";
-  private extra: Record<string, any> = {};
+  private extra: Record<string, unknown> = {};
 
   /**
    * Create a new MSZX archive builder.
@@ -128,7 +128,7 @@ export class MSZXBuilder {
    * @param value - Metadata value
    * @returns This builder for method chaining
    */
-  setExtra(key: string, value: any): this {
+  setExtra(key: string, value: unknown): this {
     this.extra[key] = value;
     return this;
   }

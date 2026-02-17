@@ -9,7 +9,7 @@ import type {
 
 // Load the native addon
 const addonPath = path.join(__dirname, "..", "..", "build", "Release", "mscompress.node");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
 const addon = require(addonPath);
 
 /** RAII file handle wrapping fd + mmap + filesize */

@@ -26,7 +26,7 @@ export class Spectra implements Iterable<Spectrum> {
     this._df = df;
     this._positions = positions;
     this.length = this._df.sourceTotalSpec;
-    this._cache = new Array(this.length).fill(null);
+    this._cache = new Array<Spectrum | null>(this.length).fill(null);
   }
 
   /**
@@ -53,7 +53,7 @@ export class Spectra implements Iterable<Spectrum> {
       );
     }
 
-    return this._cache[index]!;
+    return this._cache[index];
   }
 
   /**
@@ -63,13 +63,12 @@ export class Spectra implements Iterable<Spectrum> {
    */
   [Symbol.iterator](): Iterator<Spectrum> {
     let i = 0;
-    const self = this;
     return {
-      next(): IteratorResult<Spectrum> {
-        if (i >= self.length) {
+      next: (): IteratorResult<Spectrum> => {
+        if (i >= this.length) {
           return { done: true, value: undefined };
         }
-        return { done: false, value: self.get(i++) };
+        return { done: false, value: this.get(i++) };
       },
     };
   }

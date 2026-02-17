@@ -36,14 +36,20 @@ export class MSZFile extends BaseFile {
    * Data format information.
    */
   get format(): DataFormat {
-    return this._format!;
+    if (!this._format) {
+      throw new Error("Format not initialized");
+    }
+    return this._format;
   }
 
   /**
    * Position information for spectra.
    */
   get positions(): Division {
-    return this._positions!;
+    if (!this._positions) {
+      throw new Error("Positions not initialized");
+    }
+    return this._positions;
   }
 
   /**

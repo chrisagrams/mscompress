@@ -33,7 +33,7 @@ export async function createMSZX(
     annotations?: string[];
     description?: string;
     joinKey?: string;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
   }
 ): Promise<string> {
   const builder = new MSZXBuilder(msz);

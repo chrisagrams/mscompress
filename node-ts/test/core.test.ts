@@ -41,6 +41,7 @@ describe("core", () => {
   });
 
   it("read throws on invalid parameter type", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(() => read({} as any)).toThrow();
   });
 });

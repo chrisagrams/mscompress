@@ -44,7 +44,7 @@ export interface MSZXManifestData {
   /** Optional original source file name */
   source_file?: string;
   /** Optional custom metadata */
-  extra?: Record<string, any>;
+  extra?: Record<string, unknown>;
 }
 
 /**
@@ -61,7 +61,7 @@ export class MSZXManifest {
   join_key: string;
   description?: string;
   source_file?: string;
-  extra: Record<string, any>;
+  extra: Record<string, unknown>;
 
   /**
    * Create a new MSZX manifest.
@@ -135,6 +135,10 @@ export class MSZXManifest {
    * @returns New MSZXManifest instance
    */
   static parse(json: string): MSZXManifest {
-    return MSZXManifest.fromJSON(JSON.parse(json));
+    const parsed: unknown = JSON.parse(json);
+    if (typeof parsed !== "object" || parsed === null) {
+      throw new TypeError("Invalid manifest JSON: expected object");
+    }
+    return MSZXManifest.fromJSON(parsed as MSZXManifestData);
   }
 }

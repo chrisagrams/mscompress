@@ -133,7 +133,9 @@ export class MSZXFile {
       try {
         fs.rmSync(this.tempDir, { recursive: true, force: true });
       } catch (error) {
-        console.warn(`Warning: Failed to clean up temp directory: ${error}`);
+        console.warn(
+          `Warning: Failed to clean up temp directory: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
       this.closed = true;
     }
@@ -266,7 +268,7 @@ export class MSZXFile {
    *
    * @returns Object containing file metadata and archive information
    */
-  describe(): Record<string, any> {
+  describe(): Record<string, unknown> {
     const desc = this.mszFile.describe();
     desc.archive = {
       path: this.archivePath,
