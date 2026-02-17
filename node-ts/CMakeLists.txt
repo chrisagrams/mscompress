@@ -48,9 +48,18 @@ set(CPP_SOURCE_FILES
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})
 target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION="${PROJECT_VERSION}")
 
+# Windows SDK headers (winnt.h) require an architecture macro to be defined
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _AMD64_=1)
+endif()
+
 # Vendor libraries
 include(${VENDOR_DIR}/Lz4Include.cmake)
-include(${VENDOR_DIR}/ZlibInclude.cmake)
+# Build zlib via add_subdirectory instead of ZlibInclude.cmake so Ninja can
+# track the output properly (add_custom_target does not declare file outputs).
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+add_subdirectory(${VENDOR_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib_build)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
 include(${VENDOR_DIR}/ZstdInclude.cmake)
 set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
 include(${VENDOR_DIR}/YxmlInclude.cmake)
@@ -61,7 +70,7 @@ include(${VENDOR_DIR}/Base64Include.cmake)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 # Linking
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 zlib)
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"
