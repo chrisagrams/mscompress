@@ -195,7 +195,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21
         env:
-          CIBW_BUILD: ${{ github.ref == 'refs/heads/dev' && 'cp312-*' || 'cp39-* cp310-* cp311-* cp312-* cp313-*' }}
+          CIBW_BUILD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/stage') && 'cp39-* cp310-* cp311-* cp312-* cp313-*' || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ARCHS: "${{ matrix.cibw_arch }}"
           # Use manylinux_2_28 so pre-built scipy wheels (required by mlcroissant) are available

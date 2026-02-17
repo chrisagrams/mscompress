@@ -17,7 +17,7 @@ elseif(APPLE)
 else()
     add_custom_target(
         zlib_build
-        COMMAND ${ZLIB_SOURCE_DIR}/configure
+        COMMAND env CFLAGS=-fPIC ${ZLIB_SOURCE_DIR}/configure
         COMMAND make -C ${ZLIB_SOURCE_DIR}
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
     )
