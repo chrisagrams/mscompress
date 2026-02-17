@@ -13,7 +13,7 @@ describe("MSZX", () => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-test-"));
 
     // Use an existing MSZ file from test data
-    const dataDir = path.join(__dirname, "data");
+    const dataDir = path.resolve(__dirname, "../../test/data");
     const mszFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".msz"));
 
     if (mszFiles.length === 0) {

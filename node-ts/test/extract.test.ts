@@ -3,9 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { read, MZMLFile, MSZFile } from "../src/index.js";
-
-const MZML_PATH = path.resolve(__dirname, "data/test.mzML");
-const MSZ_PATH = path.resolve(__dirname, "data/test.msz");
+import { MZML_PATH, MSZ_PATH } from "./fixtures.js";
 
 function withTmpDir(fn: (tmpDir: string) => void) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-test-"));

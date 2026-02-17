@@ -12,8 +12,7 @@ import {
   Spectrum,
   DataPositions,
 } from "../src/index.js";
-
-const MSZ_PATH = path.resolve(__dirname, "data/test.msz");
+import { MSZ_PATH } from "./fixtures.js";
 
 describe("MSZFile", () => {
   let file: MSZFile | null = null;

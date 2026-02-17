@@ -3,8 +3,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { getNumThreads, getFilesize, getVersion, read } from "../src/index.js";
-
-const MZML_PATH = path.resolve(__dirname, "data/test.mzML");
+import { MZML_PATH } from "./fixtures.js";
 
 describe("core", () => {
   it("getNumThreads returns os.cpus().length", () => {

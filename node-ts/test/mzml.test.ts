@@ -13,8 +13,7 @@ import {
   DataPositions,
   RuntimeArguments,
 } from "../src/index.js";
-
-const MZML_PATH = path.resolve(__dirname, "data/test.mzML");
+import { MZML_PATH } from "./fixtures.js";
 
 describe("MZMLFile", () => {
   let file: MZMLFile | null = null;

@@ -7,6 +7,9 @@ on:
     branches:
       - 'stage'
       - 'dev'
+  pull_request:
+    branches:
+      - 'dev'
   workflow_dispatch:
 
 jobs:
@@ -233,6 +236,67 @@ jobs:
           path: |
             ./python/wheelhouse/*.whl
             ./python/dist/*.tar.gz
+
+  build-node:
+    name: Build Node - ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            arch: x86_64
+          - platform: macos
+            runner: macos-latest
+            arch: arm64
+          - platform: macos
+            runner: macos-15-intel
+            arch: x86_64
+          - platform: windows
+            runner: windows-latest
+            arch: x86_64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup MSVC Developer Command Prompt (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate config.h for base64
+        run: python vendor/generate_config.py
+
+      - name: Install dependencies
+        working-directory: ./node-ts
+        run: npm install
+
+      - name: Build native addon
+        working-directory: ./node-ts
+        run: npm run build:native
+
+      - name: Build TypeScript
+        working-directory: ./node-ts
+        run: npm run build:ts
+
+      - name: Run tests
+        working-directory: ./node-ts
+        run: npm test
 
   publish-python:
     name: Publish Python Package to PyPI
