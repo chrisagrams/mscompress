@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { fileURLToPath } from "node:url";
 import { MSZFile, MSZXFile, MSZXBuilder, MSZXManifest, createMSZX } from "../src/index.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("MSZX", () => {
   let testDir: string;

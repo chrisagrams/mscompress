@@ -9,21 +9,24 @@
  * 3. Providing helpful error messages for unsupported platforms
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const platform = os.platform();
 const arch = os.arch();
 const platformKey = `${platform}-${arch}`;
 
 const supportedPlatforms = {
-  'darwin-x64': '@mscompress/darwin-x64',
-  'darwin-arm64': '@mscompress/darwin-arm64',
-  'linux-x64': '@mscompress/linux-x64',
-  'linux-arm64': '@mscompress/linux-arm64',
-  'win32-x64': '@mscompress/win32-x64'
+  "darwin-x64": "@mscompress/darwin-x64",
+  "darwin-arm64": "@mscompress/darwin-arm64",
+  "linux-x64": "@mscompress/linux-x64",
+  "linux-arm64": "@mscompress/linux-arm64",
+  "win32-x64": "@mscompress/win32-x64",
 };
 
 function checkPlatformPackageInstalled() {
@@ -34,8 +37,10 @@ function checkPlatformPackageInstalled() {
   }
 
   try {
-    require.resolve(packageName);
-    console.log(`✓ Using pre-built binary for ${platformKey} (${packageName})`);
+    import.meta.resolve(packageName);
+    console.log(
+      `✓ Using pre-built binary for ${platformKey} (${packageName})`
+    );
     return true;
   } catch {
     return false;
@@ -44,34 +49,36 @@ function checkPlatformPackageInstalled() {
 
 function attemptSourceBuild() {
   console.log(`⚠  Pre-built binary not available for ${platformKey}`);
-  console.log('Attempting to build from source...');
+  console.log("Attempting to build from source...");
 
   // Check if we're in development mode (source files exist)
-  const cmakePath = path.join(__dirname, '..', 'CMakeLists.txt');
-  const srcPath = path.join(__dirname, '..', 'src', 'native');
+  const cmakePath = path.join(__dirname, "..", "CMakeLists.txt");
+  const srcPath = path.join(__dirname, "..", "src", "native");
 
   if (!fs.existsSync(cmakePath) || !fs.existsSync(srcPath)) {
-    console.log('ℹ  Source files not available in published package.');
-    console.log('   This is expected - platform binaries are installed separately.');
+    console.log("ℹ  Source files not available in published package.");
+    console.log(
+      "   This is expected - platform binaries are installed separately."
+    );
     return;
   }
 
   try {
-    console.log('Building native addon with cmake-js...');
-    execSync('node scripts/build.js', {
-      stdio: 'inherit',
-      cwd: path.join(__dirname, '..')
+    console.log("Building native addon with cmake-js...");
+    execSync("node scripts/build.js", {
+      stdio: "inherit",
+      cwd: path.join(__dirname, ".."),
     });
-    console.log('✓ Successfully built from source');
+    console.log("✓ Successfully built from source");
   } catch (error) {
-    console.error('✗ Failed to build from source');
-    console.error('\nTo build from source, you need:');
-    console.error('  - Node.js development headers');
+    console.error("✗ Failed to build from source");
+    console.error("\nTo build from source, you need:");
+    console.error("  - Node.js development headers");
     console.error('  - C++ compiler (GCC, Clang, or MSVC)');
-    console.error('  - CMake');
-    console.error('  - Python 3');
-    console.error('\nAlternatively, use a supported platform:');
-    console.error('  ' + Object.keys(supportedPlatforms).join(', '));
+    console.error("  - CMake");
+    console.error("  - Python 3");
+    console.error("\nAlternatively, use a supported platform:");
+    console.error("  " + Object.keys(supportedPlatforms).join(", "));
     process.exit(1);
   }
 }
@@ -81,16 +88,22 @@ if (!checkPlatformPackageInstalled()) {
   if (!supportedPlatforms[platformKey]) {
     console.error(`✗ Unsupported platform: ${platformKey}`);
     console.error(`\nSupported platforms:`);
-    Object.keys(supportedPlatforms).forEach(p => {
+    Object.keys(supportedPlatforms).forEach((p) => {
       console.error(`  - ${p}`);
     });
-    console.error('\nIf you need support for this platform, please open an issue:');
-    console.error('  https://github.com/chrisagrams/mscompress/issues');
+    console.error(
+      "\nIf you need support for this platform, please open an issue:"
+    );
+    console.error("  https://github.com/chrisagrams/mscompress/issues");
     attemptSourceBuild();
   } else {
     // Supported platform but package failed to install (network issue?)
-    console.error(`✗ Failed to install platform package: ${supportedPlatforms[platformKey]}`);
-    console.error('This may be due to a network issue. Try running: npm install again');
+    console.error(
+      `✗ Failed to install platform package: ${supportedPlatforms[platformKey]}`
+    );
+    console.error(
+      "This may be due to a network issue. Try running: npm install again"
+    );
     attemptSourceBuild();
   }
 }

@@ -1,4 +1,6 @@
+import { createRequire } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   DataFormatNative,
   DivisionNative,
@@ -7,9 +9,11 @@ import type {
   ExtractOptions,
 } from "../types/types.js";
 
-// Load the native addon
+// Load the native addon (.node files must be loaded via require())
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 const addonPath = path.join(__dirname, "..", "..", "build", "Release", "mscompress.node");
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
 const addon = require(addonPath);
 
 /** RAII file handle wrapping fd + mmap + filesize */

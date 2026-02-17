@@ -2,6 +2,7 @@
   "name": "mscompress",
   "version": "1.0.10",
   "description": "Multi-threaded lossless/lossy compression library for Mass Spectrometry data",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "keywords": [
