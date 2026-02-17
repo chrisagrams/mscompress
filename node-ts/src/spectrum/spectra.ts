@@ -1,7 +1,7 @@
-import { Spectrum } from "./spectrum.js";
-import { Division } from "../types/division.js";
-import { DataFormat } from "../types/data-format.js";
-import type { BaseFile } from "../files/base-file.js";
+import { Spectrum } from "@/spectrum/spectrum.js";
+import { Division } from "@/types/division.js";
+import { DataFormat } from "@/types/data-format.js";
+import type { BaseFile } from "@/files/base-file.js";
 
 /**
  * Collection of spectra with lazy loading and caching.

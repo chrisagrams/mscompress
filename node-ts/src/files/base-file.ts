@@ -1,10 +1,10 @@
-import native from "../core/bindings.js";
-import type { NativeFileHandle } from "../core/bindings.js";
-import type { ExtractOptions } from "../types/types.js";
-import { DataFormat } from "../types/data-format.js";
-import { Division } from "../types/division.js";
-import { Spectra } from "../spectrum/spectra.js";
-import { RuntimeArguments } from "../types/runtime-arguments.js";
+import native from "@/core/bindings.js";
+import type { NativeFileHandle } from "@/core/bindings.js";
+import type { ExtractOptions } from "@/types/types.js";
+import { DataFormat } from "@/types/data-format.js";
+import { Division } from "@/types/division.js";
+import { Spectra } from "@/spectrum/spectra.js";
+import { RuntimeArguments } from "@/types/runtime-arguments.js";
 
 /**
  * Abstract base class for mass spectrometry file handlers.

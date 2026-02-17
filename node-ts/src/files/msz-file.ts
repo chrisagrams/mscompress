@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import native from "../core/bindings.js";
-import { BaseFile } from "./base-file.js";
-import { DataFormat } from "../types/data-format.js";
-import { Division } from "../types/division.js";
-import { createFile, registerFileFactory } from "./file-registry.js";
-import type { ExtractOptions } from "../types/types.js";
+import native from "@/core/bindings.js";
+import { BaseFile } from "@/files/base-file.js";
+import { DataFormat } from "@/types/data-format.js";
+import { Division } from "@/types/division.js";
+import { createFile, registerFileFactory } from "@/files/file-registry.js";
+import type { ExtractOptions } from "@/types/types.js";
 
 /**
  * Handler for compressed MSZ files.

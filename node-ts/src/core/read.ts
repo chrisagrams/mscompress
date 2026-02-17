@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { BaseFile } from "../files/base-file.js";
+import type { BaseFile } from "@/files/base-file.js";
 // Import to trigger factory registration
-import { MZMLFile } from "../files/mzml-file.js";
-import { MSZFile } from "../files/msz-file.js";
+import { MZMLFile } from "@/files/mzml-file.js";
+import { MSZFile } from "@/files/msz-file.js";
 
 const MAGIC_TAG = 0x035f51b5;
 

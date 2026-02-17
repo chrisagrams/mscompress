@@ -1,4 +1,4 @@
-import type { BaseFile } from "../files/base-file.js";
+import type { BaseFile } from "@/files/base-file.js";
 
 /**
  * Represents a single mass spectrum with lazy-loaded data.

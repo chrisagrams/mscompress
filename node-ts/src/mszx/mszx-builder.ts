@@ -6,8 +6,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as tar from "tar";
-import { MSZFile } from "../files/msz-file.js";
-import { MSZXManifest, AnnotationEntry } from "./mszx-manifest.js";
+import { MSZFile } from "@/files/msz-file.js";
+import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
 
 /**
  * Builder for creating MSZX archives from MSZ files and annotations.

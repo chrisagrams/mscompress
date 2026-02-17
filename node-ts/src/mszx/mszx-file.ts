@@ -6,13 +6,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as tar from "tar";
-import { MSZFile } from "../files/msz-file.js";
-import { MSZXManifest, AnnotationEntry } from "./mszx-manifest.js";
-import { DataFormat } from "../types/data-format.js";
-import { Spectra } from "../spectrum/spectra.js";
-import { Division } from "../types/division.js";
-import { RuntimeArguments } from "../types/runtime-arguments.js";
-import type { ExtractOptions } from "../types/types.js";
+import { MSZFile } from "@/files/msz-file.js";
+import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
+import { DataFormat } from "@/types/data-format.js";
+import { Spectra } from "@/spectrum/spectra.js";
+import { Division } from "@/types/division.js";
+import { RuntimeArguments } from "@/types/runtime-arguments.js";
+import type { ExtractOptions } from "@/types/types.js";
 
 /**
  * Handler for MSZX bundled archive files.

@@ -1,4 +1,4 @@
-import type { DataFormatNative } from "./types.js";
+import type { DataFormatNative } from "@/types/types.js";
 
 /** Mapping of numeric accession codes to PSI-MS controlled vocabulary strings */
 const ACCESSION_MAP: Record<number, string> = {

@@ -36,6 +36,7 @@
     "eslint-config-prettier": "^9.1.0",
     "node-addon-api": "^8.0.0",
     "prettier": "^3.4.0",
+    "tsc-alias": "^1.8.10",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
@@ -43,7 +44,7 @@
     "postinstall": "node scripts/install.js",
     "build": "npm run build:ts",
     "build:native": "cmake-js compile",
-    "build:ts": "tsc",
+    "build:ts": "tsc && tsc-alias",
     "build:debug": "cmake-js compile --debug",
     "clean": "rm -rf build dist",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

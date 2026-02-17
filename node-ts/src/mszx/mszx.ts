@@ -2,8 +2,8 @@
  * MSZX convenience functions
  */
 
-import { MSZFile } from "../files/msz-file.js";
-import { MSZXBuilder } from "./mszx-builder.js";
+import { MSZFile } from "@/files/msz-file.js";
+import { MSZXBuilder } from "@/mszx/mszx-builder.js";
 
 /**
  * Create an MSZX archive from an MSZ file.
