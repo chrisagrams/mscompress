@@ -1,0 +1,60 @@
+{
+  "name": "mscompress",
+  "version": "1.0.7",
+  "description": "Multi-threaded lossless/lossy compression library for Mass Spectrometry data",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "mass-spectrometry",
+    "compression",
+    "mzml",
+    "msz",
+    "proteomics",
+    "native",
+    "napi"
+  ],
+  "author": "Chris Grams <chrisagrams@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisagrams/mscompress.git",
+    "directory": "node-ts"
+  },
+  "optionalDependencies": {
+    "@mscompress/darwin-arm64": "1.0.7",
+    "@mscompress/darwin-x64": "1.0.7",
+    "@mscompress/linux-arm64": "1.0.7",
+    "@mscompress/linux-x64": "1.0.7",
+    "@mscompress/win32-x64": "1.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "cmake-js": "^7.3.0",
+    "node-addon-api": "^8.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "build": "npm run build:ts",
+    "build:native": "cmake-js compile",
+    "build:ts": "tsc",
+    "build:debug": "cmake-js compile --debug",
+    "clean": "rm -rf build dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "files": [
+    "dist/",
+    "scripts/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "@types/tar": "^6.1.13",
+    "tar": "^7.5.9"
+  }
+}
