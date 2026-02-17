@@ -58,7 +58,7 @@ function attemptSourceBuild() {
 
   try {
     console.log('Building native addon with cmake-js...');
-    execSync('cmake-js compile', {
+    execSync('node scripts/build.js', {
       stdio: 'inherit',
       cwd: path.join(__dirname, '..')
     });

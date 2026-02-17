@@ -7,6 +7,8 @@ project(mscompress VERSION ${CMAKE_MATCH_1})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Static libs must be PIC since they link into the shared .node addon
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(APPLE)
     set(CMAKE_C_COMPILER "/usr/bin/clang")
@@ -55,11 +57,7 @@ endif()
 
 # Vendor libraries
 include(${VENDOR_DIR}/Lz4Include.cmake)
-# Build zlib via add_subdirectory instead of ZlibInclude.cmake so Ninja can
-# track the output properly (add_custom_target does not declare file outputs).
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-add_subdirectory(${VENDOR_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib_build)
-unset(CMAKE_POLICY_VERSION_MINIMUM)
+include(${VENDOR_DIR}/ZlibInclude.cmake)
 include(${VENDOR_DIR}/ZstdInclude.cmake)
 set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
 include(${VENDOR_DIR}/YxmlInclude.cmake)
@@ -70,7 +68,7 @@ include(${VENDOR_DIR}/Base64Include.cmake)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 # Linking
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 zlib)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"

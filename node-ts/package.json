@@ -43,7 +43,7 @@
   "scripts": {
     "postinstall": "node scripts/install.js",
     "build": "npm run build:ts",
-    "build:native": "cmake-js compile",
+    "build:native": "node scripts/build.js",
     "build:ts": "tsc && tsc-alias",
     "build:debug": "cmake-js compile --debug",
     "clean": "rm -rf build dist",
