@@ -10,7 +10,9 @@ function withTmpDir(fn: (tmpDir: string) => void) {
   try {
     fn(tmpDir);
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    // On Windows, file locks may not be released instantly after close.
+    // Retry to handle this.
+    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 
