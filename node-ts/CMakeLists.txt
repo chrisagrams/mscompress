@@ -50,9 +50,12 @@ set(CPP_SOURCE_FILES
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})
 target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION="${PROJECT_VERSION}")
 
-# Windows SDK headers (winnt.h) require an architecture macro to be defined
 if(WIN32)
+    # Windows SDK headers (winnt.h) require an architecture macro to be defined
     target_compile_definitions(${PROJECT_NAME} PRIVATE _AMD64_=1)
+    # Prefix zlib symbols to avoid clashing with Node.js's bundled zlib
+    target_compile_definitions(${PROJECT_NAME} PRIVATE Z_PREFIX)
+    set(ZLIB_EXTRA_CFLAGS "-DZ_PREFIX")
 endif()
 
 # Vendor libraries
