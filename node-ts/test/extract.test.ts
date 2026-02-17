@@ -1,14 +1,14 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { read, MZMLFile, MSZFile } from '../src/index.js';
+import { describe, it, expect, afterEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { read, MZMLFile, MSZFile } from "../src/index.js";
 
-const MZML_PATH = path.resolve(__dirname, 'data/test.mzML');
-const MSZ_PATH = path.resolve(__dirname, 'data/test.msz');
+const MZML_PATH = path.resolve(__dirname, "data/test.mzML");
+const MSZ_PATH = path.resolve(__dirname, "data/test.msz");
 
 function withTmpDir(fn: (tmpDir: string) => void) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mscompress-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-test-"));
   try {
     fn(tmpDir);
   } finally {
@@ -16,10 +16,10 @@ function withTmpDir(fn: (tmpDir: string) => void) {
   }
 }
 
-describe('MSZ -> mzML extraction', () => {
-  it('extract by indices', () => {
+describe("MSZ -> mzML extraction", () => {
+  it("extract by indices", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { indices: [0, 2, 4] });
@@ -39,9 +39,9 @@ describe('MSZ -> mzML extraction', () => {
     });
   });
 
-  it('extract by scan numbers', () => {
+  it("extract by scan numbers", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { scanNumbers: [2, 4] });
@@ -60,9 +60,9 @@ describe('MSZ -> mzML extraction', () => {
     });
   });
 
-  it('extract by ms_level', () => {
+  it("extract by ms_level", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { msLevel: 2 });
@@ -82,10 +82,10 @@ describe('MSZ -> mzML extraction', () => {
   });
 });
 
-describe('MSZ -> MSZ extraction', () => {
-  it('extract by indices', () => {
+describe("MSZ -> MSZ extraction", () => {
+  it("extract by indices", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { indices: [1, 3] });
@@ -104,9 +104,9 @@ describe('MSZ -> MSZ extraction', () => {
     });
   });
 
-  it('extract by scan numbers', () => {
+  it("extract by scan numbers", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { scanNumbers: [1, 5] });
@@ -125,9 +125,9 @@ describe('MSZ -> MSZ extraction', () => {
     });
   });
 
-  it('extract by ms_level', () => {
+  it("extract by ms_level", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
         msz.extract(outputPath, { msLevel: 1 });
@@ -147,10 +147,10 @@ describe('MSZ -> MSZ extraction', () => {
   });
 });
 
-describe('mzML -> mzML extraction', () => {
-  it('extract by indices', () => {
+describe("mzML -> mzML extraction", () => {
+  it("extract by indices", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { indices: [0, 2, 4] });
@@ -170,9 +170,9 @@ describe('mzML -> mzML extraction', () => {
     });
   });
 
-  it('extract by scan numbers', () => {
+  it("extract by scan numbers", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { scanNumbers: [2, 4] });
@@ -191,9 +191,9 @@ describe('mzML -> mzML extraction', () => {
     });
   });
 
-  it('extract by ms_level', () => {
+  it("extract by ms_level", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.mzML');
+      const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { msLevel: 2 });
@@ -213,10 +213,10 @@ describe('mzML -> mzML extraction', () => {
   });
 });
 
-describe('mzML -> MSZ extraction', () => {
-  it('extract by indices', () => {
+describe("mzML -> MSZ extraction", () => {
+  it("extract by indices", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { indices: [1, 3] });
@@ -235,9 +235,9 @@ describe('mzML -> MSZ extraction', () => {
     });
   });
 
-  it('extract by scan numbers', () => {
+  it("extract by scan numbers", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { scanNumbers: [1, 5] });
@@ -256,9 +256,9 @@ describe('mzML -> MSZ extraction', () => {
     });
   });
 
-  it('extract by ms_level', () => {
+  it("extract by ms_level", () => {
     withTmpDir((tmpDir) => {
-      const outputPath = path.join(tmpDir, 'extracted.msz');
+      const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
         mzml.extract(outputPath, { msLevel: 1 });

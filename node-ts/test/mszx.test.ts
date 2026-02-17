@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { MSZFile, MSZXFile, MSZXBuilder, MSZXManifest, createMSZX } from '../src/index.js';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import { MSZFile, MSZXFile, MSZXBuilder, MSZXManifest, createMSZX } from "../src/index.js";
 
-describe('MSZX', () => {
+describe("MSZX", () => {
   let testDir: string;
   let mszPath: string;
   let mszFile: MSZFile;
 
   beforeAll(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mszx-test-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-test-"));
 
     // Use an existing MSZ file from test data
-    const dataDir = path.join(__dirname, 'data');
-    const mszFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith('.msz'));
+    const dataDir = path.join(__dirname, "data");
+    const mszFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".msz"));
 
     if (mszFiles.length === 0) {
-      throw new Error('No MSZ test files found');
+      throw new Error("No MSZ test files found");
     }
 
     mszPath = path.join(dataDir, mszFiles[0]);
@@ -33,38 +33,38 @@ describe('MSZX', () => {
     }
   });
 
-  describe('MSZXManifest', () => {
-    it('should create a manifest with default values', () => {
+  describe("MSZXManifest", () => {
+    it("should create a manifest with default values", () => {
       const manifest = new MSZXManifest();
 
-      expect(manifest.version).toBe('1.0');
-      expect(manifest.spectra_file).toBe('spectra.msz');
+      expect(manifest.version).toBe("1.0");
+      expect(manifest.spectra_file).toBe("spectra.msz");
       expect(manifest.num_spectra).toBe(0);
       expect(manifest.annotations).toEqual([]);
-      expect(manifest.join_key).toBe('scan_number');
+      expect(manifest.join_key).toBe("scan_number");
       expect(manifest.extra).toEqual({});
     });
 
-    it('should create a manifest with custom values', () => {
+    it("should create a manifest with custom values", () => {
       const manifest = new MSZXManifest({
         num_spectra: 100,
-        description: 'Test dataset',
-        source_file: 'test.mzML',
+        description: "Test dataset",
+        source_file: "test.mzML",
       });
 
       expect(manifest.num_spectra).toBe(100);
-      expect(manifest.description).toBe('Test dataset');
-      expect(manifest.source_file).toBe('test.mzML');
+      expect(manifest.description).toBe("Test dataset");
+      expect(manifest.source_file).toBe("test.mzML");
     });
 
-    it('should serialize to JSON and back', () => {
+    it("should serialize to JSON and back", () => {
       const original = new MSZXManifest({
         num_spectra: 50,
-        description: 'Test',
+        description: "Test",
         annotations: [
           {
-            filename: 'test.pin',
-            format: 'percolator_tsv',
+            filename: "test.pin",
+            format: "percolator_tsv",
             compressed: false,
             num_records: 10,
           },
@@ -80,26 +80,26 @@ describe('MSZX', () => {
     });
   });
 
-  describe('MSZXBuilder', () => {
-    it('should create a builder from MSZ file', () => {
+  describe("MSZXBuilder", () => {
+    it("should create a builder from MSZ file", () => {
       const builder = new MSZXBuilder(mszFile);
       expect(builder).toBeDefined();
     });
 
-    it('should set description and metadata', () => {
+    it("should set description and metadata", () => {
       const builder = new MSZXBuilder(mszFile);
-      builder.setDescription('Test description');
-      builder.setJoinKey('custom_key');
-      builder.setExtra('key1', 'value1');
+      builder.setDescription("Test description");
+      builder.setJoinKey("custom_key");
+      builder.setExtra("key1", "value1");
 
       // We can't easily test these without saving, but at least verify no errors
       expect(builder).toBeDefined();
     });
 
-    it('should save an MSZX archive without annotations', async () => {
-      const outputPath = path.join(testDir, 'test-simple.mszx');
+    it("should save an MSZX archive without annotations", async () => {
+      const outputPath = path.join(testDir, "test-simple.mszx");
       const builder = new MSZXBuilder(mszFile);
-      builder.setDescription('Simple test archive');
+      builder.setDescription("Simple test archive");
 
       const result = await builder.save(outputPath);
 
@@ -107,27 +107,27 @@ describe('MSZX', () => {
       expect(fs.existsSync(outputPath)).toBe(true);
     });
 
-    it('should add .mszx extension if not provided', async () => {
-      const outputPath = path.join(testDir, 'test-no-ext');
+    it("should add .mszx extension if not provided", async () => {
+      const outputPath = path.join(testDir, "test-no-ext");
       const builder = new MSZXBuilder(mszFile);
 
       const result = await builder.save(outputPath);
 
-      expect(result).toBe(outputPath + '.mszx');
-      expect(fs.existsSync(outputPath + '.mszx')).toBe(true);
+      expect(result).toBe(outputPath + ".mszx");
+      expect(fs.existsSync(outputPath + ".mszx")).toBe(true);
     });
   });
 
-  describe('MSZXFile', () => {
+  describe("MSZXFile", () => {
     let mszxPath: string;
     let mszxFile: MSZXFile;
 
     beforeAll(async () => {
       // Create a test MSZX file
-      mszxPath = path.join(testDir, 'test-for-reading.mszx');
+      mszxPath = path.join(testDir, "test-for-reading.mszx");
       const builder = new MSZXBuilder(mszFile);
-      builder.setDescription('Test archive for reading');
-      builder.setExtra('test_key', 'test_value');
+      builder.setDescription("Test archive for reading");
+      builder.setExtra("test_key", "test_value");
       await builder.save(mszxPath);
     });
 
@@ -137,22 +137,22 @@ describe('MSZX', () => {
       }
     });
 
-    it('should open an MSZX file', () => {
+    it("should open an MSZX file", () => {
       mszxFile = MSZXFile.open(mszxPath);
       expect(mszxFile).toBeDefined();
       expect(mszxFile.archive_path).toBe(mszxPath);
     });
 
-    it('should read manifest', () => {
+    it("should read manifest", () => {
       if (!mszxFile) mszxFile = MSZXFile.open(mszxPath);
 
       const manifest = mszxFile.manifest;
-      expect(manifest.description).toBe('Test archive for reading');
-      expect(manifest.extra.test_key).toBe('test_value');
+      expect(manifest.description).toBe("Test archive for reading");
+      expect(manifest.extra.test_key).toBe("test_value");
       expect(manifest.num_spectra).toBe(mszFile.spectra.length);
     });
 
-    it('should access spectra', () => {
+    it("should access spectra", () => {
       if (!mszxFile) mszxFile = MSZXFile.open(mszxPath);
 
       expect(mszxFile.spectra.length).toBe(mszFile.spectra.length);
@@ -162,7 +162,7 @@ describe('MSZX', () => {
       expect(firstSpectrum).toBeDefined();
     });
 
-    it('should get binary data', () => {
+    it("should get binary data", () => {
       if (!mszxFile) mszxFile = MSZXFile.open(mszxPath);
 
       const mz = mszxFile.getMzBinary(0);
@@ -174,16 +174,16 @@ describe('MSZX', () => {
       expect(inten.length).toBeGreaterThan(0);
     });
 
-    it('should get XML', () => {
+    it("should get XML", () => {
       if (!mszxFile) mszxFile = MSZXFile.open(mszxPath);
 
       const xml = mszxFile.getXml(0);
       expect(xml).toBeDefined();
-      expect(typeof xml).toBe('string');
+      expect(typeof xml).toBe("string");
       expect(xml.length).toBeGreaterThan(0);
     });
 
-    it('should provide describe() with archive info', () => {
+    it("should provide describe() with archive info", () => {
       if (!mszxFile) mszxFile = MSZXFile.open(mszxPath);
 
       const desc = mszxFile.describe();
@@ -191,19 +191,19 @@ describe('MSZX', () => {
       expect(desc.archive.path).toBe(mszxPath);
     });
 
-    it('should throw error for non-existent file', () => {
+    it("should throw error for non-existent file", () => {
       expect(() => {
-        MSZXFile.open(path.join(testDir, 'nonexistent.mszx'));
-      }).toThrow('MSZX file not found');
+        MSZXFile.open(path.join(testDir, "nonexistent.mszx"));
+      }).toThrow("MSZX file not found");
     });
   });
 
-  describe('createMSZX convenience function', () => {
-    it('should create an MSZX archive', async () => {
-      const outputPath = path.join(testDir, 'test-convenience.mszx');
+  describe("createMSZX convenience function", () => {
+    it("should create an MSZX archive", async () => {
+      const outputPath = path.join(testDir, "test-convenience.mszx");
 
       const result = await createMSZX(mszFile, outputPath, {
-        description: 'Created via convenience function',
+        description: "Created via convenience function",
       });
 
       expect(result).toBe(outputPath);
@@ -211,23 +211,23 @@ describe('MSZX', () => {
 
       // Verify it can be opened
       const mszxFile = MSZXFile.open(outputPath);
-      expect(mszxFile.manifest.description).toBe('Created via convenience function');
+      expect(mszxFile.manifest.description).toBe("Created via convenience function");
       mszxFile.close();
     });
 
-    it('should handle extra metadata', async () => {
-      const outputPath = path.join(testDir, 'test-extra.mszx');
+    it("should handle extra metadata", async () => {
+      const outputPath = path.join(testDir, "test-extra.mszx");
 
       await createMSZX(mszFile, outputPath, {
-        description: 'Test',
+        description: "Test",
         extra: {
-          key1: 'value1',
+          key1: "value1",
           key2: 42,
         },
       });
 
       const mszxFile = MSZXFile.open(outputPath);
-      expect(mszxFile.manifest.extra.key1).toBe('value1');
+      expect(mszxFile.manifest.extra.key1).toBe("value1");
       expect(mszxFile.manifest.extra.key2).toBe(42);
       mszxFile.close();
     });

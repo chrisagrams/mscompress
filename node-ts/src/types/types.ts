@@ -1,6 +1,6 @@
 /** File type constants matching C core defines */
-export const COMPRESS = 1;    // mzML
-export const DECOMPRESS = 2;  // MSZ
+export const COMPRESS = 1; // mzML
+export const DECOMPRESS = 2; // MSZ
 export const EXTRACT = 3;
 export const EXTRACT_MSZ = 4;
 export const EXTERNAL = 5;

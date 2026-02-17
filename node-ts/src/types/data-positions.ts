@@ -1,4 +1,4 @@
-import type { DataPositionsNative } from './types.js';
+import type { DataPositionsNative } from "./types.js";
 
 /**
  * Position information for data blocks in a mass spectrometry file.

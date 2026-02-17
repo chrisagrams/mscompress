@@ -1,16 +1,16 @@
-import type { DataFormatNative } from './types.js';
+import type { DataFormatNative } from "./types.js";
 
 /** Mapping of numeric accession codes to PSI-MS controlled vocabulary strings */
 const ACCESSION_MAP: Record<number, string> = {
-  1000519: 'MS:1000519', // 32-bit integer
-  1000520: 'MS:1000520', // 16-bit float
-  1000521: 'MS:1000521', // 32-bit float
-  1000522: 'MS:1000522', // 64-bit integer
-  1000523: 'MS:1000523', // 64-bit double
-  1000574: 'MS:1000574', // zlib compression
-  1000576: 'MS:1000576', // no compression
-  4700000: 'MS:4700000', // lossless
-  4700001: 'MS:4700001', // ZSTD compression
+  1000519: "MS:1000519", // 32-bit integer
+  1000520: "MS:1000520", // 16-bit float
+  1000521: "MS:1000521", // 32-bit float
+  1000522: "MS:1000522", // 64-bit integer
+  1000523: "MS:1000523", // 64-bit double
+  1000574: "MS:1000574", // zlib compression
+  1000576: "MS:1000576", // no compression
+  4700000: "MS:4700000", // lossless
+  4700001: "MS:4700001", // ZSTD compression
 };
 
 /**

@@ -2,17 +2,17 @@
  * MSZX bundled archive file handler
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import * as tar from 'tar';
-import { MSZFile } from '../files/msz-file.js';
-import { MSZXManifest, AnnotationEntry } from './mszx-manifest.js';
-import { DataFormat } from '../types/data-format.js';
-import { Spectra } from '../spectrum/spectra.js';
-import { Division } from '../types/division.js';
-import { RuntimeArguments } from '../types/runtime-arguments.js';
-import type { ExtractOptions } from '../types/types.js';
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import * as tar from "tar";
+import { MSZFile } from "../files/msz-file.js";
+import { MSZXManifest, AnnotationEntry } from "./mszx-manifest.js";
+import { DataFormat } from "../types/data-format.js";
+import { Spectra } from "../spectrum/spectra.js";
+import { Division } from "../types/division.js";
+import { RuntimeArguments } from "../types/runtime-arguments.js";
+import type { ExtractOptions } from "../types/types.js";
 
 /**
  * Handler for MSZX bundled archive files.
@@ -75,7 +75,7 @@ export class MSZXFile {
     }
 
     // Create temp directory for extraction
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mszx-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-"));
 
     try {
       // Extract archive to temp directory
@@ -86,12 +86,12 @@ export class MSZXFile {
       });
 
       // Read manifest
-      const manifestPath = path.join(tempDir, 'manifest.json');
+      const manifestPath = path.join(tempDir, "manifest.json");
       if (!fs.existsSync(manifestPath)) {
-        throw new Error('Invalid MSZX archive: missing manifest.json');
+        throw new Error("Invalid MSZX archive: missing manifest.json");
       }
 
-      const manifestJson = fs.readFileSync(manifestPath, 'utf-8');
+      const manifestJson = fs.readFileSync(manifestPath, "utf-8");
       const manifest = MSZXManifest.parse(manifestJson);
 
       // Open MSZ file
@@ -306,8 +306,8 @@ export class MSZXFile {
    */
   async extractMSZX(output: string, options?: ExtractOptions): Promise<MSZXFile> {
     // Create a temporary MSZ file with extracted spectra
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mszx-extract-'));
-    const tempMszPath = path.join(tempDir, 'temp.msz');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-extract-"));
+    const tempMszPath = path.join(tempDir, "temp.msz");
 
     try {
       // Extract MSZ
@@ -315,7 +315,7 @@ export class MSZXFile {
       const extractedMsz = new MSZFile(tempMszPath);
 
       // Create new MSZX archive using builder
-      const { MSZXBuilder } = await import('./mszx-builder.js');
+      const { MSZXBuilder } = await import("./mszx-builder.js");
       const builder = new MSZXBuilder(extractedMsz);
 
       if (this.manifestData.description) {

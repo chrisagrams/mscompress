@@ -1,11 +1,11 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import type { BaseFile } from '../files/base-file.js';
+import fs from "node:fs";
+import path from "node:path";
+import type { BaseFile } from "../files/base-file.js";
 // Import to trigger factory registration
-import { MZMLFile } from '../files/mzml-file.js';
-import { MSZFile } from '../files/msz-file.js';
+import { MZMLFile } from "../files/mzml-file.js";
+import { MSZFile } from "../files/msz-file.js";
 
-const MAGIC_TAG = 0x035F51B5;
+const MAGIC_TAG = 0x035f51b5;
 
 /**
  * Detect file type by reading file header.
@@ -13,8 +13,8 @@ const MAGIC_TAG = 0x035F51B5;
  * @param filePath - Path to the file to detect
  * @returns File type ('mzML' or 'msz') or null if unknown
  */
-function detectFiletype(filePath: string): 'mzML' | 'msz' | null {
-  const fd = fs.openSync(filePath, 'r');
+function detectFiletype(filePath: string): "mzML" | "msz" | null {
+  const fd = fs.openSync(filePath, "r");
   const buf = Buffer.alloc(512);
   fs.readSync(fd, buf, 0, 512, 0);
   fs.closeSync(fd);
@@ -23,13 +23,13 @@ function detectFiletype(filePath: string): 'mzML' | 'msz' | null {
   if (buf.length >= 4) {
     const magic = buf.readUInt32LE(0);
     if (magic === MAGIC_TAG) {
-      return 'msz';
+      return "msz";
     }
   }
 
   // Check for mzML (contains "indexedmzML" in first 512 bytes)
-  if (buf.toString('utf-8').includes('indexedmzML')) {
-    return 'mzML';
+  if (buf.toString("utf-8").includes("indexedmzML")) {
+    return "mzML";
   }
 
   return null;
@@ -52,8 +52,8 @@ function detectFiletype(filePath: string): 'mzML' | 'msz' | null {
  * ```
  */
 export function read(filePath: string): BaseFile {
-  if (typeof filePath !== 'string') {
-    throw new TypeError('Path must be a string.');
+  if (typeof filePath !== "string") {
+    throw new TypeError("Path must be a string.");
   }
 
   const resolved = path.resolve(filePath);
@@ -69,9 +69,9 @@ export function read(filePath: string): BaseFile {
 
   const filetype = detectFiletype(resolved);
 
-  if (filetype === 'mzML') {
+  if (filetype === "mzML") {
     return new MZMLFile(resolved);
-  } else if (filetype === 'msz') {
+  } else if (filetype === "msz") {
     return new MSZFile(resolved);
   } else {
     throw new Error(`Could not determine file type for: ${resolved}`);

@@ -1,10 +1,10 @@
-import native from '../core/bindings.js';
-import type { NativeFileHandle } from '../core/bindings.js';
-import type { ExtractOptions } from '../types/types.js';
-import { DataFormat } from '../types/data-format.js';
-import { Division } from '../types/division.js';
-import { Spectra } from '../spectrum/spectra.js';
-import { RuntimeArguments } from '../types/runtime-arguments.js';
+import native from "../core/bindings.js";
+import type { NativeFileHandle } from "../core/bindings.js";
+import type { ExtractOptions } from "../types/types.js";
+import { DataFormat } from "../types/data-format.js";
+import { Division } from "../types/division.js";
+import { Spectra } from "../spectrum/spectra.js";
+import { RuntimeArguments } from "../types/runtime-arguments.js";
 
 /**
  * Abstract base class for mass spectrometry file handlers.
@@ -97,7 +97,7 @@ export abstract class BaseFile {
    * @throws Error if not supported for this file type
    */
   compress(_output: string): BaseFile {
-    throw new Error('Cannot compress this file type.');
+    throw new Error("Cannot compress this file type.");
   }
 
   /**
@@ -108,7 +108,7 @@ export abstract class BaseFile {
    * @throws Error if not supported for this file type
    */
   decompress(_output: string): BaseFile {
-    throw new Error('Cannot decompress this file type.');
+    throw new Error("Cannot decompress this file type.");
   }
 
   /**
@@ -120,7 +120,7 @@ export abstract class BaseFile {
    * @throws Error if not supported for this file type
    */
   extract(_output: string, _options?: ExtractOptions): BaseFile {
-    throw new Error('Cannot extract from this file type.');
+    throw new Error("Cannot extract from this file type.");
   }
 
   /**

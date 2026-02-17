@@ -14,7 +14,7 @@ export interface AnnotationEntry {
   /** Filename of the annotation file within the archive */
   filename: string;
   /** Format of the annotation file */
-  format: 'percolator_tsv' | 'pepxml' | 'tsv';
+  format: "percolator_tsv" | "pepxml" | "tsv";
   /** Whether the file is compressed with zstd */
   compressed: boolean;
   /** Optional human-readable description */
@@ -69,12 +69,12 @@ export class MSZXManifest {
    * @param data - Optional partial manifest data. Unspecified fields will use defaults.
    */
   constructor(data?: Partial<MSZXManifestData>) {
-    this.version = data?.version || '1.0';
+    this.version = data?.version || "1.0";
     this.created_at = data?.created_at || new Date().toISOString();
-    this.spectra_file = data?.spectra_file || 'spectra.msz';
+    this.spectra_file = data?.spectra_file || "spectra.msz";
     this.num_spectra = data?.num_spectra || 0;
     this.annotations = data?.annotations || [];
-    this.join_key = data?.join_key || 'scan_number';
+    this.join_key = data?.join_key || "scan_number";
     this.description = data?.description;
     this.source_file = data?.source_file;
     this.extra = data?.extra || {};

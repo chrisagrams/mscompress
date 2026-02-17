@@ -1,5 +1,5 @@
-import native from '../core/bindings.js';
-import type { RuntimeArgumentsNative } from './types.js';
+import native from "../core/bindings.js";
+import type { RuntimeArgumentsNative } from "./types.js";
 
 const ZSTD_COMPRESSION = 4700001;
 

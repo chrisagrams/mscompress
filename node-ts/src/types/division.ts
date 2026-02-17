@@ -1,5 +1,5 @@
-import type { DivisionNative } from './types.js';
-import { DataPositions } from './data-positions.js';
+import type { DivisionNative } from "./types.js";
+import { DataPositions } from "./data-positions.js";
 
 /**
  * Division containing position mappings for spectra, XML, m/z, and intensity data.

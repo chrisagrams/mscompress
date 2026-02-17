@@ -1,14 +1,14 @@
-import path from 'node:path';
+import path from "node:path";
 import type {
   DataFormatNative,
   DivisionNative,
   FooterNative,
   RuntimeArgumentsNative,
   ExtractOptions,
-} from '../types/types.js';
+} from "../types/types.js";
 
 // Load the native addon
-const addonPath = path.join(__dirname, '..', '..', 'build', 'Release', 'mscompress.node');
+const addonPath = path.join(__dirname, "..", "..", "build", "Release", "mscompress.node");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const addon = require(addonPath);
 
@@ -56,8 +56,16 @@ export interface NativeBindings {
   prepareDivisions(handle: NativeFileHandle, args: RuntimeArgumentsNative): PrepareDivisionsResult;
 
   // Spectrum access - mzML
-  getMzBinaryMzml(handle: NativeFileHandle, index: number, blocksize: number): Float64Array | Float32Array;
-  getIntenBinaryMzml(handle: NativeFileHandle, index: number, blocksize: number): Float64Array | Float32Array;
+  getMzBinaryMzml(
+    handle: NativeFileHandle,
+    index: number,
+    blocksize: number
+  ): Float64Array | Float32Array;
+  getIntenBinaryMzml(
+    handle: NativeFileHandle,
+    index: number,
+    blocksize: number
+  ): Float64Array | Float32Array;
   getXmlMzml(handle: NativeFileHandle, index: number): string;
 
   // Spectrum access - MSZ
@@ -67,10 +75,18 @@ export interface NativeBindings {
 
   // Compression / decompression
   compressMzml(handle: NativeFileHandle, outputPath: string, args: RuntimeArgumentsNative): boolean;
-  decompressMsz(handle: NativeFileHandle, outputPath: string, args: RuntimeArgumentsNative): boolean;
+  decompressMsz(
+    handle: NativeFileHandle,
+    outputPath: string,
+    args: RuntimeArgumentsNative
+  ): boolean;
 
   // Extraction
-  extractMzmlFiltered(handle: NativeFileHandle, outputPath: string, options: ExtractOptions): boolean;
+  extractMzmlFiltered(
+    handle: NativeFileHandle,
+    outputPath: string,
+    options: ExtractOptions
+  ): boolean;
   extractMsz(handle: NativeFileHandle, outputPath: string, options: ExtractOptions): boolean;
 }
 

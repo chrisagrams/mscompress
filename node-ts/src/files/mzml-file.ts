@@ -1,12 +1,12 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import native from '../core/bindings.js';
-import { BaseFile } from './base-file.js';
-import { DataFormat } from '../types/data-format.js';
-import { Division } from '../types/division.js';
-import { createFile, registerFileFactory } from './file-registry.js';
-import type { ExtractOptions } from '../types/types.js';
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import native from "../core/bindings.js";
+import { BaseFile } from "./base-file.js";
+import { DataFormat } from "../types/data-format.js";
+import { Division } from "../types/division.js";
+import { createFile, registerFileFactory } from "./file-registry.js";
+import type { ExtractOptions } from "../types/types.js";
 
 /**
  * Handler for uncompressed mzML files.
@@ -91,7 +91,7 @@ export class MZMLFile extends BaseFile {
     // Run compression
     native.compressMzml(this._handle, outputPath, this._arguments.toNative());
 
-    return createFile('msz', outputPath);
+    return createFile("msz", outputPath);
   }
 
   /**
@@ -106,9 +106,9 @@ export class MZMLFile extends BaseFile {
     const outputPath = path.resolve(output);
     const ext = path.extname(outputPath).toLowerCase();
 
-    if (ext === '.msz') {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mscompress-'));
-      const tmpMzml = path.join(tmpDir, 'temp.mzML');
+    if (ext === ".msz") {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-"));
+      const tmpMzml = path.join(tmpDir, "temp.mzML");
 
       try {
         this.extract(tmpMzml, options);
@@ -121,7 +121,7 @@ export class MZMLFile extends BaseFile {
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
-    } else if (ext === '.mzml') {
+    } else if (ext === ".mzml") {
       native.extractMzmlFiltered(this._handle, outputPath, options ?? {});
       return new MZMLFile(outputPath);
     } else {
@@ -135,9 +135,9 @@ export class MZMLFile extends BaseFile {
    * @throws Error always
    */
   decompress(_output: string): never {
-    throw new Error('Cannot decompress an mzML file.');
+    throw new Error("Cannot decompress an mzML file.");
   }
 }
 
 // Register factory
-registerFileFactory('mzml', (p) => new MZMLFile(p));
+registerFileFactory("mzml", (p) => new MZMLFile(p));

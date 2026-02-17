@@ -2,12 +2,12 @@
  * Builder for creating MSZX archives from MSZ files
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import * as tar from 'tar';
-import { MSZFile } from '../files/msz-file.js';
-import { MSZXManifest, AnnotationEntry } from './mszx-manifest.js';
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import * as tar from "tar";
+import { MSZFile } from "../files/msz-file.js";
+import { MSZXManifest, AnnotationEntry } from "./mszx-manifest.js";
 
 /**
  * Builder for creating MSZX archives from MSZ files and annotations.
@@ -28,7 +28,7 @@ export class MSZXBuilder {
   private annotations: Array<{ path: string; entry: AnnotationEntry }> = [];
   private description?: string;
   private sourceName: string;
-  private joinKey: string = 'scan_number';
+  private joinKey: string = "scan_number";
   private extra: Record<string, any> = {};
 
   /**
@@ -40,7 +40,7 @@ export class MSZXBuilder {
    */
   constructor(msz: MSZFile, sourceName?: string) {
     if (!(msz instanceof MSZFile)) {
-      throw new TypeError('msz must be an MSZFile instance');
+      throw new TypeError("msz must be an MSZFile instance");
     }
     this.msz = msz;
     this.mszPath = msz.path;
@@ -58,7 +58,7 @@ export class MSZXBuilder {
     filePath: string,
     options?: {
       description?: string;
-      format?: 'percolator_tsv' | 'pepxml' | 'tsv';
+      format?: "percolator_tsv" | "pepxml" | "tsv";
       compressed?: boolean;
     }
   ): this {
@@ -67,24 +67,24 @@ export class MSZXBuilder {
     }
 
     const compressed = options?.compressed ?? false;
-    const filename = path.basename(filePath) + (compressed ? '.zst' : '');
+    const filename = path.basename(filePath) + (compressed ? ".zst" : "");
 
     // Auto-detect format from extension if not provided
     let format = options?.format;
     if (!format) {
       const ext = path.extname(filePath).toLowerCase();
-      if (ext === '.pin' || ext === '.tsv') {
-        format = 'percolator_tsv';
-      } else if (ext === '.pepxml' || ext === '.xml') {
-        format = 'pepxml';
+      if (ext === ".pin" || ext === ".tsv") {
+        format = "percolator_tsv";
+      } else if (ext === ".pepxml" || ext === ".xml") {
+        format = "pepxml";
       } else {
-        format = 'tsv';
+        format = "tsv";
       }
     }
 
     // Count lines for num_records (simple implementation)
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n').filter((line) => line.trim().length > 0);
+    const content = fs.readFileSync(filePath, "utf-8");
+    const lines = content.split("\n").filter((line) => line.trim().length > 0);
     const num_records = Math.max(0, lines.length - 1); // Subtract header
 
     const entry: AnnotationEntry = {
@@ -160,17 +160,17 @@ export class MSZXBuilder {
   async save(outputPath: string): Promise<string> {
     let output = outputPath;
     if (!path.extname(output)) {
-      output = output + '.mszx';
+      output = output + ".mszx";
     }
 
     const manifest = this.buildManifest();
 
     // Create temporary directory for staging files
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mszx-build-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-build-"));
 
     try {
       // Write manifest to temp directory
-      const manifestPath = path.join(tempDir, 'manifest.json');
+      const manifestPath = path.join(tempDir, "manifest.json");
       fs.writeFileSync(manifestPath, manifest.toString());
 
       // Copy MSZ file to temp directory
@@ -184,8 +184,8 @@ export class MSZXBuilder {
         // TODO: Add zstd compression support if entry.compressed is true
         if (entry.compressed) {
           console.warn(
-            'Warning: Compression for annotation files not yet implemented. ' +
-              'Files will be stored uncompressed.'
+            "Warning: Compression for annotation files not yet implemented. " +
+              "Files will be stored uncompressed."
           );
         }
 

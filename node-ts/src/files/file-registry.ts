@@ -1,4 +1,4 @@
-import type { BaseFile } from './base-file.js';
+import type { BaseFile } from "./base-file.js";
 
 type FileFactory = (path: string) => BaseFile;
 

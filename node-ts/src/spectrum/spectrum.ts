@@ -1,4 +1,4 @@
-import type { BaseFile } from '../files/base-file.js';
+import type { BaseFile } from "../files/base-file.js";
 
 /**
  * Represents a single mass spectrum with lazy-loaded data.
@@ -23,13 +23,7 @@ export class Spectrum {
    * @param retentionTime - Retention time in seconds (may be NaN if not available)
    * @param file - Parent file for data access
    */
-  constructor(
-    index: number,
-    scan: number,
-    msLevel: number,
-    retentionTime: number,
-    file: BaseFile,
-  ) {
+  constructor(index: number, scan: number, msLevel: number, retentionTime: number, file: BaseFile) {
     this.index = index;
     this.scan = scan;
     this.msLevel = msLevel;
@@ -48,14 +42,16 @@ export class Spectrum {
       // Try to extract from XML
       const xml = this.xml;
       // Try both attribute orderings
-      const match = xml.match(/accession="MS:1000016"[^>]*value="([^"]+)"/)
-        || xml.match(/value="([^"]+)"[^>]*accession="MS:1000016"/);
+      const match =
+        xml.match(/accession="MS:1000016"[^>]*value="([^"]+)"/) ||
+        xml.match(/value="([^"]+)"[^>]*accession="MS:1000016"/);
       if (match) {
         const value = parseFloat(match[1]);
         // Check for unit accession (minutes vs seconds)
-        const unitMatch = xml.match(/accession="MS:1000016"[^/]*unitAccession="([^"]+)"/)
-          || xml.match(/unitAccession="([^"]+)"[^/]*accession="MS:1000016"/);
-        if (unitMatch && unitMatch[1] === 'UO:0000031') {
+        const unitMatch =
+          xml.match(/accession="MS:1000016"[^/]*unitAccession="([^"]+)"/) ||
+          xml.match(/unitAccession="([^"]+)"[^/]*accession="MS:1000016"/);
+        if (unitMatch && unitMatch[1] === "UO:0000031") {
           // minutes -> seconds
           this._retentionTime = value * 60.0;
         } else {
@@ -109,7 +105,7 @@ export class Spectrum {
     const intensity = this.intensity;
     if (mz.length !== intensity.length) {
       throw new Error(
-        `Mismatch in array lengths: mz has ${mz.length} elements, intensity has ${intensity.length} elements for spectrum ${this.index}`,
+        `Mismatch in array lengths: mz has ${mz.length} elements, intensity has ${intensity.length} elements for spectrum ${this.index}`
       );
     }
     const result = new Float64Array(mz.length * 2);

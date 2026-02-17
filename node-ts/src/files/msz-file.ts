@@ -1,12 +1,12 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import native from '../core/bindings.js';
-import { BaseFile } from './base-file.js';
-import { DataFormat } from '../types/data-format.js';
-import { Division } from '../types/division.js';
-import { createFile, registerFileFactory } from './file-registry.js';
-import type { ExtractOptions } from '../types/types.js';
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import native from "../core/bindings.js";
+import { BaseFile } from "./base-file.js";
+import { DataFormat } from "../types/data-format.js";
+import { Division } from "../types/division.js";
+import { createFile, registerFileFactory } from "./file-registry.js";
+import type { ExtractOptions } from "../types/types.js";
 
 /**
  * Handler for compressed MSZ files.
@@ -85,7 +85,7 @@ export class MSZFile extends BaseFile {
   decompress(output: string): BaseFile {
     const outputPath = path.resolve(output);
     native.decompressMsz(this._handle, outputPath, this._arguments.toNative());
-    return createFile('mzml', outputPath);
+    return createFile("mzml", outputPath);
   }
 
   /**
@@ -100,13 +100,13 @@ export class MSZFile extends BaseFile {
     const outputPath = path.resolve(output);
     const ext = path.extname(outputPath).toLowerCase();
 
-    if (ext === '.msz') {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mscompress-'));
-      const tmpMzml = path.join(tmpDir, 'temp.mzML');
+    if (ext === ".msz") {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-"));
+      const tmpMzml = path.join(tmpDir, "temp.mzML");
 
       try {
         this.extract(tmpMzml, options);
-        const tmpMzmlFile = createFile('mzml', tmpMzml);
+        const tmpMzmlFile = createFile("mzml", tmpMzml);
         try {
           return tmpMzmlFile.compress(outputPath);
         } finally {
@@ -115,9 +115,9 @@ export class MSZFile extends BaseFile {
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
-    } else if (ext === '.mzml') {
+    } else if (ext === ".mzml") {
       native.extractMsz(this._handle, outputPath, options ?? {});
-      return createFile('mzml', outputPath);
+      return createFile("mzml", outputPath);
     } else {
       throw new Error(`Unsupported output file extension: ${ext}. Use .msz or .mzML`);
     }
@@ -129,9 +129,9 @@ export class MSZFile extends BaseFile {
    * @throws Error always
    */
   compress(_output: string): never {
-    throw new Error('Cannot compress an MSZ file.');
+    throw new Error("Cannot compress an MSZ file.");
   }
 }
 
 // Register factory
-registerFileFactory('msz', (p) => new MSZFile(p));
+registerFileFactory("msz", (p) => new MSZFile(p));

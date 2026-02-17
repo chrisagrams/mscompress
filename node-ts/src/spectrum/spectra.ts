@@ -1,7 +1,7 @@
-import { Spectrum } from './spectrum.js';
-import { Division } from '../types/division.js';
-import { DataFormat } from '../types/data-format.js';
-import type { BaseFile } from '../files/base-file.js';
+import { Spectrum } from "./spectrum.js";
+import { Division } from "../types/division.js";
+import { DataFormat } from "../types/data-format.js";
+import type { BaseFile } from "../files/base-file.js";
 
 /**
  * Collection of spectra with lazy loading and caching.
@@ -38,20 +38,18 @@ export class Spectra implements Iterable<Spectrum> {
    */
   get(index: number): Spectrum {
     if (index < 0 || index >= this.length) {
-      throw new RangeError('Spectra index out of range');
+      throw new RangeError("Spectra index out of range");
     }
 
     if (this._cache[index] === null) {
-      const retTime = this._positions.retTimes !== null
-        ? this._positions.retTimes[index]
-        : NaN;
+      const retTime = this._positions.retTimes !== null ? this._positions.retTimes[index] : NaN;
 
       this._cache[index] = new Spectrum(
         index,
         this._positions.scans[index],
         this._positions.msLevels[index],
         retTime,
-        this._file,
+        this._file
       );
     }
 
