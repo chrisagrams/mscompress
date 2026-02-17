@@ -21,9 +21,8 @@ describe("core", () => {
     expect(getFilesize(MZML_PATH)).toBe(expected);
   });
 
-  it("getFilesize returns 0 for invalid path", () => {
-    // C get_filesize returns 0 for invalid paths
-    expect(getFilesize("ABC123_nonexistent")).toBe(0);
+  it("getFilesize throws for invalid path", () => {
+    expect(() => getFilesize("ABC123_nonexistent")).toThrow();
   });
 
   it("read throws on nonexistent file", () => {

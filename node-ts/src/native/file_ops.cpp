@@ -1,5 +1,7 @@
 #include "types.h"
 
+#include <sys/stat.h>
+
 extern "C" {
 #include "mscompress.h"
 }
@@ -15,6 +17,13 @@ Napi::Number GetFilesize(const Napi::CallbackInfo& info) {
     }
 
     std::string path = info[0].As<Napi::String>().Utf8Value();
+
+    struct stat fi;
+    if (stat(path.c_str(), &fi) != 0) {
+        Napi::Error::New(env, "getFilesize: file not found: " + path).ThrowAsJavaScriptException();
+        return Napi::Number::New(env, 0);
+    }
+
     size_t fs = get_filesize(const_cast<char*>(path.c_str()));
     return Napi::Number::New(env, static_cast<double>(fs));
 }
