@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(mscompress VERSION 1.0.7)
+# Version is read from .cz.toml (commitizen), the single source of truth.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../.cz.toml" CZ_TOML)
+string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ "${CZ_TOML}")
+project(mscompress VERSION ${CMAKE_MATCH_1})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +46,7 @@ set(CPP_SOURCE_FILES
 )
 
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})
+target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION="${PROJECT_VERSION}")
 
 # Vendor libraries
 include(${VENDOR_DIR}/Lz4Include.cmake)

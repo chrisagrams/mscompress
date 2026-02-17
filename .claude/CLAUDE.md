@@ -113,6 +113,19 @@ These are critical for avoiding leaks and use-after-free:
 - **Encode functions** advance `char**` src pointers during loops — save the original pointer before the loop for cleanup
 - **`block_len_t` caching**: check `if (!blk->cache)` before decompressing to avoid redundant allocations
 
+## Versioning
+
+The project version is defined in `.cz.toml` (commitizen) — this is the single source of truth. All other files read from it:
+
+- **CMake** — each `CMakeLists.txt` parses `.cz.toml` with a regex to set `PROJECT_VERSION`
+- **C code** — `cli/CMakeLists.txt` passes `VERSION` via `target_compile_definitions`
+- **Python** — `python/pyproject.toml` has a static `version` field, updated by `cz bump`
+- **npm** — all `package.json` files are updated by `cz bump`
+
+To bump: `cz bump --increment <PATCH|MINOR|MAJOR>`
+
+Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — it comes from `.cz.toml`.
+
 ## CI/CD
 
 GitHub Actions (`.github/workflows/build.yml`) runs:

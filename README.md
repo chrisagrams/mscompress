@@ -96,6 +96,17 @@ or
 
 
 
+## Versioning
+
+The project version is managed by [commitizen](https://commitizen-tools.github.io/commitizen/) via `.cz.toml`. This is the single source of truth — CMake, pyproject.toml, and all package.json files are kept in sync by `cz bump`.
+
+To bump the version:
+```
+cz bump --increment <PATCH|MINOR|MAJOR>
+```
+
+This updates `.cz.toml` and all files listed in `version_files` (package.json files and pyproject.toml).
+
 ## Compilation
 Our repository relies on CMake to support cross-platform compilation. Ensure that the necessary dependencies are installed for compilation.
 ### Prerequisites

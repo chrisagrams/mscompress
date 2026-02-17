@@ -1,10 +1,14 @@
 {
   "name": "@mscompress/darwin-arm64",
-  "version": "1.0.7",
+  "version": "1.0.10",
   "description": "macOS ARM64 native bindings for mscompress",
   "main": "mscompress.node",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

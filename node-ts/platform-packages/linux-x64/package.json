@@ -1,10 +1,14 @@
 {
   "name": "@mscompress/linux-x64",
-  "version": "1.0.7",
+  "version": "1.0.10",
   "description": "Linux x64 native bindings for mscompress",
   "main": "mscompress.node",
-  "os": ["linux"],
-  "cpu": ["x64"],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

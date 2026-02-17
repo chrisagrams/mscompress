@@ -1,6 +1,6 @@
 {
   "name": "mscompress",
-  "version": "1.0.7",
+  "version": "1.0.10",
   "description": "Multi-threaded lossless/lossy compression library for Mass Spectrometry data",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,11 +21,11 @@
     "directory": "node-ts"
   },
   "optionalDependencies": {
-    "@mscompress/darwin-arm64": "1.0.7",
-    "@mscompress/darwin-x64": "1.0.7",
-    "@mscompress/linux-arm64": "1.0.7",
-    "@mscompress/linux-x64": "1.0.7",
-    "@mscompress/win32-x64": "1.0.7"
+    "@mscompress/darwin-arm64": "1.0.10",
+    "@mscompress/darwin-x64": "1.0.10",
+    "@mscompress/linux-arm64": "1.0.10",
+    "@mscompress/linux-x64": "1.0.10",
+    "@mscompress/win32-x64": "1.0.10"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
