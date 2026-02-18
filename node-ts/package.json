@@ -21,18 +21,12 @@
     "url": "https://github.com/chrisagrams/mscompress.git",
     "directory": "node-ts"
   },
-  "optionalDependencies": {
-    "@mscompress/darwin-arm64": "1.0.10",
-    "@mscompress/darwin-x64": "1.0.10",
-    "@mscompress/linux-arm64": "1.0.10",
-    "@mscompress/linux-x64": "1.0.10",
-    "@mscompress/win32-x64": "1.0.10"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "cmake-js": "^7.3.0",
+    "prebuild": "^13.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",
     "node-addon-api": "^8.0.0",
@@ -42,9 +36,9 @@
     "vitest": "^2.1.0"
   },
   "scripts": {
-    "postinstall": "node scripts/install.js",
+    "install": "prebuild-install -r napi",
     "build": "npm run build:ts",
-    "build:native": "node scripts/build.js",
+    "build:native": "prebuild -r napi --target 8 --backend cmake-js",
     "build:ts": "tsc && tsc-alias",
     "build:debug": "cmake-js compile --debug",
     "clean": "rm -rf build dist",
@@ -58,14 +52,16 @@
   },
   "files": [
     "dist/",
-    "scripts/",
     "README.md"
   ],
+  "binary": {
+    "napi_versions": [8]
+  },
   "engines": {
     "node": ">=16.0.0"
   },
   "dependencies": {
-    "@types/tar": "^6.1.13",
+    "prebuild-install": "^7.1.0",
     "tar": "^7.5.9"
   }
 }

@@ -42,13 +42,6 @@ docs/
 ../electron/
 ../vendor/
 
-# Platform packages (these are published separately)
-platform-packages/
-
-# Scripts (keep install.js)
-scripts/*
-!scripts/install.js
-
 # Logs
 npm-debug.log*
 yarn-debug.log*
