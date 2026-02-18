@@ -386,8 +386,12 @@ jobs:
     needs: build-node
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/mscompress
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -425,6 +429,4 @@ jobs:
 
       - name: Publish to npm
         working-directory: ./node-ts
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
