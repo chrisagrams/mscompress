@@ -151,28 +151,6 @@ size_t get_filesize(char* path) {
 }
 
 /**
- * @brief Updates the tracked position of a file descriptor by a given increment.
- *
- * Searches the global `fds[]` array for the given file descriptor and updates
- * the corresponding entry in `fd_pos[]` by adding the increment.
- *
- * @param fd File descriptor whose tracked position is to be updated.
- * @param increment Number of bytes by which to advance the position (may be negative).
- *
- * @return Updated position of the file descriptor, or 0 if `fd` is not tracked
- *         in the global `fds[]` array.
- */
-long update_fd_pos(int fd, long increment) {
-   for (int i = 0; i < 3; i++) {
-      if (fds[i] == fd) {
-         fd_pos[i] += increment;
-         return fd_pos[i];
-      }
-   }
-   return 0;
-}
-
-/**
  * @brief Writes n bytes from buff to file descriptor fd.
  * @param fd File descriptor to write to.
  * @param buff Buffer containing data to write.
@@ -197,9 +175,6 @@ size_t write_to_file(int fd, char* buff, size_t n) {
           "Error in writing %ld bytes to file descriptor %d. Attempted to "
           "write %s",
           n, fd, buff);
-
-   if (!update_fd_pos(fd, rv))
-      error("write_to_file: error in updating fd pos\n");
 
    return (size_t)rv;
 }
@@ -381,8 +356,10 @@ data_format_t* deserialize_df(char* buff) {
  * @param df Pointer to the `data_format_t` struct containing header information.
  * @param blocksize Blocksize to write to header.
  * @param md5 MD5 checksum string to write to header.
+ *
+ * @return Number of bytes written (always `HEADER_SIZE`).
  */
-void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
+size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Allocate header_buff
    char header_buff[HEADER_SIZE] = "";
 
@@ -408,6 +385,8 @@ void write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    memcpy(header_buff + MD5_OFFSET, md5, MD5_SIZE);
 
    write_to_file(fd, header_buff, HEADER_SIZE);
+
+   return HEADER_SIZE;
 }
 
 /**
@@ -458,10 +437,13 @@ data_format_t* get_header_df(void* input_map) {
  *
  * @param footer Pointer to the `footer_t` struct to write.
  * @param fd File descriptor to write to.
+ *
+ * @return Number of bytes written (always `sizeof(footer_t)`).
  */
-void write_footer(footer_t* footer, int fd) {
+size_t write_footer(footer_t* footer, int fd) {
    footer->magic_tag = MAGIC_TAG;  // Set magic tag
    write_to_file(fd, (char*)footer, sizeof(footer_t));
+   return sizeof(footer_t);
 }
 
 /**
@@ -718,8 +700,6 @@ int open_output_file(char* path) {
       if (fd < 0)
          warning("Error in opening output file descriptor. (%s)\n",
                  strerror(errno));
-      else
-         fds[1] = fd;
    }
 
    return fd;
@@ -867,6 +847,7 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
 
    if (*output_path) {
       output_fd = open_output_file(*output_path);
+      fds[1] = output_fd;
       return type;
    }
 

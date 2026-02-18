@@ -1,6 +1,6 @@
 # CMake Tests for mscompress CLI
 
-set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../python/test/data)
+set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/data)
 
 # Simple test to run the executable with --version and --help
 add_test(NAME VersionTest COMMAND mscompress --version)
@@ -81,3 +81,12 @@ add_cli_test(CompressDecompressIntLossy_vdelta16 "--int-lossy;vdelta16")
 add_cli_test(CompressDecompressIntLossy_vdelta24 "--int-lossy;vdelta24")
 add_cli_test(CompressDecompressIntLossy_vbr "--int-lossy;vbr")
 add_cli_test(CompressDecompressIntLossy_bitpack "--int-lossy;bitpack")
+
+# Verbose mode test
+add_test(NAME VerboseOutputTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_verbose
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_verbose.cmake
+)
