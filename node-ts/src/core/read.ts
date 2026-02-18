@@ -16,8 +16,11 @@ const MAGIC_TAG = 0x035f51b5;
 function detectFiletype(filePath: string): "mzML" | "msz" | null {
   const fd = fs.openSync(filePath, "r");
   const buf = Buffer.alloc(512);
-  fs.readSync(fd, buf, 0, 512, 0);
-  fs.closeSync(fd);
+  try {
+    fs.readSync(fd, buf, 0, 512, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
 
   // Check for MSZ magic tag (little-endian)
   if (buf.length >= 4) {

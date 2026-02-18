@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const addonPath = path.join(__dirname, "..", "..", "build", "Release", "mscompress.node");
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const addon = require(addonPath);
 
 /** RAII file handle wrapping fd + mmap + filesize */
@@ -92,6 +93,10 @@ export interface NativeBindings {
     options: ExtractOptions
   ): boolean;
   extractMsz(handle: NativeFileHandle, outputPath: string, options: ExtractOptions): boolean;
+
+  // Zstd utilities
+  zstdCompress(data: Buffer, level?: number): Buffer;
+  zstdDecompress(data: Buffer): Buffer;
 }
 
 const native: NativeBindings = addon as NativeBindings;

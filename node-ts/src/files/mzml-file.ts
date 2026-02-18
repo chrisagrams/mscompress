@@ -59,6 +59,9 @@ export class MZMLFile extends BaseFile {
    * @returns m/z array
    */
   getMzBinary(index: number): Float64Array | Float32Array {
+    if (index < 0 || index >= this.spectra.length) {
+      throw new RangeError(`Spectrum index ${index} out of range [0, ${this.spectra.length})`);
+    }
     return native.getMzBinaryMzml(this._handle, index, this._arguments.blocksize);
   }
 
@@ -69,6 +72,9 @@ export class MZMLFile extends BaseFile {
    * @returns Intensity array
    */
   getIntenBinary(index: number): Float64Array | Float32Array {
+    if (index < 0 || index >= this.spectra.length) {
+      throw new RangeError(`Spectrum index ${index} out of range [0, ${this.spectra.length})`);
+    }
     return native.getIntenBinaryMzml(this._handle, index, this._arguments.blocksize);
   }
 
@@ -79,6 +85,9 @@ export class MZMLFile extends BaseFile {
    * @returns XML string
    */
   getXml(index: number): string {
+    if (index < 0 || index >= this.spectra.length) {
+      throw new RangeError(`Spectrum index ${index} out of range [0, ${this.spectra.length})`);
+    }
     return native.getXmlMzml(this._handle, index);
   }
 

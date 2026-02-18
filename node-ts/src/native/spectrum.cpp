@@ -87,6 +87,11 @@ Napi::Value GetIntenBinaryMzml(const Napi::CallbackInfo& info) {
     size_t index = static_cast<size_t>(info[1].As<Napi::Number>().Int64Value());
     long blocksize = static_cast<long>(info[2].As<Napi::Number>().Int64Value());
 
+    if (!handle->IsOpen() || handle->GetPositions() == nullptr || handle->GetDataFormat() == nullptr) {
+        Napi::Error::New(env, "getIntenBinaryMzml: handle not properly initialized").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
     division_t* positions = handle->GetPositions();
     data_format_t* df = handle->GetDataFormat();
 
@@ -146,6 +151,11 @@ Napi::Value GetXmlMzml(const Napi::CallbackInfo& info) {
 
     FileHandle* handle = Napi::ObjectWrap<FileHandle>::Unwrap(info[0].As<Napi::Object>());
     size_t index = static_cast<size_t>(info[1].As<Napi::Number>().Int64Value());
+
+    if (!handle->IsOpen() || handle->GetPositions() == nullptr) {
+        Napi::Error::New(env, "getXmlMzml: handle not properly initialized").ThrowAsJavaScriptException();
+        return env.Null();
+    }
 
     division_t* positions = handle->GetPositions();
     uint64_t start = positions->spectra->start_positions[index];

@@ -6,6 +6,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as tar from "tar";
+import native from "@/core/bindings.js";
+import type { BaseFile } from "@/files/base-file.js";
 import { MSZFile } from "@/files/msz-file.js";
 import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
 import { DataFormat } from "@/types/data-format.js";
@@ -28,8 +30,10 @@ import type { ExtractOptions } from "@/types/types.js";
  * try {
  *   console.log(`Spectra: ${mszx.spectra.length}`);
  *
- *   // Access spectra
- *   for (const spectrum of mszx.spectra.slice(0, 10)) {
+ *   // Access first 10 spectra
+ *   const limit = Math.min(mszx.spectra.length, 10);
+ *   for (let i = 0; i < limit; i++) {
+ *     const spectrum = mszx.spectra.get(i);
  *     console.log(spectrum.scan);
  *   }
  *
@@ -102,12 +106,13 @@ export class MSZXFile {
 
       const mszFile = new MSZFile(mszPath);
 
-      // Read annotation files into memory
+      // Read annotation files into memory (decompress if needed)
       const annotationFiles = new Map<string, Buffer>();
       for (const entry of manifest.annotations) {
         const annotationPath = path.join(tempDir, entry.filename);
         if (fs.existsSync(annotationPath)) {
-          const content = fs.readFileSync(annotationPath);
+          const raw = fs.readFileSync(annotationPath);
+          const content = entry.compressed ? native.zstdDecompress(raw) : raw;
           annotationFiles.set(entry.filename, content);
         } else {
           console.warn(`Warning: Annotation file '${entry.filename}' not found in archive`);
@@ -281,9 +286,10 @@ export class MSZXFile {
    * Decompress the MSZ file to mzML format.
    *
    * @param output - Output file path for decompressed mzML
+   * @returns BaseFile instance for the decompressed file
    */
-  decompress(output: string): void {
-    this.mszFile.decompress(output);
+  decompress(output: string): BaseFile {
+    return this.mszFile.decompress(output);
   }
 
   /**
@@ -294,9 +300,10 @@ export class MSZXFile {
    *
    * @param output - Output file path
    * @param options - Optional extraction filters (indices, scanNumbers, msLevel)
+   * @returns BaseFile instance for the extracted data
    */
-  extract(output: string, options?: ExtractOptions): void {
-    this.mszFile.extract(output, options);
+  extract(output: string, options?: ExtractOptions): BaseFile {
+    return this.mszFile.extract(output, options);
   }
 
   /**

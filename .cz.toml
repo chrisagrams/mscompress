@@ -3,11 +3,6 @@ version = "1.0.10"
 version_files = [
     "node/package.json",
     "node-ts/package.json",
-    "node-ts/platform-packages/darwin-arm64/package.json",
-    "node-ts/platform-packages/darwin-x64/package.json",
-    "node-ts/platform-packages/linux-arm64/package.json",
-    "node-ts/platform-packages/linux-x64/package.json",
-    "node-ts/platform-packages/win32-x64/package.json",
     "electron/package.json",
     "python/pyproject.toml",
 ]

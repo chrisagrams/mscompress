@@ -388,7 +388,9 @@ console.log(`Spectra: ${mszx.manifest.num_spectra}`);
 console.log(`Annotations: ${mszx.annotation_files.length}`);
 
 // Access spectra (same as MSZFile)
-for (const spectrum of mszx.spectra.slice(0, 10)) {
+const limit = Math.min(mszx.spectra.length, 10);
+for (let i = 0; i < limit; i++) {
+  const spectrum = mszx.spectra.get(i);
   console.log(`Scan ${spectrum.scan}: ${spectrum.size} peaks`);
 }
 

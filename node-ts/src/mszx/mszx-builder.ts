@@ -6,6 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as tar from "tar";
+import native from "@/core/bindings.js";
 import { MSZFile } from "@/files/msz-file.js";
 import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
 
@@ -181,15 +182,13 @@ export class MSZXBuilder {
       for (const { path: annotationPath, entry } of this.annotations) {
         const tempAnnotationPath = path.join(tempDir, entry.filename);
 
-        // TODO: Add zstd compression support if entry.compressed is true
         if (entry.compressed) {
-          console.warn(
-            "Warning: Compression for annotation files not yet implemented. " +
-              "Files will be stored uncompressed."
-          );
+          const data = fs.readFileSync(annotationPath);
+          const compressed = native.zstdCompress(data);
+          fs.writeFileSync(tempAnnotationPath, compressed);
+        } else {
+          fs.copyFileSync(annotationPath, tempAnnotationPath);
         }
-
-        fs.copyFileSync(annotationPath, tempAnnotationPath);
       }
 
       // Create tar archive from temp directory

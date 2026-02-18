@@ -30,6 +30,9 @@ Napi::Value DecompressMsz(const Napi::CallbackInfo& info);
 Napi::Value ExtractMzmlFiltered(const Napi::CallbackInfo& info);
 Napi::Value ExtractMsz(const Napi::CallbackInfo& info);
 
+Napi::Value ZstdCompress(const Napi::CallbackInfo& info);
+Napi::Value ZstdDecompress(const Napi::CallbackInfo& info);
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Register FileHandle class
     FileHandle::Init(env, exports);
@@ -68,6 +71,10 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Extraction
     exports.Set("extractMzmlFiltered", Napi::Function::New(env, ExtractMzmlFiltered));
     exports.Set("extractMsz", Napi::Function::New(env, ExtractMsz));
+
+    // Zstd utilities
+    exports.Set("zstdCompress", Napi::Function::New(env, ZstdCompress));
+    exports.Set("zstdDecompress", Napi::Function::New(env, ZstdDecompress));
 
     return exports;
 }
