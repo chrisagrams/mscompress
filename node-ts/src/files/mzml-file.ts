@@ -117,8 +117,7 @@ export class MZMLFile extends BaseFile {
       const tmpMzml = path.join(tmpDir, "temp.mzML");
 
       try {
-        this.extract(tmpMzml, options);
-        const tmpFile = new MZMLFile(tmpMzml);
+        const tmpFile = this.extract(tmpMzml, options);
         try {
           return tmpFile.compress(outputPath);
         } finally {

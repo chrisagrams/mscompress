@@ -10,9 +10,7 @@ function withTmpDir(fn: (tmpDir: string) => void) {
   try {
     fn(tmpDir);
   } finally {
-    // On Windows, file locks may not be released instantly after close.
-    // Retry to handle this.
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
@@ -22,19 +20,19 @@ describe("MSZ -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { indices: [0, 2, 4] });
+        const extracted = msz.extract(outputPath, {
+          indices: [0, 2, 4],
+        }) as MZMLFile;
+        try {
+          expect(extracted.spectra.length).toBe(3);
+          expect(extracted.spectra.get(0).scan).toBe(1);
+          expect(extracted.spectra.get(1).scan).toBe(3);
+          expect(extracted.spectra.get(2).scan).toBe(5);
+        } finally {
+          extracted.close();
+        }
       } finally {
         msz.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        expect(extracted.spectra.length).toBe(3);
-        expect(extracted.spectra.get(0).scan).toBe(1);
-        expect(extracted.spectra.get(1).scan).toBe(3);
-        expect(extracted.spectra.get(2).scan).toBe(5);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -44,18 +42,18 @@ describe("MSZ -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { scanNumbers: [2, 4] });
+        const extracted = msz.extract(outputPath, {
+          scanNumbers: [2, 4],
+        }) as MZMLFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(2);
+          expect(extracted.spectra.get(1).scan).toBe(4);
+        } finally {
+          extracted.close();
+        }
       } finally {
         msz.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(2);
-        expect(extracted.spectra.get(1).scan).toBe(4);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -65,18 +63,18 @@ describe("MSZ -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { msLevel: 2 });
-      } finally {
-        msz.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        for (const spectrum of extracted.spectra) {
-          expect(spectrum.msLevel).toBe(2);
+        const extracted = msz.extract(outputPath, {
+          msLevel: 2,
+        }) as MZMLFile;
+        try {
+          for (const spectrum of extracted.spectra) {
+            expect(spectrum.msLevel).toBe(2);
+          }
+        } finally {
+          extracted.close();
         }
       } finally {
-        extracted.close();
+        msz.close();
       }
     });
   });
@@ -88,18 +86,18 @@ describe("MSZ -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { indices: [1, 3] });
+        const extracted = msz.extract(outputPath, {
+          indices: [1, 3],
+        }) as MSZFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(2);
+          expect(extracted.spectra.get(1).scan).toBe(4);
+        } finally {
+          extracted.close();
+        }
       } finally {
         msz.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(2);
-        expect(extracted.spectra.get(1).scan).toBe(4);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -109,18 +107,18 @@ describe("MSZ -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { scanNumbers: [1, 5] });
+        const extracted = msz.extract(outputPath, {
+          scanNumbers: [1, 5],
+        }) as MSZFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(1);
+          expect(extracted.spectra.get(1).scan).toBe(5);
+        } finally {
+          extracted.close();
+        }
       } finally {
         msz.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(1);
-        expect(extracted.spectra.get(1).scan).toBe(5);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -130,18 +128,18 @@ describe("MSZ -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const msz = read(MSZ_PATH);
       try {
-        msz.extract(outputPath, { msLevel: 1 });
-      } finally {
-        msz.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        for (const spectrum of extracted.spectra) {
-          expect(spectrum.msLevel).toBe(1);
+        const extracted = msz.extract(outputPath, {
+          msLevel: 1,
+        }) as MSZFile;
+        try {
+          for (const spectrum of extracted.spectra) {
+            expect(spectrum.msLevel).toBe(1);
+          }
+        } finally {
+          extracted.close();
         }
       } finally {
-        extracted.close();
+        msz.close();
       }
     });
   });
@@ -153,19 +151,19 @@ describe("mzML -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { indices: [0, 2, 4] });
+        const extracted = mzml.extract(outputPath, {
+          indices: [0, 2, 4],
+        }) as MZMLFile;
+        try {
+          expect(extracted.spectra.length).toBe(3);
+          expect(extracted.spectra.get(0).scan).toBe(1);
+          expect(extracted.spectra.get(1).scan).toBe(3);
+          expect(extracted.spectra.get(2).scan).toBe(5);
+        } finally {
+          extracted.close();
+        }
       } finally {
         mzml.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        expect(extracted.spectra.length).toBe(3);
-        expect(extracted.spectra.get(0).scan).toBe(1);
-        expect(extracted.spectra.get(1).scan).toBe(3);
-        expect(extracted.spectra.get(2).scan).toBe(5);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -175,18 +173,18 @@ describe("mzML -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { scanNumbers: [2, 4] });
+        const extracted = mzml.extract(outputPath, {
+          scanNumbers: [2, 4],
+        }) as MZMLFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(2);
+          expect(extracted.spectra.get(1).scan).toBe(4);
+        } finally {
+          extracted.close();
+        }
       } finally {
         mzml.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(2);
-        expect(extracted.spectra.get(1).scan).toBe(4);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -196,18 +194,18 @@ describe("mzML -> mzML extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.mzML");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { msLevel: 2 });
-      } finally {
-        mzml.close();
-      }
-
-      const extracted = read(outputPath) as MZMLFile;
-      try {
-        for (const spectrum of extracted.spectra) {
-          expect(spectrum.msLevel).toBe(2);
+        const extracted = mzml.extract(outputPath, {
+          msLevel: 2,
+        }) as MZMLFile;
+        try {
+          for (const spectrum of extracted.spectra) {
+            expect(spectrum.msLevel).toBe(2);
+          }
+        } finally {
+          extracted.close();
         }
       } finally {
-        extracted.close();
+        mzml.close();
       }
     });
   });
@@ -219,18 +217,18 @@ describe("mzML -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { indices: [1, 3] });
+        const extracted = mzml.extract(outputPath, {
+          indices: [1, 3],
+        }) as MSZFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(2);
+          expect(extracted.spectra.get(1).scan).toBe(4);
+        } finally {
+          extracted.close();
+        }
       } finally {
         mzml.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(2);
-        expect(extracted.spectra.get(1).scan).toBe(4);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -240,18 +238,18 @@ describe("mzML -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { scanNumbers: [1, 5] });
+        const extracted = mzml.extract(outputPath, {
+          scanNumbers: [1, 5],
+        }) as MSZFile;
+        try {
+          expect(extracted.spectra.length).toBe(2);
+          expect(extracted.spectra.get(0).scan).toBe(1);
+          expect(extracted.spectra.get(1).scan).toBe(5);
+        } finally {
+          extracted.close();
+        }
       } finally {
         mzml.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        expect(extracted.spectra.length).toBe(2);
-        expect(extracted.spectra.get(0).scan).toBe(1);
-        expect(extracted.spectra.get(1).scan).toBe(5);
-      } finally {
-        extracted.close();
       }
     });
   });
@@ -261,18 +259,18 @@ describe("mzML -> MSZ extraction", () => {
       const outputPath = path.join(tmpDir, "extracted.msz");
       const mzml = read(MZML_PATH);
       try {
-        mzml.extract(outputPath, { msLevel: 1 });
-      } finally {
-        mzml.close();
-      }
-
-      const extracted = read(outputPath) as MSZFile;
-      try {
-        for (const spectrum of extracted.spectra) {
-          expect(spectrum.msLevel).toBe(1);
+        const extracted = mzml.extract(outputPath, {
+          msLevel: 1,
+        }) as MSZFile;
+        try {
+          for (const spectrum of extracted.spectra) {
+            expect(spectrum.msLevel).toBe(1);
+          }
+        } finally {
+          extracted.close();
         }
       } finally {
-        extracted.close();
+        mzml.close();
       }
     });
   });

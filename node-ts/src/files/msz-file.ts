@@ -111,8 +111,7 @@ export class MSZFile extends BaseFile {
       const tmpMzml = path.join(tmpDir, "temp.mzML");
 
       try {
-        this.extract(tmpMzml, options);
-        const tmpMzmlFile = createFile("mzml", tmpMzml);
+        const tmpMzmlFile = this.extract(tmpMzml, options);
         try {
           return tmpMzmlFile.compress(outputPath);
         } finally {
