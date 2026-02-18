@@ -1,0 +1,19 @@
+# Build outputs
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Native addon sources (C/C++)
+src/native/
+
+# CMake build files
+CMakeLists.txt
+cmake-js.js
+
+# Test data
+test/data/
+
+# Package files
+*.tgz

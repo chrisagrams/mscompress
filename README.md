@@ -4,6 +4,7 @@
 
 [![Build and Test](https://github.com/chrisagrams/mscompress/actions/workflows/build.yml/badge.svg?branch=stage)](https://github.com/chrisagrams/mscompress/actions/workflows/build.yml)
 ![PyPI - Version](https://img.shields.io/pypi/v/mscompress?logo=python)
+![npm - Version](https://img.shields.io/npm/v/mscompress?logo=npm)
 ![Docker Image Version](https://img.shields.io/docker/v/chrisagrams/mscompress?logo=docker)
 
 
@@ -22,7 +23,9 @@ MScompress is a multi-threaded lossless and lossy compression tool for Mass Spec
 
 🌟 Random-access to compressed file without full decompression.
 
-🌟 NodeJS library for server-side applications.
+🌟 Python library (`pip install mscompress`) and Node.js/TypeScript library (`npm install mscompress`) for programmatic access.
+
+🌟 Full TypeScript type definitions and ESM support.
 
 MScompress's multi-threaded implementation achieves state-of-the-art compression/decompression speeds with mzML files compared to general-purpose compression tools and previous work in MS data compression while maintaining comparable compression ratios.
 
@@ -33,10 +36,24 @@ Tests conducted on an Intel Core i9-12900K paired with a Samsung 980 Pro NVMe:
     <img src="assets/figures/all_hek_decompress.png" width=400px;>
 </p>
 
-MScompress can be utilized as a standalone GUI application or through the command line interface. Additionally, we provide a NodeJS library to utilize our preprocessing, compression, and decompression functions in a node environment.
+MScompress can be utilized as a standalone GUI application or through the command line interface. Additionally, we provide Python and Node.js/TypeScript libraries to utilize our preprocessing, compression, and decompression functions programmatically.
 
 ## Installation
+
+### CLI
 Our application is packaged as a portable executable containing all necessary dependencies with no installation required. Find the latest version for your platform under the [Releases](https://github.com/chrisagrams/mscompress/releases) tab.
+
+### Python
+```bash
+uv add mscompress
+# or
+pip install mscompress
+```
+
+### Node.js / TypeScript
+```bash
+npm install mscompress
+```
 
 
 ## Reporting Bugs
@@ -96,6 +113,17 @@ or
 
 
 
+## Versioning
+
+The project version is managed by [commitizen](https://commitizen-tools.github.io/commitizen/) via `.cz.toml`. This is the single source of truth — CMake, pyproject.toml, and all package.json files are kept in sync by `cz bump`.
+
+To bump the version:
+```
+cz bump --increment <PATCH|MINOR|MAJOR>
+```
+
+This updates `.cz.toml` and all files listed in `version_files` (package.json files and pyproject.toml).
+
 ## Compilation
 Our repository relies on CMake to support cross-platform compilation. Ensure that the necessary dependencies are installed for compilation.
 ### Prerequisites
@@ -141,19 +169,31 @@ cmake ..
 ```
 cmake --build ..
 ```
-### NodeJS Native-API (NAPI) Library
-To compile NAPI library:
+### Node.js/TypeScript Library
+To compile the Node.js library:
 
-1. Once cloned, navigate to `node/`
+1. Once cloned, navigate to `node-ts/`
 
 ```
-cd node/
+cd node-ts/
 ```
 
-2. Fetch dependencies and compile
+2. Install dependencies and download pre-built native binary
 ```
 npm install
 ```
+
+3. Build TypeScript sources
+```
+npm run build
+```
+
+4. Run tests
+```
+npm test
+```
+
+Pre-built native binaries are available for macOS (x64, ARM64), Linux (x64, ARM64), and Windows (x64). If a pre-built binary is not available for your platform, the native addon will be compiled from source during `npm install` (requires a C++17 compiler and CMake).
 
 ### Electron GUI Application
 To run/build Electron application:

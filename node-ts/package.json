@@ -1,0 +1,67 @@
+{
+  "name": "mscompress",
+  "version": "1.0.10",
+  "description": "Multi-threaded lossless/lossy compression library for Mass Spectrometry data",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "mass-spectrometry",
+    "compression",
+    "mzml",
+    "msz",
+    "proteomics",
+    "native",
+    "napi"
+  ],
+  "author": "Chris Grams <chrisagrams@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisagrams/mscompress.git",
+    "directory": "node-ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "cmake-js": "^7.3.0",
+    "prebuild": "^13.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "node-addon-api": "^8.0.0",
+    "prettier": "^3.4.0",
+    "tsc-alias": "^1.8.10",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "install": "prebuild-install -r napi",
+    "build": "npm run build:ts",
+    "build:native": "prebuild -r napi --target 8 --backend cmake-js",
+    "build:ts": "tsc && tsc-alias",
+    "build:debug": "cmake-js compile --debug",
+    "clean": "rm -rf build dist",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "binary": {
+    "napi_versions": [8]
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "prebuild-install": "^7.1.0",
+    "tar": "^7.5.9"
+  }
+}

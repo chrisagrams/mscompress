@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-project(mscompress VERSION 1.0)
+
+# Version is read from .cz.toml (commitizen), the single source of truth.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../.cz.toml" CZ_TOML)
+string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ "${CZ_TOML}")
+if(NOT CMAKE_MATCH_1)
+    message(FATAL_ERROR "Could not parse version from .cz.toml")
+endif()
+project(mscompress VERSION ${CMAKE_MATCH_1})
 
 # Set the build type to Release by default
 if(NOT CMAKE_BUILD_TYPE)
@@ -41,6 +48,7 @@ set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 
 file(GLOB SOURCES ${SRC_DIR}/*.c mscompress.c)
 add_executable(mscompress ${SOURCES})
+target_compile_definitions(mscompress PRIVATE VERSION="${PROJECT_VERSION}")
 
 # Ensure winnt.h sees a target arch and keep headers tidy on MSVC
 if(WIN32)

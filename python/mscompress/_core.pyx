@@ -1134,6 +1134,8 @@ cdef class BaseFile:
 
     def __init__(self, bytes path):
         self._path = path
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File not found: {os.fsdecode(path)}")
         self.filesize = _get_filesize(self._path)
         self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)

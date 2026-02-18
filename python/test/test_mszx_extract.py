@@ -3,15 +3,9 @@ from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
 from mscompress import read
 
-# Test data paths
-DATA_DIR = Path(__file__).parent / "data"
-TEST_MSZ = DATA_DIR / "test.msz" 
-
 @pytest.fixture
-def msz_file():
-    if not TEST_MSZ.exists():
-        pytest.skip("test.msz not found")
-    return read(str(TEST_MSZ))
+def msz_file(msz_file_path):
+    return read(msz_file_path)
 
 @pytest.fixture
 def dummy_pin(tmp_path):
