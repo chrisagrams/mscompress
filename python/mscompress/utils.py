@@ -51,7 +51,7 @@ def read(path: Union[str, PathLike, bytes]) -> Union[MZMLFile, MSZFile, MSZXFile
         raise OSError(f"Could not determine file type for: {path_str}")
 
 
-def detect_filetype(path: str | Path) -> Optional[Literal["mzML", "msz", "mszx"]]:
+def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "mszx"]]:
     """
     Determine the file type by examining file contents.
     

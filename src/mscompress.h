@@ -7,7 +7,6 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define VERSION "1.0.7"
 #define STATUS "Dev"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
@@ -298,8 +297,6 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df);
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
 /* file.c */
-extern long fd_pos[3];
-extern int fds[3];
 
 void* get_mapping(int fd);
 int remove_mapping(void* addr, size_t length);
@@ -308,11 +305,11 @@ int remove_file(char* path);
 size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
-void write_header(int fd, data_format_t* df, long blocksize, char* md5);
+size_t write_header(int fd, data_format_t* df, long blocksize, char* md5);
 long get_offset(int fd);
 long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
-void write_footer(footer_t* footer, int fd);
+size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 void print_footer_csv(footer_t* footer);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
@@ -364,7 +361,7 @@ void dealloc_division(division_t* div);
 void dealloc_divisions(divisions_t* divisions);
 void dealloc_read_division(division_t* div);
 void dealloc_read_divisions(divisions_t* divisions);
-void write_divisions(divisions_t* divisions, int fd);
+size_t write_divisions(divisions_t* divisions, int fd);
 divisions_t* read_divisions(void* input_map, long position, int n_divisions);
 division_t* flatten_divisions(divisions_t* divisions);
 divisions_t* create_divisions(division_t* div, long n_divisions);
@@ -485,9 +482,9 @@ ZSTD_CCtx* alloc_cctx();
 void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
                     size_t* out_len, int compression_level);
 void* compress_routine(void* args);
-void dump_block_len_queue(block_len_queue_t* queue, int fd);
-void compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
-                   data_format_t* df, divisions_t* divisions, int output_fd);
+size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
+int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
+                  data_format_t* df, divisions_t* divisions, int output_fd);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 
@@ -539,8 +536,8 @@ void* zstd_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
 void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
                   void* input_map, long offset, block_len_t* blk);
 void* decompress_routine(void* args);
-void decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
-                    int fd);
+int decompress_msz(char* input_map, size_t input_filesize, Arguments* args,
+                   int fd);
 decompression_fun set_decompress_fun(int accession);
 
 /* algo.c */
@@ -594,7 +591,7 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
 block_len_t* get_block_by_index(block_len_queue_t* queue, int index);
 long get_block_offset_by_index(block_len_queue_t* queue, int index);
 block_len_t* pop_block_len(block_len_queue_t* queue);
-void dump_block_len_queue(block_len_queue_t* queue, int fd);
+size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 
 /* zl.c */

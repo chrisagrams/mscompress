@@ -21,6 +21,8 @@
 
 #include "mscompress.h"
 
+int verbose = 0;
+
 /**
  * @brief Returns the number of available CPU threads on the current system.
  * @return The number of available processors/threads.

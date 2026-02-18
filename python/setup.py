@@ -211,7 +211,6 @@ c_sources = []
 c_sources += get_all_c_files("../vendor/lz4/lib")
 c_sources += get_all_c_files("../vendor/zlib")
 c_sources += get_all_c_files("../src")
-c_sources += get_all_c_files("../cli")
 c_sources += get_all_c_files("../vendor/zstd")
 c_sources += get_all_c_files("../vendor/zstd/lib/common")
 c_sources += get_all_c_files("../vendor/zstd/lib/compress")
@@ -281,7 +280,7 @@ else:
 # TODO: Ideally we don't need to disable assembly optimizations, but for now we do.
 # Look for a better solution in the future.
 # TODO: NO_GZCOMPRESS is also a workaround for macos. Look into how to get around it.
-define_macros: list[tuple[str, str | None]] = [
+define_macros = [
     ('NO_GZCOMPRESS', '1'),  # Disable gzip support to avoid fdopen macro conflicts
     ('ZSTD_DISABLE_ASM', '1'), # Temporary workaround to disable assembly optimizations when building.
     ('BASE64_STATIC_DEFINE', '1'),  # Tell base64 library to use static linking on Windows
