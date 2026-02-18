@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mscompress is a multi-threaded lossless/lossy compression library for Mass Spectrometry (MS) data. It defines a compressed file format (`.msz`) that supports random-access reads without full decompression. The project has a C core library, a CLI tool, and Python bindings via Cython.
+mscompress is a multi-threaded lossless/lossy compression library for Mass Spectrometry (MS) data. It defines a compressed file format (`.msz`) that supports random-access reads without full decompression. The project has a C core library, a CLI tool, Python bindings via Cython, and Node.js/TypeScript bindings via Node-API.
 
 ## Build & Test Commands
 
@@ -41,7 +41,30 @@ cd python && MSCOMPRESS_DEBUG=1 uv sync --all-extras --reinstall
 cd python && valgrind --tool=memcheck --leak-check=full --log-file=leak-check.txt $(uv run which python) -m pytest
 ```
 
-Test data lives in `python/test/data/` and is shared by both C and Python tests.
+Test data lives in `test/data/` at the repo root and is shared by C, Python, and Node.js tests.
+
+### Node.js/TypeScript bindings
+```bash
+# Build native addon + TypeScript (from node-ts/ dir)
+cd node-ts && npm run build
+
+# Build native addon only (prebuild + cmake-js)
+cd node-ts && npm run build:native
+
+# Build TypeScript only (tsc + tsc-alias)
+cd node-ts && npm run build:ts
+
+# Debug native build
+cd node-ts && npm run build:debug
+
+# Run all Node.js tests (59 tests, vitest)
+cd node-ts && npm test
+
+# Run tests in watch mode
+cd node-ts && npm run test:watch
+```
+
+Test data lives in the repo-root `test/data/` directory, referenced via relative path (`../../test/data`) from the test fixtures.
 
 ### Python build modes
 
@@ -97,6 +120,17 @@ A 512-byte header and a variable-length footer enable random access by storing b
 
 The Python build (`setup.py`) compiles all C sources + vendor libraries into a single Cython extension with architecture-specific SIMD flags for the base64 library.
 
+### Node.js/TypeScript bindings (`node-ts/`)
+- `src/native/*.cpp` — Node-API (NAPI v8) C++ addon wrapping the C core
+- `src/core/bindings.ts` — TypeScript interface to the native `.node` addon
+- `src/core/read.ts` — `read()` factory that auto-detects file type
+- `src/files/` — `BaseFile`, `MZMLFile`, `MSZFile`, `file-registry.ts` (factory to break circular deps)
+- `src/spectrum/` — `Spectrum` (lazy-loading binary data), `Spectra` (iterable collection)
+- `src/types/` — `DataFormat`, `DataPositions`, `Division`, `RuntimeArguments`
+- `src/mszx/` — MSZX archive support (pure TypeScript, uses `tar` package)
+
+The native addon compiles all C sources + vendor libraries via cmake-js into a `mscompress.node` shared library. Pre-built binaries are distributed via `prebuild`/`prebuild-install` for macOS (x64/arm64), Linux (x64/arm64), and Windows (x64). The TypeScript API mirrors the Python bindings (same class names and similar method signatures). ESM-only (`"type": "module"`), targets ES2022.
+
 ### Vendor libraries (`vendor/`)
 - **zlib** (Cloudflare fork), **zstd**, **lz4** — compression backends
 - **base64** — SIMD-optimized base64 codec (AVX2, SSSE3, SSE4, NEON)
@@ -131,5 +165,7 @@ Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — 
 GitHub Actions (`.github/workflows/build.yml`) runs:
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
 2. **build-python** — cibuildwheel for CPython 3.9–3.13 + pytest
-3. **publish-python** — PyPI publish on version tags
-4. **build-docker** — Multi-arch Docker image on version tags
+3. **build-node** — prebuild + cmake-js compile + vitest on Linux/macOS/Windows (x64, arm64)
+4. **publish-python** — PyPI publish on version tags
+5. **publish-node** — npm publish on version tags (uploads prebuilds to GitHub Release)
+6. **build-docker** — Multi-arch Docker image on version tags

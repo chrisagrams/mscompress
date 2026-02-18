@@ -8,7 +8,6 @@ Multi-threaded lossless/lossy compression library for Mass Spectrometry data wit
 ## Features
 
 - 🚀 **Fast**: Multi-threaded compression/decompression using ZSTD
-- 📦 **Compact**: Achieves 3-5x compression ratios on MS data
 - 🎯 **Random Access**: Read individual spectra without full decompression
 - 🔧 **Flexible**: Supports both lossless and lossy compression
 - 📊 **Format Conversion**: mzML ↔ MSZ with filtering options
@@ -448,18 +447,6 @@ npm test
 - C++17 compiler (GCC, Clang, or MSVC)
 - CMake >= 3.15
 - Python 3 (for node-gyp)
-
-## Performance
-
-Typical compression ratios and speeds on modern hardware:
-
-| File Size | Compressed Size | Ratio | Compress Time | Decompress Time |
-|-----------|----------------|-------|---------------|-----------------|
-| 1.2 GB    | 245 MB         | 4.9x  | 8.2s (8 threads) | 3.1s |
-| 500 MB    | 115 MB         | 4.3x  | 3.5s (8 threads) | 1.4s |
-| 100 MB    | 25 MB          | 4.0x  | 0.8s (8 threads) | 0.3s |
-
-*Benchmarked on Apple M1 Pro with ZSTD compression level 3*
 
 ## Related Projects
 
