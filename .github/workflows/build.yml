@@ -286,7 +286,13 @@ jobs:
         working-directory: ./node-ts
         run: npm install --ignore-scripts
 
-      - name: Build prebuild
+      - name: Build prebuild (Unix)
+        if: matrix.platform != 'windows'
+        working-directory: ./node-ts
+        run: npx prebuild -r napi --target 8 --backend cmake-js -- -G "Unix Makefiles"
+
+      - name: Build prebuild (Windows)
+        if: matrix.platform == 'windows'
         working-directory: ./node-ts
         run: npx prebuild -r napi --target 8 --backend cmake-js
 

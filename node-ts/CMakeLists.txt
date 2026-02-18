@@ -70,6 +70,15 @@ include(${VENDOR_DIR}/Base64Include.cmake)
 # Node addon settings
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
+# On Windows, generate node.lib from the .def file if cmake-js didn't do it
+if(WIN32 AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
+    if(NOT EXISTS ${CMAKE_JS_NODELIB_TARGET})
+        execute_process(
+            COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS}
+        )
+    endif()
+endif()
+
 # Linking
 target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
 
