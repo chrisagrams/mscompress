@@ -100,8 +100,9 @@ export class MZMLFile extends BaseFile {
   compress(output: string): BaseFile {
     const outputPath = path.resolve(output);
 
-    // Prepare divisions for compression
-    native.prepareDivisions(this._handle, this._arguments.toNative());
+    // Prepare divisions for compression and capture any updated settings
+    const divResult = native.prepareDivisions(this._handle, this._arguments.toNative());
+    this._arguments.blocksize = divResult.blocksize;
 
     // Run compression
     native.compressMzml(this._handle, outputPath, this._arguments.toNative());
