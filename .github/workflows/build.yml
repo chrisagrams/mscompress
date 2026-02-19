@@ -376,12 +376,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build Docker image
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          push: false
+
+      - name: Build and push Docker image
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/mscompress:${{ steps.extract_version.outputs.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/mscompress:latest
