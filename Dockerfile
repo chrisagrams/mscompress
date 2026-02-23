@@ -2,6 +2,7 @@
 FROM alpine:3.20 AS build
 RUN apk add --no-cache git cmake build-base
 WORKDIR /app
+COPY .cz.toml ./.cz.toml
 COPY src ./src
 COPY cli ./cli
 COPY vendor ./vendor
