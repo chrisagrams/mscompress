@@ -571,6 +571,7 @@ typedef struct {
    z_stream* z;
    float scale_factor;
    int ret_code;
+   Algo algo_fun;
 } algo_args;
 
 Algo set_compress_algo(int algo, int accession);

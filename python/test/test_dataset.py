@@ -33,11 +33,13 @@ def test_mscompress_dataset_directory(test_data_dir):
             global_index += 1
     assert global_index == total_spectra
 
-    # Test same sample across different files
-    sample_1 = dataset[0]
-    sample_1_repeat = dataset[50] # Will be index 0 from second file.
-    assert torch.equal(sample_1[0], sample_1_repeat[0])
-    assert torch.equal(sample_1[1], sample_1_repeat[1])
+    # Test same sample from test.mzML and test.msz (identical data)
+    mzml_member = dataset.members["test.mzML"]
+    msz_member = dataset.members["test.msz"]
+    sample_mzml = mzml_member[0]
+    sample_msz = msz_member[0]
+    assert torch.equal(sample_mzml[0], sample_msz[0])
+    assert torch.equal(sample_mzml[1], sample_msz[1])
 
 
 def test_mscompress_dataset_w_annotations(mszx_file_path):
