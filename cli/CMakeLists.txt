@@ -65,11 +65,10 @@ else()
 
 endif()
 
-target_include_directories(mscompress PUBLIC 
-                            ${VENDOR_DIR}/zstd/lib 
+target_include_directories(mscompress PUBLIC
+                            ${VENDOR_DIR}/zstd/lib
                             ${VENDOR_DIR}/base64/include
                             ${VENDOR_DIR}/base64/lib
-                            ${VENDOR_DIR}/yxml 
                             ${VENDOR_DIR}/lz4/include
                             ${SRC_DIR})
 
@@ -83,18 +82,15 @@ include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library
 include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
 set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C) # set zstd library language to C
 
-#yxml
-include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
-
 #base64
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
 include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
 # Link libs - only once, after all libraries are defined
 if(WIN32)
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd)
 else()
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads) # need math library and pthreads on Linux/Mac
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd m Threads::Threads) # need math library and pthreads on Linux/Mac
 endif()
 
 if(CODE_COVERAGE)

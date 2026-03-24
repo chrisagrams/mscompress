@@ -27,7 +27,6 @@ include_directories(
   ${VENDOR_DIR}/zstd/lib
   ${VENDOR_DIR}/base64/include
   ${VENDOR_DIR}/base64/lib
-  ${VENDOR_DIR}/yxml
   ${VENDOR_DIR}/lz4/include
   ${SRC_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -54,9 +53,6 @@ include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library with macOS fdopen w
 include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
 set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C) # set zstd library language to C
 
-#yxml
-include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
-
 #base64
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
 include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
@@ -69,7 +65,7 @@ option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 # Linking stage
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd base64 lz4 ${ZLIB_LIBRARY})
 
 get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)
 message("Link libraries of target ${PROJECT_NAME}: ${TMP_TARGET_LINK_LIBRARIES}")
