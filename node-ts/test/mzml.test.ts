@@ -13,7 +13,7 @@ import {
   DataPositions,
   RuntimeArguments,
 } from "../src/index.js";
-import { MZML_PATH } from "./fixtures.js";
+import { MZML_PATH, SCIEX_MZML_PATH } from "./fixtures.js";
 
 describe("MZMLFile", () => {
   let file: MZMLFile | null = null;
@@ -221,5 +221,47 @@ describe("MZMLFile", () => {
 
     const rt10 = spectra.get(10).retentionTime!;
     expect(Math.abs(rt10 - 1.15352136)).toBeLessThan(1e-4);
+  });
+});
+
+describe("Sciex TTOF6600 dtype handling (issue #105)", () => {
+  it("MSZ round-trip preserves correct dtypes (mz=float64, intensity=float32)", () => {
+    const mzml = read(SCIEX_MZML_PATH) as MZMLFile;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-test-"));
+    const mszPath = path.join(tmpDir, "sciex.msz");
+
+    try {
+      const msz = mzml.compress(mszPath);
+      mzml.close();
+
+      const spectrum = msz.spectra.get(49);
+      expect(spectrum.mz).toBeInstanceOf(Float64Array);
+      expect(spectrum.intensity).toBeInstanceOf(Float32Array);
+      msz.close();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("MSZ round-trip produces matching mz/intensity lengths", () => {
+    const mzml = read(SCIEX_MZML_PATH) as MZMLFile;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-test-"));
+    const mszPath = path.join(tmpDir, "sciex.msz");
+
+    try {
+      const msz = mzml.compress(mszPath);
+      mzml.close();
+
+      for (let i = 0; i < msz.spectra.length; i++) {
+        const spectrum = msz.spectra.get(i);
+        const mz = spectrum.mz;
+        const intensity = spectrum.intensity;
+        if (mz.length === 0 && intensity.length === 0) continue;
+        expect(mz.length).toBe(intensity.length);
+      }
+      msz.close();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

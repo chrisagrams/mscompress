@@ -10,6 +10,10 @@
  *
  */
 
+#ifndef _WIN32
+#define _GNU_SOURCE  // memmem (SIMD-optimized on glibc)
+#endif
+
 #include <assert.h>
 #include <ctype.h>  // for isspace
 #include <math.h>
@@ -17,6 +21,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/**
+ * @brief Search for needle in haystack, reading at most hay_len bytes.
+ *
+ * Uses memmem where available (glibc / BSD — SIMD-optimized on modern glibc),
+ * falls back to a portable loop on Windows.
+ */
+#ifdef _WIN32
+static void* bounded_search(const void* haystack, size_t hay_len,
+                            const void* needle, size_t needle_len) {
+   const char* h = (const char*)haystack;
+   for (size_t i = 0; i + needle_len <= hay_len; i++) {
+      if (memcmp(h + i, needle, needle_len) == 0)
+         return (void*)(h + i);
+   }
+   return NULL;
+}
+#else
+#define bounded_search memmem
+#endif
 
 #include "mscompress.h"
 #include "yxml.h"
@@ -317,18 +341,32 @@ division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
  * @param acc A parsed integer of an accession attribute (expanded by `parse_acc_to_int`).
  * @param current_type A pass-by-reference variable indicating whether the traversal
  *        is within an m/z or intensity array. Updated by this function.
+ * @param pending_fmt A pass-by-reference variable that buffers a format accession
+ *        when it appears before the array type identifier in the XML.
  * @param df An allocated, partially populated data_format_t struct to be further populated.
  * @return 1 if `data_format_t` struct is fully populated (both m/z and intensity formats detected), 0 otherwise.
  */
-int map_to_df(int acc, int* current_type, data_format_t* df)
+int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
 {
    if (acc >= _mass_ && acc <= _no_comp_) {
       switch (acc) {
          case _intensity_:
             *current_type = _intensity_;
+            if (*pending_fmt) {
+               df->source_inten_fmt = *pending_fmt;
+               df->populated++;
+               *pending_fmt = 0;
+               *current_type = 0;
+            }
             break;
          case _mass_:
             *current_type = _mass_;
+            if (*pending_fmt) {
+               df->source_mz_fmt = *pending_fmt;
+               df->populated++;
+               *pending_fmt = 0;
+               *current_type = 0;
+            }
             break;
          case _zlib_:
             df->source_compression = _zlib_;
@@ -341,15 +379,21 @@ int map_to_df(int acc, int* current_type, data_format_t* df)
                if (*current_type == _intensity_) {
                   df->source_inten_fmt = acc;
                   df->populated++;
+                  *current_type = 0;
                } else if (*current_type == _mass_) {
                   df->source_mz_fmt = acc;
                   df->populated++;
-               }
-               if (df->populated >= 2) {
-                  return 1;
+                  *current_type = 0;
+               } else {
+                  /* Format accession appeared before array type identifier;
+                     buffer it until the type is known. */
+                  *pending_fmt = acc;
                }
             }
             break;
+      }
+      if (df->populated >= 2) {
+         return 1;
       }
    }
    return 0;
@@ -384,6 +428,9 @@ data_format_t* pattern_detect(char* input_map)
    int current_type =
        0; /* A pass-by-reference variable to indicate to map_to_df of current
              binary data array type (m/z or intensity) */
+   int pending_fmt =
+       0; /* Buffers a format accession when it appears before the array type
+             identifier in the XML (e.g. 64-bit float before m/z array). */
 
    for (; *input_map; input_map++) {
       yxml_ret_t r = yxml_parse(xml, *input_map);
@@ -430,7 +477,7 @@ data_format_t* pattern_detect(char* input_map)
                df->source_total_spec = atoi(attrbuf);
                attrcur = NULL;
             } else if (in_cvParam && attrcur) {
-               if (map_to_df(parse_acc_to_int(attrbuf), &current_type, df)) {
+               if (map_to_df(parse_acc_to_int(attrbuf), &current_type, &pending_fmt, df)) {
                   free(xml);
                   return df;
                }
@@ -495,10 +542,12 @@ char* get_spectrum_start(char* ptr) {
  * @return A pointer to the character immediately after the "</spectrum>" closing tag, or `NULL` if not found.
  */
 char* get_spectrum_end(char* ptr) {
-   char* res = strstr(ptr, "</spectrum>") + strlen("</spectrum>");
-   if (res == NULL)
+   char* res = strstr(ptr, "</spectrum>");
+   if (res == NULL) {
       warning("Could not find end of spectrum.\n");
-   return res;
+      return NULL;
+   }
+   return res + strlen("</spectrum>");
 }
 
 /**
@@ -507,10 +556,12 @@ char* get_spectrum_end(char* ptr) {
  * @return A pointer to the first character after the "<binary>" opening tag, or `NULL` if not found.
  */
 char* get_binary_start(char* ptr) {
-   char* res = strstr(ptr, "<binary>") + strlen("<binary>");
-   if (res == NULL)
+   char* res = strstr(ptr, "<binary>");
+   if (res == NULL) {
       warning("Could not find start of binary.\n");
-   return res;
+      return NULL;
+   }
+   return res + strlen("<binary>");
 }
 
 /**
@@ -528,15 +579,23 @@ char* get_binary_end(char* ptr) {
 /**
  * @brief Extracts the MS level from a spectrum XML block by finding the MS:1000511 accession.
  * @param spectrum_start Pointer to the start of the spectrum XML block.
+ * @param search_len Number of bytes to search from spectrum_start.
  * @return The MS level as a long integer (e.g., 1 for MS1, 2 for MS2). Returns 0 on failure.
  */
-long get_ms_level(char* spectrum_start) {
+long get_ms_level(char* spectrum_start, size_t search_len) {
    char* ptr =
-       strstr(spectrum_start, "\"MS:1000511\"") + sizeof("\"MS:1000511\"");
+       bounded_search(spectrum_start, search_len, "\"MS:1000511\"", 12);
    if (ptr == NULL)
       return 0;
-   ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
-   char* e = strstr(ptr, "\"");
+   ptr += sizeof("\"MS:1000511\"");
+   size_t remaining = search_len - (ptr - spectrum_start);
+
+   ptr = bounded_search(ptr, remaining, "value=\"", 7);
+   if (ptr == NULL)
+      return 0;
+   ptr += sizeof("value=\"") - 1;
+
+   char* e = memchr(ptr, '"', search_len - (ptr - spectrum_start));
    if (e == NULL)
       return 0;
    return strtol(ptr, &e, 10);
@@ -544,42 +603,74 @@ long get_ms_level(char* spectrum_start) {
 
 /**
  * @brief Extracts the scan number from a spectrum XML block by parsing the "scan=" attribute.
+ *
+ * Search is limited to the opening <spectrum ...> tag to avoid O(n^2) scanning
+ * when the attribute is absent (e.g. Sciex TTOF6600 files using
+ * sample/period/cycle/experiment IDs).
+ *
  * @param spectrum_start Pointer to the start of the spectrum XML block.
- * @return The scan number as a long integer. Returns 0 on failure.
+ * @return The scan number as a long integer, or -1 if "scan=" is not found.
  */
 long get_scan(char* spectrum_start) {
-   char* ptr = strstr(spectrum_start, "scan=") + sizeof("scan=") - 1;
-   char* e = strstr(ptr, "\"");
-   if (e == NULL)
-      return 0;
-   return strtol(ptr, &e, 10);
+   // Limit search to the opening <spectrum ...> tag.
+   char* tag_end = strchr(spectrum_start, '>');
+   if (tag_end == NULL)
+      return -1;
+
+   char* ptr = strstr(spectrum_start, "scan=");
+   if (ptr == NULL || ptr >= tag_end)
+      return -1;
+
+   ptr += sizeof("scan=") - 1;
+   if (ptr >= tag_end)
+      return -1;
+
+   char* endptr;
+   long val = strtol(ptr, &endptr, 10);
+   if (endptr == ptr)  // No digits parsed
+      return -1;
+
+   return val;
 }
 
 /**
  * @brief Extract retention time (in seconds) from spectrum XML block.
  * @param spectrum_start Pointer to the start of the spectrum XML block.
+ * @param search_len Number of bytes to search from spectrum_start.
  * @return Retention time as a float. Returns 0 on failure.
  */
-float get_ret_time(char* spectrum_start) {
+float get_ret_time(char* spectrum_start, size_t search_len) {
    // Find the position of the retention time cvParam
-   char* ptr = strstr(spectrum_start, "accession=\"MS:1000016\"") +
-               sizeof("accession=\"MS:1000016\"");
-   // Return 0 if not found
+   char* ptr = bounded_search(spectrum_start, search_len,
+                              "accession=\"MS:1000016\"", 21);
    if (ptr == NULL)
       return 0;
+   ptr += sizeof("accession=\"MS:1000016\"");
+   size_t remaining = search_len - (ptr - spectrum_start);
 
    // Move the pointer to the value attribute
-   ptr = strstr(ptr, "value=\"") + sizeof("value=\"") - 1;
-   char* e = strstr(ptr, "\"");
+   ptr = bounded_search(ptr, remaining, "value=\"", 7);
+   if (ptr == NULL)
+      return 0;
+   ptr += sizeof("value=\"") - 1;
+   remaining = search_len - (ptr - spectrum_start);
+
+   char* e = memchr(ptr, '"', remaining);
    if (e == NULL)
       return 0;
 
    // Convert the retention time string to float
    float retention_time = strtof(ptr, &e);
+   remaining = search_len - (e - spectrum_start);
 
    // Find the unit of the retention time
-   ptr = strstr(e, "unitAccession=\"") + sizeof("unitAccession=\"") - 1;
-   e = strstr(ptr, "\"");
+   ptr = bounded_search(e, remaining, "unitAccession=\"", 15);
+   if (ptr == NULL)
+      return 0;
+   ptr += sizeof("unitAccession=\"") - 1;
+   remaining = search_len - (ptr - spectrum_start);
+
+   e = memchr(ptr, '"', remaining);
    if (e == NULL)
       return 0;
 
@@ -669,23 +760,27 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
       spectra_dp->start_positions[spec_curr] = ptr - input_map;
 
+      // Find end of this spectrum to bound metadata searches, preventing
+      // O(n^2) scanning when attributes are absent.
+      char* spec_end = strstr(ptr, "</spectrum>");
+      size_t spec_len =
+          spec_end ? (size_t)(spec_end - ptr) : (size_t)(end - (ptr - input_map));
+
       // From here, get any metadata we want to extract from the spectrum
       if (flags & SCANNUM) {  // If we want to extract scan numbers
-         scans[spec_curr] = get_scan(ptr);
-         if (ptr == NULL)
-            return NULL;
+         long scan = get_scan(ptr);
+         // Fall back to index+1 when scan= attribute is absent (e.g. Sciex
+         // TTOF6600 files that use sample/period/cycle/experiment IDs).
+         scans[spec_curr] =
+             (scan > 0) ? (uint32_t)scan : (uint32_t)(spec_curr + 1);
       }
 
       if (flags & MSLEVEL) {  // If we want to extract ms levels
-         ms_levels[spec_curr] = get_ms_level(ptr);
-         if (ptr == NULL)
-            return NULL;
+         ms_levels[spec_curr] = get_ms_level(ptr, spec_len);
       }
 
       if (flags & RETTIME) {  // If we want to extract ret_times
-         ret_times[spec_curr] = get_ret_time(ptr);
-         if (ptr == NULL)
-            return NULL;
+         ret_times[spec_curr] = get_ret_time(ptr, spec_len);
       }
 
       // Now, get the binaries and set the start and end positions
