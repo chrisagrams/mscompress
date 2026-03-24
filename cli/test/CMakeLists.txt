@@ -82,6 +82,17 @@ add_cli_test(CompressDecompressIntLossy_vdelta24 "--int-lossy;vdelta24")
 add_cli_test(CompressDecompressIntLossy_vbr "--int-lossy;vbr")
 add_cli_test(CompressDecompressIntLossy_bitpack "--int-lossy;bitpack")
 
+# Test mzML files without scan= attribute (e.g. Sciex TTOF6600: sample/period/cycle/experiment IDs)
+# Regression test for GitHub issue #103
+add_test(NAME CompressSciexNoScanAttr
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/sciex_ttof6600_100.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_sciex_no_scan
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}
