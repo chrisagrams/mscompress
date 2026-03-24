@@ -30,20 +30,24 @@ def test_sciex_scan_numbers_fallback(sciex_mzml_file_path):
 
 def test_sciex_compress_decompress(sciex_mzml_file_path):
     """Compress and decompress a Sciex mzML file without crashing."""
-    mzml = read(sciex_mzml_file_path)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        msz_path = Path(tmpdir) / "sciex.msz"
+    msz_path = Path(sciex_mzml_file_path).with_suffix('.msz')
+
+    with read(sciex_mzml_file_path) as mzml:
         mzml.compress(output=msz_path)
-        assert msz_path.exists()
-        assert msz_path.stat().st_size > 0
 
-        msz = read(str(msz_path))
-        assert isinstance(msz, MSZFile)
-        assert len(msz.spectra) == 100
+    assert msz_path.exists()
+    assert msz_path.stat().st_size > 0
 
-        # Verify scan fallback persists through compress/decompress
-        for i, spectrum in enumerate(msz.spectra):
-            assert spectrum.scan == i + 1
+    try:
+        with read(str(msz_path)) as msz:
+            assert isinstance(msz, MSZFile)
+            assert len(msz.spectra) == 100
+
+            # Verify scan fallback persists through compress/decompress
+            for i, spectrum in enumerate(msz.spectra):
+                assert spectrum.scan == i + 1
+    finally:
+        msz_path.unlink(missing_ok=True)
 
 
 def test_sciex_spectrum_metadata(sciex_mzml_file_path):
