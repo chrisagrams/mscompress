@@ -23,6 +23,11 @@ def mszx_file_path():
     return str(_TEST_DATA_DIR / "mszx" / "test.mszx")
 
 @pytest.fixture
+def sciex_mzml_file_path():
+    return str(_TEST_DATA_DIR / "sciex_ttof6600_100.mzML")
+
+
+@pytest.fixture
 def pepxml_file_path():
     return str(_TEST_DATA_DIR / "pepXML" / "test.pepXML")
 
