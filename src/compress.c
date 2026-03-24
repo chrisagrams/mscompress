@@ -553,10 +553,8 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
    a_args->src_len = len;
    a_args->dest = &binary_buff;
    a_args->dest_len = &binary_len;
-   a_args->src_format = df->source_mz_fmt;  // TODO: This is a hack. Need to
-                                            // fix.
 
-   df->target_mz_fun((void*)a_args);  // TODO: This is a hack. Need to fix.
+   a_args->algo_fun((void*)a_args);
 
    if (binary_buff == NULL)
       error("cmp_binary_routine: binary_buff is NULL\n");
@@ -661,9 +659,13 @@ void* compress_routine(void* args)
    if (cb_args->mode == _mass_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
       a_args->scale_factor = cb_args->df->mz_scale_factor;
+      a_args->src_format = cb_args->df->source_mz_fmt;
+      a_args->algo_fun = cb_args->df->target_mz_fun;
    } else if (cb_args->mode == _intensity_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
       a_args->scale_factor = cb_args->df->int_scale_factor;
+      a_args->src_format = cb_args->df->source_inten_fmt;
+      a_args->algo_fun = cb_args->df->target_inten_fun;
    } else if (cb_args->mode == _xml_)
       a_args->dec_fun = NULL;
    else
@@ -897,8 +899,6 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
 
    print("\t===m/z binary===\n");
    footer->mz_binary_pos = output_pos;
-   df->target_mz_fun = set_compress_algo(
-       footer->mz_fmt, df->source_mz_fmt);  // TODO, rename target_mz_fun
    mz_binary_block_lens = compress_parallel(
        (char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize,
        blocksize / 3, _mass_, divisions->n_divisions, threads, output_fd,
@@ -915,8 +915,6 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
 
    print("\t===int binary===\n");
    footer->inten_binary_pos = output_pos;
-   df->target_mz_fun = set_compress_algo(
-       footer->inten_fmt, df->source_mz_fmt);  // TODO, rename target_mz_fun
    inten_binary_block_lens = compress_parallel(
        (char*)input_map, inten_divisions, df, df->inten_compression_fun,
        blocksize, blocksize / 3, _intensity_, divisions->n_divisions, threads,

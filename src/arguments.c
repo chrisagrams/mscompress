@@ -266,7 +266,7 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    df->encode_source_compression_mz_fun = set_encode_fun(
        df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
    df->encode_source_compression_inten_fun = set_encode_fun(
-       df->source_compression, msz_footer->inten_fmt, df->source_mz_fmt);
+       df->source_compression, msz_footer->inten_fmt, df->source_inten_fmt);
 
    if (df->encode_source_compression_mz_fun == NULL ||
        df->encode_source_compression_inten_fun == NULL) {

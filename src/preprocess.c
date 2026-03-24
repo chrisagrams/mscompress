@@ -341,18 +341,32 @@ division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
  * @param acc A parsed integer of an accession attribute (expanded by `parse_acc_to_int`).
  * @param current_type A pass-by-reference variable indicating whether the traversal
  *        is within an m/z or intensity array. Updated by this function.
+ * @param pending_fmt A pass-by-reference variable that buffers a format accession
+ *        when it appears before the array type identifier in the XML.
  * @param df An allocated, partially populated data_format_t struct to be further populated.
  * @return 1 if `data_format_t` struct is fully populated (both m/z and intensity formats detected), 0 otherwise.
  */
-int map_to_df(int acc, int* current_type, data_format_t* df)
+int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
 {
    if (acc >= _mass_ && acc <= _no_comp_) {
       switch (acc) {
          case _intensity_:
             *current_type = _intensity_;
+            if (*pending_fmt) {
+               df->source_inten_fmt = *pending_fmt;
+               df->populated++;
+               *pending_fmt = 0;
+               *current_type = 0;
+            }
             break;
          case _mass_:
             *current_type = _mass_;
+            if (*pending_fmt) {
+               df->source_mz_fmt = *pending_fmt;
+               df->populated++;
+               *pending_fmt = 0;
+               *current_type = 0;
+            }
             break;
          case _zlib_:
             df->source_compression = _zlib_;
@@ -365,15 +379,21 @@ int map_to_df(int acc, int* current_type, data_format_t* df)
                if (*current_type == _intensity_) {
                   df->source_inten_fmt = acc;
                   df->populated++;
+                  *current_type = 0;
                } else if (*current_type == _mass_) {
                   df->source_mz_fmt = acc;
                   df->populated++;
-               }
-               if (df->populated >= 2) {
-                  return 1;
+                  *current_type = 0;
+               } else {
+                  /* Format accession appeared before array type identifier;
+                     buffer it until the type is known. */
+                  *pending_fmt = acc;
                }
             }
             break;
+      }
+      if (df->populated >= 2) {
+         return 1;
       }
    }
    return 0;
@@ -408,6 +428,9 @@ data_format_t* pattern_detect(char* input_map)
    int current_type =
        0; /* A pass-by-reference variable to indicate to map_to_df of current
              binary data array type (m/z or intensity) */
+   int pending_fmt =
+       0; /* Buffers a format accession when it appears before the array type
+             identifier in the XML (e.g. 64-bit float before m/z array). */
 
    for (; *input_map; input_map++) {
       yxml_ret_t r = yxml_parse(xml, *input_map);
@@ -454,7 +477,7 @@ data_format_t* pattern_detect(char* input_map)
                df->source_total_spec = atoi(attrbuf);
                attrcur = NULL;
             } else if (in_cvParam && attrcur) {
-               if (map_to_df(parse_acc_to_int(attrbuf), &current_type, df)) {
+               if (map_to_df(parse_acc_to_int(attrbuf), &current_type, &pending_fmt, df)) {
                   free(xml);
                   return df;
                }
