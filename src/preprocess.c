@@ -613,12 +613,13 @@ long get_ms_level(char* spectrum_start, size_t search_len) {
  */
 long get_scan(char* spectrum_start) {
    // Limit search to the opening <spectrum ...> tag.
-   char* tag_end = strchr(spectrum_start, '>');
+   char* tag_end = memchr(spectrum_start, '>', 4096);
    if (tag_end == NULL)
       return -1;
 
-   char* ptr = strstr(spectrum_start, "scan=");
-   if (ptr == NULL || ptr >= tag_end)
+   size_t tag_len = (size_t)(tag_end - spectrum_start);
+   char* ptr = bounded_search(spectrum_start, tag_len, "scan=", 5);
+   if (ptr == NULL)
       return -1;
 
    ptr += sizeof("scan=") - 1;
