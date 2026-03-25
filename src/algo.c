@@ -3769,7 +3769,7 @@ Algo set_decompress_algo(int algo, int accession) {
  * @param arg The argument representing the algorithm type.
  * @return An integer representing the algorithm type. If the argument is `NULL` or unknown, it logs an error and returns -1.
  */
-int get_algo_type(char* arg) {
+int get_algo_type(const char* arg) {
    if (arg == NULL)
       error("get_algo_type: arg is NULL");
    if (strcmp(arg, "lossless") == 0 || *arg == '\0' || *arg == "")
