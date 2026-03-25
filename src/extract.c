@@ -380,7 +380,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_start_offset;  // Offset relative to spectrum
    long xml_buff_offset;   // Offset relative to start of compressed block
    long xml_sum;
@@ -410,6 +410,11 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
          }
          xml_sum += xml->end_positions[j] - xml->start_positions[j];
       }
+   }
+
+   if (!found) {
+      error("extract_spectrum_start_xml: Could not find division for spectrum.\n");
+      return NULL;
    }
 
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
@@ -468,7 +473,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_buff_offset;  // Offset relative to start of compressed block
    long xml_sum;
    block_len_t* xml_blk_len;
@@ -493,11 +498,16 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
             xml_end_position = xml->end_positions[j];
             division_index = i;
             xml_buff_offset = xml_sum;
-            found = 0;
+            found = 1;
             break;
          }
          xml_sum += xml->end_positions[j] - xml->start_positions[j];
       }
+   }
+
+   if (!found) {
+      error("extract_spectrum_inner_xml: Could not find division for spectrum.\n");
+      return NULL;
    }
 
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
@@ -555,7 +565,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
 
    uint64_t xml_start_position;
    uint64_t xml_end_position;
-   int division_index;
+   int division_index = -1;
    long xml_buff_offset;  // Offset relative to start of compressed block
    long xml_sum;
    block_len_t* xml_blk_len;
@@ -587,6 +597,11 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       }
    }
 
+   if (!found) {
+      error("extract_spectrum_last_xml: Could not find division for spectrum.\n");
+      return NULL;
+   }
+
    xml_blk_len = get_block_by_index(xml_block_lens, division_index);
    xml_blk_offset =
        xml_pos + get_block_offset_by_index(xml_block_lens, division_index);
@@ -594,11 +609,11 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
    if (!xml_blk_len->cache) {
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
-      xml_blk_len->cache = decmp_xml;
       if (decmp_xml == NULL) {
          error("extract_spectrum_last_xml: Failed to decompress XML block.\n");
          return NULL;
       }
+      xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
 
@@ -809,6 +824,11 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       mz_off += mz->total_spec;
    }
 
+   if (division_index >= divisions->n_divisions) {
+      error("extract_spectrum_mz: Could not find division for spectrum index %ld.\n", index);
+      return NULL;
+   }
+
    mz_blk_len = get_block_by_index(mz_binary_block_lens, division_index);
    mz_blk_offset =
        mz_binary_blk_pos +
@@ -879,7 +899,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
    char* decmp_inten;
    char* res;
 
-   // Determine what division contains iten and in which position
+   // Determine what division contains inten and in which position
    for (division_index; division_index < divisions->n_divisions;
         division_index++) {
       division_t* curr = divisions->divisions[division_index];
@@ -892,6 +912,11 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
          break;
       }
       inten_off += inten->total_spec;
+   }
+
+   if (division_index >= divisions->n_divisions) {
+      error("extract_spectrum_inten: Could not find division for spectrum index %ld.\n", index);
+      return NULL;
    }
 
    inten_blk_len = get_block_by_index(inten_binary_block_lens, division_index);
