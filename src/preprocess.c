@@ -1133,7 +1133,7 @@ data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize,
       if (curr_div >= *divisions) {
          fprintf(stderr,
                  "err: curr_div > divisions\ncurr_div: %d\ndivisions: "
-                 "%d\ncurr_div_i: %d\ncurr_size: %d\ni: %d\ntotal_spec: %d\n",
+                 "%d\ncurr_div_i: %d\ncurr_size: %ld\ni: %d\ntotal_spec: %d\n",
                  curr_div, *divisions, curr_div_i, curr_size, i,
                  dp->total_spec * 2);
          exit(-1);

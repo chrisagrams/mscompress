@@ -705,7 +705,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    for (int i = 0; i < total_spec; i++) {
       a_args->src = (char**)&decmp_binary;
       a_args->src_len = curr_dp->end_positions[i] - curr_dp->start_positions[i];
-      a_args->dest = buff + buff_off;
+      a_args->dest = (char **)(buff + buff_off);
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
       a_args->scale_factor = scale_factor;

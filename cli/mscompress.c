@@ -169,13 +169,13 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             return 1;
          }
          arguments->scans =
-             string_to_array(argv[++i], &arguments->scans_length);
+             (uint32_t *)string_to_array(argv[++i], &arguments->scans_length);
       } else if (strcmp(argv[i], "--ms-level") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing ms level for extraction.");
             return 1;
          }
-         if (argv[++i] == 'n')
+         if (strcmp(argv[++i], "n") == 0)
             arguments->ms_level = -1;  // still valid, set to "n"
          else {
             arguments->ms_level = atoi(argv[i]);
@@ -251,8 +251,8 @@ int main(int argc, char* argv[]) {
    divisions_t* divisions;
    data_format_t* df;
 
-   void* input_map = NULL;
-   size_t input_filesize = 0;
+   char* input_map = NULL;
+   long input_filesize = 0;
    int local_fds[3] = {-1, -1, -1};
    int operation = -1;
    int error_status = 0;  // If error occurred, indicate cleanup and non-zero
@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
 
          // Scan mzML for position of all binary data. Divide the m/z,
          // intensity, and XML data over threads.
-         if (preprocess_mzml((char*)input_map, input_filesize,
+         if (preprocess_mzml(input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions)) {
             error_status = 1;
@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
          }
 
          // Start compress routine.
-         if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
+         if (compress_mzml(input_map, input_filesize, &arguments, df,
                            divisions, local_fds[1])) {
             error_status = 1;
             break;
@@ -344,26 +344,26 @@ int main(int argc, char* argv[]) {
          print("\nExtracting ...\n");
 
          arguments.threads = -1,  // force single threaded
-             preprocess_mzml((char*)input_map, input_filesize,
+             preprocess_mzml(input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
 
-         extract_mzml((char*)input_map, divisions, local_fds[1]);
+         extract_mzml(input_map, divisions, local_fds[1]);
          break;
       };
       case EXTRACT_MSZ: {
-         extract_msz((char*)input_map, input_filesize, arguments.indices,
+         extract_msz(input_map, input_filesize, arguments.indices,
                      arguments.indices_length, arguments.scans,
                      arguments.scans_length, arguments.ms_level,
                      local_fds[1]);
          break;
       };
       case EXTERNAL: {
-         preprocess_external((char*)input_map, input_filesize,
+         preprocess_external(input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
          
-         if (compress_mzml((char*)input_map, input_filesize, &arguments, df,
+         if (compress_mzml(input_map, input_filesize, &arguments, df,
                            divisions, local_fds[1])) {
             error_status = 1;
             break;
@@ -371,7 +371,7 @@ int main(int argc, char* argv[]) {
          break;
       }
       case DESCRIBE: {
-         footer_t* footer = read_footer((char*)input_map, input_filesize);
+         footer_t* footer = read_footer(input_map, input_filesize);
          if (!footer)
             exit(1);
          print_footer_csv(footer);
