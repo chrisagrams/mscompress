@@ -91,8 +91,8 @@ typedef struct {
    int threads;
    int extract_only;
    int describe_only;
-   char* mz_lossy;
-   char* int_lossy;
+   const char* mz_lossy;
+   const char* int_lossy;
    long blocksize;
    char* input_file;
    char* output_file;
@@ -576,7 +576,7 @@ typedef struct {
 
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
-int get_algo_type(char* arg);
+int get_algo_type(const char* arg);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

@@ -417,7 +417,7 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
-            a_args->dest = buff + buff_off;
+            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
@@ -471,7 +471,7 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
-            a_args->dest = buff + buff_off;
+            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             a_args->scale_factor = db_args->df->int_scale_factor;
