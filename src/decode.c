@@ -48,9 +48,11 @@ void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
 {
    int b64_ret = base64_decode(src, src_len, dest, out_len, 0);
 
-   if (b64_ret == 0)
-      error("decode_base64: base64_decode returned with an error. (%d)\n",
-            b64_ret);
+   if (b64_ret == 0) {
+      warning("decode_base64: base64_decode failed (len=%zu). "
+              "Input may contain invalid characters.\n", src_len);
+      *out_len = 0;
+   }
 }
 
 /**
