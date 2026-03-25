@@ -102,7 +102,7 @@ void algo_decode_cast32_64d(void* args) {
    res[0] = (float)len;
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = (len + 1) * sizeof(float);
 
    return;
@@ -179,7 +179,7 @@ void algo_decode_cast16_32f(void* args) {
    }
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = (len * sizeof(uint16_t)) + sizeof(uint16_t);
 
    return;
@@ -256,7 +256,7 @@ void algo_decode_cast16_64d(void* args) {
    }
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = (len * sizeof(uint16_t)) + sizeof(uint16_t);
 
    return;
@@ -335,7 +335,7 @@ void algo_decode_log_2_transform_32f(void* args)
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -414,7 +414,7 @@ void algo_decode_log_2_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = (len + 1) * sizeof(uint16_t);
 
    return;
@@ -505,7 +505,7 @@ void algo_decode_delta16_transform_32f(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -604,7 +604,7 @@ void algo_decode_delta16_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -709,7 +709,7 @@ void algo_decode_delta24_transform_32f(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -812,7 +812,7 @@ void algo_decode_delta24_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -901,7 +901,7 @@ void algo_decode_delta32_transform_32f(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -992,7 +992,7 @@ void algo_decode_delta32_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -1100,7 +1100,7 @@ void algo_decode_vdelta16_transform_32f(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -1208,7 +1208,7 @@ void algo_decode_vdelta16_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -1326,7 +1326,7 @@ void algo_decode_vdelta24_transform_32f(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -1443,7 +1443,7 @@ void algo_decode_vdelta24_transform_64d(void* args) {
    memcpy(res, &len, sizeof(uint16_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = res_len;
 
    return;
@@ -1594,7 +1594,7 @@ void algo_decode_vbr_32f(void* args) {
           sizeof(uint32_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len =
        sizeof(uint32_t) + sizeof(float) + sizeof(uint32_t) + bytes_used;
 
@@ -1745,7 +1745,7 @@ void algo_decode_vbr_64d(void* args) {
           sizeof(uint32_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len =
        sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t) + bytes_used;
 
@@ -1865,7 +1865,7 @@ void algo_decode_bitpack_32f(void* args) {
           sizeof(uint32_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = header_size + bytes_used;
 
    return;
@@ -1983,7 +1983,7 @@ void algo_decode_bitpack_64d(void* args) {
           sizeof(uint32_t));
 
    // Return result
-   *a_args->dest = res;
+   *a_args->dest = (char *)res;
    *a_args->dest_len = header_size + bytes_used;
 
    return;
