@@ -93,6 +93,17 @@ add_test(NAME CompressSciexNoScanAttr
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# Corrupt base64 test - regression test for GitHub issue #111
+# Verifies compress/decompress handles mzML with invalid base64 characters gracefully
+add_test(NAME CompressCorruptBase64
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/corrupt_base64.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_corrupt_base64
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}
