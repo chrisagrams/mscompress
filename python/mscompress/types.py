@@ -1,8 +1,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 from enum import Enum
+
+import numpy as np
+import numpy.typing as npt
+from typing_extensions import TypedDict
+
+
+class SpectrumDict(TypedDict):
+    """Dictionary representing a spectrum's binary data arrays."""
+
+    mz: npt.NDArray[np.floating]
+    intensity: npt.NDArray[np.floating]
+
+
+@runtime_checkable
+class SpectrumTransform(Protocol):
+    """Protocol for spectrum transform callables.
+
+    A transform receives a SpectrumDict and returns a SpectrumDict.
+    Both input and output must contain 'mz' and 'intensity' keys
+    with NumPy arrays of equal length.
+    """
+
+    def __call__(self, data: SpectrumDict) -> SpectrumDict: ...
 
 
 class AnnotationFormat(Enum):

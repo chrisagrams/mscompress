@@ -39,6 +39,11 @@ from .metadata import (
     build_composite_metadata,
 )
 
+from .types import (
+    SpectrumDict,
+    SpectrumTransform,
+)
+
 from .mszx import (
     # MSZX classes
     MSZXFile,
@@ -67,6 +72,8 @@ __all__ = [
     "MSZFile",
     "Spectrum",
     "Spectra",
+    "SpectrumDict",
+    "SpectrumTransform",
     "get_num_threads",
     "get_filesize",
     "__version__",
