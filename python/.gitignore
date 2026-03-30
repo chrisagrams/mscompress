@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 mscompress/_core.c
+# Cython-generated C files from Pure Python Mode modules
+mscompress/_core/*.c
 
 # Distribution / packaging
 .Python

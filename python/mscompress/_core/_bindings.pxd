@@ -3,11 +3,11 @@ cdef extern from "stdint.h":
     ctypedef unsigned int uint32_t
     ctypedef unsigned int uint16_t
 
-cdef extern from "../vendor/zlib/zlib.h":
+cdef extern from "zlib.h":
     ctypedef struct z_stream:
         pass
 
-cdef extern from "../vendor/zstd/lib/zstd.h":
+cdef extern from "zstd.h":
     ctypedef struct ZSTD_CCtx:
         pass
 
@@ -16,14 +16,14 @@ cdef extern from "../vendor/zstd/lib/zstd.h":
 
     size_t ZSTD_freeDCtx(ZSTD_DCtx* dctx)
 
-cdef extern from "../src/mscompress.h":
+cdef extern from "mscompress.h":
     int TRUE
     int FALSE
     int _ZSTD_compression_
     int ZLIB_SIZE_OFFSET
     int _32f_
     int _64d_
-    
+
     ctypedef void (*Algo)(void*)
     ctypedef Algo (*Algo_ptr)()
 
@@ -50,12 +50,12 @@ cdef extern from "../src/mscompress.h":
         int target_mz_format
         int target_inten_format
         int zstd_compression_level
-    
+
     ctypedef struct data_block_t:
         char* mem
         size_t size
         size_t max_size
-    
+
     ctypedef struct block_len_t:
         size_t original_size
         size_t compressed_size
@@ -73,7 +73,7 @@ cdef extern from "../src/mscompress.h":
         block_len_t* tail
 
         int populated
-    
+
     ctypedef struct data_format_t:
         uint32_t source_mz_fmt
         uint32_t source_inten_fmt
@@ -99,7 +99,7 @@ cdef extern from "../src/mscompress.h":
         uint64_t* start_positions
         uint64_t* end_positions
         int total_spec
-    
+
     ctypedef struct division_t:
         data_positions_t* spectra
         data_positions_t* xml
@@ -115,7 +115,7 @@ cdef extern from "../src/mscompress.h":
     ctypedef struct divisions_t:
         division_t** divisions
         int n_divisions
-    
+
     ctypedef struct footer_t:
         uint64_t xml_pos
         uint64_t mz_binary_pos
@@ -185,7 +185,7 @@ cdef extern from "../src/mscompress.h":
     # Error/warning callback functions
     ctypedef void (*error_callback_t)(const char* message)
     ctypedef void (*warning_callback_t)(const char* message)
-    
+
     void _set_error_callback "set_error_callback"(error_callback_t callback)
     void _set_warning_callback "set_warning_callback"(warning_callback_t callback)
     void _reset_error_callback "reset_error_callback"()

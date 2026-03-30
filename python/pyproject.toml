@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "cython", "oldest-supported-numpy", "tomli"]
+requires = ["setuptools>=45", "wheel", "cython>=3.1", "oldest-supported-numpy", "tomli"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -17,7 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "setuptools>=45",
-    "cython",
+    "cython>=3.1",
     "numpy",
     "pytest",
     "pytest-cov",
@@ -37,7 +37,7 @@ all = [
 include-package-data = false
 
 [tool.setuptools.package-data]
-"*" = ["*.pyx", "*.pxd", "*.c", "*.h", "*.pyi", "py.typed"]
+"*" = ["*.pyx", "*.pxd", "*.py", "*.c", "*.h", "*.pyi", "py.typed"]
 
 [tool.cibuildwheel]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
@@ -52,6 +52,14 @@ archs = ["AMD64"]
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
+
+[tool.mypy]
+[[tool.mypy.overrides]]
+module = "cython.*"
+ignore_missing_imports = true
+
+[tool.pyright]
+reportMissingImports = "warning"
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
