@@ -46,7 +46,7 @@ endif()
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 
-file(GLOB SOURCES ${SRC_DIR}/*.c mscompress.c)
+file(GLOB SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c mscompress.c)
 add_executable(mscompress ${SOURCES})
 target_compile_definitions(mscompress PRIVATE VERSION="${PROJECT_VERSION}")
 
