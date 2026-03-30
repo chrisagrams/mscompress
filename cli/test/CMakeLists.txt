@@ -7,6 +7,8 @@ add_test(NAME VersionTest COMMAND mscompress --version)
 
 add_test(NAME HelpTest COMMAND mscompress --help)
 
+add_test(NAME ListAlgorithmsTest COMMAND mscompress --list-algorithms)
+
 
 # Test compression and decompression using the run_test.cmake script
 add_test(NAME CompressTest
