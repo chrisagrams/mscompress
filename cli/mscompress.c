@@ -76,6 +76,8 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(
        stream,
        "  -d, --describe                Print header/footer in CSV format\n");
+   fprintf(stream,
+           "      --list-algorithms         List available lossy algorithms.\n");
    fprintf(stream, "  -h, --help                    Show this help message.\n");
    fprintf(stream,
            "  -V, --version                 Show version information.\n\n");
@@ -216,6 +218,9 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             str++;
          }
          arguments->zstd_compression_level = num;
+      } else if (strcmp(argv[i], "--list-algorithms") == 0) {
+         print_algorithms();
+         exit(0);
       } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
          print_usage(stdout, 0);
       } else if (strcmp(argv[i], "-V") == 0 ||

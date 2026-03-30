@@ -71,6 +71,27 @@ int set_threads(Arguments* args, int threads) {
 }
 
 /**
+* @brief Prints a formatted table of available lossy transformation algorithms.
+*/
+void print_algorithms(void) {
+   printf("Available lossy transformation algorithms:\n\n");
+   printf("  %-12s %-10s %-45s %s\n", "Name", "Target", "Description", "Default Scale Factor");
+   printf("  %-12s %-10s %-45s %s\n", "----", "------", "-----------", "--------------------");
+   printf("  %-12s %-10s %-45s %s\n", "cast",    "mz",    "Cast 64-bit double to 32-bit float",            "N/A");
+   printf("  %-12s %-10s %-45s %s\n", "cast16",  "mz",    "Cast 64-bit double to 16-bit float",            "11.801");
+   printf("  %-12s %-10s %-45s %s\n", "delta16", "mz",    "Delta encoding with 16-bit precision",          "127.998");
+   printf("  %-12s %-10s %-45s %s\n", "delta24", "mz",    "Delta encoding with 24-bit precision",          "65536");
+   printf("  %-12s %-10s %-45s %s\n", "delta32", "mz",    "Delta encoding with 32-bit precision",          "262144.0");
+   printf("  %-12s %-10s %-45s %s\n", "bitpack", "mz",    "Bit packing transform",                         "10000.0");
+   printf("  %-12s %-10s %-45s %s\n", "log",     "int",   "Log2 transform",                                "72.0");
+   printf("  %-12s %-10s %-45s %s\n", "vbr",     "mz/int","Variable bit rate encoding",                    "0.1 (mz), 1.0 (int)");
+   printf("  %-12s %-10s %-45s %s\n", "vdelta16","mz",    "Variable delta encoding 16-bit (experimental)", "N/A");
+   printf("  %-12s %-10s %-45s %s\n", "vdelta24","mz",    "Variable delta encoding 24-bit (experimental)", "N/A");
+   printf("\nUse -z/--mz-lossy or -i/--int-lossy to enable an algorithm.\n");
+   printf("Use --mz-scale-factor or --int-scale-factor to override the default.\n");
+}
+
+/**
 * @brief Sets the lossy compression algorithm for mz data.
 * @param args A pointer to the `Arguments` struct.
 * @param mz_lossy The name of the lossy compression algorithm to set.
