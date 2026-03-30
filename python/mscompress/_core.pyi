@@ -1,10 +1,12 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-from typing import Union, Iterator, Optional, Dict, Any
+from typing import Union, Iterator, Optional, Dict, Any, Callable
 from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
+
+from .types import SpectrumTransform
 
 class RuntimeArguments:
     """Runtime configuration arguments for compression/decompression operations."""
@@ -399,73 +401,103 @@ class MSZFile(BaseFile):
 
 class Spectrum:
     """Represents a single mass spectrum."""
-    
+
     index: int
     scan: int
     ms_level: int
-    
+
     def __init__(
         self,
         index: int,
         scan: int,
         ms_level: int,
         retention_time: float,
-        file: BaseFile
+        file: BaseFile,
+        transform: Optional[SpectrumTransform] = None,
     ) -> None: ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     @property
     def xml(self) -> Element:
         """XML metadata for this spectrum."""
         ...
-    
+
     @property
     def size(self) -> int:
-        """Number of m/z - intensity pairs."""
+        """Number of m/z - intensity pairs (pre-transform)."""
         ...
-    
+
     @property
     def retention_time(self) -> float:
         """Retention time of this spectrum."""
         ...
-    
+
+    @property
+    def raw_mz(self) -> npt.NDArray[Union[np.float32, np.float64]]:
+        """Raw m/z values array (before any transform)."""
+        ...
+
+    @property
+    def raw_intensity(self) -> npt.NDArray[Union[np.float32, np.float64]]:
+        """Raw intensity values array (before any transform)."""
+        ...
+
     @property
     def mz(self) -> npt.NDArray[Union[np.float32, np.float64]]:
-        """m/z values array."""
+        """m/z values array (after transform, if set)."""
         ...
-    
+
     @property
     def intensity(self) -> npt.NDArray[Union[np.float32, np.float64]]:
-        """Intensity values array."""
+        """Intensity values array (after transform, if set)."""
         ...
-    
+
     @property
     def peaks(self) -> npt.NDArray[Union[np.float32, np.float64]]:
-        """Combined m/z and intensity as 2D array."""
+        """Combined m/z and intensity as 2D array (after transform, if set)."""
         ...
 
 class Spectra:
     """
     Collection of spectra with lazy loading and iteration support.
-    
+
     Allows indexing and iteration over all spectra in a file.
     """
-    
+
     def __init__(
         self,
         f: BaseFile,
         df: DataFormat,
         positions: Division
     ) -> None: ...
-    
+
     def __iter__(self) -> Iterator[Spectrum]: ...
-    
+
     def __next__(self) -> Spectrum: ...
-    
+
     def __getitem__(self, index: int) -> Spectrum: ...
-    
+
     def __len__(self) -> int: ...
+
+    def set_transform(self, transform: Optional[SpectrumTransform]) -> None:
+        """Set a transform function applied lazily to all spectra.
+
+        Parameters:
+            transform: A callable (SpectrumDict) -> SpectrumDict, or None to clear.
+        """
+        ...
+
+    def with_transform(self, transform: Optional[SpectrumTransform]) -> Spectra:
+        """Return a new Spectra with the given transform, without modifying this one.
+
+        Parameters:
+            transform: A callable (SpectrumDict) -> SpectrumDict, or None.
+
+        Returns:
+            A new Spectra instance with the transform set.
+        """
+        ...
 
 def get_num_threads() -> int:
     """
