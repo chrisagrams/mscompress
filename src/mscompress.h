@@ -53,6 +53,9 @@
 #define _mass_ 1000514
 #define _xml_ 1000513  // TODO: change this
 
+#define TARGET_MZ 0x01
+#define TARGET_INT 0x02
+
 #define _lossless_ 4700000
 #define _ZSTD_compression_ 4700001
 #define _cast_64_to_32_ 4700002
@@ -85,6 +88,16 @@ extern "C" {
 #endif
 
 extern int verbose;
+
+typedef struct {
+   const char* name;
+   int type;
+   int target;
+   const char* description;
+   float default_mz_scale;
+   float default_int_scale;
+   int experimental;
+} algo_info_t;
 
 typedef struct {
    int verbose;
@@ -575,6 +588,8 @@ typedef struct {
    Algo algo_fun;
 } algo_args;
 
+extern const algo_info_t algo_registry[];
+extern const int algo_registry_size;
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(const char* arg);
