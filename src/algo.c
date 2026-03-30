@@ -4,6 +4,25 @@
 #include "algos/algos.h"
 
 /*
+    @section Algorithm registry
+*/
+
+const algo_info_t algo_registry[] = {
+   {"cast",     _cast_64_to_32_,       TARGET_MZ,                "Cast 64-bit double to 32-bit float",            0,          0,    0},
+   {"cast16",   _cast_64_to_16_,       TARGET_MZ,                "Cast 64-bit double to 16-bit float",            11.801,     0,    0},
+   {"delta16",  _delta16_transform_,   TARGET_MZ,                "Delta encoding with 16-bit precision",          127.998,    0,    0},
+   {"delta24",  _delta24_transform_,   TARGET_MZ,                "Delta encoding with 24-bit precision",          65536,      0,    0},
+   {"delta32",  _delta32_transform_,   TARGET_MZ,                "Delta encoding with 32-bit precision",          262144.0,   0,    0},
+   {"bitpack",  _bitpack_,             TARGET_MZ,                "Bit packing transform",                         10000.0,    0,    0},
+   {"log",      _log2_transform_,      TARGET_INT,               "Log2 transform",                                0,          72.0, 0},
+   {"vbr",      _vbr_,                 TARGET_MZ | TARGET_INT,   "Variable bit rate encoding",                    0.1,        1.0,  0},
+   {"vdelta16", _vdelta16_transform_,  TARGET_MZ,                "Variable delta encoding 16-bit (experimental)", 0,          0,    1},
+   {"vdelta24", _vdelta24_transform_,  TARGET_MZ,                "Variable delta encoding 24-bit (experimental)", 0,          0,    1},
+};
+
+const int algo_registry_size = sizeof(algo_registry) / sizeof(algo_registry[0]);
+
+/*
     @section Algo switch
 */
 
@@ -211,28 +230,10 @@ int get_algo_type(const char* arg) {
       error("get_algo_type: arg is NULL");
    if (strcmp(arg, "lossless") == 0 || *arg == '\0')
       return _lossless_;
-   else if (strcmp(arg, "log") == 0)
-      return _log2_transform_;
-   else if (strcmp(arg, "cast") == 0)
-      return _cast_64_to_32_;
-   else if (strcmp(arg, "cast16") == 0)
-      return _cast_64_to_16_;
-   else if (strcmp(arg, "delta16") == 0)
-      return _delta16_transform_;
-   else if (strcmp(arg, "delta24") == 0)
-      return _delta24_transform_;
-   else if (strcmp(arg, "delta32") == 0)
-      return _delta32_transform_;
-   else if (strcmp(arg, "vdelta16") == 0)
-      return _vdelta16_transform_;
-   else if (strcmp(arg, "vdelta24") == 0)
-      return _vdelta24_transform_;
-   else if (strcmp(arg, "vbr") == 0)
-      return _vbr_;
-   else if (strcmp(arg, "bitpack") == 0)
-      return _bitpack_;
-   else {
-      error("get_algo_type: Unknown compression algorithm");
-      return -1;
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(arg, algo_registry[i].name) == 0)
+         return algo_registry[i].type;
    }
+   error("get_algo_type: Unknown compression algorithm");
+   return -1;
 }
