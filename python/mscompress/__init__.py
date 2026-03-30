@@ -18,6 +18,7 @@ from ._core import (
 )
 
 from .utils import read
+from .types import SpectrumDict, SpectrumTransform
 
 from .metadata import (
     # Core abstractions
@@ -72,6 +73,9 @@ __all__ = [
     "__version__",
     # Utility functions
     "read",
+    # Transform types
+    "SpectrumDict",
+    "SpectrumTransform",
     # Metadata abstractions
     "MetadataBuilder",
     "FieldDefinition",

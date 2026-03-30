@@ -1,8 +1,41 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from enum import Enum
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+
+
+class SpectrumDict:
+    """TypedDict-like specification for the dict passed to spectrum transforms.
+
+    Keys:
+        mz: NDArray[np.float64] — raw m/z values
+        intensity: NDArray[np.float64] — raw intensity values
+    """
+    __slots__ = ()
+
+    # Provided for documentation; actual dicts are plain dicts at runtime.
+    mz: NDArray[np.float64]
+    intensity: NDArray[np.float64]
+
+
+class SpectrumTransform:
+    """Protocol-style base describing the callable signature for transforms.
+
+    A spectrum transform is any callable with the signature::
+
+        (dict with keys "mz" and "intensity") -> dict with keys "mz" and "intensity"
+
+    You do **not** need to subclass this; any callable matching the signature works.
+    """
+    __slots__ = ()
+
+    def __call__(self, data: dict) -> dict:
+        raise NotImplementedError
 
 
 class AnnotationFormat(Enum):

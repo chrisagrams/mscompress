@@ -1437,6 +1437,7 @@ cdef class Spectra:
     cdef object _cache  # Store computed spectra
     cdef int _index
     cdef size_t length
+    cdef object _transform
 
     def __init__(self, BaseFile f, DataFormat df, Division positions):
         self._f = f
@@ -1445,6 +1446,7 @@ cdef class Spectra:
         self.length = self._df.source_total_spec
         self._cache = [None] * self.length  # Initialize cache
         self._index = 0
+        self._transform = None
     
     def __iter__(self):
         self._index = 0  # Reset index for new iteration
@@ -1467,6 +1469,31 @@ cdef class Spectra:
         
         return self._cache[index]
     
+    def set_transform(self, transform):
+        """Set a transform function applied lazily to each spectrum's data.
+
+        Parameters
+        ----------
+        transform : callable
+            ``({"mz": ndarray, "intensity": ndarray}) -> {"mz": ndarray, "intensity": ndarray}``
+        """
+        if transform is not None and not callable(transform):
+            raise TypeError("transform must be callable or None")
+        self._transform = transform
+        # Invalidate cached spectra so they pick up the new transform
+        self._cache = [None] * self.length
+
+    def with_transform(self, transform):
+        """Return a *new* Spectra sharing the same file but with *transform* set.
+
+        The original Spectra is not modified.
+        """
+        if transform is not None and not callable(transform):
+            raise TypeError("transform must be callable or None")
+        new = Spectra(self._f, self._df, self._positions)
+        new._transform = transform
+        return new
+
     cdef Spectrum _compute_spectrum(self, size_t index):
         if self._positions.ret_times is not None:
             retention_time = self._positions.ret_times[index]
@@ -1477,7 +1504,8 @@ cdef class Spectra:
             scan=self._positions.scans[index],
             ms_level=self._positions.ms_levels[index],
             retention_time=retention_time,
-            file=self._f
+            file=self._f,
+            transform=self._transform,
         )
 
     def __len__(self) -> int:
@@ -1504,8 +1532,10 @@ cdef class Spectrum:
         object _mz
         object _intensity
         object _xml
+        object _transform
+        bint _transformed
 
-    def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file):
+    def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file, transform=None):
         self.index = index
         self.scan = scan
         self.ms_level = ms_level
@@ -1514,6 +1544,8 @@ cdef class Spectrum:
         self._mz = None
         self._intensity = None
         self._xml = None
+        self._transform = transform
+        self._transformed = False
         
     def __repr__(self):
         return f"Spectrum(index={self.index}, scan={self.scan}, ms_level={self.ms_level}, retention_time={self.retention_time})"
@@ -1532,16 +1564,14 @@ cdef class Spectrum:
                 self._xml = self._file.get_xml(self.index)
             return self._xml
 
-    property size: 
+    property size:
         def __get__(self):
-            if self._mz is None:
-                self._mz = self._file.get_mz_binary(self.index)
-            return len(self._mz)
-    
+            return len(self.raw_mz)
+
     property ms_level:
         def __get__(self):
             return self.ms_level
-    
+
     property retention_time:
         def __get__(self):
             if math.isnan(self._retention_time): # If the ms level wasn't derived from preprocessing step, find it
@@ -1560,17 +1590,43 @@ cdef class Spectrum:
             else:
                 return self._retention_time
 
-    property mz:
+    property raw_mz:
         def __get__(self):
             if self._mz is None:
                 self._mz = self._file.get_mz_binary(self.index)
             return self._mz
 
-    property intensity:
+    property raw_intensity:
         def __get__(self):
             if self._intensity is None:
                 self._intensity = self._file.get_inten_binary(self.index)
             return self._intensity
+
+    cdef _apply_transform(self):
+        if self._transformed:
+            return
+        if self._transform is not None:
+            # Ensure raw data is loaded
+            raw_mz = self.raw_mz
+            raw_intensity = self.raw_intensity
+            result = self._transform({"mz": raw_mz, "intensity": raw_intensity})
+            self._mz = result["mz"]
+            self._intensity = result["intensity"]
+        self._transformed = True
+
+    property mz:
+        def __get__(self):
+            if self._transform is not None:
+                self._apply_transform()
+                return self._mz
+            return self.raw_mz
+
+    property intensity:
+        def __get__(self):
+            if self._transform is not None:
+                self._apply_transform()
+                return self._intensity
+            return self.raw_intensity
 
     property peaks:
         def __get__(self):
