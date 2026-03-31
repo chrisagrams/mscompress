@@ -46,6 +46,8 @@ void init_args(Arguments* args) {
    args->target_inten_format = _ZSTD_compression_;  // default
 
    args->zstd_compression_level = 3;  // default
+
+   args->json_output = 0;
 }
 
 /**
@@ -107,6 +109,25 @@ void print_algorithms(void) {
    }
    printf("\nUse -z/--mz-lossy or -i/--int-lossy to enable an algorithm.\n");
    printf("Use --mz-scale-factor or --int-scale-factor to override the default.\n");
+}
+
+/**
+* @brief Prints available lossy transformation algorithms as a JSON array.
+*/
+void print_algorithms_json(void) {
+   printf("[\n");
+   for (int i = 0; i < algo_registry_size; i++) {
+      const algo_info_t* a = &algo_registry[i];
+      printf("  {\n");
+      printf("    \"name\": \"%s\",\n", a->name);
+      printf("    \"target\": \"%s\",\n", target_str(a->target));
+      printf("    \"description\": \"%s\",\n", a->description);
+      printf("    \"default_mz_scale\": %g,\n", (double)a->default_mz_scale);
+      printf("    \"default_int_scale\": %g,\n", (double)a->default_int_scale);
+      printf("    \"experimental\": %s\n", a->experimental ? "true" : "false");
+      printf("  }%s\n", (i < algo_registry_size - 1) ? "," : "");
+   }
+   printf("]\n");
 }
 
 /**
