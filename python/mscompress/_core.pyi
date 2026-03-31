@@ -1,25 +1,27 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-from typing import Union, Iterator, Optional, Dict, Any, Callable
+from typing import Union, Iterator, Optional, Dict, Any
 from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
 
-from .types import SpectrumTransform
+from .types import AlgorithmInfo, SpectrumTransform
 
 class RuntimeArguments:
     """Runtime configuration arguments for compression/decompression operations."""
-    
+
     threads: int
     blocksize: int
+    mz_lossy: str
+    int_lossy: str
     mz_scale_factor: int
     int_scale_factor: int
     target_xml_format: int
     target_mz_format: int
     target_inten_format: int
     zstd_compression_level: int
-    
+
     def __init__(self) -> None: ...
 
 class DataFormat:
@@ -511,14 +513,18 @@ def get_num_threads() -> int:
 def get_filesize(path: Union[str, bytes]) -> int:
     """
     Get the size of a file in bytes.
-    
+
     Parameters:
         path: Path to file (string or bytes).
-        
+
     Returns:
         Size of the file in bytes.
-        
+
     Raises:
         FileNotFoundError: If file does not exist.
     """
+    ...
+
+def list_algorithms() -> list[AlgorithmInfo]:
+    """Return a list of available lossy algorithm descriptors from the C registry."""
     ...

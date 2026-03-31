@@ -100,11 +100,15 @@ def _pipe_stream(c_func, args, chunk_size=1_048_576):
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
+    cdef bytes _mz_lossy_buf
+    cdef bytes _int_lossy_buf
 
     def __init__(self):
         self._arguments.threads = _get_num_threads()
-        self._arguments.mz_lossy = "lossless"
-        self._arguments.int_lossy = "lossless"
+        self._mz_lossy_buf = b"lossless"
+        self._int_lossy_buf = b"lossless"
+        self._arguments.mz_lossy = self._mz_lossy_buf
+        self._arguments.int_lossy = self._int_lossy_buf
         self._arguments.blocksize = <long>1e+8
         self._arguments.mz_scale_factor = 1000
         self._arguments.int_scale_factor = 0
@@ -164,11 +168,93 @@ cdef class RuntimeArguments:
         def __set__(self, value):
             self._arguments.target_inten_format = value
     
+    property mz_lossy:
+        def __get__(self):
+            return self._arguments.mz_lossy.decode('utf-8') if isinstance(self._arguments.mz_lossy, bytes) else self._arguments.mz_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_MZ):
+                        valid = True
+                        if algo_registry[i].default_mz_scale != 0:
+                            self._arguments.mz_scale_factor = algo_registry[i].default_mz_scale
+                        break
+                if not valid:
+                    mz_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_MZ:
+                            mz_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown m/z lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in mz_algos)}"
+                    )
+            self._mz_lossy_buf = value_bytes
+            self._arguments.mz_lossy = self._mz_lossy_buf
+
+    property int_lossy:
+        def __get__(self):
+            return self._arguments.int_lossy.decode('utf-8') if isinstance(self._arguments.int_lossy, bytes) else self._arguments.int_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_INT):
+                        valid = True
+                        if algo_registry[i].default_int_scale != 0:
+                            self._arguments.int_scale_factor = algo_registry[i].default_int_scale
+                        break
+                if not valid:
+                    int_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_INT:
+                            int_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown intensity lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in int_algos)}"
+                    )
+            self._int_lossy_buf = value_bytes
+            self._arguments.int_lossy = self._int_lossy_buf
+
     property zstd_compression_level:
         def __get__(self):
             return self._arguments.zstd_compression_level
         def __set__(self, value):
             self._arguments.zstd_compression_level = value
+
+
+def list_algorithms():
+    """Return a list of available lossy algorithm descriptors from the C registry.
+
+    Each entry is a dict with keys: name, target, description,
+    default_mz_scale, default_int_scale, experimental.
+    """
+    result = []
+    for i in range(algo_registry_size):
+        targets = []
+        if algo_registry[i].target & TARGET_MZ:
+            targets.append("mz")
+        if algo_registry[i].target & TARGET_INT:
+            targets.append("intensity")
+        result.append({
+            "name": algo_registry[i].name.decode('utf-8'),
+            "target": targets,
+            "description": algo_registry[i].description.decode('utf-8'),
+            "default_mz_scale": algo_registry[i].default_mz_scale,
+            "default_int_scale": algo_registry[i].default_int_scale,
+            "experimental": bool(algo_registry[i].experimental),
+        })
+    return result
 
 
 cdef class DataBlock:
@@ -359,8 +445,16 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
+    def _validate_scale_factors(self):
+        cdef char err_buf[512]
+        err_buf[0] = b'\0'
+        if _validate_args(self._arguments.get_ptr(), err_buf, sizeof(err_buf)) != 0:
+            msg = err_buf.decode('utf-8').strip() if err_buf[0] != b'\0' else ""
+            raise ValueError(msg or "Invalid argument configuration.")
+
     def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)
+        self._validate_scale_factors()
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
         cdef int rv = _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
@@ -373,6 +467,7 @@ cdef class MZMLFile(BaseFile):
 
     def _compress_to_fd(self, int write_fd):
         """Internal helper: run compression pipeline writing to the given fd."""
+        self._validate_scale_factors()
         cdef int rv
         cdef char* mapping = <char*> self._mapping
         cdef size_t filesize = self.filesize

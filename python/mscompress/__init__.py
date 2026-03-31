@@ -15,6 +15,7 @@ from ._core import (
     Spectra,
     get_num_threads,
     get_filesize,
+    list_algorithms,
 )
 
 from .utils import read
@@ -40,6 +41,7 @@ from .metadata import (
 )
 
 from .types import (
+    AlgorithmInfo,
     SpectrumDict,
     SpectrumTransform,
 )
@@ -63,6 +65,7 @@ from .annotations import (
 
 __all__ = [
     # Core types
+    "AlgorithmInfo",
     "RuntimeArguments",
     "DataFormat",
     "DataPositions",
@@ -76,6 +79,7 @@ __all__ = [
     "SpectrumTransform",
     "get_num_threads",
     "get_filesize",
+    "list_algorithms",
     "__version__",
     # Utility functions
     "read",
