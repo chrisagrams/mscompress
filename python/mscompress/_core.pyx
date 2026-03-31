@@ -164,11 +164,87 @@ cdef class RuntimeArguments:
         def __set__(self, value):
             self._arguments.target_inten_format = value
     
+    property mz_lossy:
+        def __get__(self):
+            return self._arguments.mz_lossy.decode('utf-8') if isinstance(self._arguments.mz_lossy, bytes) else self._arguments.mz_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_MZ):
+                        valid = True
+                        break
+                if not valid:
+                    mz_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_MZ:
+                            mz_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown m/z lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in mz_algos)}"
+                    )
+            self._arguments.mz_lossy = value_bytes
+
+    property int_lossy:
+        def __get__(self):
+            return self._arguments.int_lossy.decode('utf-8') if isinstance(self._arguments.int_lossy, bytes) else self._arguments.int_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_INT):
+                        valid = True
+                        break
+                if not valid:
+                    int_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_INT:
+                            int_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown intensity lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in int_algos)}"
+                    )
+            self._arguments.int_lossy = value_bytes
+
     property zstd_compression_level:
         def __get__(self):
             return self._arguments.zstd_compression_level
         def __set__(self, value):
             self._arguments.zstd_compression_level = value
+
+
+def list_algorithms():
+    """Return a list of available lossy algorithm descriptors from the C registry.
+
+    Each entry is a dict with keys: name, target, description,
+    default_mz_scale, default_int_scale, experimental.
+    """
+    result = []
+    for i in range(algo_registry_size):
+        targets = []
+        if algo_registry[i].target & TARGET_MZ:
+            targets.append("mz")
+        if algo_registry[i].target & TARGET_INT:
+            targets.append("intensity")
+        result.append({
+            "name": algo_registry[i].name.decode('utf-8'),
+            "target": targets,
+            "description": algo_registry[i].description.decode('utf-8'),
+            "default_mz_scale": algo_registry[i].default_mz_scale,
+            "default_int_scale": algo_registry[i].default_int_scale,
+            "experimental": bool(algo_registry[i].experimental),
+        })
+    return result
 
 
 cdef class DataBlock:

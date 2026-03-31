@@ -15,6 +15,7 @@ from ._core import (
     Spectra,
     get_num_threads,
     get_filesize,
+    list_algorithms,
 )
 
 from .utils import read
@@ -69,6 +70,7 @@ __all__ = [
     "Spectra",
     "get_num_threads",
     "get_filesize",
+    "list_algorithms",
     "__version__",
     # Utility functions
     "read",

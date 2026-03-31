@@ -8,16 +8,18 @@ import numpy.typing as npt
 
 class RuntimeArguments:
     """Runtime configuration arguments for compression/decompression operations."""
-    
+
     threads: int
     blocksize: int
+    mz_lossy: str
+    int_lossy: str
     mz_scale_factor: int
     int_scale_factor: int
     target_xml_format: int
     target_mz_format: int
     target_inten_format: int
     zstd_compression_level: int
-    
+
     def __init__(self) -> None: ...
 
 class DataFormat:
@@ -479,14 +481,22 @@ def get_num_threads() -> int:
 def get_filesize(path: Union[str, bytes]) -> int:
     """
     Get the size of a file in bytes.
-    
+
     Parameters:
         path: Path to file (string or bytes).
-        
+
     Returns:
         Size of the file in bytes.
-        
+
     Raises:
         FileNotFoundError: If file does not exist.
+    """
+    ...
+
+def list_algorithms() -> list[Dict[str, Any]]:
+    """Return a list of available lossy algorithm descriptors from the C registry.
+
+    Each entry is a dict with keys: name, target, description,
+    default_mz_scale, default_int_scale, experimental.
     """
     ...

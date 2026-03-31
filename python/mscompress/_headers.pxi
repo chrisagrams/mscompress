@@ -182,6 +182,21 @@ cdef extern from "../src/mscompress.h":
     int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd) nogil
     void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd) nogil
 
+    int TARGET_MZ
+    int TARGET_INT
+
+    ctypedef struct algo_info_t:
+        const char* name
+        int type
+        int target
+        const char* description
+        float default_mz_scale
+        float default_int_scale
+        int experimental
+
+    const algo_info_t algo_registry[]
+    const int algo_registry_size
+
     # Error/warning callback functions
     ctypedef void (*error_callback_t)(const char* message)
     ctypedef void (*warning_callback_t)(const char* message)
