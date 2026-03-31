@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-from typing import Union, Iterator, Optional, Dict, Any
+from typing import Union, Iterator, Optional, Dict, Any, TypedDict, Literal
 from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
@@ -493,10 +493,15 @@ def get_filesize(path: Union[str, bytes]) -> int:
     """
     ...
 
-def list_algorithms() -> list[Dict[str, Any]]:
-    """Return a list of available lossy algorithm descriptors from the C registry.
+class AlgorithmInfo(TypedDict):
+    """Descriptor for a lossy transformation algorithm."""
+    name: str
+    target: list[Literal["mz", "intensity"]]
+    description: str
+    default_mz_scale: float
+    default_int_scale: float
+    experimental: bool
 
-    Each entry is a dict with keys: name, target, description,
-    default_mz_scale, default_int_scale, experimental.
-    """
+def list_algorithms() -> list[AlgorithmInfo]:
+    """Return a list of available lossy algorithm descriptors from the C registry."""
     ...
