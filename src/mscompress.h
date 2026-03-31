@@ -122,6 +122,8 @@ typedef struct {
    int target_inten_format;
 
    int zstd_compression_level;
+
+   int json_output;
 } Arguments;
 
 typedef struct {
@@ -307,6 +309,7 @@ int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
 void print_algorithms(void);
+void print_algorithms_json(void);
 int set_compress_runtime_variables(Arguments* args, data_format_t* df);
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
@@ -326,6 +329,7 @@ data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 void print_footer_csv(footer_t* footer);
+void print_footer_json(footer_t* footer);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
                 char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);

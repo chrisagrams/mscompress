@@ -9,6 +9,31 @@ add_test(NAME HelpTest COMMAND mscompress --help)
 
 add_test(NAME ListAlgorithmsTest COMMAND mscompress --list-algorithms)
 
+# --json flag tests
+add_test(NAME JsonVersionTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;--version"
+    -DEXPECTED_PATTERN=version
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
+
+add_test(NAME JsonListAlgorithmsTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;--list-algorithms"
+    -DEXPECTED_PATTERN=name
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
+
+add_test(NAME JsonDescribeTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;-d"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.msz
+    -DEXPECTED_PATTERN=num_spectra
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
 
 # Test compression and decompression using the run_test.cmake script
 add_test(NAME CompressTest
