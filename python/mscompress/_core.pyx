@@ -32,14 +32,10 @@ def _install_mscompress_warning_formatter():
 _install_mscompress_warning_formatter()
 # `with gil` is required because these callbacks may be invoked from C code
 # running without the GIL (e.g., streaming methods release the GIL for I/O).
-_last_error_message = None
-
 cdef void _python_error_handler(const char* message) noexcept with gil:
     """Callback function to handle C errors in Python"""
-    global _last_error_message
     msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    _last_error_message = msg.strip()
-    warnings.warn(_last_error_message, RuntimeWarning, stacklevel=2)
+    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
 
 cdef void _python_warning_handler(const char* message) noexcept with gil:
     """Callback function to handle C warnings in Python"""
@@ -450,10 +446,11 @@ cdef class MZMLFile(BaseFile):
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
     def _validate_scale_factors(self):
-        global _last_error_message
-        _last_error_message = None
-        if _validate_args(self._arguments.get_ptr()) != 0:
-            raise ValueError(_last_error_message or "Invalid argument configuration.")
+        cdef char err_buf[512]
+        err_buf[0] = b'\0'
+        if _validate_args(self._arguments.get_ptr(), err_buf, sizeof(err_buf)) != 0:
+            msg = err_buf.decode('utf-8').strip() if err_buf[0] != b'\0' else ""
+            raise ValueError(msg or "Invalid argument configuration.")
 
     def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)

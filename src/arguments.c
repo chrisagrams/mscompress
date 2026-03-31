@@ -234,9 +234,10 @@ int set_int_scale_factor(Arguments* args, const char* scale_factor_str) {
  * @param args A pointer to the `Arguments` struct to validate.
  * @return Returns 0 if valid, 1 if invalid (with error message via error callback).
  */
-int validate_args(Arguments* args) {
+int validate_args(Arguments* args, char* err_buf, size_t err_buf_size) {
    if (args == NULL) {
-      error("validate_args: NULL arguments\n");
+      if (err_buf && err_buf_size > 0)
+         snprintf(err_buf, err_buf_size, "validate_args: NULL arguments");
       return 1;
    }
 
@@ -244,8 +245,10 @@ int validate_args(Arguments* args) {
       if (strcmp(args->mz_lossy, algo_registry[i].name) == 0 &&
           (algo_registry[i].target & TARGET_MZ)) {
          if (algo_registry[i].default_mz_scale != 0 && args->mz_scale_factor == 0) {
-            error("mz_scale_factor cannot be 0 for algorithm '%s' (default: %g)\n",
-                  args->mz_lossy, (double)algo_registry[i].default_mz_scale);
+            if (err_buf && err_buf_size > 0)
+               snprintf(err_buf, err_buf_size,
+                        "mz_scale_factor cannot be 0 for algorithm '%s' (default: %g)",
+                        args->mz_lossy, (double)algo_registry[i].default_mz_scale);
             return 1;
          }
          break;
@@ -256,8 +259,10 @@ int validate_args(Arguments* args) {
       if (strcmp(args->int_lossy, algo_registry[i].name) == 0 &&
           (algo_registry[i].target & TARGET_INT)) {
          if (algo_registry[i].default_int_scale != 0 && args->int_scale_factor == 0) {
-            error("int_scale_factor cannot be 0 for algorithm '%s' (default: %g)\n",
-                  args->int_lossy, (double)algo_registry[i].default_int_scale);
+            if (err_buf && err_buf_size > 0)
+               snprintf(err_buf, err_buf_size,
+                        "int_scale_factor cannot be 0 for algorithm '%s' (default: %g)",
+                        args->int_lossy, (double)algo_registry[i].default_int_scale);
             return 1;
          }
          break;

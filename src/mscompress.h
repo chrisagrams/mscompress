@@ -308,7 +308,7 @@ int set_mz_lossy(Arguments* args, const char* mz_lossy);
 int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
-int validate_args(Arguments* args);
+int validate_args(Arguments* args, char* err_buf, size_t err_buf_size);
 void print_algorithms(void);
 void print_algorithms_json(void);
 int set_compress_runtime_variables(Arguments* args, data_format_t* df);
