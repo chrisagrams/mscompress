@@ -1,12 +1,12 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-from typing import Union, Iterator, Optional, Dict, Any, TypedDict, Literal, Callable
+from typing import Union, Iterator, Optional, Dict, Any
 from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
 
-from .types import SpectrumTransform
+from .types import AlgorithmInfo, SpectrumTransform
 
 class RuntimeArguments:
     """Runtime configuration arguments for compression/decompression operations."""
@@ -524,15 +524,6 @@ def get_filesize(path: Union[str, bytes]) -> int:
         FileNotFoundError: If file does not exist.
     """
     ...
-
-class AlgorithmInfo(TypedDict):
-    """Descriptor for a lossy transformation algorithm."""
-    name: str
-    target: list[Literal["mz", "intensity"]]
-    description: str
-    default_mz_scale: float
-    default_int_scale: float
-    experimental: bool
 
 def list_algorithms() -> list[AlgorithmInfo]:
     """Return a list of available lossy algorithm descriptors from the C registry."""

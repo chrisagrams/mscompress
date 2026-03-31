@@ -41,6 +41,7 @@ from .metadata import (
 )
 
 from .types import (
+    AlgorithmInfo,
     SpectrumDict,
     SpectrumTransform,
 )
@@ -64,6 +65,7 @@ from .annotations import (
 
 __all__ = [
     # Core types
+    "AlgorithmInfo",
     "RuntimeArguments",
     "DataFormat",
     "DataPositions",

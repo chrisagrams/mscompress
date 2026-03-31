@@ -6,7 +6,19 @@ from enum import Enum
 
 import numpy as np
 import numpy.typing as npt
+from typing import Literal
 from typing_extensions import TypedDict
+
+
+class AlgorithmInfo(TypedDict):
+    """Descriptor for a lossy transformation algorithm."""
+
+    name: str
+    target: list[Literal["mz", "intensity"]]
+    description: str
+    default_mz_scale: float
+    default_int_scale: float
+    experimental: bool
 
 
 class SpectrumDict(TypedDict):
