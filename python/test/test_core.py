@@ -1,7 +1,8 @@
 import os
 import re
 import pytest
-from mscompress import get_num_threads, get_filesize, list_algorithms, read
+import numpy as np
+from mscompress import get_num_threads, get_filesize, list_algorithms, read, MSZFile
 
 def test_get_num_threads():
     assert get_num_threads() == os.cpu_count()
@@ -53,6 +54,46 @@ def test_list_algorithms_known_entries():
     assert algos["log"]["target"] == ["intensity"]
     assert "vbr" in algos
     assert set(algos["vbr"]["target"]) == {"mz", "intensity"}
+
+
+def _algo_target_params():
+    """Generate pytest params for each (algorithm, target) pair."""
+    for algo in list_algorithms():
+        for target in algo["target"]:
+            test_id = f"{algo['name']}-{target}"
+            yield pytest.param(algo, target, id=test_id)
+
+@pytest.mark.parametrize("algo,target", _algo_target_params())
+def test_algorithm_compress_decompress(algo, target, mzml_file_path, tmp_path):
+    """Compress with each registered lossy algorithm per target, decompress, and verify spectra."""
+    name = algo["name"]
+
+    msz_path = tmp_path / f"{name}_{target}.msz"
+    out_path = tmp_path / f"{name}_{target}.mzML"
+
+    # Compress with lossy algorithm on one target
+    with read(mzml_file_path) as mzml:
+        if target == "mz":
+            mzml.arguments.mz_lossy = name
+        else:
+            mzml.arguments.int_lossy = name
+        msz = mzml.compress(str(msz_path))
+        assert isinstance(msz, MSZFile)
+        assert os.path.exists(msz_path)
+
+    # Decompress back to mzML
+    with read(str(msz_path)) as msz:
+        msz.decompress(str(out_path))
+        assert os.path.exists(out_path)
+
+    # Verify spectra are readable and non-empty
+    with read(str(out_path)) as mzml_check:
+        spectra = mzml_check.spectra
+        assert len(spectra) > 0
+        s = spectra[0]
+        assert len(s.mz) > 0
+        assert len(s.intensity) > 0
+        assert len(s.mz) == len(s.intensity)
 
 
 def test_read_nonexistent_file():

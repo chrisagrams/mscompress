@@ -32,10 +32,14 @@ def _install_mscompress_warning_formatter():
 _install_mscompress_warning_formatter()
 # `with gil` is required because these callbacks may be invoked from C code
 # running without the GIL (e.g., streaming methods release the GIL for I/O).
+_last_error_message = None
+
 cdef void _python_error_handler(const char* message) noexcept with gil:
     """Callback function to handle C errors in Python"""
+    global _last_error_message
     msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+    _last_error_message = msg.strip()
+    warnings.warn(_last_error_message, RuntimeWarning, stacklevel=2)
 
 cdef void _python_warning_handler(const char* message) noexcept with gil:
     """Callback function to handle C warnings in Python"""
@@ -100,11 +104,15 @@ def _pipe_stream(c_func, args, chunk_size=1_048_576):
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
+    cdef bytes _mz_lossy_buf
+    cdef bytes _int_lossy_buf
 
     def __init__(self):
         self._arguments.threads = _get_num_threads()
-        self._arguments.mz_lossy = "lossless"
-        self._arguments.int_lossy = "lossless"
+        self._mz_lossy_buf = b"lossless"
+        self._int_lossy_buf = b"lossless"
+        self._arguments.mz_lossy = self._mz_lossy_buf
+        self._arguments.int_lossy = self._int_lossy_buf
         self._arguments.blocksize = <long>1e+8
         self._arguments.mz_scale_factor = 1000
         self._arguments.int_scale_factor = 0
@@ -178,6 +186,8 @@ cdef class RuntimeArguments:
                 for i in range(algo_registry_size):
                     if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_MZ):
                         valid = True
+                        if algo_registry[i].default_mz_scale != 0:
+                            self._arguments.mz_scale_factor = algo_registry[i].default_mz_scale
                         break
                 if not valid:
                     mz_algos = []
@@ -188,7 +198,8 @@ cdef class RuntimeArguments:
                         f"Unknown m/z lossy algorithm '{value_str}'. "
                         f"Valid options: 'lossless', {', '.join(repr(a) for a in mz_algos)}"
                     )
-            self._arguments.mz_lossy = value_bytes
+            self._mz_lossy_buf = value_bytes
+            self._arguments.mz_lossy = self._mz_lossy_buf
 
     property int_lossy:
         def __get__(self):
@@ -204,6 +215,8 @@ cdef class RuntimeArguments:
                 for i in range(algo_registry_size):
                     if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_INT):
                         valid = True
+                        if algo_registry[i].default_int_scale != 0:
+                            self._arguments.int_scale_factor = algo_registry[i].default_int_scale
                         break
                 if not valid:
                     int_algos = []
@@ -214,7 +227,8 @@ cdef class RuntimeArguments:
                         f"Unknown intensity lossy algorithm '{value_str}'. "
                         f"Valid options: 'lossless', {', '.join(repr(a) for a in int_algos)}"
                     )
-            self._arguments.int_lossy = value_bytes
+            self._int_lossy_buf = value_bytes
+            self._arguments.int_lossy = self._int_lossy_buf
 
     property zstd_compression_level:
         def __get__(self):
@@ -435,8 +449,15 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
+    def _validate_scale_factors(self):
+        global _last_error_message
+        _last_error_message = None
+        if _validate_args(self._arguments.get_ptr()) != 0:
+            raise ValueError(_last_error_message or "Invalid argument configuration.")
+
     def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)
+        self._validate_scale_factors()
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
         cdef int rv = _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
@@ -449,6 +470,7 @@ cdef class MZMLFile(BaseFile):
 
     def _compress_to_fd(self, int write_fd):
         """Internal helper: run compression pipeline writing to the given fd."""
+        self._validate_scale_factors()
         cdef int rv
         cdef char* mapping = <char*> self._mapping
         cdef size_t filesize = self.filesize

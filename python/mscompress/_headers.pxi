@@ -197,6 +197,8 @@ cdef extern from "../src/mscompress.h":
     const algo_info_t algo_registry[]
     const int algo_registry_size
 
+    int _validate_args "validate_args"(Arguments* args)
+
     # Error/warning callback functions
     ctypedef void (*error_callback_t)(const char* message)
     ctypedef void (*warning_callback_t)(const char* message)

@@ -230,6 +230,44 @@ int set_int_scale_factor(Arguments* args, const char* scale_factor_str) {
 }
 
 /**
+ * @brief Validates that scale factors are non-zero for algorithms that require them.
+ * @param args A pointer to the `Arguments` struct to validate.
+ * @return Returns 0 if valid, 1 if invalid (with error message via error callback).
+ */
+int validate_args(Arguments* args) {
+   if (args == NULL) {
+      error("validate_args: NULL arguments\n");
+      return 1;
+   }
+
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(args->mz_lossy, algo_registry[i].name) == 0 &&
+          (algo_registry[i].target & TARGET_MZ)) {
+         if (algo_registry[i].default_mz_scale != 0 && args->mz_scale_factor == 0) {
+            error("mz_scale_factor cannot be 0 for algorithm '%s' (default: %g)\n",
+                  args->mz_lossy, (double)algo_registry[i].default_mz_scale);
+            return 1;
+         }
+         break;
+      }
+   }
+
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(args->int_lossy, algo_registry[i].name) == 0 &&
+          (algo_registry[i].target & TARGET_INT)) {
+         if (algo_registry[i].default_int_scale != 0 && args->int_scale_factor == 0) {
+            error("int_scale_factor cannot be 0 for algorithm '%s' (default: %g)\n",
+                  args->int_lossy, (double)algo_registry[i].default_int_scale);
+            return 1;
+         }
+         break;
+      }
+   }
+
+   return 0;
+}
+
+/**
  * @brief Sets the compression runtime variables for the given arguments and data format.
  * @param args A pointer to the `Arguments` struct.
  * @param df A pointer to the `data_format_t` struct.
