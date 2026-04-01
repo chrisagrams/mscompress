@@ -1,0 +1,52 @@
+services:
+  # Step 1: Download reference data (mzML + FASTA)
+  download:
+    build:
+      context: ./download
+    volumes:
+      - ./data:/data
+
+  # Step 2: Generate scheme combinations from algorithm registry
+  generate-schemes:
+    build:
+      context: ../..
+      dockerfile: benchmark/lossy/generate-schemes/Dockerfile
+    volumes:
+      - ./results:/results
+    depends_on:
+      download:
+        condition: service_completed_successfully
+
+  # Step 3: Compress + decompress each scheme
+  compress:
+    build:
+      context: ../..
+      dockerfile: benchmark/lossy/compress/Dockerfile
+    volumes:
+      - ./data:/data:ro
+      - ./results:/results
+    depends_on:
+      generate-schemes:
+        condition: service_completed_successfully
+
+  # Step 4: Run MSFragger + Percolator on original + each scheme
+  search:
+    build:
+      context: ./search
+    volumes:
+      - ./data:/data:ro
+      - ./results:/results
+    depends_on:
+      compress:
+        condition: service_completed_successfully
+
+  # Step 5: Analyze results and produce plots
+  analysis:
+    build:
+      context: ./analysis
+    volumes:
+      - ./data:/data:ro
+      - ./results:/results
+    depends_on:
+      search:
+        condition: service_completed_successfully

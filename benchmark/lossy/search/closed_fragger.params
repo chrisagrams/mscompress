@@ -1,0 +1,81 @@
+# MSFragger closed search parameters for lossy compression benchmark
+
+database_name = /data/UP000005640_9606.fasta
+num_threads = 0
+
+# Precursor mass tolerance
+precursor_mass_lower = -20
+precursor_mass_upper = 20
+precursor_mass_units = 1            # 0=Da, 1=ppm
+precursor_true_tolerance = 20
+precursor_true_units = 1            # 0=Da, 1=ppm
+
+# Fragment mass tolerance
+fragment_mass_tolerance = 20
+fragment_mass_units = 1             # 0=Da, 1=ppm
+
+# Calibration and deisotoping
+calibrate_mass = 2                  # 0=OFF, 1=ON, 2=ON+optimize
+deisotope = 1
+
+# Digestion
+search_enzyme_name_1 = Trypsin
+search_enzyme_cut_1 = KR
+search_enzyme_nocut_1 = P
+search_enzyme_sense_1 = C           # C=C-terminal, N=N-terminal
+allowed_missed_cleavage_1 = 2
+search_enzyme_name_2 = null
+search_enzyme_cut_2 =
+search_enzyme_nocut_2 =
+search_enzyme_sense_2 = C
+
+# Peptide length and mass
+digest_min_length = 7
+digest_max_length = 50
+digest_mass_range = 500.0 5000.0
+
+# Ion series
+fragment_ion_series = b,y
+
+# Isotope error
+isotope_error = 0/1/2
+
+# Modifications
+# Static: carbamidomethylation on C
+add_C_cysteine = 57.02146
+
+# Variable modifications (max 7)
+# Oxidation on M
+variable_mod_01 = 15.9949 M 3
+# N-term acetylation
+variable_mod_02 = 42.0106 [^ 1
+
+# Output
+output_format = pepxml              # pepxml for Philosopher compatibility
+output_report_topN = 1
+output_max_expect = 50
+report_alternative_proteins = 1
+
+# Precursor charge range
+precursor_charge = 1 4
+override_charge = 0
+
+# Spectral processing
+minimum_peaks = 15
+use_topN_peaks = 150
+minimum_ratio = 0.0
+intensity_transform = 0            # 0=none, 1=sqrt
+
+# Masses
+mass_offsets = 0
+precursor_mass_mode = selected
+
+# Decoy
+decoy_prefix = rev_
+
+# Misc
+track_zero_topN = 0
+zero_bin_accept_expect = 0
+zero_bin_mult_expect = 1
+check_spectral_files = 1
+minimum_number_peaks = 15
