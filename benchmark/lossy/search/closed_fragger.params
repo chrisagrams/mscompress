@@ -1,6 +1,6 @@
 # MSFragger closed search parameters for lossy compression benchmark
 
-database_name = /data/UP000005640_9606.fasta
+database_name = /results/db/UP000005640_9606.fasta
 num_threads = 0
 
 # Precursor mass tolerance
@@ -51,7 +51,7 @@ variable_mod_01 = 15.9949 M 3
 variable_mod_02 = 42.0106 [^ 1
 
 # Output
-output_format = pepxml              # pepxml for Philosopher compatibility
+output_format = tsv_pin             # pin format for direct Percolator input
 output_report_topN = 1
 output_max_expect = 50
 report_alternative_proteins = 1

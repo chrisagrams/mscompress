@@ -30,12 +30,15 @@ services:
         condition: service_completed_successfully
 
   # Step 4: Run MSFragger + Percolator on original + each scheme
+  # MSFragger requires an academic license. Download the JAR from
+  # https://msfragger.nesvilab.org/ and place it in ./ext/ before running.
   search:
     build:
       context: ./search
     volumes:
       - ./data:/data:ro
       - ./results:/results
+      - ./ext:/ext:ro
     depends_on:
       compress:
         condition: service_completed_successfully

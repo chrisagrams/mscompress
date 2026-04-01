@@ -7,21 +7,66 @@ the uncompressed original, producing a diverging bar chart and summary TSV.
 import os
 import sys
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+
+
+# ---------------------------------------------------------------------------
+# Publication style setup (matches mscompress-dl-training conventions)
+# ---------------------------------------------------------------------------
+
+def _setup_style():
+    """Configure matplotlib for publication-quality output with serif fonts."""
+    mpl.rcParams.update({
+        # Font
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+        "mathtext.fontset": "stix",
+        "font.size": 10,
+        "axes.labelsize": 11,
+        "axes.titlesize": 12,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "legend.fontsize": 9,
+        # Lines / markers
+        "lines.linewidth": 1.5,
+        "lines.markersize": 6,
+        # Axes
+        "axes.linewidth": 0.8,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        # Ticks
+        "xtick.major.width": 0.8,
+        "ytick.major.width": 0.8,
+        "xtick.direction": "out",
+        "ytick.direction": "out",
+        # Legend
+        "legend.frameon": False,
+        # Saving
+        "savefig.dpi": 300,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.05,
+        "pdf.fonttype": 42,   # editable text in PDFs
+        "ps.fonttype": 42,
+    })
 
 RESULTS_DIR = "/results"
 PLOTS_DIR = os.path.join(RESULTS_DIR, "plots")
 BASELINE_LABEL = "original"
-PSM_FILENAME = "psm.tsv"
+PSM_FILENAME = "percolator-psms.txt"
 SKIP_DIRS = {"plots"}
 SCHEMES_FILE = os.path.join(RESULTS_DIR, "schemes.txt")
 
 
-def load_peptides(psm_tsv_path: str) -> set[str]:
-    """Load unique peptide sequences from a Philosopher psm.tsv file."""
+def load_peptides(psm_tsv_path: str, qvalue_threshold: float = 0.01) -> set[str]:
+    """Load unique peptide sequences from a Percolator PSM output file."""
     df = pd.read_csv(psm_tsv_path, sep="\t")
-    return set(df["Peptide"].unique())
+    df = df[df["q-value"] <= qvalue_threshold]
+    # Percolator peptide format: flanking.SEQUENCE.flanking — extract the core sequence.
+    peptides = df["peptide"].str.replace(r"^.*?\.(.*?)\..*$", r"\1", regex=True)
+    return set(peptides.unique())
 
 
 def get_file_size_mb(path: str) -> float | None:
@@ -124,44 +169,144 @@ def main() -> None:
     print(f"\nSummary saved to {summary_path}")
 
     # ── Plot ────────────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(12, 6))
+    _setup_style()
 
-    x = range(len(summary))
-    labels = summary["scheme"]
-    gained = summary["gained"]
-    lost = summary["lost"]
+    gained_vals = summary["gained"].values
+    lost_vals = summary["lost"].values
+    scheme_labels = summary["scheme"].values
+    total_peptides = summary["total_peptides"].values
+    x = np.arange(len(summary))
 
-    ax.bar(x, gained, color="#2ecc71", label="Gained peptides", zorder=3)
-    ax.bar(x, [-v for v in lost], color="#e74c3c", label="Lost peptides", zorder=3)
+    # Use a broken y-axis so gained peptides (small) are visible alongside
+    # lost peptides (potentially large).
+    max_gained = max(gained_vals) if max(gained_vals) > 0 else 1
+    max_lost = max(lost_vals) if max(lost_vals) > 0 else 1
 
-    # Annotate total count on top of each bar group
-    for i, row in summary.iterrows():
-        y_top = max(row["gained"], row["lost"]) + baseline_count * 0.01
-        ax.text(
-            i,
-            y_top,
-            str(row["total_peptides"]),
-            ha="center",
-            va="bottom",
-            fontsize=7,
-            color="#555",
+    # Top axis: gained (positive), Bottom axis: lost (negative)
+    gained_pad = max_gained * 0.35
+    lost_pad = max_lost * 0.15
+
+    fig, (ax_top, ax_bot) = plt.subplots(
+        2, 1,
+        figsize=(max(8, len(summary) * 0.55), 5.5),
+        sharex=True,
+        gridspec_kw={"height_ratios": [1, 3], "hspace": 0.08},
+    )
+
+    # Colors — Wong colorblind-safe palette
+    color_gained = "#009E73"  # green
+    color_lost = "#D55E00"    # vermilion
+
+    bar_kw = dict(width=0.7, edgecolor="black", linewidth=0.6, zorder=3)
+
+    # Draw bars on both axes
+    for ax in (ax_top, ax_bot):
+        ax.bar(x, gained_vals, color=color_gained, label="Gained", **bar_kw)
+        ax.bar(x, [-v for v in lost_vals], color=color_lost, label="Lost", **bar_kw)
+        ax.axhline(0, color="black", linewidth=0.8, zorder=2)
+        ax.yaxis.grid(True, linewidth=0.3, alpha=0.5)
+        ax.set_axisbelow(True)
+
+    # Top axis shows only the gained (positive) region
+    ax_top.set_ylim(0, max_gained + gained_pad)
+    ax_top.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
+
+    # Bottom axis shows only the lost (negative) region
+    ax_bot.set_ylim(-(max_lost + lost_pad), 0)
+    ax_bot.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5, symmetric=False))
+
+    # Hide overlapping spines to create the broken-axis effect
+    ax_top.spines["bottom"].set_visible(False)
+    ax_bot.spines["top"].set_visible(False)
+    ax_top.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+
+    # Diagonal break marks
+    d = 0.012
+    kwargs = dict(transform=ax_top.transAxes, color="black",
+                  clip_on=False, linewidth=0.8)
+    ax_top.plot((-d, +d), (-d, +d), **kwargs)
+    ax_top.plot((1 - d, 1 + d), (-d, +d), **kwargs)
+    kwargs.update(transform=ax_bot.transAxes)
+    ax_bot.plot((-d, +d), (1 - d, 1 + d), **kwargs)
+    ax_bot.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
+
+    # Annotate total peptide count above each bar group
+    for i in range(len(summary)):
+        g = gained_vals[i]
+        y_annot = g + max_gained * 0.08 if g > 0 else max_gained * 0.08
+        ax_top.text(
+            i, y_annot, f"{total_peptides[i]:,}",
+            ha="center", va="bottom", fontsize=7, color="#333",
         )
 
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
-    ax.set_ylabel("Peptide count")
-    ax.set_title(
-        f"Impact of lossy compression on peptide identification\n"
-        f"(baseline: {baseline_count} peptides from uncompressed mzML)"
-    )
-    ax.axhline(0, color="black", linewidth=0.8)
-    ax.legend(loc="upper right")
-    ax.grid(axis="y", alpha=0.3, zorder=0)
+    # X-axis labels
+    ax_bot.set_xticks(x)
+    ax_bot.set_xticklabels(scheme_labels, rotation=45, ha="right")
 
-    plt.tight_layout()
-    plot_path = os.path.join(PLOTS_DIR, "peptide_comparison.png")
-    fig.savefig(plot_path, dpi=150)
-    print(f"Plot saved to {plot_path}")
+    # Shared y-label
+    fig.text(0.01, 0.5, "Peptide Count", va="center", rotation="vertical",
+             fontsize=11)
+
+    # Title
+    ax_top.set_title(
+        f"Impact of Lossy Compression on Peptide Identification\n"
+        f"(baseline: {baseline_count:,} peptides from uncompressed mzML)",
+    )
+
+    # Legend
+    ax_top.legend(loc="upper right")
+
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.90, bottom=0.25, hspace=0.08)
+
+    # Save as PDF + SVG (publication) and PNG (preview)
+    for ext in ("pdf", "svg", "png"):
+        fig.savefig(os.path.join(PLOTS_DIR, f"peptide_comparison.{ext}"))
+    plt.close(fig)
+    print(f"Plots saved to {PLOTS_DIR}/peptide_comparison.{{pdf,svg,png}}")
+
+    # ── Compression ratio plot ─────────────────────────────────────────────
+    ratio_df = summary.dropna(subset=["compression_ratio"]).copy()
+    if not ratio_df.empty and original_size:
+        fig, ax = plt.subplots(
+            figsize=(max(8, len(ratio_df) * 0.55), 4),
+        )
+
+        rx = np.arange(len(ratio_df))
+        ratios = ratio_df["compression_ratio"].values
+        sizes = ratio_df["compressed_mb"].values
+        rlabels = ratio_df["scheme"].values
+
+        color_bar = "#0072B2"  # Wong blue
+        bars = ax.bar(
+            rx, ratios, width=0.7, color=color_bar,
+            edgecolor="black", linewidth=0.6, zorder=3,
+        )
+
+        # Annotate each bar with compressed size
+        for i, (r, s) in enumerate(zip(ratios, sizes)):
+            ax.text(
+                i, r + 0.005, f"{s:.1f} MB",
+                ha="center", va="bottom", fontsize=7, color="#333",
+            )
+
+        ax.set_xticks(rx)
+        ax.set_xticklabels(rlabels, rotation=45, ha="right")
+        ax.set_ylabel("Compression Ratio (compressed / original)")
+        ax.set_title(
+            f"Compression Ratio by Lossy Scheme\n"
+            f"(original: {original_size:.1f} MB)"
+        )
+        ax.set_ylim(bottom=0)
+        ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=6))
+        ax.yaxis.grid(True, linewidth=0.3, alpha=0.5)
+        ax.set_axisbelow(True)
+
+        fig.subplots_adjust(bottom=0.30)
+
+        for ext in ("pdf", "svg", "png"):
+            fig.savefig(os.path.join(PLOTS_DIR, f"compression_ratio.{ext}"))
+        plt.close(fig)
+        print(f"Plots saved to {PLOTS_DIR}/compression_ratio.{{pdf,svg,png}}")
 
 
 if __name__ == "__main__":

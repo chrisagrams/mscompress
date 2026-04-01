@@ -7,8 +7,21 @@ Evaluates how mscompress lossy compression algorithms affect downstream peptide 
 - Docker and Docker Compose
 - ~10 GB free disk space
 - Internet access (first run downloads reference data)
+- **MSFragger JAR** (see below)
 
-> **Licensing:** MSFragger is free for academic and non-commercial use. Commercial users must obtain a license from [Fragmatics](https://www.fragmatics.com/).
+> **Licensing:** MSFragger is free for academic and non-commercial use but requires a separate download due to its license. Download it from [msfragger.nesvilab.org](https://msfragger.nesvilab.org/). Commercial users must obtain a license from [Fragmatics](https://www.fragmatics.com/).
+
+### MSFragger Setup
+
+MSFragger is not bundled in the Docker image. Download the JAR and place it in the `ext/` directory:
+
+```bash
+mkdir -p benchmark/lossy/ext
+# Download MSFragger from https://msfragger.nesvilab.org/ and place the JAR here:
+cp ~/Downloads/MSFragger-4.1/MSFragger-4.1.jar benchmark/lossy/ext/
+```
+
+Alternatively, set the `FRAGGER_JAR` environment variable to the path inside the container.
 
 ## Quick Start
 
@@ -26,18 +39,19 @@ Each pipeline step lives in its own subdirectory with a `Dockerfile` and associa
 ```
 benchmark/lossy/
   docker-compose.yml          # Orchestrates the full pipeline
+  ext/                        # Place MSFragger JAR here (not checked in)
   download/
     Dockerfile                # Alpine + curl
     download.sh               # Downloads reference mzML + FASTA
   generate-schemes/
-    Dockerfile                # Builds mscompress into Alpine
+    Dockerfile                # Builds mscompress + jq into Alpine
     generate_schemes.sh       # Queries algorithm registry, writes schemes.txt
   compress/
     Dockerfile                # Builds mscompress into Alpine
     compress.sh               # Compresses + decompresses each scheme
   search/
     Dockerfile                # Extends fcyucn/fragpipe
-    search.sh                 # MSFragger + Percolator + Philosopher
+    search.sh                 # MSFragger + Percolator
     closed_fragger.params     # MSFragger search parameters
   analysis/
     Dockerfile                # Python + matplotlib/pandas
@@ -51,7 +65,7 @@ benchmark/lossy/
 | `download` | `download/` | Downloads reference mzML and UniProt human proteome FASTA to `data/` |
 | `generate-schemes` | `generate-schemes/` | Queries `mscompress --list-algorithms --json` to dynamically build all lossy scheme combinations |
 | `compress` | `compress/` | Compresses the reference mzML with each scheme, then decompresses back to mzML |
-| `search` | `search/` | Runs MSFragger database search + Percolator PSM rescoring + Philosopher FDR filtering on the original and each decompressed mzML |
+| `search` | `search/` | Runs MSFragger database search + Percolator PSM rescoring on the original and each decompressed mzML |
 | `analysis` | `analysis/` | Compares peptide identifications and produces a bar chart + summary TSV |
 
 ### Dependency chain
@@ -82,7 +96,7 @@ results/
   lossless/                # Each scheme directory contains:
     compressed.msz         #   Compressed file
     decompressed.mzML      #   Decompressed mzML
-    psm.tsv                #   FDR-filtered peptide-spectrum matches
+    percolator-psms.txt    #   Percolator target PSMs (q-value filtered at analysis)
   mz_cast/
   ...
   plots/
@@ -109,6 +123,8 @@ Edit `search/closed_fragger.params` to adjust MSFragger settings (tolerances, en
 
 ### Run a single service
 
+Each service depends on the previous steps. Using `docker compose up` will automatically run all prerequisites first:
+
 ```bash
 docker compose up download          # Just download data
 docker compose up generate-schemes  # Generate schemes (runs download first)
@@ -117,9 +133,25 @@ docker compose up search            # Run searches (runs prior steps)
 docker compose up analysis          # Analyze results (runs all steps)
 ```
 
+### Re-run a single service in isolation
+
+If previous steps have already completed and you want to re-run just one service (e.g., to tweak the analysis plots without re-running the full pipeline), use `--no-deps`:
+
+```bash
+docker compose run --rm --no-deps analysis    # Re-run analysis only
+docker compose run --rm --no-deps search      # Re-run search only
+```
+
+Add `--build` to force a rebuild if you changed the service's code:
+
+```bash
+docker compose build analysis && docker compose run --rm --no-deps analysis
+```
+
 ## Troubleshooting
 
 - **Disk space:** Each decompressed mzML is the same size as the original. Expect N x original file size in `results/`, where N is the number of generated schemes.
 - **Memory:** MSFragger uses up to 16 GB heap by default. Adjust `-Xmx` in `search/search.sh` if needed.
 - **Docker permissions:** Output files may be owned by root. Mount volumes or adjust as needed.
+- **MSFragger not found:** Ensure the MSFragger JAR is placed in `ext/` or set the `FRAGGER_JAR` environment variable. See [MSFragger Setup](#msfragger-setup).
 - **Download failures:** Delete the partial file from `data/` and re-run.

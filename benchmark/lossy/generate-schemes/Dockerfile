@@ -12,6 +12,7 @@ RUN cmake -S cli -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-
 RUN strip build/mscompress
 
 FROM alpine:3.20
+RUN apk add --no-cache jq
 COPY --from=build /app/build/mscompress /usr/local/bin/mscompress
 COPY benchmark/lossy/generate-schemes/generate_schemes.sh /scripts/generate_schemes.sh
 ENTRYPOINT ["/bin/sh", "/scripts/generate_schemes.sh"]

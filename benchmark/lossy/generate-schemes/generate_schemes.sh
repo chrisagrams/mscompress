@@ -16,29 +16,10 @@ mkdir -p /results
 
 JSON=$(mscompress --list-algorithms --json)
 
-# Parse algorithm names and targets using only sh + built-in JSON handling.
-# We use awk to extract non-experimental algorithms grouped by target.
-MZ_ALGOS=$(echo "$JSON" | awk '
-  /"name":/   { gsub(/[",]/, "", $2); name=$2 }
-  /"target":/  { gsub(/[",]/, "", $2); target=$2 }
-  /"experimental":/ {
-    gsub(/[",]/, "", $2); exp=$2
-    if (exp == "false") {
-      if (target == "mz" || target == "mz/int") print name
-    }
-  }
-')
+# Parse algorithm names and targets using jq.
+MZ_ALGOS=$(echo "$JSON" | jq -r '.[] | select(.experimental == false) | select(.target == "mz" or .target == "mz/int") | .name')
 
-INT_ALGOS=$(echo "$JSON" | awk '
-  /"name":/   { gsub(/[",]/, "", $2); name=$2 }
-  /"target":/  { gsub(/[",]/, "", $2); target=$2 }
-  /"experimental":/ {
-    gsub(/[",]/, "", $2); exp=$2
-    if (exp == "false") {
-      if (target == "int" || target == "mz/int") print name
-    }
-  }
-')
+INT_ALGOS=$(echo "$JSON" | jq -r '.[] | select(.experimental == false) | select(.target == "int" or .target == "mz/int") | .name')
 
 # Start with lossless baseline
 echo "lossless::" > "$SCHEMES_FILE"
