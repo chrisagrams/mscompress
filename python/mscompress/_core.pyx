@@ -116,6 +116,7 @@ cdef class RuntimeArguments:
         self._arguments.target_mz_format = _ZSTD_compression_
         self._arguments.target_inten_format = _ZSTD_compression_
         self._arguments.zstd_compression_level = 3
+        self._arguments.topn = 150
 
     cdef Arguments* get_ptr(self):
         return &self._arguments
@@ -253,6 +254,7 @@ def list_algorithms():
             "default_mz_scale": algo_registry[i].default_mz_scale,
             "default_int_scale": algo_registry[i].default_int_scale,
             "experimental": bool(algo_registry[i].experimental),
+            "coupled": bool(algo_registry[i].coupled),
         })
     return result
 

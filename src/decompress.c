@@ -14,6 +14,58 @@
 #include "mscompress.h"
 
 /**
+ * @brief Patch the defaultArrayLength attribute in the output buffer.
+ *
+ * Searches backward from `search_end` for `defaultArrayLength="` and replaces
+ * the numeric value with `new_count`. Adjusts `buff_off` if the new value has
+ * a different digit count than the old one.
+ *
+ * @param buff       Output buffer.
+ * @param buff_off   Pointer to current write offset (updated on size change).
+ * @param search_end Position to start searching backward from.
+ * @param new_count  New array length value.
+ */
+static void patch_default_array_length(char* buff, int64_t* buff_off,
+                                       int64_t search_end, int new_count) {
+   const char* needle = "defaultArrayLength=\"";
+   const int needle_len = 20;
+
+   /* Search backward for the attribute (it's in the XML block preceding the binary) */
+   char* found = NULL;
+   for (int64_t pos = search_end - needle_len; pos >= 0; pos--) {
+      if (memcmp(buff + pos, needle, needle_len) == 0) {
+         found = buff + pos + needle_len;
+         break;
+      }
+   }
+
+   if (found == NULL)
+      return;
+
+   /* Find end of old value (closing quote) */
+   char* quote_end = strchr(found, '"');
+   if (quote_end == NULL)
+      return;
+
+   int old_len = (int)(quote_end - found);
+
+   /* Format new value */
+   char new_val[16];
+   int new_len = snprintf(new_val, sizeof(new_val), "%d", new_count);
+
+   int diff = new_len - old_len;
+
+   if (diff != 0) {
+      /* Shift everything after the old value */
+      memmove(found + new_len, found + old_len,
+              *buff_off - (int64_t)(found + old_len - buff));
+      *buff_off += diff;
+   }
+
+   memcpy(found, new_val, new_len);
+}
+
+/**
  * @brief Creates a ZSTD decompression context and handles errors.
  *
  * @return A ZSTD decompression context on success. `NULL` on error.
@@ -355,6 +407,7 @@ void* decompress_routine(void* args) {
    db_args->ret = buff;
 
    int64_t curr_len = 0;
+   int64_t xml_block_start = 0;
 
    algo_args* a_args = malloc(sizeof(algo_args));
    
@@ -395,6 +448,7 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len <= len);
+            xml_block_start = buff_off;
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -415,12 +469,15 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len < len);
+            {
+            int64_t mz_start = buff_off;  /* Position before m/z binary */
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
             a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
+            a_args->out_count = -1;
 
             // Call the target mz function to encode the mz block and write it to the output buffer
             db_args->df->target_mz_fun((void*)a_args);
@@ -432,6 +489,11 @@ void* decompress_routine(void* args) {
             }
 
             buff_off += *a_args->dest_len;
+
+            /* Patch defaultArrayLength in preceding XML if algo changed peak count */
+            if (a_args->out_count >= 0)
+               patch_default_array_length(buff, &buff_off, mz_start, a_args->out_count);
+            }
             mz_i++;
             block++;
             break;

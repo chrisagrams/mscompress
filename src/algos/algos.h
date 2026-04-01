@@ -49,6 +49,16 @@ void algo_decode_vbr_64d(void* args);
 void algo_encode_vbr_32f(void* args);
 void algo_encode_vbr_64d(void* args);
 
+/* cast24.c */
+void algo_decode_cast24_32f(void* args);
+void algo_decode_cast24_64d(void* args);
+void algo_encode_cast24_32f(void* args);
+void algo_encode_cast24_64d(void* args);
+
+/* topn.c */
+void algo_decode_topn_32f(void* args);
+void algo_decode_topn_64d(void* args);
+
 /* bitpack.c */
 void algo_decode_bitpack_32f(void* args);
 void algo_decode_bitpack_64d(void* args);

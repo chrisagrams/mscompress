@@ -42,6 +42,9 @@ static void print_usage(FILE* stream, int exit_code) {
            " --int-scale-factor factor      Set int scale factors for log "
            "transform or threshold for vbr\n");
    fprintf(stream,
+           " --topn N                       Set number of peaks to keep for "
+           "topn algorithm (default: 150)\n");
+   fprintf(stream,
            " --extract-indices [range]      Extract indices from mzML or msz "
            "file (eg. 0-100 or [0-100]). (disabled by default)\n");
    fprintf(
@@ -163,6 +166,16 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
          }
          if (set_mz_scale_factor(arguments, argv[++i]) != 0)
             return 1;
+      } else if (strcmp(argv[i], "--topn") == 0) {
+         if (i + 1 >= argc) {
+            fprintf(stderr, "%s\n", "Missing value for --topn.");
+            return 1;
+         }
+         arguments->topn = atoi(argv[++i]);
+         if (arguments->topn <= 0) {
+            fprintf(stderr, "Invalid --topn value: must be > 0\n");
+            return 1;
+         }
       } else if (strcmp(argv[i], "--int-scale-factor") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n",
@@ -290,6 +303,14 @@ int main(int argc, char* argv[]) {
 
    if (parse_arguments(argc, argv, &arguments))
       print_usage(stderr, 1);
+
+   {
+      char err_buf[512] = {0};
+      if (validate_args(&arguments, err_buf, sizeof(err_buf))) {
+         fprintf(stderr, "Error: %s\n", err_buf);
+         exit(1);
+      }
+   }
 
    verbose = arguments.verbose;
 

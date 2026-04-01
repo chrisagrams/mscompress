@@ -8,16 +8,18 @@
 */
 
 const algo_info_t algo_registry[] = {
-   {"cast",     _cast_64_to_32_,       TARGET_MZ,                "Cast 64-bit double to 32-bit float",            0,          0,    0},
-   {"cast16",   _cast_64_to_16_,       TARGET_MZ,                "Cast 64-bit double to 16-bit float",            11.801,     0,    0},
-   {"delta16",  _delta16_transform_,   TARGET_MZ,                "Delta encoding with 16-bit precision",          127.998,    0,    0},
-   {"delta24",  _delta24_transform_,   TARGET_MZ,                "Delta encoding with 24-bit precision",          65536,      0,    0},
-   {"delta32",  _delta32_transform_,   TARGET_MZ,                "Delta encoding with 32-bit precision",          262144.0,   0,    0},
-   {"bitpack",  _bitpack_,             TARGET_MZ,                "Bit packing transform",                         10000.0,    0,    0},
-   {"log",      _log2_transform_,      TARGET_INT,               "Log2 transform",                                0,          72.0, 0},
-   {"vbr",      _vbr_,                 TARGET_MZ | TARGET_INT,   "Variable bit rate encoding",                    0.1,        1.0,  0},
-   {"vdelta16", _vdelta16_transform_,  TARGET_MZ,                "Variable delta encoding 16-bit (experimental)", 0,          0,    1},
-   {"vdelta24", _vdelta24_transform_,  TARGET_MZ,                "Variable delta encoding 24-bit (experimental)", 0,          0,    1},
+   {"cast",     _cast_64_to_32_,       TARGET_MZ,                "Cast 64-bit double to 32-bit float",            0,          0,    0, 0},
+   {"cast16",   _cast_64_to_16_,       TARGET_MZ,                "Cast 64-bit double to 16-bit float",            11.801,     0,    0, 0},
+   {"delta16",  _delta16_transform_,   TARGET_MZ,                "Delta encoding with 16-bit precision",          127.998,    0,    0, 0},
+   {"delta24",  _delta24_transform_,   TARGET_MZ,                "Delta encoding with 24-bit precision",          65536,      0,    0, 0},
+   {"delta32",  _delta32_transform_,   TARGET_MZ,                "Delta encoding with 32-bit precision",          262144.0,   0,    0, 0},
+   {"bitpack",  _bitpack_,             TARGET_MZ,                "Bit packing transform",                         10000.0,    0,    0, 0},
+   {"log",      _log2_transform_,      TARGET_INT,               "Log2 transform",                                0,          72.0, 0, 0},
+   {"vbr",      _vbr_,                 TARGET_MZ | TARGET_INT,   "Variable bit rate encoding",                    0.1,        1.0,  0, 0},
+   {"cast24",   _cast_64_to_24_,       TARGET_MZ,                "Cast to 24-bit fixed-point",                    10000.0,    0,    0, 0},
+   {"topn",     _topn_,                TARGET_MZ | TARGET_INT,   "Top-N peak filter with 24-bit quantization",    10000.0,    10000.0, 0, 1},
+   {"vdelta16", _vdelta16_transform_,  TARGET_MZ,                "Variable delta encoding 16-bit (experimental)", 0,          0,    1, 0},
+   {"vdelta24", _vdelta24_transform_,  TARGET_MZ,                "Variable delta encoding 24-bit (experimental)", 0,          0,    1, 0},
 };
 
 const int algo_registry_size = sizeof(algo_registry) / sizeof(algo_registry[0]);
@@ -107,6 +109,22 @@ Algo set_compress_algo(int algo, int accession) {
                return algo_decode_vbr_32f;
             case _64d_:
                return algo_decode_vbr_64d;
+         }
+      };
+      case _cast_64_to_24_: {
+         switch (accession) {
+            case _32f_:
+               return algo_decode_cast24_32f;
+            case _64d_:
+               return algo_decode_cast24_64d;
+         }
+      };
+      case _topn_: {
+         switch (accession) {
+            case _32f_:
+               return algo_decode_topn_32f;
+            case _64d_:
+               return algo_decode_topn_64d;
          }
       };
       case _bitpack_: {
@@ -204,6 +222,22 @@ Algo set_decompress_algo(int algo, int accession) {
                return algo_encode_vbr_32f;
             case _64d_:
                return algo_encode_vbr_64d;
+         }
+      };
+      case _cast_64_to_24_: {
+         switch (accession) {
+            case _32f_:
+               return algo_encode_cast24_32f;
+            case _64d_:
+               return algo_encode_cast24_64d;
+         }
+      };
+      case _topn_: {
+         switch (accession) {
+            case _32f_:
+               return algo_encode_cast24_32f;
+            case _64d_:
+               return algo_encode_cast24_64d;
          }
       };
       case _bitpack_: {

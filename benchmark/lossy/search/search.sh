@@ -78,9 +78,20 @@ run_search() {
     "$PIN_FILE"
 }
 
+# Skip search if percolator output already exists (delete to re-run)
+skip_if_done() {
+  local label="$1"
+  local out_dir="/results/${label}"
+  if [ -f "$out_dir/percolator-psms.txt" ]; then
+    echo "--- Skipping: $label (already done, delete $out_dir/percolator-psms.txt to re-run) ---"
+    return 0
+  fi
+  return 1
+}
+
 # Search original (baseline)
 mkdir -p "/results/original"
-run_search "original" "$ORIGINAL_MZML"
+skip_if_done "original" || run_search "original" "$ORIGINAL_MZML"
 
 # Search each scheme
 if [ ! -f "$SCHEMES_FILE" ]; then
@@ -89,7 +100,7 @@ if [ ! -f "$SCHEMES_FILE" ]; then
 fi
 
 while IFS=: read -r label _ _; do
-  run_search "$label" "/results/${label}/decompressed.mzML"
+  skip_if_done "$label" || run_search "$label" "/results/${label}/decompressed.mzML"
 done < "$SCHEMES_FILE"
 
 echo "All searches complete."

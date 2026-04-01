@@ -69,6 +69,8 @@
 #define _vdelta24_transform_ 4700010
 #define _cast_64_to_16_ 4700011
 #define _no_encode_ 4700012
+#define _cast_64_to_24_ 4700013
+#define _topn_ 4700014
 
 #define _LZ4_compression_ 4700012
 
@@ -97,6 +99,7 @@ typedef struct {
    float default_mz_scale;
    float default_int_scale;
    int experimental;
+   int coupled;
 } algo_info_t;
 
 typedef struct {
@@ -124,6 +127,8 @@ typedef struct {
    int zstd_compression_level;
 
    int json_output;
+
+   int topn;
 } Arguments;
 
 typedef struct {
@@ -299,6 +304,7 @@ typedef struct {
    int zstd_compression_level;  // no need to write to file since ZSTD_DCtx
                                 // doesn't need it.
 
+   int topn;  // runtime only, not serialized
 } data_format_t;
 
 /* arguments.c */
@@ -495,6 +501,7 @@ typedef struct {
    cmp_blk_queue_t* ret;
    compression_fun comp_fun;
 
+   data_positions_t* dp_peer;  /* Peer stream positions (NULL if non-coupled) */
 } compress_args_t;
 
 ZSTD_CCtx* alloc_cctx();
@@ -591,6 +598,14 @@ typedef struct {
    float scale_factor;
    int ret_code;
    Algo algo_fun;
+   /* Coupled algo fields — NULL/0 for non-coupled algos */
+   char* peer_src;
+   size_t peer_src_len;
+   int peer_src_format;
+   decode_fun peer_dec_fun;
+   int topn;
+   int out_count;  /* Number of elements produced by encode (decompress path).
+                      Set by encode functions; -1 means unchanged. */
 } algo_args;
 
 extern const algo_info_t algo_registry[];

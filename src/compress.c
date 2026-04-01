@@ -275,7 +275,8 @@ compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
                                      data_format_t* df,
                                      compression_fun comp_fun,
                                      size_t cmp_blk_size, long blocksize,
-                                     int mode) {
+                                     int mode,
+                                     data_positions_t* dp_peer) {
    compress_args_t* r;
 
    r = malloc(sizeof(compress_args_t));
@@ -292,6 +293,7 @@ compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
    r->cmp_blk_size = cmp_blk_size;
    r->blocksize = blocksize;
    r->mode = mode;
+   r->dp_peer = dp_peer;
 
    r->ret = NULL;
 
@@ -656,11 +658,22 @@ void* compress_routine(void* args)
    else
       cmp_fun = cmp_binary_routine;
 
+   /* Initialize coupled algo fields to NULL/0 */
+   a_args->peer_src = NULL;
+   a_args->peer_src_len = 0;
+   a_args->peer_src_format = 0;
+   a_args->peer_dec_fun = NULL;
+   a_args->topn = cb_args->df->topn;
+
    if (cb_args->mode == _mass_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
       a_args->scale_factor = cb_args->df->mz_scale_factor;
       a_args->src_format = cb_args->df->source_mz_fmt;
       a_args->algo_fun = cb_args->df->target_mz_fun;
+      if (cb_args->dp_peer) {
+         a_args->peer_src_format = cb_args->df->source_inten_fmt;
+         a_args->peer_dec_fun = cb_args->df->decode_source_compression_inten_fun;
+      }
    } else if (cb_args->mode == _intensity_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
       a_args->scale_factor = cb_args->df->int_scale_factor;
@@ -686,6 +699,13 @@ void* compress_routine(void* args)
 
       if (len == 0)
          continue;  // Skip empty data blocks (e.g. empty spectra)
+
+      /* Populate peer data for coupled algos */
+      if (cb_args->dp_peer) {
+         a_args->peer_src = cb_args->input_map + cb_args->dp_peer->start_positions[i];
+         a_args->peer_src_len = cb_args->dp_peer->end_positions[i] -
+                                cb_args->dp_peer->start_positions[i];
+      }
 
       cmp_fun(cb_args->comp_fun, czstd, a_args, cmp_buff, &curr_block,
               cb_args->df, map, len, &tot_size, &tot_cmp);
@@ -741,7 +761,8 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
                                      compression_fun comp_fun,
                                      size_t cmp_blk_size, long blocksize,
                                      int mode, int divisions, int threads,
-                                     int fd, size_t* bytes_written) {
+                                     int fd, size_t* bytes_written,
+                                     data_positions_t** ddp_peer) {
    block_len_queue_t* blk_len_queue;
    compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
    size_t total_written = 0;
@@ -761,7 +782,8 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
 
    for (i = divisions_used; i < divisions; i++) {
       compress_args_t* i_args = alloc_compress_args(
-          input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
+          input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode,
+          ddp_peer ? ddp_peer[i] : NULL);
       if (i_args == NULL) {
          error("compress_parallel: Failed to allocate compress_args_t.\n");
          return NULL;
@@ -872,6 +894,15 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    footer->mz_fmt = get_algo_type(arguments->mz_lossy);
    footer->inten_fmt = get_algo_type(arguments->int_lossy);
 
+   // Check if m/z algo is coupled (needs peer intensity data)
+   int mz_coupled = 0;
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (algo_registry[i].type == footer->mz_fmt && algo_registry[i].coupled) {
+         mz_coupled = 1;
+         break;
+      }
+   }
+
    long blocksize = arguments->blocksize;
    int threads = arguments->threads;
 
@@ -886,7 +917,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    xml_block_lens = compress_parallel(
        (char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize,
        blocksize / 3, _xml_, divisions->n_divisions, threads, output_fd,
-       &stream_bytes); /* Compress XML */
+       &stream_bytes, NULL); /* Compress XML */
    output_pos += stream_bytes;
    free(xml_divisions);
    if (xml_block_lens == NULL) {
@@ -902,7 +933,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    mz_binary_block_lens = compress_parallel(
        (char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize,
        blocksize / 3, _mass_, divisions->n_divisions, threads, output_fd,
-       &stream_bytes); /* Compress m/z binary */
+       &stream_bytes, mz_coupled ? inten_divisions : NULL); /* Compress m/z binary */
    output_pos += stream_bytes;
    free(mz_divisions);
    if (mz_binary_block_lens == NULL) {
@@ -918,7 +949,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    inten_binary_block_lens = compress_parallel(
        (char*)input_map, inten_divisions, df, df->inten_compression_fun,
        blocksize, blocksize / 3, _intensity_, divisions->n_divisions, threads,
-       output_fd, &stream_bytes); /* Compress int binary */
+       output_fd, &stream_bytes, NULL); /* Compress int binary */
    output_pos += stream_bytes;
    free(inten_divisions);
    if (inten_binary_block_lens == NULL) {

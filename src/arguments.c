@@ -48,6 +48,7 @@ void init_args(Arguments* args) {
    args->zstd_compression_level = 3;  // default
 
    args->json_output = 0;
+   args->topn = 150;
 }
 
 /**
@@ -124,7 +125,8 @@ void print_algorithms_json(void) {
       printf("    \"description\": \"%s\",\n", a->description);
       printf("    \"default_mz_scale\": %g,\n", (double)a->default_mz_scale);
       printf("    \"default_int_scale\": %g,\n", (double)a->default_int_scale);
-      printf("    \"experimental\": %s\n", a->experimental ? "true" : "false");
+      printf("    \"experimental\": %s,\n", a->experimental ? "true" : "false");
+      printf("    \"coupled\": %s\n", a->coupled ? "true" : "false");
       printf("  }%s\n", (i < algo_registry_size - 1) ? "," : "");
    }
    printf("]\n");
@@ -269,6 +271,21 @@ int validate_args(Arguments* args, char* err_buf, size_t err_buf_size) {
       }
    }
 
+   /* Coupled algorithms must be set on both mz and int targets. */
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (algo_registry[i].coupled) {
+         int mz_match = strcmp(args->mz_lossy, algo_registry[i].name) == 0;
+         int int_match = strcmp(args->int_lossy, algo_registry[i].name) == 0;
+         if (mz_match != int_match) {
+            if (err_buf && err_buf_size > 0)
+               snprintf(err_buf, err_buf_size,
+                        "Algorithm '%s' must be set on both --mz-lossy and --int-lossy",
+                        algo_registry[i].name);
+            return 1;
+         }
+      }
+   }
+
    return 0;
 }
 
@@ -340,6 +357,9 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    // Set scale factor.
    df->mz_scale_factor = args->mz_scale_factor;
    df->int_scale_factor = args->int_scale_factor;
+
+   // Set top-N.
+   df->topn = args->topn;
 
    return 0;
 }

@@ -21,7 +21,7 @@ def test_get_filesize_invalid_path():
         get_filesize("ABC123")
 
 
-EXPECTED_KEYS = {"name", "target", "description", "default_mz_scale", "default_int_scale", "experimental"}
+EXPECTED_KEYS = {"name", "target", "description", "default_mz_scale", "default_int_scale", "experimental", "coupled"}
 VALID_TARGETS = {"mz", "intensity"}
 
 def test_list_algorithms_returns_list():
@@ -57,11 +57,15 @@ def test_list_algorithms_known_entries():
 
 
 def _algo_target_params():
-    """Generate pytest params for each (algorithm, target) pair."""
+    """Generate pytest params for each (algorithm, target) pair.
+    Coupled algos are tested once (both targets set simultaneously)."""
     for algo in list_algorithms():
-        for target in algo["target"]:
-            test_id = f"{algo['name']}-{target}"
-            yield pytest.param(algo, target, id=test_id)
+        if algo.get("coupled"):
+            yield pytest.param(algo, "coupled", id=algo['name'])
+        else:
+            for target in algo["target"]:
+                test_id = f"{algo['name']}-{target}"
+                yield pytest.param(algo, target, id=test_id)
 
 @pytest.mark.parametrize("algo,target", _algo_target_params())
 def test_algorithm_compress_decompress(algo, target, mzml_file_path, tmp_path):
@@ -71,9 +75,12 @@ def test_algorithm_compress_decompress(algo, target, mzml_file_path, tmp_path):
     msz_path = tmp_path / f"{name}_{target}.msz"
     out_path = tmp_path / f"{name}_{target}.mzML"
 
-    # Compress with lossy algorithm on one target
+    # Compress with lossy algorithm on the appropriate target(s)
     with read(mzml_file_path) as mzml:
-        if target == "mz":
+        if target == "coupled":
+            mzml.arguments.mz_lossy = name
+            mzml.arguments.int_lossy = name
+        elif target == "mz":
             mzml.arguments.mz_lossy = name
         else:
             mzml.arguments.int_lossy = name

@@ -86,6 +86,7 @@ add_cli_test(CompressDecompressTargetInten_none "--target-inten-format;none")
 # --mz-lossy tests
 add_cli_test(CompressDecompressMZLossy_cast "--mz-lossy;cast")
 add_cli_test(CompressDecompressMZLossy_cast16 "--mz-lossy;cast16")
+add_cli_test(CompressDecompressMZLossy_cast24 "--mz-lossy;cast24")
 add_cli_test(CompressDecompressMZLossy_log "--mz-lossy;log")
 add_cli_test(CompressDecompressMZLossy_delta16 "--mz-lossy;delta16")
 add_cli_test(CompressDecompressMZLossy_delta24 "--mz-lossy;delta24")
@@ -94,6 +95,8 @@ add_cli_test(CompressDecompressMZLossy_vdelta16 "--mz-lossy;vdelta16")
 add_cli_test(CompressDecompressMZLossy_vdelta24 "--mz-lossy;vdelta24")
 add_cli_test(CompressDecompressMZLossy_vbr "--mz-lossy;vbr")
 add_cli_test(CompressDecompressMZLossy_bitpack "--mz-lossy;bitpack")
+add_cli_test(CompressDecompressLossy_topn "--mz-lossy;topn;--int-lossy;topn")
+add_cli_test(CompressDecompressLossy_topn_50 "--mz-lossy;topn;--int-lossy;topn;--topn;50")
 
 add_cli_test(CompressDecompressThreadsExceedSpectra "--threads;100")
 

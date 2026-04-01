@@ -50,6 +50,8 @@ cdef extern from "../src/mscompress.h":
         int target_mz_format
         int target_inten_format
         int zstd_compression_level
+        int json_output
+        int topn
     
     ctypedef struct data_block_t:
         char* mem
@@ -193,6 +195,7 @@ cdef extern from "../src/mscompress.h":
         float default_mz_scale
         float default_int_scale
         int experimental
+        int coupled
 
     const algo_info_t algo_registry[]
     const int algo_registry_size

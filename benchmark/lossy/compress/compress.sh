@@ -11,6 +11,11 @@ if [ ! -f "$SCHEMES_FILE" ]; then
 fi
 
 while IFS=: read -r label mz_algo int_algo; do
+  if [ -f "/results/${label}/decompressed.mzML" ]; then
+    echo "--- Skipping: $label (already done, delete /results/${label}/decompressed.mzML to re-run) ---"
+    continue
+  fi
+
   echo "--- $label ---"
   mkdir -p "/results/${label}"
 
