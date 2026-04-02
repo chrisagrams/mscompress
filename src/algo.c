@@ -271,3 +271,16 @@ int get_algo_type(const char* arg) {
    error("get_algo_type: Unknown compression algorithm");
    return -1;
 }
+
+/**
+ * @brief Checks if an algorithm requires peer data (e.g., m/z needing intensity).
+ * @param type The algorithm type identifier.
+ * @return 1 if coupled, 0 otherwise.
+ */
+int is_algo_coupled(int type) {
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (algo_registry[i].type == type && algo_registry[i].coupled)
+         return 1;
+   }
+   return 0;
+}

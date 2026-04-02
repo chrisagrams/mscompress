@@ -613,6 +613,7 @@ extern const int algo_registry_size;
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(const char* arg);
+int is_algo_coupled(int type);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();

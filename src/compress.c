@@ -895,13 +895,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    footer->inten_fmt = get_algo_type(arguments->int_lossy);
 
    // Check if m/z algo is coupled (needs peer intensity data)
-   int mz_coupled = 0;
-   for (int i = 0; i < algo_registry_size; i++) {
-      if (algo_registry[i].type == footer->mz_fmt && algo_registry[i].coupled) {
-         mz_coupled = 1;
-         break;
-      }
-   }
+   int mz_coupled = is_algo_coupled(footer->mz_fmt);
 
    long blocksize = arguments->blocksize;
    int threads = arguments->threads;
