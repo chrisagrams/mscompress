@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../mscompress.h"
+#include "algos.h"
 
 /*
     @section Decoding functions (compress path)
@@ -63,14 +64,7 @@ void algo_decode_cast24_32f(void* args) {
    float* f = (float*)(decoded);
    uint8_t* dest = res + sizeof(uint16_t);
 
-   for (int i = 0; i < len; i++) {
-      uint32_t val = (uint32_t)floor(f[i] * a_args->scale_factor);
-      if (val > 16777215)
-         val = 16777215;
-      dest[i * 3]     = (val >> 16) & 0xFF;
-      dest[i * 3 + 1] = (val >> 8) & 0xFF;
-      dest[i * 3 + 2] = val & 0xFF;
-   }
+   pack_uint24_32f(f, NULL, len, a_args->scale_factor, dest);
 
    free(decoded);
 
@@ -132,14 +126,7 @@ void algo_decode_cast24_64d(void* args) {
    double* f = (double*)(decoded);
    uint8_t* dest = res + sizeof(uint16_t);
 
-   for (int i = 0; i < len; i++) {
-      uint32_t val = (uint32_t)floor(f[i] * a_args->scale_factor);
-      if (val > 16777215)
-         val = 16777215;
-      dest[i * 3]     = (val >> 16) & 0xFF;
-      dest[i * 3 + 1] = (val >> 8) & 0xFF;
-      dest[i * 3 + 2] = val & 0xFF;
-   }
+   pack_uint24_64d(f, NULL, len, a_args->scale_factor, dest);
 
    free(decoded);
 

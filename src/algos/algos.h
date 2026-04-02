@@ -1,6 +1,47 @@
 #ifndef ALGOS_H
 #define ALGOS_H
 
+#include <math.h>
+#include <stdint.h>
+
+/**
+ * @brief Pack float values into 24-bit big-endian unsigned integers.
+ *
+ * Scales each value by scale_factor, clamps to UINT24_MAX (16777215),
+ * and writes 3 bytes per element into dest. If indices is non-NULL,
+ * gathers from arr[indices[i]]; otherwise reads sequentially.
+ */
+static inline void pack_uint24_32f(const float* arr, const int* indices,
+                                   int count, double scale_factor,
+                                   uint8_t* dest) {
+   for (int i = 0; i < count; i++) {
+      int src_idx = indices ? indices[i] : i;
+      uint32_t val = (uint32_t)floor(arr[src_idx] * scale_factor);
+      if (val > 16777215) val = 16777215;
+      dest[i * 3]     = (val >> 16) & 0xFF;
+      dest[i * 3 + 1] = (val >> 8) & 0xFF;
+      dest[i * 3 + 2] = val & 0xFF;
+   }
+}
+
+/**
+ * @brief Pack double values into 24-bit big-endian unsigned integers.
+ *
+ * Same as pack_uint24_32f but for double-precision source data.
+ */
+static inline void pack_uint24_64d(const double* arr, const int* indices,
+                                   int count, double scale_factor,
+                                   uint8_t* dest) {
+   for (int i = 0; i < count; i++) {
+      int src_idx = indices ? indices[i] : i;
+      uint32_t val = (uint32_t)floor(arr[src_idx] * scale_factor);
+      if (val > 16777215) val = 16777215;
+      dest[i * 3]     = (val >> 16) & 0xFF;
+      dest[i * 3 + 1] = (val >> 8) & 0xFF;
+      dest[i * 3 + 2] = val & 0xFF;
+   }
+}
+
 /* lossless.c */
 void algo_decode_lossless(void* args);
 void algo_encode_lossless(void* args);

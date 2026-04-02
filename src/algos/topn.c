@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../mscompress.h"
+#include "algos.h"
 
 /*
     @section Helper: argsort descending by value, tiebreak ascending by index
@@ -15,6 +16,10 @@ typedef struct {
    double value;
 } indexed_value_t;
 
+/**
+ * @brief qsort comparator: sort indexed_value_t by value descending.
+ *        Ties are broken by index ascending for deterministic ordering.
+ */
 static int cmp_descending(const void* a, const void* b) {
    const indexed_value_t* ia = (const indexed_value_t*)a;
    const indexed_value_t* ib = (const indexed_value_t*)b;
@@ -26,6 +31,10 @@ static int cmp_descending(const void* a, const void* b) {
    return 0;
 }
 
+/**
+ * @brief qsort comparator: sort indexed_value_t by index ascending.
+ *        Used to restore original positional order after a value-based sort.
+ */
 static int cmp_ascending_index(const void* a, const void* b) {
    return ((const indexed_value_t*)a)->index -
           ((const indexed_value_t*)b)->index;
@@ -180,14 +189,7 @@ void algo_decode_topn_32f(void* args) {
    memcpy(res, &count, sizeof(uint16_t));
    uint8_t* dest = res + sizeof(uint16_t);
 
-   for (int i = 0; i < keep; i++) {
-      int src_idx = indices ? indices[i] : i;
-      uint32_t val = (uint32_t)floor(arr[src_idx] * a_args->scale_factor);
-      if (val > 16777215) val = 16777215;
-      dest[i * 3]     = (val >> 16) & 0xFF;
-      dest[i * 3 + 1] = (val >> 8) & 0xFF;
-      dest[i * 3 + 2] = val & 0xFF;
-   }
+   pack_uint24_32f(arr, indices, keep, a_args->scale_factor, dest);
 
    free(decoded);
    free(indices);
@@ -304,14 +306,7 @@ void algo_decode_topn_64d(void* args) {
    memcpy(res, &count, sizeof(uint16_t));
    uint8_t* dest = res + sizeof(uint16_t);
 
-   for (int i = 0; i < keep; i++) {
-      int src_idx = indices ? indices[i] : i;
-      uint32_t val = (uint32_t)floor(arr[src_idx] * a_args->scale_factor);
-      if (val > 16777215) val = 16777215;
-      dest[i * 3]     = (val >> 16) & 0xFF;
-      dest[i * 3 + 1] = (val >> 8) & 0xFF;
-      dest[i * 3 + 2] = val & 0xFF;
-   }
+   pack_uint24_64d(arr, indices, keep, a_args->scale_factor, dest);
 
    free(decoded);
    free(indices);
