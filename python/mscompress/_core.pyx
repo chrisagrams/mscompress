@@ -233,6 +233,12 @@ cdef class RuntimeArguments:
         def __set__(self, value):
             self._arguments.zstd_compression_level = value
 
+    property topn:
+        def __get__(self):
+            return self._arguments.topn
+        def __set__(self, value):
+            self._arguments.topn = value
+
 
 def list_algorithms():
     """Return a list of available lossy algorithm descriptors from the C registry.
