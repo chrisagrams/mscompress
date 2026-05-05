@@ -76,6 +76,11 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(
        stream,
        "  -d, --describe                Print header/footer in CSV format\n");
+   fprintf(stream,
+           "      --list-algorithms         List available lossy algorithms.\n");
+   fprintf(stream,
+           "      --json                    Output in JSON format (for "
+           "--version, --describe, --list-algorithms).\n");
    fprintf(stream, "  -h, --help                    Show this help message.\n");
    fprintf(stream,
            "  -V, --version                 Show version information.\n\n");
@@ -99,8 +104,18 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
       return 1;
    }
 
+   /* Pre-scan for --json so it takes effect before early-exit flags. */
    for (i = 1; i < argc; i++) {
-      if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+      if (strcmp(argv[i], "--json") == 0) {
+         arguments->json_output = 1;
+         break;
+      }
+   }
+
+   for (i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "--json") == 0) {
+         continue;  /* Already handled in pre-scan. */
+      } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
          arguments->verbose = 1;
       } else if (strcmp(argv[i], "-t") == 0 ||
                  strcmp(argv[i], "--threads") == 0) {
@@ -216,13 +231,28 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             str++;
          }
          arguments->zstd_compression_level = num;
+      } else if (strcmp(argv[i], "--list-algorithms") == 0) {
+         if (arguments->json_output)
+            print_algorithms_json();
+         else
+            print_algorithms();
+         exit(0);
       } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
          print_usage(stdout, 0);
       } else if (strcmp(argv[i], "-V") == 0 ||
                  strcmp(argv[i], "--version") == 0) {
-         fprintf(stdout, "MSCompress version %s %s\n", VERSION, STATUS);
-         fprintf(stdout, "Supports msz versions %s-%s\n", MIN_SUPPORT,
-                 MAX_SUPPORT);
+         if (arguments->json_output) {
+            printf("{\n");
+            printf("  \"version\": \"%s\",\n", VERSION);
+            printf("  \"status\": \"%s\",\n", STATUS);
+            printf("  \"min_support\": \"%s\",\n", MIN_SUPPORT);
+            printf("  \"max_support\": \"%s\"\n", MAX_SUPPORT);
+            printf("}\n");
+         } else {
+            fprintf(stdout, "MSCompress version %s %s\n", VERSION, STATUS);
+            fprintf(stdout, "Supports msz versions %s-%s\n", MIN_SUPPORT,
+                    MAX_SUPPORT);
+         }
          exit(0);
       } else if (arguments->input_file == NULL) {
          arguments->input_file = argv[i];
@@ -374,7 +404,10 @@ int main(int argc, char* argv[]) {
          footer_t* footer = read_footer(input_map, input_filesize);
          if (!footer)
             exit(1);
-         print_footer_csv(footer);
+         if (arguments.json_output)
+            print_footer_json(footer);
+         else
+            print_footer_csv(footer);
          break;
       };
    }

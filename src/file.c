@@ -504,6 +504,29 @@ void print_footer_csv(footer_t* footer) {
           footer->mz_fmt, footer->inten_fmt);
 }
 
+void print_footer_json(footer_t* footer) {
+   if (!footer) {
+      warning("print_footer_json: footer is NULL.\n");
+      return;
+   }
+
+   printf("{\n");
+   printf("  \"xml_pos\": %lu,\n", footer->xml_pos);
+   printf("  \"mz_binary_pos\": %lu,\n", footer->mz_binary_pos);
+   printf("  \"inten_binary_pos\": %lu,\n", footer->inten_binary_pos);
+   printf("  \"xml_blk_pos\": %lu,\n", footer->xml_blk_pos);
+   printf("  \"mz_binary_blk_pos\": %lu,\n", footer->mz_binary_blk_pos);
+   printf("  \"inten_binary_blk_pos\": %lu,\n", footer->inten_binary_blk_pos);
+   printf("  \"divisions_t_pos\": %lu,\n", footer->divisions_t_pos);
+   printf("  \"num_spectra\": %zu,\n", footer->num_spectra);
+   printf("  \"original_filesize\": %lu,\n", footer->original_filesize);
+   printf("  \"n_divisions\": %d,\n", footer->n_divisions);
+   printf("  \"magic_tag\": %d,\n", footer->magic_tag);
+   printf("  \"mz_fmt\": %d,\n", footer->mz_fmt);
+   printf("  \"inten_fmt\": %d\n", footer->inten_fmt);
+   printf("}\n");
+}
+
 /**
  * @brief Determines if a memory-mapped file is an MSZ file.
  *

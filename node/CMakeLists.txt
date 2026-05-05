@@ -38,7 +38,7 @@ message("Include dirs are: ${dirs}")
 
 
 # Common source files
-file(GLOB SOURCE_FILES ${SRC_DIR}/*.c *.cpp)
+file(GLOB SOURCE_FILES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c *.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
