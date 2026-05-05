@@ -125,8 +125,18 @@
             "cwd": "${workspaceFolder}/electron",
             "environment": [],
             "externalConsole": false,
+          },
+          {
+            "name": "Python: parquet -> MSZX dataloader example",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/python/examples/parquet_to_mszx_dataloader.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/python",
+            "python": "${workspaceFolder}/python/.venv/bin/python",
+            "justMyCode": false
           }
-          
+
     ],
     "compounds": [
       {
