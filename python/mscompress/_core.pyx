@@ -100,11 +100,15 @@ def _pipe_stream(c_func, args, chunk_size=1_048_576):
 
 cdef class RuntimeArguments:
     cdef Arguments _arguments
+    cdef bytes _mz_lossy_buf
+    cdef bytes _int_lossy_buf
 
     def __init__(self):
         self._arguments.threads = _get_num_threads()
-        self._arguments.mz_lossy = "lossless"
-        self._arguments.int_lossy = "lossless"
+        self._mz_lossy_buf = b"lossless"
+        self._int_lossy_buf = b"lossless"
+        self._arguments.mz_lossy = self._mz_lossy_buf
+        self._arguments.int_lossy = self._int_lossy_buf
         self._arguments.blocksize = <long>1e+8
         self._arguments.mz_scale_factor = 1000
         self._arguments.int_scale_factor = 0
@@ -164,11 +168,93 @@ cdef class RuntimeArguments:
         def __set__(self, value):
             self._arguments.target_inten_format = value
     
+    property mz_lossy:
+        def __get__(self):
+            return self._arguments.mz_lossy.decode('utf-8') if isinstance(self._arguments.mz_lossy, bytes) else self._arguments.mz_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_MZ):
+                        valid = True
+                        if algo_registry[i].default_mz_scale != 0:
+                            self._arguments.mz_scale_factor = algo_registry[i].default_mz_scale
+                        break
+                if not valid:
+                    mz_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_MZ:
+                            mz_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown m/z lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in mz_algos)}"
+                    )
+            self._mz_lossy_buf = value_bytes
+            self._arguments.mz_lossy = self._mz_lossy_buf
+
+    property int_lossy:
+        def __get__(self):
+            return self._arguments.int_lossy.decode('utf-8') if isinstance(self._arguments.int_lossy, bytes) else self._arguments.int_lossy
+        def __set__(self, value):
+            if isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            else:
+                value_bytes = value
+            value_str = value_bytes.decode('utf-8') if isinstance(value_bytes, bytes) else value_bytes
+            if value_str != "lossless":
+                valid = False
+                for i in range(algo_registry_size):
+                    if algo_registry[i].name == value_bytes and (algo_registry[i].target & TARGET_INT):
+                        valid = True
+                        if algo_registry[i].default_int_scale != 0:
+                            self._arguments.int_scale_factor = algo_registry[i].default_int_scale
+                        break
+                if not valid:
+                    int_algos = []
+                    for i in range(algo_registry_size):
+                        if algo_registry[i].target & TARGET_INT:
+                            int_algos.append(algo_registry[i].name.decode('utf-8'))
+                    raise ValueError(
+                        f"Unknown intensity lossy algorithm '{value_str}'. "
+                        f"Valid options: 'lossless', {', '.join(repr(a) for a in int_algos)}"
+                    )
+            self._int_lossy_buf = value_bytes
+            self._arguments.int_lossy = self._int_lossy_buf
+
     property zstd_compression_level:
         def __get__(self):
             return self._arguments.zstd_compression_level
         def __set__(self, value):
             self._arguments.zstd_compression_level = value
+
+
+def list_algorithms():
+    """Return a list of available lossy algorithm descriptors from the C registry.
+
+    Each entry is a dict with keys: name, target, description,
+    default_mz_scale, default_int_scale, experimental.
+    """
+    result = []
+    for i in range(algo_registry_size):
+        targets = []
+        if algo_registry[i].target & TARGET_MZ:
+            targets.append("mz")
+        if algo_registry[i].target & TARGET_INT:
+            targets.append("intensity")
+        result.append({
+            "name": algo_registry[i].name.decode('utf-8'),
+            "target": targets,
+            "description": algo_registry[i].description.decode('utf-8'),
+            "default_mz_scale": algo_registry[i].default_mz_scale,
+            "default_int_scale": algo_registry[i].default_int_scale,
+            "experimental": bool(algo_registry[i].experimental),
+        })
+    return result
 
 
 cdef class DataBlock:
@@ -359,8 +445,16 @@ cdef class MZMLFile(BaseFile):
             # If we have more threads than divisions, increase the blocksize to max division size
             self._arguments.blocksize = _get_division_size_max(self._divisions)
 
+    def _validate_scale_factors(self):
+        cdef char err_buf[512]
+        err_buf[0] = b'\0'
+        if _validate_args(self._arguments.get_ptr(), err_buf, sizeof(err_buf)) != 0:
+            msg = err_buf.decode('utf-8').strip() if err_buf[0] != b'\0' else ""
+            raise ValueError(msg or "Invalid argument configuration.")
+
     def compress(self, output: Union[str, PathLike]) -> MSZFile:
         output = os.fspath(output)
+        self._validate_scale_factors()
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
         cdef int rv = _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
@@ -373,6 +467,7 @@ cdef class MZMLFile(BaseFile):
 
     def _compress_to_fd(self, int write_fd):
         """Internal helper: run compression pipeline writing to the given fd."""
+        self._validate_scale_factors()
         cdef int rv
         cdef char* mapping = <char*> self._mapping
         cdef size_t filesize = self.filesize
@@ -1413,21 +1508,21 @@ cdef class BaseFile:
 cdef class Spectra:
     """
     A class to represent and manage a collection of spectra, allowing (lazy) iteration and access by index.
-   
+
     Methods:
     __init__(self, DataFormat df, Division positions):
         Initializes the Spectra object with a data format and a list of postions.
-    
+
     __iter__(self):
         Resets the iteration index and returns the iterator object.
-    
+
     __next__(self):
         Returns the next spectrum in the sequence during iteration, raises `StopIteration` when the end is reached.
-    
+
     __getitem__(self, size_t index):
         Computes and returns the spectrum at the specified index.
         Raises `IndexError` if the index is out of range.
-    
+
     __len__(self) -> int:
         Returns the total number of spectra.
     """
@@ -1437,6 +1532,7 @@ cdef class Spectra:
     cdef object _cache  # Store computed spectra
     cdef int _index
     cdef size_t length
+    cdef object _transform
 
     def __init__(self, BaseFile f, DataFormat df, Division positions):
         self._f = f
@@ -1445,7 +1541,8 @@ cdef class Spectra:
         self.length = self._df.source_total_spec
         self._cache = [None] * self.length  # Initialize cache
         self._index = 0
-    
+        self._transform = None
+
     def __iter__(self):
         self._index = 0  # Reset index for new iteration
         return self
@@ -1453,20 +1550,20 @@ cdef class Spectra:
     def __next__(self):
         if self._index >= self.length:
             raise StopIteration
-        
+
         result = self[self._index]
         self._index += 1
         return result
-    
+
     def __getitem__(self, size_t index):
         if index >= self.length:
             raise IndexError("Spectra index out of range")
-        
+
         if self._cache[index] is None:
             self._cache[index] = self._compute_spectrum(index)
-        
+
         return self._cache[index]
-    
+
     cdef Spectrum _compute_spectrum(self, size_t index):
         if self._positions.ret_times is not None:
             retention_time = self._positions.ret_times[index]
@@ -1477,8 +1574,48 @@ cdef class Spectra:
             scan=self._positions.scans[index],
             ms_level=self._positions.ms_levels[index],
             retention_time=retention_time,
-            file=self._f
+            file=self._f,
+            transform=self._transform
         )
+
+    def set_transform(self, transform):
+        """Set a transform function to apply lazily to all spectra.
+
+        The transform must be a callable that accepts a dict with 'mz' and
+        'intensity' NumPy array keys and returns a dict with the same keys.
+
+        Setting a new transform invalidates cached spectra so they will be
+        recomputed with the new transform on next access.
+
+        Parameters:
+            transform: A callable matching the SpectrumTransform protocol,
+                       or None to clear the transform.
+        """
+        from .types import SpectrumTransform
+        if transform is not None and not isinstance(transform, SpectrumTransform):
+            raise TypeError(
+                "transform must be a callable with signature "
+                "(SpectrumDict) -> SpectrumDict, or None"
+            )
+        self._transform = transform
+        # Invalidate cache so spectra are recomputed with new transform
+        self._cache = [None] * self.length
+
+    def with_transform(self, transform):
+        """Return a new Spectra instance with the given transform applied.
+
+        The original Spectra is not modified.
+
+        Parameters:
+            transform: A callable matching the SpectrumTransform protocol,
+                       or None for no transform.
+
+        Returns:
+            A new Spectra instance with the transform set.
+        """
+        new = Spectra(self._f, self._df, self._positions)
+        new.set_transform(transform)
+        return new
 
     def __len__(self) -> int:
         return self.length
@@ -1491,7 +1628,7 @@ cdef class Spectrum:
     Attributes:
     index (int): Index of spectrum relative to the file.
     scan (int): Scan number of spectrum reported by instrument.
-    size (int): Number of m/z - intensity pairs.
+    size (int): Number of m/z - intensity pairs (pre-transform).
     ms_level (int): MS level of spectrum.
     retention_time (float): Retention time of spectrum.
     """
@@ -1504,8 +1641,10 @@ cdef class Spectrum:
         object _mz
         object _intensity
         object _xml
+        object _transform
+        object _transformed
 
-    def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file):
+    def __init__(self, uint64_t index, uint32_t scan, uint16_t ms_level, float retention_time, BaseFile file, transform=None):
         self.index = index
         self.scan = scan
         self.ms_level = ms_level
@@ -1514,34 +1653,43 @@ cdef class Spectrum:
         self._mz = None
         self._intensity = None
         self._xml = None
-        
+        self._transform = transform
+        self._transformed = None
+
     def __repr__(self):
         return f"Spectrum(index={self.index}, scan={self.scan}, ms_level={self.ms_level}, retention_time={self.retention_time})"
+
+    cdef dict _apply_transform(self):
+        """Apply the transform and cache the result."""
+        if self._transformed is None and self._transform is not None:
+            self._transformed = self._transform({
+                'mz': self.raw_mz,
+                'intensity': self.raw_intensity,
+            })
+        return self._transformed
 
     property index:
         def __get__(self):
             return self.index
-    
+
     property scan:
         def __get__(self):
             return self.scan
-    
+
     property xml:
         def __get__(self):
             if self._xml is None:
                 self._xml = self._file.get_xml(self.index)
             return self._xml
 
-    property size: 
+    property size:
         def __get__(self):
-            if self._mz is None:
-                self._mz = self._file.get_mz_binary(self.index)
-            return len(self._mz)
-    
+            return len(self.raw_mz)
+
     property ms_level:
         def __get__(self):
             return self.ms_level
-    
+
     property retention_time:
         def __get__(self):
             if math.isnan(self._retention_time): # If the ms level wasn't derived from preprocessing step, find it
@@ -1560,17 +1708,29 @@ cdef class Spectrum:
             else:
                 return self._retention_time
 
-    property mz:
+    property raw_mz:
         def __get__(self):
             if self._mz is None:
                 self._mz = self._file.get_mz_binary(self.index)
             return self._mz
 
-    property intensity:
+    property raw_intensity:
         def __get__(self):
             if self._intensity is None:
                 self._intensity = self._file.get_inten_binary(self.index)
             return self._intensity
+
+    property mz:
+        def __get__(self):
+            if self._transform is not None:
+                return self._apply_transform()['mz']
+            return self.raw_mz
+
+    property intensity:
+        def __get__(self):
+            if self._transform is not None:
+                return self._apply_transform()['intensity']
+            return self.raw_intensity
 
     property peaks:
         def __get__(self):

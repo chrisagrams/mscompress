@@ -35,7 +35,7 @@ include_directories(
 )
 
 # C core sources
-file(GLOB C_SOURCE_FILES ${SRC_DIR}/*.c)
+file(GLOB C_SOURCE_FILES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c)
 
 # C++ native addon sources
 set(CPP_SOURCE_FILES

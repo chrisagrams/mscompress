@@ -211,6 +211,7 @@ c_sources = []
 c_sources += get_all_c_files("../vendor/lz4/lib")
 c_sources += get_all_c_files("../vendor/zlib")
 c_sources += get_all_c_files("../src")
+c_sources += get_all_c_files("../src/algos")
 c_sources += get_all_c_files("../vendor/zstd")
 c_sources += get_all_c_files("../vendor/zstd/lib/common")
 c_sources += get_all_c_files("../vendor/zstd/lib/compress")

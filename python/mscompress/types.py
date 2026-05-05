@@ -1,8 +1,43 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 from enum import Enum
+
+import numpy as np
+import numpy.typing as npt
+from typing import Literal
+from typing_extensions import TypedDict
+
+
+class AlgorithmInfo(TypedDict):
+    """Descriptor for a lossy transformation algorithm."""
+
+    name: str
+    target: list[Literal["mz", "intensity"]]
+    description: str
+    default_mz_scale: float
+    default_int_scale: float
+    experimental: bool
+
+
+class SpectrumDict(TypedDict):
+    """Dictionary representing a spectrum's binary data arrays."""
+
+    mz: npt.NDArray[np.floating]
+    intensity: npt.NDArray[np.floating]
+
+
+@runtime_checkable
+class SpectrumTransform(Protocol):
+    """Protocol for spectrum transform callables.
+
+    A transform receives a SpectrumDict and returns a SpectrumDict.
+    Both input and output must contain 'mz' and 'intensity' keys
+    with NumPy arrays of equal length.
+    """
+
+    def __call__(self, data: SpectrumDict) -> SpectrumDict: ...
 
 
 class AnnotationFormat(Enum):

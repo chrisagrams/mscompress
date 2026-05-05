@@ -53,6 +53,9 @@
 #define _mass_ 1000514
 #define _xml_ 1000513  // TODO: change this
 
+#define TARGET_MZ 0x01
+#define TARGET_INT 0x02
+
 #define _lossless_ 4700000
 #define _ZSTD_compression_ 4700001
 #define _cast_64_to_32_ 4700002
@@ -87,6 +90,16 @@ extern "C" {
 extern int verbose;
 
 typedef struct {
+   const char* name;
+   int type;
+   int target;
+   const char* description;
+   float default_mz_scale;
+   float default_int_scale;
+   int experimental;
+} algo_info_t;
+
+typedef struct {
    int verbose;
    int threads;
    int extract_only;
@@ -109,6 +122,8 @@ typedef struct {
    int target_inten_format;
 
    int zstd_compression_level;
+
+   int json_output;
 } Arguments;
 
 typedef struct {
@@ -293,6 +308,9 @@ int set_mz_lossy(Arguments* args, const char* mz_lossy);
 int set_int_lossy(Arguments* args, const char* int_lossy);
 int set_mz_scale_factor(Arguments* args, const char* scale_factor_str);
 int set_int_scale_factor(Arguments* args, const char* scale_factor_str);
+int validate_args(Arguments* args, char* err_buf, size_t err_buf_size);
+void print_algorithms(void);
+void print_algorithms_json(void);
 int set_compress_runtime_variables(Arguments* args, data_format_t* df);
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 
@@ -312,6 +330,7 @@ data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
 void print_footer_csv(footer_t* footer);
+void print_footer_json(footer_t* footer);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
                 char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
@@ -574,6 +593,8 @@ typedef struct {
    Algo algo_fun;
 } algo_args;
 
+extern const algo_info_t algo_registry[];
+extern const int algo_registry_size;
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(const char* arg);

@@ -11,16 +11,12 @@
 * @return Returns 0 if the algorithm name is valid, 1 otherwise.
 */
 static int validate_algo_name(const char* name) {
-   if (strcmp(name, "cast") != 0 && strcmp(name, "cast16") != 0 &&
-       strcmp(name, "log") != 0 && strcmp(name, "delta16") != 0 &&
-       strcmp(name, "delta24") != 0 && strcmp(name, "delta32") != 0 &&
-       strcmp(name, "vdelta16") != 0 && strcmp(name, "vdelta24") != 0 &&
-       strcmp(name, "vbr") != 0 && strcmp(name, "bitpack") != 0) {
-      fprintf(stderr, "Invalid lossy compression type: %s\n", name);
-      return 1;  // Indicate error
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(name, algo_registry[i].name) == 0)
+         return 0;
    }
-
-   return 0;  // Indicate success
+   fprintf(stderr, "Invalid lossy compression type: %s\n", name);
+   return 1;
 }
 
 /**
@@ -50,6 +46,8 @@ void init_args(Arguments* args) {
    args->target_inten_format = _ZSTD_compression_;  // default
 
    args->zstd_compression_level = 3;  // default
+
+   args->json_output = 0;
 }
 
 /**
@@ -71,37 +69,89 @@ int set_threads(Arguments* args, int threads) {
 }
 
 /**
+* @brief Prints a formatted table of available lossy transformation algorithms.
+*/
+static const char* target_str(int target) {
+   if ((target & TARGET_MZ) && (target & TARGET_INT))
+      return "mz/int";
+   if (target & TARGET_MZ)
+      return "mz";
+   if (target & TARGET_INT)
+      return "int";
+   return "unknown";
+}
+
+static void scale_factor_str(char* buf, size_t buf_size, const algo_info_t* algo) {
+   if ((algo->target & TARGET_MZ) && (algo->target & TARGET_INT)) {
+      snprintf(buf, buf_size, "%g (mz), %g (int)",
+               (double)algo->default_mz_scale, (double)algo->default_int_scale);
+   } else if ((algo->target & TARGET_MZ) && algo->default_mz_scale != 0) {
+      snprintf(buf, buf_size, "%g", (double)algo->default_mz_scale);
+   } else if ((algo->target & TARGET_INT) && algo->default_int_scale != 0) {
+      snprintf(buf, buf_size, "%g", (double)algo->default_int_scale);
+   } else {
+      snprintf(buf, buf_size, "N/A");
+   }
+}
+
+void print_algorithms(void) {
+   printf("Available lossy transformation algorithms:\n\n");
+   printf("  %-12s %-10s %-45s %s\n", "Name", "Target", "Description", "Default Scale Factor");
+   printf("  %-12s %-10s %-45s %s\n", "----", "------", "-----------", "--------------------");
+   for (int i = 0; i < algo_registry_size; i++) {
+      char scale_buf[64];
+      scale_factor_str(scale_buf, sizeof(scale_buf), &algo_registry[i]);
+      printf("  %-12s %-10s %-45s %s\n",
+             algo_registry[i].name,
+             target_str(algo_registry[i].target),
+             algo_registry[i].description,
+             scale_buf);
+   }
+   printf("\nUse -z/--mz-lossy or -i/--int-lossy to enable an algorithm.\n");
+   printf("Use --mz-scale-factor or --int-scale-factor to override the default.\n");
+}
+
+/**
+* @brief Prints available lossy transformation algorithms as a JSON array.
+*/
+void print_algorithms_json(void) {
+   printf("[\n");
+   for (int i = 0; i < algo_registry_size; i++) {
+      const algo_info_t* a = &algo_registry[i];
+      printf("  {\n");
+      printf("    \"name\": \"%s\",\n", a->name);
+      printf("    \"target\": \"%s\",\n", target_str(a->target));
+      printf("    \"description\": \"%s\",\n", a->description);
+      printf("    \"default_mz_scale\": %g,\n", (double)a->default_mz_scale);
+      printf("    \"default_int_scale\": %g,\n", (double)a->default_int_scale);
+      printf("    \"experimental\": %s\n", a->experimental ? "true" : "false");
+      printf("  }%s\n", (i < algo_registry_size - 1) ? "," : "");
+   }
+   printf("]\n");
+}
+
+/**
 * @brief Sets the lossy compression algorithm for mz data.
 * @param args A pointer to the `Arguments` struct.
 * @param mz_lossy The name of the lossy compression algorithm to set.
 * @return Returns 0 on success, 1 on error.
 */
 int set_mz_lossy(Arguments* args, const char* mz_lossy) {
-   // Validate the algorithm name
-   if (validate_algo_name(mz_lossy))
-      return 1;
-
-   // Assign the algorithm to arguments
-   args->mz_lossy = mz_lossy;
-
-   // Set the default scale factor based on the algorithm
-   if (strcmp(mz_lossy, "delta16") == 0)
-      args->mz_scale_factor = 127.998046875;
-   else if (strcmp(mz_lossy, "delta24") == 0)
-      args->mz_scale_factor = 65536;
-   else if (strcmp(mz_lossy, "delta32") == 0)
-      args->mz_scale_factor = 262143.99993896484;
-   else if (strcmp(mz_lossy, "vbr") == 0)
-      args->mz_scale_factor = 0.1;
-   else if (strcmp(mz_lossy, "bitpack") == 0)
-      args->mz_scale_factor = 10000.0;
-   else if (strcmp(mz_lossy, "cast16") == 0)
-      args->mz_scale_factor = 11.801;
-   else {
-      fprintf(stderr, "Invalid mz lossy compression type: %s\n", mz_lossy);
-      return 1;  // Indicate error
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(mz_lossy, algo_registry[i].name) == 0) {
+         if (!(algo_registry[i].target & TARGET_MZ)) {
+            fprintf(stderr, "Algorithm '%s' does not support mz target.\n",
+                    mz_lossy);
+            return 1;
+         }
+         args->mz_lossy = mz_lossy;
+         if (algo_registry[i].default_mz_scale != 0)
+            args->mz_scale_factor = algo_registry[i].default_mz_scale;
+         return 0;
+      }
    }
-   return 0;  // Indicate success
+   fprintf(stderr, "Invalid mz lossy compression type: %s\n", mz_lossy);
+   return 1;
 }
 
 /**
@@ -111,24 +161,21 @@ int set_mz_lossy(Arguments* args, const char* mz_lossy) {
 * @return Returns 0 on success, 1 on error.
 */
 int set_int_lossy(Arguments* args, const char* int_lossy) {
-   // Validate the algorithm name
-   if (validate_algo_name(int_lossy))
-      return 1;
-
-   // Assign the algorithm to arguments
-   args->int_lossy = int_lossy;
-
-   // Set the default scale factor based on the algorithm
-   if (strcmp(args->int_lossy, "log") == 0)
-      args->int_scale_factor = 72.0;
-   else if (strcmp(args->int_lossy, "vbr") == 0)
-      args->int_scale_factor = 1.0;
-   else {
-      fprintf(stderr, "Invalid int lossy compression type: %s\n", int_lossy);
-      return 1;  // Indicate error
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(int_lossy, algo_registry[i].name) == 0) {
+         if (!(algo_registry[i].target & TARGET_INT)) {
+            fprintf(stderr, "Algorithm '%s' does not support int target.\n",
+                    int_lossy);
+            return 1;
+         }
+         args->int_lossy = int_lossy;
+         if (algo_registry[i].default_int_scale != 0)
+            args->int_scale_factor = algo_registry[i].default_int_scale;
+         return 0;
+      }
    }
-
-   return 0;  // Indicate success
+   fprintf(stderr, "Invalid int lossy compression type: %s\n", int_lossy);
+   return 1;
 }
 
 /**
@@ -179,6 +226,49 @@ int set_int_scale_factor(Arguments* args, const char* scale_factor_str) {
    }
 
    args->int_scale_factor = parse_scale_factor(scale_factor_str);
+   return 0;
+}
+
+/**
+ * @brief Validates that scale factors are non-zero for algorithms that require them.
+ * @param args A pointer to the `Arguments` struct to validate.
+ * @return Returns 0 if valid, 1 if invalid (with error message via error callback).
+ */
+int validate_args(Arguments* args, char* err_buf, size_t err_buf_size) {
+   if (args == NULL) {
+      if (err_buf && err_buf_size > 0)
+         snprintf(err_buf, err_buf_size, "validate_args: NULL arguments");
+      return 1;
+   }
+
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(args->mz_lossy, algo_registry[i].name) == 0 &&
+          (algo_registry[i].target & TARGET_MZ)) {
+         if (algo_registry[i].default_mz_scale != 0 && args->mz_scale_factor == 0) {
+            if (err_buf && err_buf_size > 0)
+               snprintf(err_buf, err_buf_size,
+                        "mz_scale_factor cannot be 0 for algorithm '%s' (default: %g)",
+                        args->mz_lossy, (double)algo_registry[i].default_mz_scale);
+            return 1;
+         }
+         break;
+      }
+   }
+
+   for (int i = 0; i < algo_registry_size; i++) {
+      if (strcmp(args->int_lossy, algo_registry[i].name) == 0 &&
+          (algo_registry[i].target & TARGET_INT)) {
+         if (algo_registry[i].default_int_scale != 0 && args->int_scale_factor == 0) {
+            if (err_buf && err_buf_size > 0)
+               snprintf(err_buf, err_buf_size,
+                        "int_scale_factor cannot be 0 for algorithm '%s' (default: %g)",
+                        args->int_lossy, (double)algo_registry[i].default_int_scale);
+            return 1;
+         }
+         break;
+      }
+   }
+
    return 0;
 }
 

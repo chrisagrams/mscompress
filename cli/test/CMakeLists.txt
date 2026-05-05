@@ -7,6 +7,33 @@ add_test(NAME VersionTest COMMAND mscompress --version)
 
 add_test(NAME HelpTest COMMAND mscompress --help)
 
+add_test(NAME ListAlgorithmsTest COMMAND mscompress --list-algorithms)
+
+# --json flag tests
+add_test(NAME JsonVersionTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;--version"
+    -DEXPECTED_PATTERN=version
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
+
+add_test(NAME JsonListAlgorithmsTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;--list-algorithms"
+    -DEXPECTED_PATTERN=name
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
+
+add_test(NAME JsonDescribeTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--json;-d"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.msz
+    -DEXPECTED_PATTERN=num_spectra
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_json.cmake
+)
 
 # Test compression and decompression using the run_test.cmake script
 add_test(NAME CompressTest
@@ -90,6 +117,17 @@ add_test(NAME CompressSciexNoScanAttr
     "-DARGS="
     -DINPUT_FILE=${TEST_DATA_DIR}/sciex_ttof6600_100.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_sciex_no_scan
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# Corrupt base64 test - regression test for GitHub issue #111
+# Verifies compress/decompress handles mzML with invalid base64 characters gracefully
+add_test(NAME CompressCorruptBase64
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/corrupt_base64.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_corrupt_base64
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 

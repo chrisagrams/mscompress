@@ -1,9 +1,10 @@
 [tool.commitizen]
-version = "1.0.13"
+version = "1.0.14"
 version_files = [
     "node/package.json",
     "node-ts/package.json",
     "electron/package.json",
     "python/pyproject.toml",
+    "python/mscompress/__init__.py:__version__",
 ]
 create_tag = false

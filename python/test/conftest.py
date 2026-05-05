@@ -34,3 +34,7 @@ def pepxml_file_path():
 @pytest.fixture
 def percolator_tsv_file_path():
     return str(_TEST_DATA_DIR / "percolator" / "test.tsv")
+
+@pytest.fixture
+def corrupt_base64_mzml_path():
+    return str(_TEST_DATA_DIR / "corrupt_base64.mzML")
