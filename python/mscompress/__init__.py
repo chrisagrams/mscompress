@@ -56,6 +56,17 @@ from .annotations import (
     PepXMLReader,
 )
 
+# Optional parquet support (requires the [parquet] extra).
+try:
+    from .parquet import (
+        parquet_to_msz,
+        parquet_to_annotations_tsv,
+        parquet_to_mszx,
+    )
+    _HAS_PARQUET = True
+except ImportError:
+    _HAS_PARQUET = False
+
 __all__ = [
     # Core types
     "RuntimeArguments",
@@ -101,4 +112,11 @@ __all__ = [
     "TSVReader",
     "PepXMLReader",
 ]
+
+if _HAS_PARQUET:
+    __all__.extend([
+        "parquet_to_msz",
+        "parquet_to_annotations_tsv",
+        "parquet_to_mszx",
+    ])
 
