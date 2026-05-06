@@ -20,6 +20,7 @@ from mscompress.parquet import (
 
 _TEST_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "test" / "data"
 _PARQUET_FIXTURE = _TEST_DATA_DIR / "parquet" / "consensus_wsbin_00001_100rows.parquet"
+_PARQUET_FIXTURE_MINIMAL = _TEST_DATA_DIR / "parquet" / "consensus_00_100rows.parquet"
 
 
 @pytest.fixture
@@ -32,6 +33,19 @@ def parquet_path():
 @pytest.fixture
 def parquet_table(parquet_path):
     return pq.read_table(str(parquet_path))
+
+
+@pytest.fixture
+def minimal_parquet_path():
+    """Real-world parquet with only `peptide_charge`, `m/z`, `int` columns."""
+    if not _PARQUET_FIXTURE_MINIMAL.exists():
+        pytest.skip(f"Minimal parquet fixture missing: {_PARQUET_FIXTURE_MINIMAL}")
+    return _PARQUET_FIXTURE_MINIMAL
+
+
+@pytest.fixture
+def minimal_parquet_table(minimal_parquet_path):
+    return pq.read_table(str(minimal_parquet_path))
 
 
 def test_parquet_to_msz_roundtrip(parquet_path, parquet_table, tmp_path):
@@ -191,5 +205,154 @@ def test_parquet_to_msz_missing_column(tmp_path):
     bad_path = tmp_path / "bad.parquet"
     pq.write_table(bad, bad_path)
 
-    with pytest.raises(ValueError, match="missing required columns"):
+    with pytest.raises(ValueError, match="missing required mz/intensity"):
         parquet_to_msz(bad_path, tmp_path / "out.msz")
+
+
+# ---------------------------------------------------------------------------
+# Schema-flexibility tests (mz + intensity required, everything else optional)
+# ---------------------------------------------------------------------------
+
+def _make_minimal_parquet(tmp_path: Path, **overrides) -> Path:
+    """Build a tiny parquet with mz/intensity-style columns plus overrides."""
+    cols = {
+        "mz": [[100.0, 200.0, 300.0], [110.5, 220.5]],
+        "intensity": [[10.0, 20.0, 30.0], [11.0, 22.0]],
+    }
+    cols.update(overrides)
+    table = pa.table(cols)
+    p = tmp_path / "minimal.parquet"
+    pq.write_table(table, p)
+    return p
+
+
+def test_parquet_renamed_columns(tmp_path):
+    """`m/z` + `int` aliases must be accepted with no other metadata."""
+    cols = {
+        "m/z": [[100.0, 200.0], [110.5, 220.5, 330.5]],
+        "int": [[10.0, 20.0], [11.0, 22.0, 33.0]],
+    }
+    p = tmp_path / "renamed.parquet"
+    pq.write_table(pa.table(cols), p)
+
+    out = tmp_path / "out.msz"
+    msz_file = parquet_to_msz(p, out)
+    msz_file.__exit__(None, None, None)
+
+    with read(out) as msz:
+        assert len(msz.spectra) == 2
+        for i, expected in enumerate(cols["m/z"]):
+            got = msz.spectra[i].mz.astype(np.float32)
+            assert np.array_equal(got, np.asarray(expected, dtype=np.float32))
+
+
+def test_parquet_default_ret_time_when_missing(tmp_path):
+    """Missing ret_time column must round-trip as -1 (default)."""
+    p = _make_minimal_parquet(tmp_path)
+
+    out = tmp_path / "out.msz"
+    msz_file = parquet_to_msz(p, out, ret_time_unit="second")
+    msz_file.__exit__(None, None, None)
+
+    with read(out) as msz:
+        for spectrum in msz.spectra:
+            # _DEFAULT_RET_TIME = -1.0 emitted in seconds → preserved exactly.
+            assert math.isclose(spectrum.retention_time, -1.0, rel_tol=1e-5)
+
+
+def test_parquet_combined_peptide_charge_split(tmp_path):
+    """`peptide_charge` should split on the last underscore for annotations."""
+    p = _make_minimal_parquet(
+        tmp_path,
+        peptide_charge=["AANFVHMDTAQK_2", "PEPT_IDE_3"],
+    )
+
+    tsv = tmp_path / "ann.tsv"
+    parquet_to_annotations_tsv(p, tsv)
+
+    psms = list(TSVReader(tsv))
+    assert len(psms) == 2
+    assert psms[0].peptide == "AANFVHMDTAQK"
+    assert psms[0].charge == 2
+    # Last underscore wins, so "PEPT_IDE_3" → ("PEPT_IDE", 3).
+    assert psms[1].peptide == "PEPT_IDE"
+    assert psms[1].charge == 3
+
+
+def test_parquet_score_column_none_writes_empty(tmp_path):
+    """score_column=None with no auto-resolvable score → empty cells, no raise."""
+    p = _make_minimal_parquet(
+        tmp_path,
+        peptide_charge=["AAA_2", "BBB_3"],
+    )
+
+    tsv = tmp_path / "ann.tsv"
+    parquet_to_annotations_tsv(p, tsv, score_column=None)
+
+    text = tsv.read_text(encoding="utf-8")
+    lines = text.strip().split("\n")
+    # Header + 2 rows.
+    assert len(lines) == 3
+    headers = lines[0].split("\t")
+    score_idx = headers.index("score")
+    for row in lines[1:]:
+        cells = row.split("\t")
+        assert cells[score_idx] == "", f"expected empty score cell, got {cells[score_idx]!r}"
+
+
+def test_parquet_score_column_specified_but_missing_raises(tmp_path):
+    """Explicit score_column not in schema must raise."""
+    p = _make_minimal_parquet(tmp_path, peptide_charge=["A_2", "B_3"])
+
+    with pytest.raises(ValueError, match="score_column='nope' not in"):
+        parquet_to_annotations_tsv(p, tmp_path / "ann.tsv", score_column="nope")
+
+
+def test_parquet_score_column_auto_resolves_max_score(tmp_path, parquet_path):
+    """With max_score present, score_column=None must auto-pick it."""
+    tsv = tmp_path / "ann.tsv"
+    parquet_to_annotations_tsv(parquet_path, tsv)  # no score_column → auto
+
+    table = pq.read_table(str(parquet_path))
+    expected_scores = table.column("max_score").to_numpy(zero_copy_only=False)
+
+    psms = list(TSVReader(tsv))
+    assert len(psms) == len(expected_scores)
+    for psm, expected in zip(psms, expected_scores):
+        assert math.isclose(psm.score, float(expected), rel_tol=1e-6)
+
+
+def test_parquet_minimal_fixture_to_mszx_full(minimal_parquet_path, minimal_parquet_table, tmp_path):
+    """End-to-end on the consensus_00 fixture (peptide_charge / m/z / int only)."""
+    out = tmp_path / "consensus_00.mszx"
+    parquet_to_mszx(
+        minimal_parquet_path,
+        out,
+        description="minimal-schema parquet bundle",
+    )
+
+    n_rows = minimal_parquet_table.num_rows
+    mz_lists = minimal_parquet_table.column("m/z").to_pylist()
+    int_lists = minimal_parquet_table.column("int").to_pylist()
+    pep_charges = minimal_parquet_table.column("peptide_charge").to_pylist()
+
+    with MSZXFile.open(out) as mszx:
+        assert len(mszx.spectra) == n_rows
+        annotations = list(mszx.annotations)
+        assert len(annotations) == n_rows
+
+        ann_by_scan = {a.scan_number: a for a in annotations}
+        for i, spectrum in enumerate(mszx.spectra):
+            assert np.array_equal(
+                spectrum.mz.astype(np.float32),
+                np.asarray(mz_lists[i], dtype=np.float32),
+            )
+            assert np.array_equal(
+                spectrum.intensity.astype(np.float32),
+                np.asarray(int_lists[i], dtype=np.float32),
+            )
+            # peptide_charge split: "<seq>_<charge>"
+            seq, _, ch = pep_charges[i].rpartition("_")
+            ann = ann_by_scan[spectrum.scan]
+            assert ann.peptide == seq
+            assert ann.charge == int(ch)
