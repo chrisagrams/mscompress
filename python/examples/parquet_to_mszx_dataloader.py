@@ -31,7 +31,8 @@ from mscompress.types import AnnotationFormat
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_PARQUET = REPO_ROOT / "test" / "data" / "parquet" / "consensus_wsbin_00001_100rows.parquet"
+# DEFAULT_PARQUET = REPO_ROOT / "test" / "data" / "parquet" / "consensus_wsbin_00001_100rows.parquet"
+DEFAULT_PARQUET = REPO_ROOT / "test" / "data" / "parquet" / "consensus_00_100rows.parquet"
 
 
 def collate_variable_length(batch):
@@ -80,7 +81,8 @@ def main() -> int:
         parquet_to_mszx(
             args.parquet,
             mszx_path,
-            score_column="max_score",
+            # score_column="max_score",
+            score_column=None,
             description=f"Converted from {args.parquet.name}",
         )
         print(f"  archive size: {mszx_path.stat().st_size:,} bytes")
