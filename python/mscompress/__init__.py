@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.0.14"
+__version__ = "1.0.15"
 
 
 from ._core import (
