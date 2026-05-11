@@ -69,6 +69,7 @@ try:
         parquet_to_msz,
         parquet_to_annotations_tsv,
         parquet_to_mszx,
+        to_parquet,
     )
     _HAS_PARQUET = True
 except ImportError:
@@ -129,5 +130,6 @@ if _HAS_PARQUET:
         "parquet_to_msz",
         "parquet_to_annotations_tsv",
         "parquet_to_mszx",
+        "to_parquet",
     ])
 

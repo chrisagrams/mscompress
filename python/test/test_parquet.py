@@ -15,6 +15,7 @@ from mscompress.parquet import (
     parquet_to_annotations_tsv,
     parquet_to_msz,
     parquet_to_mszx,
+    to_parquet,
 )
 
 
@@ -356,3 +357,211 @@ def test_parquet_minimal_fixture_to_mszx_full(minimal_parquet_path, minimal_parq
             ann = ann_by_scan[spectrum.scan]
             assert ann.peptide == seq
             assert ann.charge == int(ch)
+
+
+# ---------------------------------------------------------------------------
+# Inverse path: mzML / MSZ / MSZX -> parquet
+# ---------------------------------------------------------------------------
+
+_MZML_FIXTURE = _TEST_DATA_DIR / "test.mzML"
+
+
+@pytest.fixture
+def mzml_path():
+    if not _MZML_FIXTURE.exists():
+        pytest.skip(f"mzML fixture missing: {_MZML_FIXTURE}")
+    return _MZML_FIXTURE
+
+
+def test_to_parquet_roundtrip_msz(parquet_path, parquet_table, tmp_path):
+    """parquet -> msz -> parquet must preserve mz/intensity bit-exact."""
+    msz_out = tmp_path / "spectra.msz"
+    pq_out = tmp_path / "roundtrip.parquet"
+
+    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+    to_parquet(msz_out, pq_out)
+
+    rt_table = pq.read_table(str(pq_out))
+    src_mz = parquet_table.column("mz").to_pylist()
+    src_in = parquet_table.column("intensity").to_pylist()
+    out_mz = rt_table.column("mz").to_pylist()
+    out_in = rt_table.column("intensity").to_pylist()
+
+    assert rt_table.num_rows == parquet_table.num_rows
+    for i in range(parquet_table.num_rows):
+        assert np.array_equal(
+            np.asarray(out_mz[i], dtype=np.float32),
+            np.asarray(src_mz[i], dtype=np.float32),
+        ), f"mz mismatch at row {i}"
+        assert np.array_equal(
+            np.asarray(out_in[i], dtype=np.float32),
+            np.asarray(src_in[i], dtype=np.float32),
+        ), f"intensity mismatch at row {i}"
+
+
+def test_to_parquet_metadata(parquet_path, parquet_table, tmp_path):
+    """scan, ms_level, precursor, charge, ret_time (in minutes) round-trip."""
+    msz_out = tmp_path / "spectra.msz"
+    pq_out = tmp_path / "roundtrip.parquet"
+
+    parquet_to_msz(parquet_path, msz_out, ret_time_unit="minute").__exit__(None, None, None)
+    to_parquet(msz_out, pq_out)
+
+    out = pq.read_table(str(pq_out))
+    expected_rt = parquet_table.column("ret_time").to_numpy(zero_copy_only=False)
+    expected_prec = parquet_table.column("precursor").to_numpy(zero_copy_only=False)
+    expected_charge = parquet_table.column("charge").to_numpy(zero_copy_only=False)
+
+    scans = out.column("scan").to_numpy(zero_copy_only=False)
+    ms_levels = out.column("ms_level").to_numpy(zero_copy_only=False)
+    rt = out.column("ret_time").to_numpy(zero_copy_only=False)
+    prec = out.column("precursor").to_numpy(zero_copy_only=False)
+    charges = out.column("charge").to_numpy(zero_copy_only=False)
+
+    for i in range(out.num_rows):
+        assert int(scans[i]) == i + 1
+        assert int(ms_levels[i]) == 2
+        # ret_time was minutes in source, MSZ stores seconds, auto-detect
+        # should emit minutes again.
+        assert math.isclose(float(rt[i]), float(expected_rt[i]), rel_tol=1e-4), (
+            f"rt mismatch row {i}: {rt[i]} vs {expected_rt[i]}"
+        )
+        assert math.isclose(float(prec[i]), float(expected_prec[i]), rel_tol=1e-5)
+        assert int(charges[i]) == int(expected_charge[i])
+
+
+def test_to_parquet_schema_columns_msz(parquet_path, tmp_path):
+    """MSZ input must produce schema *without* annotation columns."""
+    msz_out = tmp_path / "spectra.msz"
+    pq_out = tmp_path / "out.parquet"
+    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+    to_parquet(msz_out, pq_out)
+
+    schema = pq.read_schema(str(pq_out))
+    names = set(schema.names)
+    assert {"scan", "ms_level", "ret_time", "precursor", "charge",
+            "mz", "intensity", "n_peaks"} <= names
+    assert "peptide" not in names
+    assert "score" not in names
+
+
+def test_to_parquet_mszx_includes_annotations(parquet_path, parquet_table, tmp_path):
+    """MSZX input must emit peptide/peptide_charge/score columns."""
+    mszx_out = tmp_path / "bundle.mszx"
+    pq_out = tmp_path / "out.parquet"
+    parquet_to_mszx(parquet_path, mszx_out, score_column="max_score")
+    to_parquet(mszx_out, pq_out)
+
+    schema = pq.read_schema(str(pq_out))
+    assert {"peptide", "peptide_charge", "score", "q_value"} <= set(schema.names)
+
+    out = pq.read_table(str(pq_out))
+    assert out.num_rows == parquet_table.num_rows
+
+    expected_peptides = parquet_table.column("peptide").to_pylist()
+    expected_charges = parquet_table.column("charge").to_numpy(zero_copy_only=False)
+    expected_scores = parquet_table.column("max_score").to_numpy(zero_copy_only=False)
+
+    # Match output rows back to source by scan number (forward path emits scan = i+1).
+    out_by_scan = {
+        int(out.column("scan")[i].as_py()): i for i in range(out.num_rows)
+    }
+    out_pep = out.column("peptide").to_pylist()
+    out_pep_charge = out.column("peptide_charge").to_pylist()
+    out_score = out.column("score").to_numpy(zero_copy_only=False)
+    for i, expected_pep in enumerate(expected_peptides):
+        scan = i + 1
+        row = out_by_scan[scan]
+        assert out_pep[row] == expected_pep
+        assert out_pep_charge[row] == f"{expected_pep}_{int(expected_charges[i])}"
+        assert math.isclose(float(out_score[row]), float(expected_scores[i]), rel_tol=1e-5)
+
+
+def test_to_parquet_full_roundtrip_mszx(parquet_path, parquet_table, tmp_path):
+    """mszx -> parquet -> mszx preserves spectra and annotations."""
+    mszx_in = tmp_path / "in.mszx"
+    pq_mid = tmp_path / "mid.parquet"
+    mszx_out = tmp_path / "out.mszx"
+
+    parquet_to_mszx(parquet_path, mszx_in, score_column="max_score")
+    to_parquet(mszx_in, pq_mid)
+    parquet_to_mszx(pq_mid, mszx_out)
+
+    with MSZXFile.open(mszx_out) as mszx:
+        assert len(mszx.spectra) == parquet_table.num_rows
+        ann_by_scan = {a.scan_number: a for a in mszx.annotations}
+        expected_pep = parquet_table.column("peptide").to_pylist()
+        for i, spectrum in enumerate(mszx.spectra):
+            assert spectrum.scan == i + 1
+            assert ann_by_scan[spectrum.scan].peptide == expected_pep[i]
+
+
+def test_to_parquet_mzml(mzml_path, tmp_path):
+    """to_parquet must work on an mzML directly, not just MSZ."""
+    pq_out = tmp_path / "from_mzml.parquet"
+    to_parquet(mzml_path, pq_out)
+
+    out = pq.read_table(str(pq_out))
+    assert out.num_rows > 0
+    # Required columns must exist and be the right dtype.
+    schema = out.schema
+    assert pa.types.is_list(schema.field("mz").type)
+    assert pa.types.is_list(schema.field("intensity").type)
+    assert pa.types.is_int32(schema.field("scan").type)
+    # No annotation columns on an mzML input.
+    assert "peptide" not in schema.names
+
+
+def test_to_parquet_ret_time_unit_seconds(parquet_path, parquet_table, tmp_path):
+    """Source written in seconds must auto-detect and emit in seconds."""
+    msz_out = tmp_path / "spectra.msz"
+    pq_out = tmp_path / "out.parquet"
+
+    parquet_to_msz(parquet_path, msz_out, ret_time_unit="second").__exit__(None, None, None)
+    to_parquet(msz_out, pq_out)
+
+    out = pq.read_table(str(pq_out))
+    expected_rt = parquet_table.column("ret_time").to_numpy(zero_copy_only=False)
+    rt = out.column("ret_time").to_numpy(zero_copy_only=False)
+    # Source ret_time was numbers we asked to be interpreted as seconds when
+    # writing the msz; reading back through MSZ -> parquet should give those
+    # same numbers (auto-detected as seconds, no conversion).
+    for i in range(out.num_rows):
+        assert math.isclose(float(rt[i]), float(expected_rt[i]), rel_tol=1e-4)
+
+
+def test_to_parquet_open_file_object(parquet_path, tmp_path):
+    """Passing an already-open file should not close it."""
+    msz_out = tmp_path / "spectra.msz"
+    pq_out = tmp_path / "out.parquet"
+    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+
+    with read(msz_out) as msz:
+        to_parquet(msz, pq_out)
+        # File is still usable after to_parquet returns.
+        n = len(msz.spectra)
+        assert n > 0
+
+    out = pq.read_table(str(pq_out))
+    assert out.num_rows == n
+
+
+def test_to_parquet_multi_psm_all(parquet_path, tmp_path):
+    """multi_psm='all' emits N rows per scan when there are N PSMs.
+
+    We only have one PSM per scan in the test fixture, so behavior should
+    match the default 'best' for row count, but the codepath should still
+    function.
+    """
+    mszx_out = tmp_path / "bundle.mszx"
+    pq_all = tmp_path / "all.parquet"
+    pq_best = tmp_path / "best.parquet"
+
+    parquet_to_mszx(parquet_path, mszx_out, score_column="max_score")
+    to_parquet(mszx_out, pq_all, multi_psm="all")
+    to_parquet(mszx_out, pq_best, multi_psm="best")
+
+    n_all = pq.read_metadata(str(pq_all)).num_rows
+    n_best = pq.read_metadata(str(pq_best)).num_rows
+    # Fixture has 1 PSM per scan, so 'all' and 'best' coincide.
+    assert n_all == n_best

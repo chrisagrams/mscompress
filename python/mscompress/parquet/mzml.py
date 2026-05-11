@@ -1,41 +1,32 @@
-"""
-Parquet → MSZ / MSZX converter.
+"""mzML knowledge used by both directions of the parquet bridge.
 
-Converts a peptide-level consensus parquet (one row per peptide-spectrum entry,
-with `mz` / `intensity` list columns) into a compressed `.msz` spectra file and,
-optionally, an `.mszx` archive bundling a Percolator-style annotations TSV.
+Forward (parquet -> mzML synthesis):
+    `_synthesize_mzml` writes a minimal mzML file from a parquet, including
+    the schema-resolution helpers it leans on (`_ColumnMap`, `_resolve_schema`,
+    `_split_peptide_charge`).
 
-Public API:
-    parquet_to_msz                  - parquet -> .msz
-    parquet_to_annotations_tsv      - parquet -> .tsv
-    parquet_to_mszx                 - parquet -> .mszx (msz + tsv bundle)
+Inverse (mzML XML parsing for msz/mszx/mzML -> parquet):
+    `_iter_cv_params`, `_extract_precursor_charge`, `_detect_ret_time_unit`
+    parse the same cvParams the forward path writes.
 
-Requires the `[parquet]` extra (`pyarrow`).
+Everything else in the parquet package (`msz.py`, `mszx.py`, the package
+init's `to_parquet`) depends on this module; this module imports only from
+`mscompress._core` / `mscompress.mszx`.
 """
 
 from __future__ import annotations
 
 import base64
-import os
-import tempfile
 import zlib
 from dataclasses import dataclass
-from os import PathLike
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
-try:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-except ImportError as e:
-    raise ImportError(
-        "mscompress.parquet requires pyarrow. Install with: "
-        "pip install 'mscompress[parquet]'"
-    ) from e
+import pyarrow as pa
+import pyarrow.parquet as pq
 
-from mscompress._core import MSZFile, MZMLFile
-from mscompress.annotations import TSVReader
-from mscompress.mszx import MSZXBuilder
+from mscompress._core import BaseFile
+from mscompress.mszx import MSZXFile
 
 
 # MS / UO accessions used in the synthesized mzML.
@@ -317,242 +308,70 @@ def _synthesize_mzml(
     return idx
 
 
-def _tsv_escape(value: object) -> str:
-    """Render a TSV cell, replacing whitespace that would break the row."""
-    if value is None:
-        return ""
-    s = str(value)
-    return s.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+# ---------------------------------------------------------------------------
+# Inverse-path helpers: parsing mzML-style cvParams out of spectrum XML.
+# These read the same cvParams the forward path writes, so changes to either
+# side should track each other.
+# ---------------------------------------------------------------------------
 
 
-def _write_annotations_tsv(
-    parquet_path: Path,
-    tsv_path: Path,
-    *,
-    score_column: Optional[str],
-) -> int:
-    """Write a Percolator-compatible TSV beside the spectra file.
+def _iter_cv_params(xml_elem):
+    """Yield every cvParam descendant, namespace-agnostic."""
+    if xml_elem is None:
+        return
+    for elem in xml_elem.iter():
+        tag = elem.tag
+        # ElementTree puts namespaces in `{uri}local` form; bare `cvParam`
+        # appears when the source XML has no default xmlns (e.g. the parquet
+        # synthesizer's output).
+        if tag == "cvParam" or (
+            isinstance(tag, str) and tag.endswith("}cvParam")
+        ):
+            yield elem
 
-    Returns the number of rows written.
 
-    `score_column=None` writes empty `score` cells (callers downstream of
-    `TSVReader` will see `score=0.0`). Pass an explicit column name to require
-    it; if absent from the schema, `_resolve_schema` raises.
+def _extract_precursor_charge(xml_elem) -> Tuple[float, int]:
+    """Pull precursor m/z (MS:1000744) and charge (MS:1000041) from spectrum XML.
+
+    Missing values fall back to the same defaults the forward path uses, so a
+    parquet -> msz -> parquet round-trip is stable on rows that originally had
+    no precursor/charge.
     """
-    pf = pq.ParquetFile(str(parquet_path))
-    schema = pf.schema_arrow
-    cmap = _resolve_schema(schema, score_column=score_column)
-
-    # Optional float columns we still surface as TSV extras when present (and
-    # not already used as the score column).
-    extra_cols = [
-        c for c in _OPTIONAL_FLOAT_COLUMNS
-        if c in schema.names and c != cmap.score
-    ]
-    columns = [c for c in (
-        cmap.peptide, cmap.charge, cmap.peptide_charge,
-        cmap.precursor, cmap.ret_time, cmap.score,
-    ) if c is not None] + extra_cols
-
-    headers = ["ScanNr", "Peptide", "Charge", "score", "precursor", "ret_time"] + extra_cols
-
-    n = 0
-    with open(tsv_path, "w", encoding="utf-8", newline="\n") as out:
-        out.write("\t".join(headers) + "\n")
-        for batch in pf.iter_batches(columns=columns):
-            peptide_col = (
-                batch.column(cmap.peptide).to_pylist() if cmap.peptide else None
-            )
-            charge_col = (
-                batch.column(cmap.charge).to_numpy(zero_copy_only=False)
-                if cmap.charge else None
-            )
-            pep_charge_col = (
-                batch.column(cmap.peptide_charge).to_pylist()
-                if cmap.peptide_charge else None
-            )
-            precursor_col = (
-                batch.column(cmap.precursor).to_numpy(zero_copy_only=False)
-                if cmap.precursor else None
-            )
-            ret_time_col = (
-                batch.column(cmap.ret_time).to_numpy(zero_copy_only=False)
-                if cmap.ret_time else None
-            )
-            score_col = (
-                batch.column(cmap.score).to_numpy(zero_copy_only=False)
-                if cmap.score else None
-            )
-            extras = {
-                c: batch.column(c).to_numpy(zero_copy_only=False) for c in extra_cols
-            }
-
-            for i in range(batch.num_rows):
-                n += 1
-                if peptide_col is not None:
-                    peptide_val = peptide_col[i] or _DEFAULT_PEPTIDE
-                    charge_val = (
-                        int(charge_col[i]) if charge_col is not None else _DEFAULT_CHARGE
-                    )
-                elif pep_charge_col is not None:
-                    peptide_val, charge_val = _split_peptide_charge(
-                        pep_charge_col[i] or ""
-                    )
-                else:
-                    peptide_val = _DEFAULT_PEPTIDE
-                    charge_val = (
-                        int(charge_col[i]) if charge_col is not None else _DEFAULT_CHARGE
-                    )
-
-                precursor_val = (
-                    float(precursor_col[i]) if precursor_col is not None
-                    else _DEFAULT_PRECURSOR
-                )
-                ret_time_val = (
-                    float(ret_time_col[i]) if ret_time_col is not None
-                    else _DEFAULT_RET_TIME
-                )
-                score_cell = (
-                    repr(float(score_col[i])) if score_col is not None else ""
-                )
-
-                row = [
-                    str(n),
-                    _tsv_escape(peptide_val),
-                    str(charge_val),
-                    score_cell,
-                    repr(precursor_val),
-                    repr(ret_time_val),
-                ]
-                for c in extra_cols:
-                    row.append(repr(float(extras[c][i])))
-                out.write("\t".join(row) + "\n")
-
-    return n
+    precursor = _DEFAULT_PRECURSOR
+    charge = _DEFAULT_CHARGE
+    for elem in _iter_cv_params(xml_elem):
+        acc = elem.attrib.get("accession", "")
+        if acc == _ACC_PRECURSOR_MZ:
+            try:
+                precursor = float(elem.attrib.get("value", precursor))
+            except (TypeError, ValueError):
+                pass
+        elif acc == _ACC_CHARGE:
+            try:
+                charge = int(elem.attrib.get("value", charge))
+            except (TypeError, ValueError):
+                pass
+    return precursor, charge
 
 
-def parquet_to_msz(
-    parquet_path: Union[str, PathLike],
-    output_path: Union[str, PathLike],
-    *,
-    use_zlib_binary: bool = False,
-    ret_time_unit: str = "minute",
-) -> MSZFile:
-    """Convert a peptide-level parquet file into a `.msz` file.
+def _detect_ret_time_unit(file: Union[BaseFile, MSZXFile]) -> str:
+    """Inspect the first spectrum's XML to recover the *original* rt unit.
 
-    Args:
-        parquet_path: Source parquet. Must contain `mz` and `intensity`
-            list-typed columns (aliases: `m/z`, `MZ`, `mass_to_charge` for mz;
-            `int`, `intensities`, `Intensity`, `INTENSITY` for intensity).
-            Optional columns: `precursor`, `charge`, `ret_time`, `peptide`,
-            and the combined `peptide_charge` ("PEPTIDE_2") string column.
-            Missing optional columns are filled with defaults
-            (`ret_time=-1.0`, `precursor=0.0`, `charge=0`).
-        output_path: Destination `.msz` path.
-        use_zlib_binary: If True, deflate each binary array before base64
-            encoding (`MS:1000574`). Default False (`MS:1000576`).
-        ret_time_unit: Unit of the parquet `ret_time` column. `"minute"`
-            (default) maps to UO:0000031; `"second"` to UO:0000010.
-
-    Returns:
-        An open MSZFile for the written output.
+    The C preprocessor normalizes retention time to seconds, so `Spectrum.
+    retention_time` is always in seconds regardless of source. The original
+    unit only survives on the spectrum XML's `MS:1000016` cvParam. Returns
+    `"minute"` when that cvParam carries `UO:0000031`, else `"second"` (the
+    safe default when there are no spectra or no unit annotation).
     """
-    parquet_path = Path(os.fspath(parquet_path))
-    output_path = Path(os.fspath(output_path))
-
-    with tempfile.TemporaryDirectory(prefix="mscompress-parquet-") as td:
-        tmp_mzml = Path(td) / "synthesized.mzML"
-        _synthesize_mzml(
-            parquet_path,
-            tmp_mzml,
-            ret_time_unit=ret_time_unit,
-            use_zlib_binary=use_zlib_binary,
-        )
-        with MZMLFile(str(tmp_mzml).encode("utf-8")) as mzml:
-            return mzml.compress(str(output_path))
-
-
-def parquet_to_annotations_tsv(
-    parquet_path: Union[str, PathLike],
-    output_path: Union[str, PathLike],
-    *,
-    score_column: Optional[str] = None,
-) -> Path:
-    """Extract per-row metadata from a parquet into a Percolator-style TSV.
-
-    Args:
-        parquet_path: Source parquet.
-        output_path: Destination `.tsv` path.
-        score_column: Parquet column to surface as the PSM `score`. If `None`
-            (default), the writer auto-picks one of `max_score`, `mean_score`,
-            `score`, or `Score` if present, otherwise leaves the score cells
-            empty. If you pass an explicit name and it is not in the schema,
-            this raises.
-
-    Returns:
-        The written TSV path.
-    """
-    parquet_path = Path(os.fspath(parquet_path))
-    output_path = Path(os.fspath(output_path))
-    _write_annotations_tsv(parquet_path, output_path, score_column=score_column)
-    return output_path
-
-
-def parquet_to_mszx(
-    parquet_path: Union[str, PathLike],
-    output_path: Union[str, PathLike],
-    *,
-    score_column: Optional[str] = None,
-    use_zlib_binary: bool = False,
-    ret_time_unit: str = "minute",
-    description: Optional[str] = None,
-) -> Path:
-    """Bundle a parquet file into a complete `.mszx` archive.
-
-    Produces a `.mszx` containing:
-      - `spectra.msz` - compressed mz/intensity/retention-time data
-      - `<source>.tsv.zst` - Percolator-style annotations (peptide/charge/score…)
-      - `manifest.json`
-
-    Args:
-        parquet_path: Source parquet.
-        output_path: Destination `.mszx` path.
-        score_column: Parquet column to use as PSM score. `None` (default)
-            auto-picks `max_score`/`mean_score`/`score`/`Score` if present,
-            otherwise emits empty score cells. An explicit name that is not
-            in the schema raises.
-        use_zlib_binary: zlib-deflate binary arrays inside the synthesized
-            mzML before base64 encoding.
-        ret_time_unit: `"minute"` (default) or `"second"`.
-        description: Optional human-readable description.
-
-    Returns:
-        The written archive path.
-    """
-    parquet_path = Path(os.fspath(parquet_path))
-    output_path = Path(os.fspath(output_path))
-
-    with tempfile.TemporaryDirectory(prefix="mscompress-parquet-mszx-") as td_str:
-        td = Path(td_str)
-        tmp_msz = td / "spectra.msz"
-        tmp_tsv = td / (parquet_path.stem + ".tsv")
-
-        msz = parquet_to_msz(
-            parquet_path, tmp_msz,
-            use_zlib_binary=use_zlib_binary,
-            ret_time_unit=ret_time_unit,
-        )
-        try:
-            _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
-            reader = TSVReader(tmp_tsv)
-            builder = MSZXBuilder(msz, source_name=parquet_path.name)
-            builder.add_annotations(
-                reader,
-                description=description or f"Annotations extracted from {parquet_path.name}",
-            )
-            if description:
-                builder.set_description(description)
-            return builder.save(output_path)
-        finally:
-            # Release mmap before TemporaryDirectory cleans up tmp_msz (Windows).
-            msz.__exit__(None, None, None)
+    spectra = file.spectra
+    if len(spectra) == 0:
+        return "second"
+    try:
+        xml = spectra[0].xml
+    except Exception:
+        return "second"
+    for elem in _iter_cv_params(xml):
+        if elem.attrib.get("accession") != _ACC_RET_TIME:
+            continue
+        return "minute" if elem.attrib.get("unitAccession") == _ACC_UO_MINUTE else "second"
+    return "second"
