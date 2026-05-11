@@ -3,7 +3,7 @@ Convert a peptide-level parquet to MSZX, then iterate it via a PyTorch
 DataLoader with annotations.
 
 What this shows:
-  1. parquet -> .mszx using mscompress.parquet.parquet_to_mszx
+  1. parquet -> .mszx using mscompress.parquet.from_parquet
   2. open the .mszx with MSCompressDataset (PyTorch Dataset)
   3. load Percolator TSV annotations alongside each spectrum
   4. iterate a DataLoader with a custom collate_fn (peak counts vary per
@@ -26,7 +26,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from mscompress.datasets.torch import MSCompressDataset
-from mscompress.parquet import parquet_to_mszx
+from mscompress.parquet import from_parquet
 from mscompress.types import AnnotationFormat
 
 
@@ -77,8 +77,9 @@ def main() -> int:
         mszx_path = Path(td) / (args.parquet.stem + ".mszx")
 
         # Step 1: parquet -> .mszx (spectra in .msz + Percolator-style TSV)
+        # The .mszx extension on the output path tells from_parquet to bundle.
         print(f"converting {args.parquet.name} -> {mszx_path.name}")
-        parquet_to_mszx(
+        from_parquet(
             args.parquet,
             mszx_path,
             # score_column="max_score",

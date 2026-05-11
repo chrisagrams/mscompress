@@ -11,12 +11,7 @@ pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
 from mscompress import MSZFile, MSZXFile, TSVReader, read
-from mscompress.parquet import (
-    parquet_to_annotations_tsv,
-    parquet_to_msz,
-    parquet_to_mszx,
-    to_parquet,
-)
+from mscompress.parquet import from_parquet, to_parquet
 
 
 _TEST_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "test" / "data"
@@ -52,8 +47,7 @@ def minimal_parquet_table(minimal_parquet_path):
 def test_parquet_to_msz_roundtrip(parquet_path, parquet_table, tmp_path):
     """mz / intensity must round-trip bit-exact (f32 source, f32 storage)."""
     out = tmp_path / "spectra.msz"
-    msz_file = parquet_to_msz(parquet_path, out)
-    msz_file.__exit__(None, None, None)
+    from_parquet(parquet_path, out)
 
     n = parquet_table.num_rows
     mz_lists = parquet_table.column("mz").to_pylist()
@@ -77,8 +71,7 @@ def test_parquet_to_msz_roundtrip(parquet_path, parquet_table, tmp_path):
 def test_parquet_to_msz_metadata(parquet_path, parquet_table, tmp_path):
     """scan, ms_level, retention_time must be preserved (rt minute->second)."""
     out = tmp_path / "spectra.msz"
-    msz_file = parquet_to_msz(parquet_path, out, ret_time_unit="minute")
-    msz_file.__exit__(None, None, None)
+    from_parquet(parquet_path, out, ret_time_unit="minute")
 
     rt_minutes = parquet_table.column("ret_time").to_numpy(zero_copy_only=False)
 
@@ -97,8 +90,7 @@ def test_parquet_to_msz_metadata(parquet_path, parquet_table, tmp_path):
 def test_parquet_to_msz_ret_time_seconds(parquet_path, parquet_table, tmp_path):
     """ret_time_unit='second' must NOT apply the *60 conversion."""
     out = tmp_path / "spectra.msz"
-    msz_file = parquet_to_msz(parquet_path, out, ret_time_unit="second")
-    msz_file.__exit__(None, None, None)
+    from_parquet(parquet_path, out, ret_time_unit="second")
 
     rt = parquet_table.column("ret_time").to_numpy(zero_copy_only=False)
 
@@ -110,8 +102,7 @@ def test_parquet_to_msz_ret_time_seconds(parquet_path, parquet_table, tmp_path):
 def test_parquet_to_msz_zlib_binary(parquet_path, parquet_table, tmp_path):
     """use_zlib_binary=True must still round-trip mz/intensity exactly."""
     out = tmp_path / "spectra.msz"
-    msz_file = parquet_to_msz(parquet_path, out, use_zlib_binary=True)
-    msz_file.__exit__(None, None, None)
+    from_parquet(parquet_path, out, use_zlib_binary=True)
 
     mz_lists = parquet_table.column("mz").to_pylist()
 
@@ -126,7 +117,7 @@ def test_parquet_to_msz_zlib_binary(parquet_path, parquet_table, tmp_path):
 def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
     """TSV must be readable by TSVReader and round-trip peptide/charge/score."""
     tsv = tmp_path / "annotations.tsv"
-    parquet_to_annotations_tsv(parquet_path, tsv, score_column="max_score")
+    from_parquet(parquet_path, tsv, score_column="max_score")
 
     peptides = parquet_table.column("peptide").to_pylist()
     charges = parquet_table.column("charge").to_numpy(zero_copy_only=False)
@@ -149,7 +140,7 @@ def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
 def test_parquet_to_mszx_full(parquet_path, parquet_table, tmp_path):
     """End-to-end: produce an .mszx with both spectra and annotations."""
     out = tmp_path / "consensus.mszx"
-    parquet_to_mszx(
+    from_parquet(
         parquet_path, out,
         score_column="max_score",
         description="parquet test bundle",
@@ -187,8 +178,7 @@ def test_parquet_to_msz_empty_peaks(tmp_path, parquet_path):
     pq.write_table(edited, edited_path)
 
     out = tmp_path / "spectra.msz"
-    msz_file = parquet_to_msz(edited_path, out)
-    msz_file.__exit__(None, None, None)
+    from_parquet(edited_path, out)
 
     with read(out) as msz:
         assert len(msz.spectra) == src.num_rows
@@ -207,7 +197,7 @@ def test_parquet_to_msz_missing_column(tmp_path):
     pq.write_table(bad, bad_path)
 
     with pytest.raises(ValueError, match="missing required mz/intensity"):
-        parquet_to_msz(bad_path, tmp_path / "out.msz")
+        from_parquet(bad_path, tmp_path / "out.msz")
 
 
 # ---------------------------------------------------------------------------
@@ -237,8 +227,7 @@ def test_parquet_renamed_columns(tmp_path):
     pq.write_table(pa.table(cols), p)
 
     out = tmp_path / "out.msz"
-    msz_file = parquet_to_msz(p, out)
-    msz_file.__exit__(None, None, None)
+    from_parquet(p, out)
 
     with read(out) as msz:
         assert len(msz.spectra) == 2
@@ -252,8 +241,7 @@ def test_parquet_default_ret_time_when_missing(tmp_path):
     p = _make_minimal_parquet(tmp_path)
 
     out = tmp_path / "out.msz"
-    msz_file = parquet_to_msz(p, out, ret_time_unit="second")
-    msz_file.__exit__(None, None, None)
+    from_parquet(p, out, ret_time_unit="second")
 
     with read(out) as msz:
         for spectrum in msz.spectra:
@@ -269,7 +257,7 @@ def test_parquet_combined_peptide_charge_split(tmp_path):
     )
 
     tsv = tmp_path / "ann.tsv"
-    parquet_to_annotations_tsv(p, tsv)
+    from_parquet(p, tsv)
 
     psms = list(TSVReader(tsv))
     assert len(psms) == 2
@@ -288,7 +276,7 @@ def test_parquet_score_column_none_writes_empty(tmp_path):
     )
 
     tsv = tmp_path / "ann.tsv"
-    parquet_to_annotations_tsv(p, tsv, score_column=None)
+    from_parquet(p, tsv, score_column=None)
 
     text = tsv.read_text(encoding="utf-8")
     lines = text.strip().split("\n")
@@ -306,13 +294,13 @@ def test_parquet_score_column_specified_but_missing_raises(tmp_path):
     p = _make_minimal_parquet(tmp_path, peptide_charge=["A_2", "B_3"])
 
     with pytest.raises(ValueError, match="score_column='nope' not in"):
-        parquet_to_annotations_tsv(p, tmp_path / "ann.tsv", score_column="nope")
+        from_parquet(p, tmp_path / "ann.tsv", score_column="nope")
 
 
 def test_parquet_score_column_auto_resolves_max_score(tmp_path, parquet_path):
     """With max_score present, score_column=None must auto-pick it."""
     tsv = tmp_path / "ann.tsv"
-    parquet_to_annotations_tsv(parquet_path, tsv)  # no score_column → auto
+    from_parquet(parquet_path, tsv)  # no score_column → auto
 
     table = pq.read_table(str(parquet_path))
     expected_scores = table.column("max_score").to_numpy(zero_copy_only=False)
@@ -326,7 +314,7 @@ def test_parquet_score_column_auto_resolves_max_score(tmp_path, parquet_path):
 def test_parquet_minimal_fixture_to_mszx_full(minimal_parquet_path, minimal_parquet_table, tmp_path):
     """End-to-end on the consensus_00 fixture (peptide_charge / m/z / int only)."""
     out = tmp_path / "consensus_00.mszx"
-    parquet_to_mszx(
+    from_parquet(
         minimal_parquet_path,
         out,
         description="minimal-schema parquet bundle",
@@ -378,7 +366,7 @@ def test_to_parquet_roundtrip_msz(parquet_path, parquet_table, tmp_path):
     msz_out = tmp_path / "spectra.msz"
     pq_out = tmp_path / "roundtrip.parquet"
 
-    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+    from_parquet(parquet_path, msz_out)
     to_parquet(msz_out, pq_out)
 
     rt_table = pq.read_table(str(pq_out))
@@ -404,7 +392,7 @@ def test_to_parquet_metadata(parquet_path, parquet_table, tmp_path):
     msz_out = tmp_path / "spectra.msz"
     pq_out = tmp_path / "roundtrip.parquet"
 
-    parquet_to_msz(parquet_path, msz_out, ret_time_unit="minute").__exit__(None, None, None)
+    from_parquet(parquet_path, msz_out, ret_time_unit="minute")
     to_parquet(msz_out, pq_out)
 
     out = pq.read_table(str(pq_out))
@@ -434,7 +422,7 @@ def test_to_parquet_schema_columns_msz(parquet_path, tmp_path):
     """MSZ input must produce schema *without* annotation columns."""
     msz_out = tmp_path / "spectra.msz"
     pq_out = tmp_path / "out.parquet"
-    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+    from_parquet(parquet_path, msz_out)
     to_parquet(msz_out, pq_out)
 
     schema = pq.read_schema(str(pq_out))
@@ -449,7 +437,7 @@ def test_to_parquet_mszx_includes_annotations(parquet_path, parquet_table, tmp_p
     """MSZX input must emit peptide/peptide_charge/score columns."""
     mszx_out = tmp_path / "bundle.mszx"
     pq_out = tmp_path / "out.parquet"
-    parquet_to_mszx(parquet_path, mszx_out, score_column="max_score")
+    from_parquet(parquet_path, mszx_out, score_column="max_score")
     to_parquet(mszx_out, pq_out)
 
     schema = pq.read_schema(str(pq_out))
@@ -483,9 +471,9 @@ def test_to_parquet_full_roundtrip_mszx(parquet_path, parquet_table, tmp_path):
     pq_mid = tmp_path / "mid.parquet"
     mszx_out = tmp_path / "out.mszx"
 
-    parquet_to_mszx(parquet_path, mszx_in, score_column="max_score")
+    from_parquet(parquet_path, mszx_in, score_column="max_score")
     to_parquet(mszx_in, pq_mid)
-    parquet_to_mszx(pq_mid, mszx_out)
+    from_parquet(pq_mid, mszx_out)
 
     with MSZXFile.open(mszx_out) as mszx:
         assert len(mszx.spectra) == parquet_table.num_rows
@@ -517,7 +505,7 @@ def test_to_parquet_ret_time_unit_seconds(parquet_path, parquet_table, tmp_path)
     msz_out = tmp_path / "spectra.msz"
     pq_out = tmp_path / "out.parquet"
 
-    parquet_to_msz(parquet_path, msz_out, ret_time_unit="second").__exit__(None, None, None)
+    from_parquet(parquet_path, msz_out, ret_time_unit="second")
     to_parquet(msz_out, pq_out)
 
     out = pq.read_table(str(pq_out))
@@ -534,7 +522,7 @@ def test_to_parquet_open_file_object(parquet_path, tmp_path):
     """Passing an already-open file should not close it."""
     msz_out = tmp_path / "spectra.msz"
     pq_out = tmp_path / "out.parquet"
-    parquet_to_msz(parquet_path, msz_out).__exit__(None, None, None)
+    from_parquet(parquet_path, msz_out)
 
     with read(msz_out) as msz:
         to_parquet(msz, pq_out)
@@ -557,7 +545,7 @@ def test_to_parquet_multi_psm_all(parquet_path, tmp_path):
     pq_all = tmp_path / "all.parquet"
     pq_best = tmp_path / "best.parquet"
 
-    parquet_to_mszx(parquet_path, mszx_out, score_column="max_score")
+    from_parquet(parquet_path, mszx_out, score_column="max_score")
     to_parquet(mszx_out, pq_all, multi_psm="all")
     to_parquet(mszx_out, pq_best, multi_psm="best")
 
@@ -565,3 +553,63 @@ def test_to_parquet_multi_psm_all(parquet_path, tmp_path):
     n_best = pq.read_metadata(str(pq_best)).num_rows
     # Fixture has 1 PSM per scan, so 'all' and 'best' coincide.
     assert n_all == n_best
+
+
+# ---------------------------------------------------------------------------
+# from_parquet dispatch behavior
+# ---------------------------------------------------------------------------
+
+def test_from_parquet_extension_inference_msz(parquet_path, tmp_path):
+    """.msz extension dispatches to the MSZ writer."""
+    out = tmp_path / "out.msz"
+    returned = from_parquet(parquet_path, out)
+    assert returned == out
+    with read(out) as f:
+        assert isinstance(f, MSZFile)
+
+
+def test_from_parquet_extension_inference_mszx(parquet_path, tmp_path):
+    """.mszx extension produces an MSZX archive (msz + tsv inside)."""
+    out = tmp_path / "out.mszx"
+    from_parquet(parquet_path, out, score_column="max_score")
+    with MSZXFile.open(out) as mszx:
+        assert mszx.annotations is not None
+
+
+def test_from_parquet_extension_inference_tsv(parquet_path, tmp_path):
+    """.tsv extension dispatches to the annotations TSV writer."""
+    out = tmp_path / "out.tsv"
+    from_parquet(parquet_path, out, score_column="max_score")
+    psms = list(TSVReader(out))
+    assert len(psms) > 0
+
+
+def test_from_parquet_case_insensitive_extension(parquet_path, tmp_path):
+    """Suffix matching is case-insensitive (.MSZ works)."""
+    out = tmp_path / "out.MSZ"
+    from_parquet(parquet_path, out)
+    # Even though we wrote with .MSZ suffix, the file should be a valid msz.
+    with read(out) as f:
+        assert isinstance(f, MSZFile)
+
+
+def test_from_parquet_explicit_output_type_overrides(parquet_path, tmp_path):
+    """output_type kwarg wins over extension inference."""
+    out = tmp_path / "out.unknown"
+    from_parquet(parquet_path, out, output_type="tsv", score_column="max_score")
+    psms = list(TSVReader(out))
+    assert len(psms) > 0
+
+
+def test_from_parquet_unknown_extension_raises(parquet_path, tmp_path):
+    """No way to dispatch without an explicit output_type → ValueError."""
+    out = tmp_path / "out.xyz"
+    with pytest.raises(ValueError, match="Cannot infer output type"):
+        from_parquet(parquet_path, out)
+
+
+def test_from_parquet_invalid_output_type_raises(parquet_path, tmp_path):
+    """Bad output_type value raises a clear error."""
+    out = tmp_path / "out.msz"
+    with pytest.raises(ValueError, match="output_type must be"):
+        from_parquet(parquet_path, out, output_type="bogus")  # type: ignore[arg-type]
