@@ -159,11 +159,6 @@ def test_parquet_to_mszx_full(parquet_path, parquet_table, tmp_path):
             assert ann.peptide == peptides[i]
 
 
-@pytest.mark.skip(
-    reason="Empty <binary></binary> blocks crash the C extractor (bus error). "
-           "Real consensus parquets always have n_peaks > 0; revisit if that "
-           "assumption breaks."
-)
 def test_parquet_to_msz_empty_peaks(tmp_path, parquet_path):
     """A row with empty mz/intensity must still round-trip cleanly."""
     src = pq.read_table(str(parquet_path))
