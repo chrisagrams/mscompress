@@ -460,7 +460,11 @@ def _iter_long_spectra(pf: pq.ParquetFile, cmap: _ColumnMap):
     source); without it, two adjacent batches sharing a scan would be emitted
     as two spectra.
     """
-    assert cmap.scan is not None and cmap.level is not None
+    if cmap.scan is None or cmap.level is None:
+        raise ValueError(
+            "long-format parquet requires scan and ms-level columns "
+            f"(aliases {_SCAN_ALIASES} and {_LEVEL_ALIASES})"
+        )
     columns = [cmap.mz, cmap.intensity, cmap.scan, cmap.level]
     for c in (
         cmap.ret_time, cmap.precursor, cmap.charge,
@@ -637,7 +641,10 @@ def _synthesize_mzml(
     cmap = _resolve_schema(pf.schema_arrow)
 
     if cmap.is_long:
-        assert cmap.scan is not None
+        if cmap.scan is None:
+            raise ValueError(
+                f"long-format parquet requires a scan-id column (one of {_SCAN_ALIASES})"
+            )
         total = _count_long_format_spectra(pf, cmap.scan)
     else:
         total = pf.metadata.num_rows
