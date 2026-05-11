@@ -123,11 +123,13 @@ class MSZXBuilder:
     Builder for creating MSZX archives from MSZ files and annotations.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> builder = MSZXBuilder(msz)
-        >>> builder.add_annotations(reader, description="Percolator results")
-        >>> builder.set_description("Proteomics dataset with PSM annotations")
-        >>> builder.save("sample.mszx")
+        ```python
+        msz = mscompress.read("sample.msz")
+        builder = MSZXBuilder(msz)
+        builder.add_annotations(reader, description="Percolator results")
+        builder.set_description("Proteomics dataset with PSM annotations")
+        builder.save("sample.mszx")
+        ```
     """
 
     def __init__(
@@ -270,17 +272,19 @@ class MSZXFile:
     plus access to bundled search results with PSM lookup.
 
     Example:
-        >>> with MSZXFile.open("sample.mszx") as mszx:
-        ...     print(f"Spectra: {len(mszx.spectra)}")
-        ...     
-        ...     # Access spectra with optional PSM lookup
-        ...     for spectrum in mszx.spectra[:10]:
-        ...         psms = mszx.get_psms_for_spectrum(spectrum)
-        ...         print(spectrum.scan, len(psms), "PSMs")
-        ...     
-        ...     # Direct annotations access
-        ...     for annotation in mszx.annotations:
-        ...         print(annotation.peptide, annotation.score)
+        ```python
+        with MSZXFile.open("sample.mszx") as mszx:
+            print(f"Spectra: {len(mszx.spectra)}")
+
+            # Access spectra with optional PSM lookup
+            for spectrum in mszx.spectra[:10]:
+                psms = mszx.get_psms_for_spectrum(spectrum)
+                print(spectrum.scan, len(psms), "PSMs")
+
+            # Direct annotations access
+            for annotation in mszx.annotations:
+                print(annotation.peptide, annotation.score)
+        ```
     """
 
     def __init__(
@@ -722,13 +726,15 @@ def create_mszx(
         Path to the created archive.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> create_mszx(
-        ...     msz,
-        ...     "sample.mszx",
-        ...     annotations=["sample.pin", "sample.pepXML"],
-        ...     description="Annotated proteomics dataset"
-        ... )
+        ```python
+        msz = mscompress.read("sample.msz")
+        create_mszx(
+            msz,
+            "sample.mszx",
+            annotations=["sample.pin", "sample.pepXML"],
+            description="Annotated proteomics dataset",
+        )
+        ```
     """
     builder = MSZXBuilder(msz)
 
