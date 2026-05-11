@@ -436,18 +436,23 @@ def _synthesize_mzml_wide(
     return idx
 
 
-def _synthesize_mzml_long(
-    out: IO[bytes],
-    pf: pq.ParquetFile,
-    cmap: _ColumnMap,
-    *,
-    unit_acc: str,
-    unit_name: str,
-    comp_acc: str,
-    comp_name: str,
-    use_zlib_binary: bool,
-) -> int:
-    """Long-format iterator: aggregate consecutive same-scan rows → one spectrum.
+@dataclass
+class _LongSpectrum:
+    """One scan's worth of aggregated long-format rows, before mzML conversion."""
+    scan: int
+    level: int
+    mz: list
+    intensity: list
+    rt: Optional[float]
+    precursor_mz: Optional[float]
+    precursor_charge: Optional[int]
+    ion_mobility: Optional[float]
+    isolation_lower: Optional[float]
+    isolation_upper: Optional[float]
+
+
+def _iter_long_spectra(pf: pq.ParquetFile, cmap: _ColumnMap):
+    """Yield `_LongSpectrum` per unique scan from a long-format parquet.
 
     Relies on the ThermoRawFileParser writer invariant that all peaks for a
     single scan land in the same row group. A defensive cross-batch carry
@@ -464,63 +469,11 @@ def _synthesize_mzml_long(
         if c is not None:
             columns.append(c)
 
-    idx = 0
-    pending: Optional[dict] = None  # carries an open run across batch boundaries
-
     def _scalar_or_none(arr, i):
         """`arr[i].as_py()` semantics on a pyarrow Array (returns None for null)."""
         return arr[i].as_py() if arr is not None else None
 
-    def _flush(state: dict) -> None:
-        nonlocal idx
-        mz_arr = np.asarray(state["mz"], dtype="<f4")
-        in_arr = np.asarray(state["intensity"], dtype="<f4")
-        ms_level = state["level"]
-        rt_val = state["rt"]
-        if rt_val is None or (isinstance(rt_val, float) and math.isnan(rt_val)):
-            rt_val = _DEFAULT_RET_TIME
-        prec_mz = state["precursor_mz"]
-        prec_charge = state["precursor_charge"]
-        im_val = state["ion_mobility"]
-        iso_lo = state["isolation_lower"]
-        iso_hi = state["isolation_upper"]
-
-        if ms_level == 1:
-            precursor = None
-            isolation_window = None
-        else:
-            precursor = (
-                float(prec_mz) if prec_mz is not None else _DEFAULT_PRECURSOR,
-                int(prec_charge) if prec_charge is not None else _DEFAULT_CHARGE,
-            )
-            if iso_lo is not None and iso_hi is not None:
-                target = (float(iso_lo) + float(iso_hi)) / 2.0
-                isolation_window = (
-                    target,
-                    target - float(iso_lo),
-                    float(iso_hi) - target,
-                )
-            else:
-                isolation_window = None
-
-        _write_spectrum_xml(
-            out,
-            idx=idx,
-            scan_no=int(state["scan"]),
-            ms_level=int(ms_level),
-            rt_val=float(rt_val),
-            mz_arr=mz_arr,
-            inten_arr=in_arr,
-            unit_acc=unit_acc,
-            unit_name=unit_name,
-            comp_acc=comp_acc,
-            comp_name=comp_name,
-            use_zlib_binary=use_zlib_binary,
-            precursor=precursor,
-            ion_mobility=float(im_val) if im_val is not None else None,
-            isolation_window=isolation_window,
-        )
-        idx += 1
+    pending: Optional[_LongSpectrum] = None  # carries an open run across batch boundaries
 
     for batch in pf.iter_batches(columns=columns):
         if batch.num_rows == 0:
@@ -551,32 +504,111 @@ def _synthesize_mzml_long(
             run_end = int(run_end)
             scan_no = int(scans[run_start])
 
-            if pending is not None and pending["scan"] == scan_no:
+            if pending is not None and pending.scan == scan_no:
                 # Carry-over: this batch resumes the previous batch's open run.
-                pending["mz"].extend(mz_vals[run_start:run_end].tolist())
-                pending["intensity"].extend(in_vals[run_start:run_end].tolist())
+                pending.mz.extend(mz_vals[run_start:run_end].tolist())
+                pending.intensity.extend(in_vals[run_start:run_end].tolist())
                 continue
 
             if pending is not None:
-                _flush(pending)
+                yield pending
 
-            pending = {
-                "scan": scan_no,
-                "level": int(levels[run_start]),
-                "mz": mz_vals[run_start:run_end].tolist(),
-                "intensity": in_vals[run_start:run_end].tolist(),
-                "rt": _scalar_or_none(rt_arr, run_start),
-                "precursor_mz": _scalar_or_none(prec_arr, run_start),
-                "precursor_charge": _scalar_or_none(charge_arr, run_start),
-                "ion_mobility": _scalar_or_none(im_arr, run_start),
-                "isolation_lower": _scalar_or_none(iso_lo_arr, run_start),
-                "isolation_upper": _scalar_or_none(iso_hi_arr, run_start),
-            }
+            pending = _LongSpectrum(
+                scan=scan_no,
+                level=int(levels[run_start]),
+                mz=mz_vals[run_start:run_end].tolist(),
+                intensity=in_vals[run_start:run_end].tolist(),
+                rt=_scalar_or_none(rt_arr, run_start),
+                precursor_mz=_scalar_or_none(prec_arr, run_start),
+                precursor_charge=_scalar_or_none(charge_arr, run_start),
+                ion_mobility=_scalar_or_none(im_arr, run_start),
+                isolation_lower=_scalar_or_none(iso_lo_arr, run_start),
+                isolation_upper=_scalar_or_none(iso_hi_arr, run_start),
+            )
 
     if pending is not None:
-        _flush(pending)
+        yield pending
 
-    return idx
+
+def _emit_long_spectrum(
+    out: IO[bytes],
+    *,
+    idx: int,
+    spec: _LongSpectrum,
+    unit_acc: str,
+    unit_name: str,
+    comp_acc: str,
+    comp_name: str,
+    use_zlib_binary: bool,
+) -> None:
+    """Serialize one aggregated long-format spectrum as an mzML <spectrum>."""
+    rt_val = spec.rt
+    if rt_val is None or (isinstance(rt_val, float) and math.isnan(rt_val)):
+        rt_val = _DEFAULT_RET_TIME
+
+    if spec.level == 1:
+        precursor = None
+        isolation_window = None
+    else:
+        precursor = (
+            float(spec.precursor_mz) if spec.precursor_mz is not None else _DEFAULT_PRECURSOR,
+            int(spec.precursor_charge) if spec.precursor_charge is not None else _DEFAULT_CHARGE,
+        )
+        if spec.isolation_lower is not None and spec.isolation_upper is not None:
+            target = (float(spec.isolation_lower) + float(spec.isolation_upper)) / 2.0
+            isolation_window = (
+                target,
+                target - float(spec.isolation_lower),
+                float(spec.isolation_upper) - target,
+            )
+        else:
+            isolation_window = None
+
+    _write_spectrum_xml(
+        out,
+        idx=idx,
+        scan_no=int(spec.scan),
+        ms_level=int(spec.level),
+        rt_val=float(rt_val),
+        mz_arr=np.asarray(spec.mz, dtype="<f4"),
+        inten_arr=np.asarray(spec.intensity, dtype="<f4"),
+        unit_acc=unit_acc,
+        unit_name=unit_name,
+        comp_acc=comp_acc,
+        comp_name=comp_name,
+        use_zlib_binary=use_zlib_binary,
+        precursor=precursor,
+        ion_mobility=float(spec.ion_mobility) if spec.ion_mobility is not None else None,
+        isolation_window=isolation_window,
+    )
+
+
+def _synthesize_mzml_long(
+    out: IO[bytes],
+    pf: pq.ParquetFile,
+    cmap: _ColumnMap,
+    *,
+    unit_acc: str,
+    unit_name: str,
+    comp_acc: str,
+    comp_name: str,
+    use_zlib_binary: bool,
+) -> int:
+    """Aggregate long-format rows into spectra and stream them as mzML."""
+    count = 0
+    for idx, spec in enumerate(_iter_long_spectra(pf, cmap)):
+        _emit_long_spectrum(
+            out,
+            idx=idx,
+            spec=spec,
+            unit_acc=unit_acc,
+            unit_name=unit_name,
+            comp_acc=comp_acc,
+            comp_name=comp_name,
+            use_zlib_binary=use_zlib_binary,
+        )
+        count = idx + 1
+    return count
 
 
 def _synthesize_mzml(
