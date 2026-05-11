@@ -17,11 +17,13 @@ init's `to_parquet`) depends on this module; this module imports only from
 from __future__ import annotations
 
 import base64
+import math
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import IO, Optional, Tuple, Union
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -39,8 +41,13 @@ _ACC_MZ_ARRAY = "MS:1000514"
 _ACC_INTEN_ARRAY = "MS:1000515"
 _ACC_PRECURSOR_MZ = "MS:1000744"
 _ACC_CHARGE = "MS:1000041"
+_ACC_ION_MOBILITY = "MS:1002476"   # ion mobility drift time
+_ACC_ISO_TARGET = "MS:1000827"     # isolation window target m/z
+_ACC_ISO_LOWER = "MS:1000828"      # isolation window lower offset
+_ACC_ISO_UPPER = "MS:1000829"      # isolation window upper offset
 _ACC_UO_MINUTE = "UO:0000031"
 _ACC_UO_SECOND = "UO:0000010"
+_ACC_UO_MILLISECOND = "UO:0000028"
 
 
 # Aliases for the logical columns the loader cares about. First match wins,
@@ -52,6 +59,12 @@ _CHARGE_ALIASES = ("charge", "Charge", "z", "precursor_charge")
 _PEPTIDE_CHARGE_ALIASES = ("peptide_charge", "peptide.charge", "PeptideCharge")
 _PRECURSOR_ALIASES = ("precursor", "precursor_mz", "Precursor")
 _RET_TIME_ALIASES = ("ret_time", "retention_time", "rt", "RT")
+# Long-format-only columns (one row per peak; ThermoRawFileParser .mzparquet).
+_SCAN_ALIASES = ("scan", "scan_number", "scanNumber", "scan_id")
+_LEVEL_ALIASES = ("level", "ms_level", "msLevel")
+_ION_MOBILITY_ALIASES = ("ion_mobility", "ionMobility", "drift_time")
+_ISOLATION_LOWER_ALIASES = ("isolation_lower", "isolationLower")
+_ISOLATION_UPPER_ALIASES = ("isolation_upper", "isolationUpper")
 # Auto-resolved score columns when caller passes score_column=None and wants
 # annotations. Order = priority.
 _SCORE_AUTO_FALLBACKS = ("max_score", "mean_score", "score", "Score")
@@ -69,7 +82,13 @@ _OPTIONAL_FLOAT_COLUMNS = (
 
 @dataclass(frozen=True)
 class _ColumnMap:
-    """Maps logical fields to actual parquet column names. None = absent."""
+    """Maps logical fields to actual parquet column names. None = absent.
+
+    `is_long=True` means one row per peak (long format, e.g.
+    ThermoRawFileParser .mzparquet); `mz`/`intensity` are scalar float
+    columns and rows must be aggregated by `scan` to form spectra. Otherwise
+    each row is one spectrum and `mz`/`intensity` are list columns.
+    """
     mz: str
     intensity: str
     peptide: Optional[str]
@@ -78,6 +97,12 @@ class _ColumnMap:
     precursor: Optional[str]
     ret_time: Optional[str]
     score: Optional[str]
+    scan: Optional[str] = None
+    level: Optional[str] = None
+    ion_mobility: Optional[str] = None
+    isolation_lower: Optional[str] = None
+    isolation_upper: Optional[str] = None
+    is_long: bool = False
 
 
 def _first_present(names: Tuple[str, ...], schema_names) -> Optional[str]:
@@ -113,11 +138,28 @@ def _resolve_schema(
         )
 
     mz_t = schema.field(mz).type
-    if not pa.types.is_list(mz_t):
-        raise ValueError(f"`{mz}` must be a list column, got {mz_t}")
     inten_t = schema.field(intensity).type
-    if not pa.types.is_list(inten_t):
-        raise ValueError(f"`{intensity}` must be a list column, got {inten_t}")
+    mz_is_list = pa.types.is_list(mz_t) or pa.types.is_large_list(mz_t)
+    inten_is_list = pa.types.is_list(inten_t) or pa.types.is_large_list(inten_t)
+    mz_is_scalar_num = pa.types.is_floating(mz_t) or pa.types.is_integer(mz_t)
+    inten_is_scalar_num = pa.types.is_floating(inten_t) or pa.types.is_integer(inten_t)
+
+    if mz_is_list and inten_is_list:
+        is_long = False
+    elif mz_is_scalar_num and inten_is_scalar_num:
+        # Long format requires a scan-id column to aggregate peaks → spectra.
+        if _first_present(_SCAN_ALIASES, names) is None:
+            raise ValueError(
+                f"scalar `{mz}`/`{intensity}` columns require a scan-id column "
+                f"(one of {_SCAN_ALIASES}) for long-format aggregation; "
+                f"got schema columns: {schema.names}"
+            )
+        is_long = True
+    else:
+        raise ValueError(
+            f"`{mz}` and `{intensity}` must both be list or both be scalar; "
+            f"got mz={mz_t}, intensity={inten_t}"
+        )
 
     peptide = _first_present(_PEPTIDE_ALIASES, names)
     charge = _first_present(_CHARGE_ALIASES, names)
@@ -128,6 +170,12 @@ def _resolve_schema(
     )
     precursor = _first_present(_PRECURSOR_ALIASES, names)
     ret_time = _first_present(_RET_TIME_ALIASES, names)
+
+    scan_col = _first_present(_SCAN_ALIASES, names) if is_long else None
+    level_col = _first_present(_LEVEL_ALIASES, names) if is_long else None
+    ion_mobility_col = _first_present(_ION_MOBILITY_ALIASES, names) if is_long else None
+    iso_lower_col = _first_present(_ISOLATION_LOWER_ALIASES, names) if is_long else None
+    iso_upper_col = _first_present(_ISOLATION_UPPER_ALIASES, names) if is_long else None
 
     if score_column is not None:
         if score_column not in names:
@@ -147,6 +195,12 @@ def _resolve_schema(
         precursor=precursor,
         ret_time=ret_time,
         score=score,
+        scan=scan_col,
+        level=level_col,
+        ion_mobility=ion_mobility_col,
+        isolation_lower=iso_lower_col,
+        isolation_upper=iso_upper_col,
+        is_long=is_long,
     )
 
 
@@ -177,6 +231,354 @@ def _encode_binary(values: bytes, use_zlib: bool) -> bytes:
     return base64.b64encode(values)
 
 
+def _write_spectrum_xml(
+    out: IO[bytes],
+    *,
+    idx: int,
+    scan_no: int,
+    ms_level: int,
+    rt_val: float,
+    mz_arr: np.ndarray,
+    inten_arr: np.ndarray,
+    unit_acc: str,
+    unit_name: str,
+    comp_acc: str,
+    comp_name: str,
+    use_zlib_binary: bool,
+    precursor: Optional[Tuple[float, int]] = None,
+    ion_mobility: Optional[float] = None,
+    isolation_window: Optional[Tuple[float, float, float]] = None,
+) -> None:
+    """Emit one <spectrum> element to `out`.
+
+    `precursor=None` skips the <precursorList> entirely (MS1 spectra). When
+    provided as `(mz, charge)`, emits the standard selectedIon block. When
+    `ion_mobility` is set it adds an MS:1002476 cvParam inside <scan>. When
+    `isolation_window` is `(target, lower_offset, upper_offset)` it adds an
+    <isolationWindow> block inside <precursor>; ignored if `precursor` is None.
+    """
+    mz_b64 = _encode_binary(mz_arr.tobytes(), use_zlib_binary)
+    in_b64 = _encode_binary(inten_arr.tobytes(), use_zlib_binary)
+
+    spectrum_header = (
+        b'<spectrum index="' + str(idx).encode("ascii")
+        + b'" id="scan=' + str(scan_no).encode("ascii")
+        + b'" defaultArrayLength="' + str(len(mz_arr)).encode("ascii") + b'">'
+        b'<cvParam cvRef="MS" accession="' + _ACC_MS_LEVEL.encode("ascii")
+        + b'" name="ms level" value="' + str(ms_level).encode("ascii") + b'"/>'
+    )
+
+    scan_block_parts = [
+        b'<scanList count="1"><scan>'
+        b'<cvParam cvRef="MS" accession="' + _ACC_RET_TIME.encode("ascii")
+        + b'" name="scan start time" value="' + repr(rt_val).encode("ascii")
+        + b'" unitCvRef="UO" unitAccession="' + unit_acc.encode("ascii")
+        + b'" unitName="' + unit_name.encode("ascii") + b'"/>'
+    ]
+    if ion_mobility is not None:
+        scan_block_parts.append(
+            b'<cvParam cvRef="MS" accession="' + _ACC_ION_MOBILITY.encode("ascii")
+            + b'" name="ion mobility drift time" value="'
+            + repr(float(ion_mobility)).encode("ascii")
+            + b'" unitCvRef="UO" unitAccession="' + _ACC_UO_MILLISECOND.encode("ascii")
+            + b'" unitName="millisecond"/>'
+        )
+    scan_block_parts.append(b'</scan></scanList>')
+    scan_block = b''.join(scan_block_parts)
+
+    if precursor is not None:
+        prec_val, charge_val = precursor
+        iso_block = b''
+        if isolation_window is not None:
+            target, lower_off, upper_off = isolation_window
+            iso_block = (
+                b'<isolationWindow>'
+                b'<cvParam cvRef="MS" accession="' + _ACC_ISO_TARGET.encode("ascii")
+                + b'" name="isolation window target m/z" value="'
+                + repr(float(target)).encode("ascii") + b'"/>'
+                b'<cvParam cvRef="MS" accession="' + _ACC_ISO_LOWER.encode("ascii")
+                + b'" name="isolation window lower offset" value="'
+                + repr(float(lower_off)).encode("ascii") + b'"/>'
+                b'<cvParam cvRef="MS" accession="' + _ACC_ISO_UPPER.encode("ascii")
+                + b'" name="isolation window upper offset" value="'
+                + repr(float(upper_off)).encode("ascii") + b'"/>'
+                b'</isolationWindow>'
+            )
+        precursor_block = (
+            b'<precursorList count="1"><precursor>'
+            + iso_block
+            + b'<selectedIonList count="1"><selectedIon>'
+            b'<cvParam cvRef="MS" accession="' + _ACC_PRECURSOR_MZ.encode("ascii")
+            + b'" name="selected ion m/z" value="' + repr(float(prec_val)).encode("ascii") + b'"/>'
+            b'<cvParam cvRef="MS" accession="' + _ACC_CHARGE.encode("ascii")
+            + b'" name="charge state" value="' + str(int(charge_val)).encode("ascii") + b'"/>'
+            b'</selectedIon></selectedIonList>'
+            b'</precursor></precursorList>'
+        )
+    else:
+        precursor_block = b''
+
+    binary_block = (
+        b'<binaryDataArrayList count="2">'
+        b'<binaryDataArray encodedLength="' + str(len(mz_b64)).encode("ascii") + b'">'
+        b'<cvParam cvRef="MS" accession="' + _ACC_FLOAT32.encode("ascii") + b'" name="32-bit float"/>'
+        b'<cvParam cvRef="MS" accession="' + comp_acc.encode("ascii") + b'" name="' + comp_name.encode("ascii") + b'"/>'
+        b'<cvParam cvRef="MS" accession="' + _ACC_MZ_ARRAY.encode("ascii") + b'" name="m/z array"/>'
+        b'<binary>' + mz_b64 + b'</binary>'
+        b'</binaryDataArray>'
+        b'<binaryDataArray encodedLength="' + str(len(in_b64)).encode("ascii") + b'">'
+        b'<cvParam cvRef="MS" accession="' + _ACC_FLOAT32.encode("ascii") + b'" name="32-bit float"/>'
+        b'<cvParam cvRef="MS" accession="' + comp_acc.encode("ascii") + b'" name="' + comp_name.encode("ascii") + b'"/>'
+        b'<cvParam cvRef="MS" accession="' + _ACC_INTEN_ARRAY.encode("ascii") + b'" name="intensity array"/>'
+        b'<binary>' + in_b64 + b'</binary>'
+        b'</binaryDataArray>'
+        b'</binaryDataArrayList>'
+        # trailing newline: extract_spectrum_last_xml reads spectrum_end+1,
+        # expecting whitespace.
+        b'</spectrum>\n'
+    )
+
+    out.write(spectrum_header + scan_block + precursor_block + binary_block)
+
+
+def _count_long_format_spectra(pf: pq.ParquetFile, scan_col: str) -> int:
+    """Count unique scans across all row groups.
+
+    Counts run transitions per batch plus the boundary between batches; for a
+    well-formed mzparquet (writer invariant: a scan never spans row groups)
+    this equals the spectrum count. The cross-batch carry guards against a
+    malformed source silently inflating the count.
+    """
+    total = 0
+    prev_last_scan: Optional[int] = None
+    for batch in pf.iter_batches(columns=[scan_col]):
+        scans = batch.column(scan_col).to_numpy(zero_copy_only=False)
+        if len(scans) == 0:
+            continue
+        n_runs = 1 + int(np.count_nonzero(scans[1:] != scans[:-1]))
+        if prev_last_scan is not None and int(scans[0]) == prev_last_scan:
+            n_runs -= 1
+        total += n_runs
+        prev_last_scan = int(scans[-1])
+    return total
+
+
+def _synthesize_mzml_wide(
+    out: IO[bytes],
+    pf: pq.ParquetFile,
+    cmap: _ColumnMap,
+    *,
+    unit_acc: str,
+    unit_name: str,
+    comp_acc: str,
+    comp_name: str,
+    use_zlib_binary: bool,
+) -> int:
+    """Wide-format iterator: one parquet row → one spectrum.
+
+    `cmap.mz` and `cmap.intensity` are list columns; metadata is per-row.
+    """
+    columns = [cmap.mz, cmap.intensity]
+    for c in (cmap.precursor, cmap.charge, cmap.ret_time, cmap.peptide_charge):
+        if c is not None:
+            columns.append(c)
+
+    idx = 0
+    for batch in pf.iter_batches(columns=columns):
+        mz_col = batch.column(cmap.mz)
+        inten_col = batch.column(cmap.intensity)
+        prec_col = (
+            batch.column(cmap.precursor).to_numpy(zero_copy_only=False)
+            if cmap.precursor else None
+        )
+        charge_col = (
+            batch.column(cmap.charge).to_numpy(zero_copy_only=False)
+            if cmap.charge else None
+        )
+        rt_col = (
+            batch.column(cmap.ret_time).to_numpy(zero_copy_only=False)
+            if cmap.ret_time else None
+        )
+        pep_charge_col = (
+            batch.column(cmap.peptide_charge).to_pylist()
+            if cmap.peptide_charge else None
+        )
+
+        for i in range(batch.num_rows):
+            mz_arr = mz_col[i].values.to_numpy(zero_copy_only=False).astype("<f4", copy=False)
+            inten_arr = inten_col[i].values.to_numpy(zero_copy_only=False).astype("<f4", copy=False)
+
+            rt_val = float(rt_col[i]) if rt_col is not None else _DEFAULT_RET_TIME
+            prec_val = float(prec_col[i]) if prec_col is not None else _DEFAULT_PRECURSOR
+            if charge_col is not None:
+                charge_val = int(charge_col[i])
+            elif pep_charge_col is not None:
+                _, charge_val = _split_peptide_charge(pep_charge_col[i] or "")
+            else:
+                charge_val = _DEFAULT_CHARGE
+
+            _write_spectrum_xml(
+                out,
+                idx=idx,
+                scan_no=idx + 1,
+                ms_level=2,
+                rt_val=rt_val,
+                mz_arr=mz_arr,
+                inten_arr=inten_arr,
+                unit_acc=unit_acc,
+                unit_name=unit_name,
+                comp_acc=comp_acc,
+                comp_name=comp_name,
+                use_zlib_binary=use_zlib_binary,
+                precursor=(prec_val, charge_val),
+            )
+            idx += 1
+    return idx
+
+
+def _synthesize_mzml_long(
+    out: IO[bytes],
+    pf: pq.ParquetFile,
+    cmap: _ColumnMap,
+    *,
+    unit_acc: str,
+    unit_name: str,
+    comp_acc: str,
+    comp_name: str,
+    use_zlib_binary: bool,
+) -> int:
+    """Long-format iterator: aggregate consecutive same-scan rows → one spectrum.
+
+    Relies on the ThermoRawFileParser writer invariant that all peaks for a
+    single scan land in the same row group. A defensive cross-batch carry
+    handles the case where that invariant is violated (e.g. by a malformed
+    source); without it, two adjacent batches sharing a scan would be emitted
+    as two spectra.
+    """
+    assert cmap.scan is not None and cmap.level is not None
+    columns = [cmap.mz, cmap.intensity, cmap.scan, cmap.level]
+    for c in (
+        cmap.ret_time, cmap.precursor, cmap.charge,
+        cmap.ion_mobility, cmap.isolation_lower, cmap.isolation_upper,
+    ):
+        if c is not None:
+            columns.append(c)
+
+    idx = 0
+    pending: Optional[dict] = None  # carries an open run across batch boundaries
+
+    def _scalar_or_none(arr, i):
+        """`arr[i].as_py()` semantics on a pyarrow Array (returns None for null)."""
+        return arr[i].as_py() if arr is not None else None
+
+    def _flush(state: dict) -> None:
+        nonlocal idx
+        mz_arr = np.asarray(state["mz"], dtype="<f4")
+        in_arr = np.asarray(state["intensity"], dtype="<f4")
+        ms_level = state["level"]
+        rt_val = state["rt"]
+        if rt_val is None or (isinstance(rt_val, float) and math.isnan(rt_val)):
+            rt_val = _DEFAULT_RET_TIME
+        prec_mz = state["precursor_mz"]
+        prec_charge = state["precursor_charge"]
+        im_val = state["ion_mobility"]
+        iso_lo = state["isolation_lower"]
+        iso_hi = state["isolation_upper"]
+
+        if ms_level == 1:
+            precursor = None
+            isolation_window = None
+        else:
+            precursor = (
+                float(prec_mz) if prec_mz is not None else _DEFAULT_PRECURSOR,
+                int(prec_charge) if prec_charge is not None else _DEFAULT_CHARGE,
+            )
+            if iso_lo is not None and iso_hi is not None:
+                target = (float(iso_lo) + float(iso_hi)) / 2.0
+                isolation_window = (
+                    target,
+                    target - float(iso_lo),
+                    float(iso_hi) - target,
+                )
+            else:
+                isolation_window = None
+
+        _write_spectrum_xml(
+            out,
+            idx=idx,
+            scan_no=int(state["scan"]),
+            ms_level=int(ms_level),
+            rt_val=float(rt_val),
+            mz_arr=mz_arr,
+            inten_arr=in_arr,
+            unit_acc=unit_acc,
+            unit_name=unit_name,
+            comp_acc=comp_acc,
+            comp_name=comp_name,
+            use_zlib_binary=use_zlib_binary,
+            precursor=precursor,
+            ion_mobility=float(im_val) if im_val is not None else None,
+            isolation_window=isolation_window,
+        )
+        idx += 1
+
+    for batch in pf.iter_batches(columns=columns):
+        if batch.num_rows == 0:
+            continue
+
+        scans = batch.column(cmap.scan).to_numpy(zero_copy_only=False)
+        levels = batch.column(cmap.level).to_numpy(zero_copy_only=False)
+        mz_vals = batch.column(cmap.mz).to_numpy(zero_copy_only=False).astype("<f4", copy=False)
+        in_vals = batch.column(cmap.intensity).to_numpy(zero_copy_only=False).astype("<f4", copy=False)
+
+        # Nullable columns: keep as pyarrow Arrays for None-aware indexing.
+        rt_arr = batch.column(cmap.ret_time) if cmap.ret_time else None
+        prec_arr = batch.column(cmap.precursor) if cmap.precursor else None
+        charge_arr = batch.column(cmap.charge) if cmap.charge else None
+        im_arr = batch.column(cmap.ion_mobility) if cmap.ion_mobility else None
+        iso_lo_arr = batch.column(cmap.isolation_lower) if cmap.isolation_lower else None
+        iso_hi_arr = batch.column(cmap.isolation_upper) if cmap.isolation_upper else None
+
+        run_starts = np.concatenate(
+            ([0], np.flatnonzero(scans[1:] != scans[:-1]) + 1)
+        ).astype(np.int64)
+        run_ends = np.concatenate(
+            (run_starts[1:], [len(scans)])
+        ).astype(np.int64)
+
+        for run_start, run_end in zip(run_starts, run_ends):
+            run_start = int(run_start)
+            run_end = int(run_end)
+            scan_no = int(scans[run_start])
+
+            if pending is not None and pending["scan"] == scan_no:
+                # Carry-over: this batch resumes the previous batch's open run.
+                pending["mz"].extend(mz_vals[run_start:run_end].tolist())
+                pending["intensity"].extend(in_vals[run_start:run_end].tolist())
+                continue
+
+            if pending is not None:
+                _flush(pending)
+
+            pending = {
+                "scan": scan_no,
+                "level": int(levels[run_start]),
+                "mz": mz_vals[run_start:run_end].tolist(),
+                "intensity": in_vals[run_start:run_end].tolist(),
+                "rt": _scalar_or_none(rt_arr, run_start),
+                "precursor_mz": _scalar_or_none(prec_arr, run_start),
+                "precursor_charge": _scalar_or_none(charge_arr, run_start),
+                "ion_mobility": _scalar_or_none(im_arr, run_start),
+                "isolation_lower": _scalar_or_none(iso_lo_arr, run_start),
+                "isolation_upper": _scalar_or_none(iso_hi_arr, run_start),
+            }
+
+    if pending is not None:
+        _flush(pending)
+
+    return idx
+
+
 def _synthesize_mzml(
     parquet_path: Path,
     mzml_path: Path,
@@ -186,6 +588,7 @@ def _synthesize_mzml(
 ) -> int:
     """Stream a parquet file into a minimal mzML on disk.
 
+    Dispatches to the wide- or long-format iterator based on the schema.
     Returns the number of spectra written.
     """
     if ret_time_unit == "minute":
@@ -200,12 +603,12 @@ def _synthesize_mzml(
 
     pf = pq.ParquetFile(str(parquet_path))
     cmap = _resolve_schema(pf.schema_arrow)
-    total = pf.metadata.num_rows
 
-    columns = [cmap.mz, cmap.intensity]
-    for c in (cmap.precursor, cmap.charge, cmap.ret_time, cmap.peptide_charge):
-        if c is not None:
-            columns.append(c)
+    if cmap.is_long:
+        assert cmap.scan is not None
+        total = _count_long_format_spectra(pf, cmap.scan)
+    else:
+        total = pf.metadata.num_rows
 
     with open(mzml_path, "wb") as out:
         # NOTE: the cvList preamble is required, not cosmetic. The C
@@ -226,82 +629,20 @@ def _synthesize_mzml(
             b'<spectrumList count="' + str(total).encode("ascii") + b'">'
         )
 
-        idx = 0
-        for batch in pf.iter_batches(columns=columns):
-            mz_col = batch.column(cmap.mz)
-            inten_col = batch.column(cmap.intensity)
-            prec_col = (
-                batch.column(cmap.precursor).to_numpy(zero_copy_only=False)
-                if cmap.precursor else None
+        if cmap.is_long:
+            idx = _synthesize_mzml_long(
+                out, pf, cmap,
+                unit_acc=unit_acc, unit_name=unit_name,
+                comp_acc=comp_acc, comp_name=comp_name,
+                use_zlib_binary=use_zlib_binary,
             )
-            charge_col = (
-                batch.column(cmap.charge).to_numpy(zero_copy_only=False)
-                if cmap.charge else None
+        else:
+            idx = _synthesize_mzml_wide(
+                out, pf, cmap,
+                unit_acc=unit_acc, unit_name=unit_name,
+                comp_acc=comp_acc, comp_name=comp_name,
+                use_zlib_binary=use_zlib_binary,
             )
-            rt_col = (
-                batch.column(cmap.ret_time).to_numpy(zero_copy_only=False)
-                if cmap.ret_time else None
-            )
-            pep_charge_col = (
-                batch.column(cmap.peptide_charge).to_pylist()
-                if cmap.peptide_charge else None
-            )
-
-            for i in range(batch.num_rows):
-                # mz/intensity arrive as Arrow ListScalar -> numpy float32 view.
-                mz_arr = mz_col[i].values.to_numpy(zero_copy_only=False).astype("<f4", copy=False)
-                inten_arr = inten_col[i].values.to_numpy(zero_copy_only=False).astype("<f4", copy=False)
-                mz_b64 = _encode_binary(mz_arr.tobytes(), use_zlib_binary)
-                in_b64 = _encode_binary(inten_arr.tobytes(), use_zlib_binary)
-
-                rt_val = float(rt_col[i]) if rt_col is not None else _DEFAULT_RET_TIME
-                prec_val = float(prec_col[i]) if prec_col is not None else _DEFAULT_PRECURSOR
-                if charge_col is not None:
-                    charge_val = int(charge_col[i])
-                elif pep_charge_col is not None:
-                    _, charge_val = _split_peptide_charge(pep_charge_col[i] or "")
-                else:
-                    charge_val = _DEFAULT_CHARGE
-
-                scan_no = idx + 1
-                out.write(
-                    b'<spectrum index="' + str(idx).encode("ascii")
-                    + b'" id="scan=' + str(scan_no).encode("ascii")
-                    + b'" defaultArrayLength="' + str(len(mz_arr)).encode("ascii") + b'">'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_MS_LEVEL.encode("ascii")
-                    + b'" name="ms level" value="2"/>'
-                    b'<scanList count="1"><scan>'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_RET_TIME.encode("ascii")
-                    + b'" name="scan start time" value="' + repr(rt_val).encode("ascii")
-                    + b'" unitCvRef="UO" unitAccession="' + unit_acc.encode("ascii")
-                    + b'" unitName="' + unit_name.encode("ascii") + b'"/>'
-                    b'</scan></scanList>'
-                    b'<precursorList count="1"><precursor>'
-                    b'<selectedIonList count="1"><selectedIon>'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_PRECURSOR_MZ.encode("ascii")
-                    + b'" name="selected ion m/z" value="' + repr(prec_val).encode("ascii") + b'"/>'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_CHARGE.encode("ascii")
-                    + b'" name="charge state" value="' + str(charge_val).encode("ascii") + b'"/>'
-                    b'</selectedIon></selectedIonList>'
-                    b'</precursor></precursorList>'
-                    b'<binaryDataArrayList count="2">'
-                    b'<binaryDataArray encodedLength="' + str(len(mz_b64)).encode("ascii") + b'">'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_FLOAT32.encode("ascii") + b'" name="32-bit float"/>'
-                    b'<cvParam cvRef="MS" accession="' + comp_acc.encode("ascii") + b'" name="' + comp_name.encode("ascii") + b'"/>'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_MZ_ARRAY.encode("ascii") + b'" name="m/z array"/>'
-                    b'<binary>' + mz_b64 + b'</binary>'
-                    b'</binaryDataArray>'
-                    b'<binaryDataArray encodedLength="' + str(len(in_b64)).encode("ascii") + b'">'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_FLOAT32.encode("ascii") + b'" name="32-bit float"/>'
-                    b'<cvParam cvRef="MS" accession="' + comp_acc.encode("ascii") + b'" name="' + comp_name.encode("ascii") + b'"/>'
-                    b'<cvParam cvRef="MS" accession="' + _ACC_INTEN_ARRAY.encode("ascii") + b'" name="intensity array"/>'
-                    b'<binary>' + in_b64 + b'</binary>'
-                    b'</binaryDataArray>'
-                    b'</binaryDataArrayList>'
-                    b'</spectrum>\n'  # trailing newline: extract_spectrum_last_xml
-                                       # reads spectrum_end+1, expecting whitespace.
-                )
-                idx += 1
 
         out.write(b'</spectrumList></run></mzML>')
 

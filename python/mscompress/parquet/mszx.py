@@ -138,6 +138,13 @@ def _write_annotations_tsv(
     schema = pf.schema_arrow
     cmap = _resolve_schema(schema, score_column=score_column)
 
+    if cmap.is_long:
+        raise ValueError(
+            "TSV annotations export is not supported for long-format "
+            "(.mzparquet) input: no peptide/score columns present. "
+            f"Got schema columns: {schema.names}"
+        )
+
     # Optional float columns we still surface as TSV extras when present (and
     # not already used as the score column).
     extra_cols = [
@@ -221,6 +228,10 @@ def parquet_to_mszx(
     parquet_path = Path(os.fspath(parquet_path))
     output_path = Path(os.fspath(output_path))
 
+    # Peek at the schema: long-format input (.mzparquet) has no PSM columns,
+    # so the archive is built without an annotations bundle.
+    is_long = _resolve_schema(pq.ParquetFile(str(parquet_path)).schema_arrow).is_long
+
     with tempfile.TemporaryDirectory(prefix="mscompress-parquet-mszx-") as td_str:
         td = Path(td_str)
         tmp_msz = td / "spectra.msz"
@@ -232,13 +243,14 @@ def parquet_to_mszx(
             ret_time_unit=ret_time_unit,
         )
         try:
-            _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
-            reader = TSVReader(tmp_tsv)
             builder = MSZXBuilder(msz, source_name=parquet_path.name)
-            builder.add_annotations(
-                reader,
-                description=description or f"Annotations extracted from {parquet_path.name}",
-            )
+            if not is_long:
+                _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
+                reader = TSVReader(tmp_tsv)
+                builder.add_annotations(
+                    reader,
+                    description=description or f"Annotations extracted from {parquet_path.name}",
+                )
             if description:
                 builder.set_description(description)
             return builder.save(output_path)

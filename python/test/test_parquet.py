@@ -613,3 +613,295 @@ def test_from_parquet_invalid_output_type_raises(parquet_path, tmp_path):
     out = tmp_path / "out.msz"
     with pytest.raises(ValueError, match="output_type must be"):
         from_parquet(parquet_path, out, output_type="bogus")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Long-format (.mzparquet) support — ThermoRawFileParser one-row-per-peak schema
+# ---------------------------------------------------------------------------
+
+_MZPARQUET_FIXTURE = _TEST_DATA_DIR / "parquet" / "test.mzparquet"
+
+
+@pytest.fixture
+def mzparquet_path():
+    if not _MZPARQUET_FIXTURE.exists():
+        pytest.skip(f"mzparquet fixture missing: {_MZPARQUET_FIXTURE}")
+    return _MZPARQUET_FIXTURE
+
+
+@pytest.fixture
+def mzparquet_table(mzparquet_path):
+    return pq.read_table(str(mzparquet_path))
+
+
+def _group_peaks_by_scan(table):
+    """Group peaks from a long-format table by scan, preserving source order.
+
+    Returns OrderedDict[int, dict] with keys: mz (list[float]), intensity
+    (list[float]), level, rt, precursor_mz, precursor_charge, ion_mobility,
+    isolation_lower, isolation_upper. Per-scan scalars are taken from the
+    first peak of that scan.
+    """
+    import collections
+    cols = {name: table.column(name).to_pylist() for name in table.schema.names}
+    groups: "collections.OrderedDict[int, dict]" = collections.OrderedDict()
+    for i in range(table.num_rows):
+        scan = int(cols["scan"][i])
+        g = groups.get(scan)
+        if g is None:
+            g = {
+                "mz": [],
+                "intensity": [],
+                "level": int(cols["level"][i]),
+                "rt": float(cols["rt"][i]),
+                "precursor_mz": cols.get("precursor_mz", [None] * table.num_rows)[i],
+                "precursor_charge": cols.get("precursor_charge", [None] * table.num_rows)[i],
+                "ion_mobility": cols.get("ion_mobility", [None] * table.num_rows)[i],
+                "isolation_lower": cols.get("isolation_lower", [None] * table.num_rows)[i],
+                "isolation_upper": cols.get("isolation_upper", [None] * table.num_rows)[i],
+            }
+            groups[scan] = g
+        g["mz"].append(float(cols["mz"][i]))
+        g["intensity"].append(float(cols["intensity"][i]))
+    return groups
+
+
+def test_mzparquet_to_msz_spectrum_count(mzparquet_path, mzparquet_table, tmp_path):
+    """One spectrum per unique source scan."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    unique_scans = len(set(mzparquet_table.column("scan").to_pylist()))
+    with read(out) as msz:
+        assert len(msz.spectra) == unique_scans
+
+
+def test_mzparquet_to_msz_scan_numbers(mzparquet_path, mzparquet_table, tmp_path):
+    """Scan numbers come from the source `scan` column, not idx+1."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    source_scans = list(groups.keys())
+    with read(out) as msz:
+        assert [s.scan for s in msz.spectra] == source_scans
+
+
+def test_mzparquet_to_msz_ms_levels(mzparquet_path, mzparquet_table, tmp_path):
+    """ms_level reflects source `level` column (mix of 1 and 2), not hardcoded 2."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        assert {s.ms_level for s in msz.spectra} == {1, 2}, (
+            "fixture must exercise both MS1 and MS2 to validate the level column"
+        )
+        for spectrum in msz.spectra:
+            assert spectrum.ms_level == groups[spectrum.scan]["level"]
+
+
+def test_mzparquet_to_msz_mz_intensity_bitexact(mzparquet_path, mzparquet_table, tmp_path):
+    """Per-scan mz/intensity must match the grouped source peaks bit-exact."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        for spectrum in msz.spectra:
+            g = groups[spectrum.scan]
+            expected_mz = np.asarray(g["mz"], dtype=np.float32)
+            expected_in = np.asarray(g["intensity"], dtype=np.float32)
+            assert np.array_equal(spectrum.mz.astype(np.float32), expected_mz), (
+                f"mz mismatch at scan {spectrum.scan}"
+            )
+            assert np.array_equal(spectrum.intensity.astype(np.float32), expected_in), (
+                f"intensity mismatch at scan {spectrum.scan}"
+            )
+
+
+def test_mzparquet_to_msz_retention_time(mzparquet_path, mzparquet_table, tmp_path):
+    """rt minute→second conversion applies; per-scan rt comes from first peak."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out, ret_time_unit="minute")
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        for spectrum in msz.spectra:
+            expected = groups[spectrum.scan]["rt"] * 60.0
+            assert math.isclose(spectrum.retention_time, expected, rel_tol=1e-5), (
+                f"rt mismatch at scan {spectrum.scan}: "
+                f"got {spectrum.retention_time}, expected {expected}"
+            )
+
+
+def test_mzparquet_to_msz_precursor_for_ms2(mzparquet_path, mzparquet_table, tmp_path):
+    """MS2 spectra carry precursor m/z + charge state from the source."""
+    from mscompress.parquet.mzml import _extract_precursor_charge
+
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        ms2 = [s for s in msz.spectra if s.ms_level == 2]
+        assert len(ms2) > 0
+        for spectrum in ms2:
+            g = groups[spectrum.scan]
+            precursor, charge = _extract_precursor_charge(spectrum.xml)
+            assert math.isclose(precursor, float(g["precursor_mz"]), rel_tol=1e-5)
+            assert charge == int(g["precursor_charge"])
+
+
+def test_mzparquet_to_msz_ms1_no_precursor(mzparquet_path, mzparquet_table, tmp_path):
+    """MS1 spectra must not carry a <precursorList> element."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    with read(out) as msz:
+        ms1 = [s for s in msz.spectra if s.ms_level == 1]
+        assert len(ms1) > 0
+        for spectrum in ms1:
+            has_precursor_list = any(
+                elem.tag == "precursorList" or (
+                    isinstance(elem.tag, str) and elem.tag.endswith("}precursorList")
+                )
+                for elem in spectrum.xml.iter()
+            )
+            assert not has_precursor_list, (
+                f"MS1 scan {spectrum.scan} should not have <precursorList>"
+            )
+
+
+def test_mzparquet_to_msz_ion_mobility(mzparquet_path, mzparquet_table, tmp_path):
+    """ion_mobility column surfaces as MS:1002476 cvParam in <scan>."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        non_null_seen = 0
+        for spectrum in msz.spectra:
+            expected = groups[spectrum.scan]["ion_mobility"]
+            im_params = [
+                elem for elem in spectrum.xml.iter()
+                if (elem.tag == "cvParam" or (
+                    isinstance(elem.tag, str) and elem.tag.endswith("}cvParam")
+                )) and elem.attrib.get("accession") == "MS:1002476"
+            ]
+            if expected is None:
+                assert im_params == [], (
+                    f"scan {spectrum.scan}: no ion_mobility in source but cvParam emitted"
+                )
+            else:
+                assert len(im_params) == 1, (
+                    f"scan {spectrum.scan}: expected one ion_mobility cvParam"
+                )
+                assert math.isclose(
+                    float(im_params[0].attrib["value"]), float(expected), rel_tol=1e-5
+                )
+                non_null_seen += 1
+        # Test is only meaningful if the fixture has some non-null values.
+        # If the fixture has all-null ion_mobility, the loop above still passes
+        # vacuously, but at least we've confirmed we don't emit spurious params.
+
+
+def test_mzparquet_to_msz_isolation_window(mzparquet_path, mzparquet_table, tmp_path):
+    """isolation_lower/upper surface as MS:1000827/8/9 cvParams under <precursor>."""
+    out = tmp_path / "spectra.msz"
+    from_parquet(mzparquet_path, out)
+
+    groups = _group_peaks_by_scan(mzparquet_table)
+    with read(out) as msz:
+        verified = 0
+        for spectrum in msz.spectra:
+            if spectrum.ms_level == 1:
+                continue
+            g = groups[spectrum.scan]
+            iso_lo = g["isolation_lower"]
+            iso_hi = g["isolation_upper"]
+            if iso_lo is None or iso_hi is None:
+                continue
+            params = {
+                elem.attrib.get("accession"): float(elem.attrib.get("value"))
+                for elem in spectrum.xml.iter()
+                if (elem.tag == "cvParam" or (
+                    isinstance(elem.tag, str) and elem.tag.endswith("}cvParam")
+                )) and elem.attrib.get("accession", "").startswith("MS:100082")
+            }
+            assert "MS:1000827" in params
+            assert "MS:1000828" in params
+            assert "MS:1000829" in params
+            # offsets should reconstruct the full isolation width
+            full_width = float(iso_hi) - float(iso_lo)
+            assert math.isclose(
+                params["MS:1000828"] + params["MS:1000829"], full_width, rel_tol=1e-5
+            )
+            verified += 1
+        assert verified > 0, "fixture must include at least one MS2 with isolation window"
+
+
+def test_mzparquet_to_mszx_no_annotations(mzparquet_path, mzparquet_table, tmp_path):
+    """mszx bundle for long-format input contains spectra but no annotations."""
+    out = tmp_path / "long.mszx"
+    from_parquet(mzparquet_path, out)
+
+    unique_scans = len(set(mzparquet_table.column("scan").to_pylist()))
+    with MSZXFile.open(out) as mszx:
+        assert len(mszx.spectra) == unique_scans
+        # No annotations bundle in the archive at all.
+        assert mszx.annotations is None or list(mszx.annotations) == []
+
+
+def test_mzparquet_to_tsv_raises(mzparquet_path, tmp_path):
+    """TSV export of long-format input must raise (no PSM data)."""
+    out = tmp_path / "out.tsv"
+    with pytest.raises(ValueError, match="long-format"):
+        from_parquet(mzparquet_path, out)
+
+
+def test_long_format_requires_scan_column(tmp_path):
+    """Scalar mz/intensity without a scan column → clear error."""
+    table = pa.table({
+        "mz": pa.array([100.0, 200.0, 300.0], type=pa.float32()),
+        "intensity": pa.array([10.0, 20.0, 30.0], type=pa.float32()),
+    })
+    bad_path = tmp_path / "scalar_no_scan.parquet"
+    pq.write_table(table, bad_path)
+
+    with pytest.raises(ValueError, match="scan-id column"):
+        from_parquet(bad_path, tmp_path / "out.msz")
+
+
+def test_long_format_rejects_mixed_list_scalar(tmp_path):
+    """One list + one scalar must raise."""
+    table = pa.table({
+        "mz": pa.array([[100.0, 200.0]], type=pa.list_(pa.float32())),
+        "intensity": pa.array([10.0], type=pa.float32()),
+        "scan": pa.array([1], type=pa.uint32()),
+    })
+    bad_path = tmp_path / "mixed.parquet"
+    pq.write_table(table, bad_path)
+
+    with pytest.raises(ValueError, match="both be list or both be scalar"):
+        from_parquet(bad_path, tmp_path / "out.msz")
+
+
+def test_long_format_null_rt_falls_back_to_default(tmp_path):
+    """NaN/null rt for a scan → spectrum.retention_time == -1.0 (default)."""
+    table = pa.table({
+        "scan": pa.array([1, 1, 2, 2], type=pa.uint32()),
+        "level": pa.array([1, 1, 2, 2], type=pa.uint8()),
+        "mz": pa.array([100.0, 200.0, 110.0, 220.0], type=pa.float32()),
+        "intensity": pa.array([10.0, 20.0, 11.0, 22.0], type=pa.float32()),
+        "rt": pa.array([float("nan"), float("nan"), float("nan"), float("nan")],
+                       type=pa.float32()),
+    })
+    p = tmp_path / "nan_rt.parquet"
+    pq.write_table(table, p)
+    out = tmp_path / "out.msz"
+    from_parquet(p, out, ret_time_unit="second")
+
+    with read(out) as msz:
+        for spectrum in msz.spectra:
+            assert math.isclose(spectrum.retention_time, -1.0, rel_tol=1e-5)
