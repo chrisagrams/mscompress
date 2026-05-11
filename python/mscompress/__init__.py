@@ -66,9 +66,8 @@ from .annotations import (
 # Optional parquet support (requires the [parquet] extra).
 try:
     from .parquet import (
-        parquet_to_msz,
-        parquet_to_annotations_tsv,
-        parquet_to_mszx,
+        from_parquet,
+        to_parquet,
     )
     _HAS_PARQUET = True
 except ImportError:
@@ -126,8 +125,7 @@ __all__ = [
 
 if _HAS_PARQUET:
     __all__.extend([
-        "parquet_to_msz",
-        "parquet_to_annotations_tsv",
-        "parquet_to_mszx",
+        "from_parquet",
+        "to_parquet",
     ])
 

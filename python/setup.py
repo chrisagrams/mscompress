@@ -415,6 +415,7 @@ setup(
         "mscompress.annotations.psms",
         "mscompress.datasets",
         "mscompress.metadata",
+        "mscompress.parquet",
     ],
     ext_modules=cythonize(
         extensions,
