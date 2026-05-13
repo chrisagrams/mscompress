@@ -199,7 +199,7 @@ jobs:
         run: python vendor/generate_config.py
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3
+        uses: pypa/cibuildwheel@v3.4
         env:
           CIBW_BUILD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
