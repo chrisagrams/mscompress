@@ -1,14 +1,13 @@
-"""Tests for the mmap-into-tar MSZX open path.
+"""Tests for the first-class MSZXFile (Cython) reader.
 
-The MSZX loader opens the embedded MSZ via MSZFile.from_mszx, which mmaps
-the .mszx archive at the entry's byte offset rather than extracting the
-MSZ to a temp file. These tests verify:
+MSZXFile extends MSZFile and mmaps the embedded MSZ payload directly out
+of the .mszx archive at the entry's byte offset. These tests verify:
 
   - no temp directory is created on open;
   - data read through the mmap'd MSZ is byte-identical to data read from
     the same MSZ extracted to a standalone file;
-  - MSZFile instances opened from an archive cannot be pickled (the path
-    no longer points to a standalone MSZ).
+  - MSZXFile pickles by re-opening the archive (round-trip works);
+  - MSZXFile is polymorphic with MSZFile (isinstance check).
 """
 
 import os
@@ -40,11 +39,16 @@ def test_no_temp_dir_created(mszx_file_path):
 
     mszx = MSZXFile.open(mszx_file_path)
     try:
-        assert mszx._temp_dir is None
         after = {e for e in os.listdir(tmpdir) if e.startswith("mszx_")}
         assert after == before, f"new mszx_* entries appeared: {after - before}"
     finally:
         mszx.close()
+
+
+def test_mszxfile_is_a_mszfile(mszx_file_path):
+    """MSZXFile must be polymorphic with MSZFile."""
+    with MSZXFile.open(mszx_file_path) as mszx:
+        assert isinstance(mszx, MSZFile)
 
 
 def test_msz_data_integrity_via_mmap(mszx_file_path, standalone_msz_path):
@@ -55,9 +59,9 @@ def test_msz_data_integrity_via_mmap(mszx_file_path, standalone_msz_path):
     try:
         assert len(via_archive.spectra) == len(direct.spectra)
 
-        # Compare scan numbers.
+        # Compare scan numbers — directly off the MSZXFile (no .msz indirection).
         direct_scans = [int(s) for s in direct.positions.scans]
-        archive_scans = [int(s) for s in via_archive.msz.positions.scans]
+        archive_scans = [int(s) for s in via_archive.positions.scans]
         assert direct_scans == archive_scans
 
         # Sample a few spectra and byte-compare m/z + intensity arrays.
@@ -75,16 +79,22 @@ def test_msz_data_integrity_via_mmap(mszx_file_path, standalone_msz_path):
         via_archive.close()
 
 
-def test_pickle_raises_on_archive_opened(mszx_file_path):
-    """An MSZFile opened from an MSZX archive cannot be pickled — the path
-    points to the .mszx, not to a standalone MSZ, so naive re-open would
-    misinterpret the file."""
+def test_pickle_roundtrip_via_archive(mszx_file_path):
+    """MSZXFile.__reduce__ re-opens the archive on unpickle, so the
+    round-trip yields a fresh, working MSZXFile."""
     mszx = MSZXFile.open(mszx_file_path)
     try:
-        with pytest.raises(TypeError, match="cannot be pickled"):
-            pickle.dumps(mszx.msz)
+        data = pickle.dumps(mszx)
     finally:
         mszx.close()
+
+    restored = pickle.loads(data)
+    try:
+        assert isinstance(restored, MSZXFile)
+        assert len(restored.spectra) > 0
+        assert restored.annotations is not None
+    finally:
+        restored.close()
 
 
 def test_decompress_to_directory(mszx_file_path, tmp_path):

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ._base import MetadataBuilder
-from ._types import DataCollectionInfo, JoinDefinition
+from mscompress.metadata._base import MetadataBuilder
+from mscompress.metadata._types import DataCollectionInfo, JoinDefinition
 
 
 class CompositeMetadataBuilder:
