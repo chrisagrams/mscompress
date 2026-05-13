@@ -33,6 +33,8 @@ Napi::Value ExtractMsz(const Napi::CallbackInfo& info);
 Napi::Value ZstdCompress(const Napi::CallbackInfo& info);
 Napi::Value ZstdDecompress(const Napi::CallbackInfo& info);
 
+Napi::Value OpenMszFromArchive(const Napi::CallbackInfo& info);
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Register FileHandle class
     FileHandle::Init(env, exports);
@@ -75,6 +77,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Zstd utilities
     exports.Set("zstdCompress", Napi::Function::New(env, ZstdCompress));
     exports.Set("zstdDecompress", Napi::Function::New(env, ZstdDecompress));
+
+    // MSZX archive helpers
+    exports.Set("openMszFromArchive", Napi::Function::New(env, OpenMszFromArchive));
 
     return exports;
 }
