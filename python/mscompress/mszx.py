@@ -288,7 +288,7 @@ class MSZXFile:
         archive_path: Union[str, Path],
         manifest: MSZXManifest,
         msz_file: MSZFile,
-        temp_dir: Path,
+        temp_dir: Optional[Path] = None,
         annotation_readers: Optional[Dict[str, BasePSMReader]] = None,
     ):
         """
@@ -297,8 +297,10 @@ class MSZXFile:
         Args:
             archive_path: Path to the .mszx archive.
             manifest: Parsed manifest.
-            msz_file: Extracted MSZ file handler.
-            temp_dir: Temporary directory containing extracted files.
+            msz_file: MSZ file handler (mmap'd into the archive when opened
+                via MSZXFile.open).
+            temp_dir: Temporary directory containing extracted files. None
+                when the MSZ is mmap'd directly out of the archive.
             annotation_readers: Dict mapping filenames to annotation readers.
         """
         self._archive_path = Path(archive_path)
@@ -318,6 +320,11 @@ class MSZXFile:
         """
         Open an MSZX archive for reading.
 
+        Mmaps the embedded MSZ payload directly out of the archive (no temp
+        extraction). Annotation entries are read into memory via the
+        existing tar-based reader and the tar handle is closed before
+        returning.
+
         Args:
             path: Path to the .mszx file.
 
@@ -332,90 +339,66 @@ class MSZXFile:
         if not archive_path.exists():
             raise FileNotFoundError(f"MSZX file not found: {archive_path}")
 
-        # Create temp directory for extraction (only MSZ file needs to be extracted)
-        temp_dir = Path(tempfile.mkdtemp(prefix="mszx_"))
+        with tarfile.open(archive_path, "r") as tar:
+            # Read manifest from the tar.
+            try:
+                manifest_member = tar.getmember("manifest.json")
+            except KeyError:
+                raise ValueError("Invalid MSZX archive: missing manifest.json")
 
-        try:
-            with tarfile.open(archive_path, "r") as tar:
-                # Extract manifest first
+            manifest_file = tar.extractfile(manifest_member)
+            if manifest_file is None:
+                raise ValueError("Could not read manifest.json")
+
+            manifest = MSZXManifest.from_json(manifest_file.read().decode("utf-8"))
+
+            # Eagerly read annotation entries while the tar is still open;
+            # MSZXAnnotationFile caches bytes in memory, so it does not
+            # need a long-lived tar reference.
+            annotation_readers: Dict[str, BasePSMReader] = {}
+            for entry in manifest.annotations:
                 try:
-                    manifest_member = tar.getmember("manifest.json")
+                    member = tar.getmember(entry.filename)
+                    mszx_source = MSZXAnnotationFile(
+                        mszx_file=tar,
+                        member=member,
+                        name=entry.filename,
+                    )
+                    reader = PSMReader(mszx_source)
+                    annotation_readers[entry.filename] = reader
                 except KeyError:
-                    raise ValueError("Invalid MSZX archive: missing manifest.json")
-
-                manifest_file = tar.extractfile(manifest_member)
-                if manifest_file is None:
-                    raise ValueError("Could not read manifest.json")
-
-                manifest = MSZXManifest.from_json(manifest_file.read().decode("utf-8"))
-
-                # Extract only the MSZ file (it needs to be on disk for the core reader)
-                try:
-                    msz_member = tar.getmember(manifest.spectra_file)
-                    tar.extract(msz_member, temp_dir)
-                except KeyError:
-                    raise ValueError(
-                        f"Invalid MSZX archive: missing spectra file {manifest.spectra_file}"
+                    warnings.warn(
+                        f"Annotation file '{entry.filename}' not found in archive",
+                        UserWarning,
+                        stacklevel=2
+                    )
+                except (ValueError, Exception) as e:
+                    warnings.warn(
+                        f"Could not parse annotation file '{entry.filename}': {e}",
+                        UserWarning,
+                        stacklevel=2
                     )
 
-                # Read annotation files directly from tar using AnnotationSource
-                annotation_readers: Dict[str, BasePSMReader] = {}
-                for entry in manifest.annotations:
-                    try:
-                        member = tar.getmember(entry.filename)
-                        mszx_source = MSZXAnnotationFile(
-                            mszx_file=tar,
-                            member=member,
-                            name=entry.filename,
-                        )
-                        
-                        reader = PSMReader(mszx_source)
-                        annotation_readers[entry.filename] = reader
-                    except KeyError:
-                        warnings.warn(
-                            f"Annotation file '{entry.filename}' not found in archive",
-                            UserWarning,
-                            stacklevel=2
-                        )
-                    except (ValueError, Exception) as e:
-                        # Skip files we can't parse, but print a warning
-                        warnings.warn(
-                            f"Could not parse annotation file '{entry.filename}': {e}",
-                            UserWarning,
-                            stacklevel=2
-                        )
+        # Mmap the MSZ entry directly out of the archive.
+        msz_file = MSZFile.from_mszx(
+            str(archive_path).encode(),
+            manifest.spectra_file.encode(),
+        )
 
-            # Open the MSZ file
-            msz_path = temp_dir / manifest.spectra_file
-            if not msz_path.exists():
-                raise ValueError(
-                    f"Invalid MSZX archive: missing spectra file {manifest.spectra_file}"
-                )
-
-            msz_file = MSZFile(str(msz_path).encode())
-            if not isinstance(msz_file, MSZFile):
-                raise ValueError(
-                    f"Spectra file {manifest.spectra_file} is not a valid MSZ file"
-                )
-
-            return cls(
-                archive_path=archive_path,
-                manifest=manifest,
-                msz_file=msz_file,
-                temp_dir=temp_dir,
-                annotation_readers=annotation_readers,
-            )
-
-        except Exception:
-            # Clean up temp dir on failure
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            raise
+        return cls(
+            archive_path=archive_path,
+            manifest=manifest,
+            msz_file=msz_file,
+            temp_dir=None,
+            annotation_readers=annotation_readers,
+        )
 
     def close(self) -> None:
         """Close the archive and clean up temporary files."""
         if not self._closed:
             self.msz._cleanup()
-            shutil.rmtree(self._temp_dir, ignore_errors=True)
+            if self._temp_dir is not None:
+                shutil.rmtree(self._temp_dir, ignore_errors=True)
             self._closed = True
 
     def __enter__(self) -> MSZXFile:
@@ -560,8 +543,30 @@ class MSZXFile:
         return self.msz.extract_metadata(tag_name)
     
     def decompress(self, output: Union[str, os.PathLike]) -> None:
-        """Decompress the MSZ file to mzML format."""
-        self.msz.decompress(output)
+        """
+        Decompress the MSZ file to mzML format.
+
+        If `output` is an existing directory or has no file extension, the
+        mzML is written inside it as `<archive_stem>.mzML` and any cached
+        annotation readers are written alongside (using the entry's name
+        with any trailing ``.zst`` suffix stripped, since annotation readers
+        already hold decompressed bytes). Otherwise, `output` is treated
+        as a single file path and only the mzML is written.
+        """
+        out_path = Path(os.fspath(output))
+        is_dir_output = out_path.is_dir() or out_path.suffix == ""
+
+        if not is_dir_output:
+            self.msz.decompress(output)
+            return
+
+        out_path.mkdir(parents=True, exist_ok=True)
+        mzml_path = out_path / f"{self._archive_path.stem}.mzML"
+        self.msz.decompress(mzml_path)
+
+        for filename, reader in self._annotations.items():
+            out_name = filename[:-4] if filename.endswith(".zst") else filename
+            (out_path / out_name).write_bytes(reader.source.read())
 
     def extract(
         self,

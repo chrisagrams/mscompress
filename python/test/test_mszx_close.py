@@ -1,3 +1,5 @@
+import os
+import tempfile
 import pytest
 from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
@@ -59,13 +61,17 @@ def test_close_sets_closed_flag(mszx_archive):
     assert mszx._closed
 
 
-def test_close_removes_temp_dir(mszx_archive):
-    """close() should remove the temporary directory."""
+def test_open_does_not_create_temp_dir(mszx_archive):
+    """MSZXFile.open() mmaps the MSZ in-place and must not create a temp dir."""
+    before = set(os.listdir(tempfile.gettempdir()))
     mszx = MSZXFile.open(mszx_archive)
-    temp_dir = mszx._temp_dir
-    assert Path(temp_dir).exists()
-    mszx.close()
-    assert not Path(temp_dir).exists()
+    try:
+        assert mszx._temp_dir is None
+        after = set(os.listdir(tempfile.gettempdir()))
+        new_entries = [e for e in (after - before) if e.startswith("mszx_")]
+        assert new_entries == [], f"unexpected mszx_* temp dirs: {new_entries}"
+    finally:
+        mszx.close()
 
 
 def test_close_is_idempotent(mszx_archive):
@@ -97,14 +103,12 @@ def test_context_manager_then_close(mszx_archive):
 def test_del_calls_close(mszx_archive):
     """__del__ should trigger close() and clean up the MSZFile."""
     mszx = MSZXFile.open(mszx_archive)
-    temp_dir = mszx._temp_dir
     tracker = CleanupTracker(mszx.msz)
     mszx.msz = tracker
 
     del mszx  # Triggers __del__ -> close() -> msz._cleanup()
 
     assert tracker.cleanup_count == 1
-    assert not Path(temp_dir).exists()
 
 
 def test_extract_returned_mszx_cleans_up_on_close(tmp_path, mszx_archive):

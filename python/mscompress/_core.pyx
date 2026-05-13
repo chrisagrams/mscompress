@@ -805,6 +805,82 @@ cdef class MSZFile(BaseFile):
     def _reopen(path: bytes):
         return MSZFile(path)
 
+    @classmethod
+    def from_mszx(cls, bytes mszx_path, bytes entry_name):
+        """
+        Open an MSZ file embedded inside an MSZX (tar) archive without
+        extracting it to disk. Mmap's the archive at the entry's byte
+        offset (page-aligned).
+
+        Parameters
+        ----------
+        mszx_path : bytes
+            Path to the .mszx archive.
+        entry_name : bytes
+            Name of the MSZ entry within the archive (e.g. b"spectra.msz").
+        """
+        if not os.path.exists(mszx_path):
+            raise FileNotFoundError(f"File not found: {os.fsdecode(mszx_path)}")
+
+        cdef MSZFile self = cls.__new__(cls)
+        cdef int fd = _open_input_file(mszx_path)
+        if fd < 0:
+            raise OSError(f"Could not open MSZX archive: {os.fsdecode(mszx_path)}")
+
+        cdef int64_t off = 0
+        cdef size_t sz = 0
+        if _find_tar_entry(fd, entry_name, &off, &sz) != 0:
+            _close_file(fd)
+            raise ValueError(
+                f"Entry '{os.fsdecode(entry_name)}' not found in archive "
+                f"or archive is not a valid USTAR tar"
+            )
+
+        cdef size_t pad = 0
+        cdef size_t maplen = 0
+        cdef void* base = _get_mapping_range(fd, off, sz, &pad, &maplen)
+        if base == NULL:
+            _close_file(fd)
+            raise ValueError(
+                "MSZX archive is truncated or corrupted (mmap range exceeds file size)"
+            )
+
+        # Populate BaseFile fields manually (bypassing __init__).
+        self._path = mszx_path
+        self._fd = fd
+        self._map_base = base
+        self._map_length = maplen
+        self._mapping = (<char*>base) + pad
+        self.filesize = sz
+        self._opened_from_archive = True
+        self._spectra = None
+        self._arguments = RuntimeArguments()
+        self._z = _alloc_z_stream()
+        self.output_fd = -1
+        self._df = NULL
+        self._divisions = NULL
+        self._positions = NULL
+
+        # Run the MSZFile-specific init body.
+        self._df = _get_header_df(self._mapping)
+        self._footer = _read_footer(self._mapping, self.filesize)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
+        self._positions = _flatten_divisions(self._divisions)
+        self._dctx = _alloc_dctx()
+        self._xml_block_lens = _read_block_len_queue(self._mapping, self._footer.xml_blk_pos, self._footer.mz_binary_blk_pos)
+        self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
+        self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
+        _set_decompress_runtime_variables(self._df, self._footer)
+        return self
+
+    def __reduce__(self):
+        if self._opened_from_archive:
+            raise TypeError(
+                "MSZFile opened from MSZX cannot be pickled. "
+                "Re-open the .mszx archive in the worker process instead."
+            )
+        return (self.__class__._reopen, (self._path,))
+
     def _cleanup(self):
         """Free MSZFile-specific resources before calling parent cleanup"""
 
@@ -1218,7 +1294,11 @@ cdef class BaseFile:
     cdef size_t filesize
     cdef int _fd
     cdef void* _mapping
-    cdef data_format_t* _df 
+    cdef void* _map_base       # true mmap base; equals _mapping for path-opened files,
+                               # differs by _map_pad for offset-mmap'd files (e.g. MSZX)
+    cdef size_t _map_length    # actual mapped length, used for unmap (≥ filesize)
+    cdef bint _opened_from_archive
+    cdef data_format_t* _df
     cdef divisions_t* _divisions
     cdef division_t* _positions
     cdef Spectra _spectra
@@ -1234,6 +1314,9 @@ cdef class BaseFile:
         self.filesize = _get_filesize(self._path)
         self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)
+        self._map_base = self._mapping
+        self._map_length = self.filesize
+        self._opened_from_archive = False
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
@@ -1271,8 +1354,13 @@ cdef class BaseFile:
 
     def _cleanup(self):
         # On Windows, unmap must happen before closing the file descriptor
-        # Unmap file mapping if exists
-        if self._mapping != NULL:
+        # Unmap file mapping if exists. For offset-mmap'd files (MSZX), unmap
+        # the true base + actual mapped length, not the user-facing pointer.
+        if self._map_base != NULL:
+            _remove_mapping(self._map_base, self._map_length)
+            self._map_base = NULL
+            self._mapping = NULL
+        elif self._mapping != NULL:
             _remove_mapping(self._mapping, self.filesize)
             self._mapping = NULL
 
