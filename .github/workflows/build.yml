@@ -29,7 +29,7 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
           - platform: macos
             runner: macos-15-intel
@@ -58,7 +58,7 @@ jobs:
       - name: Configure CMake (Windows)
         if: matrix.platform == 'windows'
         working-directory: ./cli
-        run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
+        run: cmake -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
       
       - name: Build CLI (Unix)
         if: matrix.platform != 'windows'
@@ -164,7 +164,7 @@ jobs:
             cibw_arch: aarch64
             os_name: Linux
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
-          - runner: windows-latest
+          - runner: windows-2025-vs2026
             cibw_arch: AMD64
             os_name: Windows
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
@@ -260,7 +260,7 @@ jobs:
             runner: macos-15-intel
             arch: x86_64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
 
     steps:
