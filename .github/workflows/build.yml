@@ -103,14 +103,14 @@ jobs:
       
       - name: Upload CLI artifact (Unix)
         if: matrix.platform != 'windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./cli/mscompress
       
       - name: Upload CLI artifact (Windows)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -236,7 +236,7 @@ jobs:
           fi
 
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: python-package-${{ matrix.os_name }}-${{ matrix.cibw_arch }}
           path: |
@@ -311,7 +311,7 @@ jobs:
         run: npm test
 
       - name: Upload prebuild artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./node-ts/prebuilds/*.tar.gz
@@ -329,7 +329,7 @@ jobs:
     
     steps:
       - name: Download all Python artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: python-package-*
           merge-multiple: true
@@ -378,7 +378,7 @@ jobs:
 
       - name: Build Docker image
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -386,7 +386,7 @@ jobs:
 
       - name: Build and push Docker image
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -419,7 +419,7 @@ jobs:
           node-version: '24'
 
       - name: Download all prebuild artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: prebuild-*
           path: ./node-ts/prebuilds
