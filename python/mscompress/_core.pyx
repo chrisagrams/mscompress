@@ -457,7 +457,20 @@ cdef class MZMLFile(BaseFile):
         self._validate_scale_factors()
         self._prepare_divisions()
         self.output_fd = self._prepare_output_fd(output)
-        cdef int rv = _compress_mzml(<char*> self._mapping, self.filesize, self._arguments.get_ptr(), self._df, self._divisions, self.output_fd)
+        cdef int rv
+        cdef char* mapping = <char*> self._mapping
+        cdef size_t filesize = self.filesize
+        cdef Arguments* args = self._arguments.get_ptr()
+        cdef data_format_t* df = self._df
+        cdef divisions_t* divisions = self._divisions
+        cdef int fd = self.output_fd
+        # Release the GIL so worker threads can re-enter Python via the
+        # error/warning callbacks (declared `with gil`). Without this, a worker
+        # that hits a base64 decode failure (or any other warning path) blocks
+        # in PyGILState_Ensure while the main thread is parked in pthread_join,
+        # producing an unrecoverable deadlock.
+        with nogil:
+            rv = _compress_mzml(mapping, filesize, args, df, divisions, fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
@@ -837,7 +850,16 @@ cdef class MSZFile(BaseFile):
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
         self.output_fd = self._prepare_output_fd(output)
-        cdef int rv = _decompress_msz(<char*>self._mapping, self.filesize, self._arguments.get_ptr(), self.output_fd)
+        cdef int rv
+        cdef char* mapping = <char*>self._mapping
+        cdef size_t filesize = self.filesize
+        cdef Arguments* args = self._arguments.get_ptr()
+        cdef int fd = self.output_fd
+        # Release the GIL so worker threads can re-enter Python via the
+        # error/warning callbacks. See MZMLFile.compress for the deadlock
+        # this avoids.
+        with nogil:
+            rv = _decompress_msz(mapping, filesize, args, fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
