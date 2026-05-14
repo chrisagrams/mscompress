@@ -97,6 +97,10 @@ export interface NativeBindings {
   // Zstd utilities
   zstdCompress(data: Buffer, level?: number): Buffer;
   zstdDecompress(data: Buffer): Buffer;
+
+  // MSZX archive helpers — open the embedded MSZ payload at its offset
+  // inside a .mszx tar without extracting to a temp file.
+  openMszFromArchive(archivePath: string, entryName: string): NativeFileHandle;
 }
 
 const native: NativeBindings = addon as NativeBindings;

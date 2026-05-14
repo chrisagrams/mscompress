@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 
-from ._base import MetadataBuilder
-from ._types import (
+from mscompress.metadata._base import MetadataBuilder
+from mscompress.metadata._types import (
     DataCollectionInfo,
     FieldDefinition,
     FileDistribution,

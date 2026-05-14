@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import native from "@/core/bindings.js";
+import type { NativeFileHandle } from "@/core/bindings.js";
 import { BaseFile } from "@/files/base-file.js";
 import { DataFormat } from "@/types/data-format.js";
 import { Division } from "@/types/division.js";
@@ -14,12 +15,15 @@ import type { ExtractOptions } from "@/types/types.js";
  */
 export class MSZFile extends BaseFile {
   /**
-   * Create an MSZFile instance.
+   * Create an MSZFile instance from either a file path or a pre-built
+   * native handle (the latter is the offset-mmap path used by `fromMszx`
+   * and by `MSZXFile`, where `input.path` is the .mszx archive).
    *
-   * @param filePath - Path to the MSZ file
+   * @param input - Path to the MSZ file, or `{ handle, path }` for an
+   *                already-mmap'd payload inside an MSZX archive.
    */
-  constructor(filePath: string) {
-    super(filePath);
+  constructor(input: string | { handle: NativeFileHandle; path: string }) {
+    super(input);
     // Read header data format
     const dfNative = native.getDataFormat(this._handle);
     this._format = new DataFormat(dfNative);
@@ -30,6 +34,18 @@ export class MSZFile extends BaseFile {
 
     // Set decompress runtime variables
     native.setDecompressRuntimeVars(this._handle);
+  }
+
+  /**
+   * Open an MSZ payload embedded inside an MSZX (tar) archive without
+   * extracting it. Mmaps the entry at its byte offset.
+   *
+   * @param archivePath - Path to the .mszx file.
+   * @param entryName - MSZ entry name inside the archive (e.g. "spectra.msz").
+   */
+  static fromMszx(archivePath: string, entryName: string): MSZFile {
+    const handle = native.openMszFromArchive(archivePath, entryName);
+    return new MSZFile({ handle, path: archivePath });
   }
 
   /**
@@ -120,7 +136,10 @@ export class MSZFile extends BaseFile {
       const tmpMzml = path.join(tmpDir, "temp.mzML");
 
       try {
-        const tmpMzmlFile = this.extract(tmpMzml, options);
+        // Use the parent's prototype extract directly to avoid recursing
+        // through any subclass override (e.g. MSZXFile.extract) when the
+        // intermediate mzML is produced.
+        const tmpMzmlFile = MSZFile.prototype.extract.call(this, tmpMzml, options);
         try {
           return tmpMzmlFile.compress(outputPath);
         } finally {
