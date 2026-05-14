@@ -23,6 +23,7 @@
 #define read _read
 #define write _write
 #define lseek64 _lseeki64
+#define ssize_t int
 #define PATH_SEP '\\'
 #else
 #include <sys/mman.h>
