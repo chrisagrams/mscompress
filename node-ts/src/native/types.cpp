@@ -240,28 +240,54 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
     : Napi::ObjectWrap<FileHandle>(info) {
     Napi::Env env = info.Env();
 
-    if (info.Length() < 1 || !info[0].IsString()) {
+    if (info.Length() < 1) {
+        Napi::TypeError::New(env, "FileHandle: path string or handle object expected").ThrowAsJavaScriptException();
+        return;
+    }
+
+    // --- Object form: pre-built handle from offset-mmap (e.g. MSZX path) ---
+    if (info[0].IsObject() && !info[0].IsString()) {
+        Napi::Object obj = info[0].As<Napi::Object>();
+        if (!obj.Has("fd") || !obj.Has("mapping") || !obj.Has("mapBase")
+            || !obj.Has("mapLength") || !obj.Has("filesize")) {
+            Napi::TypeError::New(env,
+                "FileHandle: handle object must have {fd, mapping, mapBase, mapLength, filesize}"
+            ).ThrowAsJavaScriptException();
+            return;
+        }
+
+        fd_ = obj.Get("fd").As<Napi::Number>().Int32Value();
+        // Pointers come across as External<void> wrappers (set by the addon side).
+        mapping_ = obj.Get("mapping").As<Napi::External<void>>().Data();
+        map_base_ = obj.Get("mapBase").As<Napi::External<void>>().Data();
+        map_length_ = static_cast<size_t>(obj.Get("mapLength").As<Napi::Number>().Int64Value());
+        filesize_ = static_cast<size_t>(obj.Get("filesize").As<Napi::Number>().Int64Value());
+
+        filetype_ = determine_filetype(mapping_, filesize_);
+        z_ = alloc_z_stream();
+        return;
+    }
+
+    // --- String form: open and mmap from a file path ---
+    if (!info[0].IsString()) {
         Napi::TypeError::New(env, "FileHandle: string path expected").ThrowAsJavaScriptException();
         return;
     }
 
     std::string path = info[0].As<Napi::String>().Utf8Value();
 
-    // Get filesize
     filesize_ = get_filesize(const_cast<char*>(path.c_str()));
     if (filesize_ == 0) {
         Napi::Error::New(env, "FileHandle: file is empty or does not exist: " + path).ThrowAsJavaScriptException();
         return;
     }
 
-    // Open file
     fd_ = open_input_file(const_cast<char*>(path.c_str()));
     if (fd_ < 0) {
         Napi::Error::New(env, "FileHandle: failed to open file: " + path).ThrowAsJavaScriptException();
         return;
     }
 
-    // Memory map
     mapping_ = get_mapping(fd_);
     if (mapping_ == nullptr) {
         close_file(fd_);
@@ -270,10 +296,11 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
         return;
     }
 
-    // Detect file type
-    filetype_ = determine_filetype(mapping_, filesize_);
+    // Path-based open: the user-facing pointer IS the mmap base.
+    map_base_ = mapping_;
+    map_length_ = filesize_;
 
-    // Allocate z_stream for mzML decoding
+    filetype_ = determine_filetype(mapping_, filesize_);
     z_ = alloc_z_stream();
 }
 
@@ -333,8 +360,13 @@ void FileHandle::Cleanup() {
     // footer_ points to mmap memory in MSZ path, don't free
     footer_ = nullptr;
 
-    // Unmap then close
-    if (mapping_) {
+    // Unmap then close. For offset-mmap (MSZX), unmap the true base + actual
+    // mapped length, not the user-facing pointer.
+    if (map_base_) {
+        remove_mapping(map_base_, map_length_);
+        map_base_ = nullptr;
+        mapping_ = nullptr;
+    } else if (mapping_) {
         remove_mapping(mapping_, filesize_);
         mapping_ = nullptr;
     }

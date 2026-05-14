@@ -20,13 +20,22 @@ export abstract class BaseFile {
   protected _arguments: RuntimeArguments;
 
   /**
-   * Create a file instance.
+   * Create a file instance from either a path or an already-constructed
+   * FileHandle (the latter is used by MSZX zero-copy open via
+   * `native.openMszFromArchive`, where the handle's "path" is the
+   * containing archive and the mapping points into it).
    *
-   * @param filePath - Absolute path to the file
+   * @param input - Absolute path to the file, or a pre-built native handle
+   *                paired with the originating archive path.
    */
-  constructor(filePath: string) {
-    this.path = filePath;
-    this._handle = new native.FileHandle(filePath);
+  constructor(input: string | { handle: NativeFileHandle; path: string }) {
+    if (typeof input === "string") {
+      this.path = input;
+      this._handle = new native.FileHandle(input);
+    } else {
+      this.path = input.path;
+      this._handle = input.handle;
+    }
     this.filesize = this._handle.filesize;
     this._arguments = new RuntimeArguments();
   }
