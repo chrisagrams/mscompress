@@ -107,7 +107,11 @@ describe("MSZXFile (mmap-into-tar)", () => {
     try {
       const mszx = MSZXFile.open(MSZX_PATH);
       try {
-        mszx.decompress(outDir);
+        // `decompress` returns an open MZMLFile wrapping the freshly-written
+        // mzML. It must be closed before rmSync, else Windows fails with
+        // EPERM (the mmap keeps the file locked).
+        const produced = mszx.decompress(outDir);
+        produced.close();
       } finally {
         mszx.close();
       }
