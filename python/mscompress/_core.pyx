@@ -818,6 +818,90 @@ cdef class MSZFile(BaseFile):
     def _reopen(path: bytes):
         return MSZFile(path)
 
+    def _init_from_archive(self, bytes mszx_path, bytes entry_name):
+        """
+        Populate this instance's BaseFile + MSZFile state from an MSZX
+        archive entry. Used by both MSZFile.from_mszx and MSZXFile.open
+        to share the offset-mmap construction path.
+        """
+        if not os.path.exists(mszx_path):
+            raise FileNotFoundError(f"File not found: {os.fsdecode(mszx_path)}")
+
+        cdef int fd = _open_input_file(mszx_path)
+        if fd < 0:
+            raise OSError(f"Could not open MSZX archive: {os.fsdecode(mszx_path)}")
+
+        cdef int64_t off = 0
+        cdef size_t sz = 0
+        if _find_tar_entry(fd, entry_name, &off, &sz) != 0:
+            _close_file(fd)
+            raise ValueError(
+                f"Entry '{os.fsdecode(entry_name)}' not found in archive "
+                f"or archive is not a valid USTAR tar"
+            )
+
+        cdef size_t pad = 0
+        cdef size_t maplen = 0
+        cdef void* base = _get_mapping_range(fd, off, sz, &pad, &maplen)
+        if base == NULL:
+            _close_file(fd)
+            raise ValueError(
+                "MSZX archive is truncated or corrupted (mmap range exceeds file size)"
+            )
+
+        # Populate BaseFile fields manually (bypassing __init__).
+        self._path = mszx_path
+        self._fd = fd
+        self._map_base = base
+        self._map_length = maplen
+        self._mapping = (<char*>base) + pad
+        self.filesize = sz
+        self._opened_from_archive = True
+        self._spectra = None
+        self._arguments = RuntimeArguments()
+        self._z = _alloc_z_stream()
+        self.output_fd = -1
+        self._df = NULL
+        self._divisions = NULL
+        self._positions = NULL
+
+        # Run the MSZFile-specific init body.
+        self._df = _get_header_df(self._mapping)
+        self._footer = _read_footer(self._mapping, self.filesize)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
+        self._positions = _flatten_divisions(self._divisions)
+        self._dctx = _alloc_dctx()
+        self._xml_block_lens = _read_block_len_queue(self._mapping, self._footer.xml_blk_pos, self._footer.mz_binary_blk_pos)
+        self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
+        self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
+        _set_decompress_runtime_variables(self._df, self._footer)
+
+    @classmethod
+    def from_mszx(cls, bytes mszx_path, bytes entry_name):
+        """
+        Open an MSZ file embedded inside an MSZX (tar) archive without
+        extracting it to disk. Mmap's the archive at the entry's byte
+        offset (page-aligned).
+
+        Parameters
+        ----------
+        mszx_path : bytes
+            Path to the .mszx archive.
+        entry_name : bytes
+            Name of the MSZ entry within the archive (e.g. b"spectra.msz").
+        """
+        cdef MSZFile self = cls.__new__(cls)
+        self._init_from_archive(mszx_path, entry_name)
+        return self
+
+    def __reduce__(self):
+        if self._opened_from_archive:
+            raise TypeError(
+                "MSZFile opened from MSZX cannot be pickled. "
+                "Re-open the .mszx archive in the worker process instead."
+            )
+        return (self.__class__._reopen, (self._path,))
+
     def _cleanup(self):
         """Free MSZFile-specific resources before calling parent cleanup"""
 
@@ -933,10 +1017,12 @@ cdef class MSZFile(BaseFile):
             if output.exists():
                 output.unlink()
 
-            # Extract to temporary mzML file
+            # Extract to temporary mzML file. Use unbound MSZFile.extract
+            # to avoid re-dispatching through a subclass override (e.g.,
+            # MSZXFile.extract) and recursing infinitely.
             temp_mzml = None
             try:
-                self.extract(temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
+                MSZFile.extract(self, temp_mzml_path, indicies=indicies, scan_numbers=scan_numbers, ms_level=ms_level)
 
                 # Compress the temporary mzML to MSZ
                 temp_mzml = MZMLFile(str(temp_mzml_path).encode('utf-8'))
@@ -1215,6 +1301,299 @@ cdef class MSZFile(BaseFile):
                 free(decmp_xml)
     
 
+cdef class MSZXFile(MSZFile):
+    """
+    First-class Cython reader for MSZX (tar) archives.
+
+    Extends MSZFile so all properties and methods (`spectra`, `positions`,
+    `decompress`, `extract`, `get_mz_binary`, etc.) work directly without
+    going through a separate `.msz` accessor. The embedded MSZ payload is
+    mmap'd in place via the offset-mmap path; annotation entries are
+    eagerly cached as Python objects.
+
+    Open via the `open()` classmethod. The MSZX-specific `extract()` and
+    `decompress()` overrides handle filtered MSZX-archive output and
+    directory-output mzML+annotations respectively.
+    """
+    cdef object _manifest                # MSZXManifest
+    cdef dict _annotations               # {filename: PSMReader}
+    cdef object _archive_path            # pathlib.Path
+    cdef object _primary_annotation_reader
+    cdef public bint _closed             # idempotent-close guard (visible to Python)
+
+    @classmethod
+    def open(cls, path):
+        """
+        Open an MSZX archive for reading.
+
+        Mmaps the embedded MSZ payload directly out of the archive (no
+        temp extraction). Annotation entries are read into memory via the
+        existing tar-based reader and the tar handle is closed before
+        returning.
+
+        Args:
+            path: Path to the .mszx file.
+        """
+        # Local imports break the circular module load between _core and
+        # the Python-side annotation/tarfile machinery (mscompress.mszx
+        # re-exports MSZXFile from _core, so it can't be imported eagerly
+        # at the top of this file).
+        import tarfile
+        import warnings
+        from mscompress.annotations import PSMReader, MSZXAnnotationFile
+        from mscompress.mszx.metadata import MSZXManifest
+
+        archive_path = Path(path)
+        if not archive_path.exists():
+            raise FileNotFoundError(f"MSZX file not found: {archive_path}")
+
+        with tarfile.open(archive_path, "r") as tar:
+            try:
+                manifest_member = tar.getmember("manifest.json")
+            except KeyError:
+                raise ValueError("Invalid MSZX archive: missing manifest.json")
+
+            manifest_file = tar.extractfile(manifest_member)
+            if manifest_file is None:
+                raise ValueError("Could not read manifest.json")
+
+            manifest = MSZXManifest.from_json(manifest_file.read().decode("utf-8"))
+
+            annotation_readers = {}
+            for entry in manifest.annotations:
+                try:
+                    member = tar.getmember(entry.filename)
+                    mszx_source = MSZXAnnotationFile(
+                        mszx_file=tar,
+                        member=member,
+                        name=entry.filename,
+                    )
+                    reader = PSMReader(mszx_source)
+                    annotation_readers[entry.filename] = reader
+                except KeyError:
+                    warnings.warn(
+                        f"Annotation file '{entry.filename}' not found in archive",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                except (ValueError, Exception) as e:
+                    warnings.warn(
+                        f"Could not parse annotation file '{entry.filename}': {e}",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
+        # Construct and populate via the shared MSZ-from-archive helper.
+        cdef MSZXFile self = cls.__new__(cls)
+        self._init_from_archive(
+            str(archive_path).encode(),
+            manifest.spectra_file.encode(),
+        )
+        self._manifest = manifest
+        self._annotations = annotation_readers
+        self._archive_path = archive_path
+        self._primary_annotation_reader = (
+            next(iter(annotation_readers.values())) if annotation_readers else None
+        )
+        self._closed = False
+        return self
+
+    def close(self):
+        """Close the archive and release all resources. Idempotent."""
+        self._cleanup()
+
+    def __reduce__(self):
+        # MSZXFile re-opens cleanly from its archive path — unlike a bare
+        # MSZFile-from-archive which can't reconstruct the entry name.
+        return (MSZXFile.open, (self._archive_path,))
+
+    def _cleanup(self):
+        # Idempotent: subsequent calls are no-ops once the resources have
+        # been released. The parent's _cleanup is also defensive (NULL
+        # guards) but tracking _closed lets us short-circuit Python work.
+        if self._closed:
+            return
+        self._closed = True
+        # Drop Python references so the underlying data can be GC'd before
+        # the C resources are torn down by the parent.
+        self._annotations = None
+        self._primary_annotation_reader = None
+        self._manifest = None
+        MSZFile._cleanup(self)
+
+    @property
+    def manifest(self):
+        """The archive manifest."""
+        return self._manifest
+
+    @property
+    def archive_path(self):
+        """Path to the MSZX archive."""
+        return self._archive_path
+
+    @property
+    def annotations(self):
+        """Primary annotation reader, or None if no annotations."""
+        return self._primary_annotation_reader
+
+    @property
+    def annotation_readers(self):
+        """Dict of all annotation readers, keyed by filename."""
+        return self._annotations
+
+    @property
+    def annotation_files(self):
+        """List of annotation entries in the archive."""
+        return self._manifest.annotations
+
+    def get_annotation_reader(self, filename):
+        """Get the annotation reader for a specific file by name."""
+        if filename in self._annotations:
+            return self._annotations[filename]
+        raise KeyError(f"Annotation file not found: {filename}")
+
+    def get_annotation_readers_by_format(self, format):
+        """Get all annotation readers matching a specific format."""
+        return [
+            self._annotations[entry.filename]
+            for entry in self._manifest.annotations
+            if entry.format == format and entry.filename in self._annotations
+        ]
+
+    def describe(self):
+        """Description including the archive metadata."""
+        desc = MSZFile.describe(self)
+        desc["archive"] = {
+            "path": str(self._archive_path),
+            "annotations": [sr.to_dict() for sr in self._manifest.annotations],
+        }
+        return desc
+
+    def decompress(self, output):
+        """
+        Decompress the embedded MSZ to mzML.
+
+        If `output` is an existing directory or has no file extension, the
+        mzML is written inside it as `<archive_stem>.mzML` and any cached
+        annotation readers are written alongside (using the entry's name
+        with any trailing `.zst` suffix stripped). Otherwise, `output` is
+        treated as a single file path and only the mzML is written.
+        """
+        out_path = Path(os.fspath(output))
+        is_dir_output = out_path.is_dir() or out_path.suffix == ""
+
+        if not is_dir_output:
+            return MSZFile.decompress(self, output)
+
+        out_path.mkdir(parents=True, exist_ok=True)
+        mzml_path = out_path / f"{self._archive_path.stem}.mzML"
+        result = MSZFile.decompress(self, mzml_path)
+
+        for filename, reader in self._annotations.items():
+            out_name = filename[:-4] if filename.endswith(".zst") else filename
+            (out_path / out_name).write_bytes(reader.source.read())
+
+        return result
+
+    def extract(self, output, indicies=None, scan_numbers=None, ms_level=None):
+        """
+        Extract a subset of spectra and annotations to a new MSZX archive.
+
+        Args:
+            output: Path to the output .mszx file.
+            indicies: List of spectrum indices to extract.
+            scan_numbers: List of scan numbers to extract.
+            ms_level: Filter by MS level.
+
+        Returns:
+            New MSZXFile instance for the created archive.
+        """
+        # Local imports avoid the _core <-> mszx circular at module load.
+        import tempfile
+        import warnings
+        from mscompress.mszx import MSZXBuilder
+        from mscompress.annotations import PSMReader
+
+        output_path = Path(output)
+        if not output_path.suffix:
+            output_path = output_path.with_suffix(".mszx")
+
+        target_scans = set()
+
+        if scan_numbers:
+            target_scans.update(scan_numbers)
+
+        if indicies:
+            all_scans = self.positions.scans
+            for idx in indicies:
+                if 0 <= idx < len(all_scans):
+                    target_scans.add(int(all_scans[idx]))
+
+        if ms_level is not None:
+            all_scans = self.positions.scans
+            all_levels = self.positions.ms_levels
+
+            for i in range(len(all_scans)):
+                if all_levels[i] == ms_level:
+                    scan = int(all_scans[i])
+                    is_match = True
+                    if indicies and i not in indicies:
+                        is_match = False
+                    if scan_numbers and scan not in scan_numbers:
+                        is_match = False
+                    if is_match:
+                        target_scans.add(scan)
+
+            if indicies or scan_numbers:
+                valid_scans_by_level = set()
+                for i in range(len(all_scans)):
+                    if all_levels[i] == ms_level:
+                        valid_scans_by_level.add(int(all_scans[i]))
+                target_scans.intersection_update(valid_scans_by_level)
+            else:
+                for i in range(len(all_scans)):
+                    if all_levels[i] == ms_level:
+                        target_scans.add(int(all_scans[i]))
+
+        if not indicies and not scan_numbers and ms_level is None:
+            all_scans = self.positions.scans
+            target_scans.update(int(s) for s in all_scans)
+
+        final_scan_list = sorted(target_scans)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            temp_msz_path = temp_path / "temp.msz"
+
+            MSZFile.extract(self, output=str(temp_msz_path), scan_numbers=final_scan_list)
+
+            extracted_msz = MSZFile(str(temp_msz_path).encode("utf-8"))
+            try:
+                builder = MSZXBuilder(extracted_msz, compression=True)
+                builder.set_description(self._manifest.description or "")
+
+                for k, v in self._manifest.extra.items():
+                    builder.set_extra(k, v)
+
+                for filename, reader in self._annotations.items():
+                    fname_path = Path(filename)
+                    temp_filename = fname_path.stem if fname_path.suffix.lower() == ".zst" else filename
+                    temp_ann_path = temp_path / temp_filename
+
+                    try:
+                        reader.filter_to_file(temp_ann_path, target_scans)
+                        new_reader = PSMReader(temp_ann_path)
+                        builder.add_annotations(new_reader)
+                    except Exception as e:
+                        warnings.warn(f"Failed to filter annotation {filename}: {e}")
+
+                builder.save(output_path)
+            finally:
+                extracted_msz._cleanup()
+
+            return MSZXFile.open(output_path)
+
+
 cdef class BaseFile:
     """
     Parent class for MZMLFile and MSZFile classes. Provides common interfaces for both child classes.
@@ -1240,7 +1619,11 @@ cdef class BaseFile:
     cdef size_t filesize
     cdef int _fd
     cdef void* _mapping
-    cdef data_format_t* _df 
+    cdef void* _map_base       # true mmap base; equals _mapping for path-opened files,
+                               # differs by _map_pad for offset-mmap'd files (e.g. MSZX)
+    cdef size_t _map_length    # actual mapped length, used for unmap (≥ filesize)
+    cdef bint _opened_from_archive
+    cdef data_format_t* _df
     cdef divisions_t* _divisions
     cdef division_t* _positions
     cdef Spectra _spectra
@@ -1256,6 +1639,9 @@ cdef class BaseFile:
         self.filesize = _get_filesize(self._path)
         self._fd = _open_input_file(self._path)
         self._mapping = _get_mapping(self._fd)
+        self._map_base = self._mapping
+        self._map_length = self.filesize
+        self._opened_from_archive = False
         self._spectra = None
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
@@ -1293,8 +1679,13 @@ cdef class BaseFile:
 
     def _cleanup(self):
         # On Windows, unmap must happen before closing the file descriptor
-        # Unmap file mapping if exists
-        if self._mapping != NULL:
+        # Unmap file mapping if exists. For offset-mmap'd files (MSZX), unmap
+        # the true base + actual mapped length, not the user-facing pointer.
+        if self._map_base != NULL:
+            _remove_mapping(self._map_base, self._map_length)
+            self._map_base = NULL
+            self._mapping = NULL
+        elif self._mapping != NULL:
             _remove_mapping(self._mapping, self.filesize)
             self._mapping = NULL
 
@@ -1613,7 +2004,7 @@ cdef class Spectra:
             transform: A callable matching the SpectrumTransform protocol,
                        or None to clear the transform.
         """
-        from .types import SpectrumTransform
+        from mscompress.types import SpectrumTransform
         if transform is not None and not isinstance(transform, SpectrumTransform):
             raise TypeError(
                 "transform must be a callable with signature "

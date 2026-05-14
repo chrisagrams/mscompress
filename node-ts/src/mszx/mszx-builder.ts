@@ -207,4 +207,55 @@ export class MSZXBuilder {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }
+
+  /**
+   * Synchronous variant of `save()`. Used by `MSZXFile.extract` for
+   * `.mszx` output, where the surrounding API is sync (matching
+   * MSZFile.extract). Behaves identically to `save()` apart from running
+   * tar creation in sync mode.
+   *
+   * @param outputPath - Output file path (should end with .mszx).
+   * @returns Path of the created archive.
+   */
+  saveSync(outputPath: string): string {
+    let output = outputPath;
+    if (!path.extname(output)) {
+      output = output + ".mszx";
+    }
+
+    const manifest = this.buildManifest();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-build-"));
+
+    try {
+      const manifestPath = path.join(tempDir, "manifest.json");
+      fs.writeFileSync(manifestPath, manifest.toString());
+
+      const tempMszPath = path.join(tempDir, manifest.spectra_file);
+      fs.copyFileSync(this.mszPath, tempMszPath);
+
+      for (const { path: annotationPath, entry } of this.annotations) {
+        const tempAnnotationPath = path.join(tempDir, entry.filename);
+        if (entry.compressed) {
+          const data = fs.readFileSync(annotationPath);
+          fs.writeFileSync(tempAnnotationPath, native.zstdCompress(data));
+        } else {
+          fs.copyFileSync(annotationPath, tempAnnotationPath);
+        }
+      }
+
+      tar.create(
+        {
+          file: output,
+          cwd: tempDir,
+          gzip: false,
+          sync: true,
+        },
+        fs.readdirSync(tempDir)
+      );
+
+      return output;
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 }

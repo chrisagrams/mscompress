@@ -2,6 +2,7 @@ cdef extern from "stdint.h":
     ctypedef unsigned int uint64_t
     ctypedef unsigned int uint32_t
     ctypedef unsigned int uint16_t
+    ctypedef long long int64_t
 
 cdef extern from "../vendor/zlib/zlib.h":
     ctypedef struct z_stream:
@@ -140,6 +141,8 @@ cdef extern from "../src/mscompress.h":
     int _flush "flush"(int fd) nogil
     size_t _get_filesize "get_filesize"(char* path)
     void* _get_mapping "get_mapping"(int fd)
+    void* _get_mapping_range "get_mapping_range"(int fd, int64_t offset, size_t length, size_t* out_pad, size_t* out_map_length)
+    int _find_tar_entry "find_tar_entry"(int fd, const char* name, int64_t* out_offset, size_t* out_size)
     int _determine_filetype "determine_filetype"(void* input_map, size_t input_length)
 
     data_format_t* _pattern_detect "pattern_detect"(char* input_map)
