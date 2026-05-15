@@ -209,7 +209,8 @@ jobs:
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_BUILD: "python {package}/../vendor/generate_config.py"
           # Run tests inside cibuildwheel so each Python version is tested with its own wheel
-          CIBW_TEST_REQUIRES: "pytest torch"
+          CIBW_TEST_REQUIRES: "pytest"
+          CIBW_TEST_EXTRAS: "pytorch"
           CIBW_TEST_COMMAND: "cd {project}/python && pytest test -v"
           CIBW_TEST_COMMAND_WINDOWS: "cd /d {project}\\python && pytest test -v"
           CIBW_BUILD_VERBOSITY: 1

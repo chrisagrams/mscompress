@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.0.15"
+__version__ = "1.0.16"
 
 
 from mscompress._core import (
