@@ -6,10 +6,12 @@ has an invalid character injected into its m/z base64 data. mscompress should
 handle this gracefully (empty array) instead of crashing.
 """
 
+import multiprocessing
+
 import numpy as np
 import pytest
 
-from mscompress import read, MZMLFile
+from mscompress import MSZFile, MZMLFile, read
 
 
 def test_read_corrupt_base64_mzml(corrupt_base64_mzml_path):
@@ -54,3 +56,74 @@ def test_dense_sequential_access_no_crash(corrupt_base64_mzml_path):
         inten = mzml.get_inten_binary(i)
         assert isinstance(mz, np.ndarray)
         assert isinstance(inten, np.ndarray)
+
+
+def _compress_in_subprocess(input_path: str, output_path: str) -> None:
+    """Run compress() in a child process so the parent can enforce a timeout."""
+    from mscompress import MZMLFile as _MZMLFile
+
+    with _MZMLFile(input_path.encode("utf-8")) as mzml:
+        mzml.compress(output_path)
+
+
+def test_compress_corrupt_base64_does_not_deadlock(corrupt_base64_mzml_path, tmp_path):
+    """compress() must return on a corrupt-base64 input, not deadlock.
+
+    Before the fix in fix/compress-gil-deadlock-corrupt-base64, MZMLFile.compress()
+    held the GIL during _compress_mzml(). Worker threads that hit the
+    `decode_base64 failed` warning blocked in PyGILState_Ensure while the main
+    thread was parked in pthread_join — an unrecoverable deadlock. We run
+    compress() in a subprocess with a wall-clock budget so a regression fails
+    the test instead of hanging CI.
+    """
+    output_path = tmp_path / "corrupt_roundtrip.msz"
+
+    ctx = multiprocessing.get_context("spawn")
+    proc = ctx.Process(
+        target=_compress_in_subprocess,
+        args=(corrupt_base64_mzml_path, str(output_path)),
+    )
+    proc.start()
+    proc.join(timeout=60)
+
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=5)
+        if proc.is_alive():
+            proc.kill()
+            proc.join()
+        pytest.fail(
+            "MZMLFile.compress() deadlocked on corrupt-base64 input "
+            "(GIL/pthread_join regression — see fix/compress-gil-deadlock-corrupt-base64)."
+        )
+
+    assert proc.exitcode == 0, f"compress subprocess exited with {proc.exitcode}"
+    assert output_path.exists(), "compress() did not produce an output file"
+    assert output_path.stat().st_size > 0, "compress() produced an empty output file"
+
+
+def test_compress_corrupt_base64_roundtrip(corrupt_base64_mzml_path, tmp_path):
+    """After compress(), the MSZ should open and report the expected spectrum count."""
+    output_path = tmp_path / "corrupt_roundtrip.msz"
+
+    ctx = multiprocessing.get_context("spawn")
+    proc = ctx.Process(
+        target=_compress_in_subprocess,
+        args=(corrupt_base64_mzml_path, str(output_path)),
+    )
+    proc.start()
+    proc.join(timeout=60)
+
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=5)
+        if proc.is_alive():
+            proc.kill()
+            proc.join()
+        pytest.fail("compress() deadlocked; cannot verify roundtrip.")
+
+    assert proc.exitcode == 0
+    assert output_path.exists()
+
+    with MSZFile(str(output_path).encode("utf-8")) as msz:
+        assert msz.format.source_total_spec == 5

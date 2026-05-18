@@ -703,8 +703,18 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    a_args->dest_len = &algo_output_len;
 
    for (int i = 0; i < total_spec; i++) {
+      size_t src_len = curr_dp->end_positions[i] - curr_dp->start_positions[i];
+
+      // Empty <binary></binary>: compression skipped it, so the cache holds
+      // no bytes for this spectrum. Calling target_fun with src_len==0 would
+      // walk into the next spectrum's payload and shift every later index.
+      if (src_len == 0) {
+         res_lens[i] = 0;
+         continue;
+      }
+
       a_args->src = (char**)&decmp_binary;
-      a_args->src_len = curr_dp->end_positions[i] - curr_dp->start_positions[i];
+      a_args->src_len = src_len;
       a_args->dest = (char **)(buff + buff_off);
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
@@ -760,6 +770,15 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
                                  size_t* out_len) {
    size_t offset = 0;
    size_t len = blk->encoded_cache_lens[index];
+
+   // Empty spectrum: return a freeable non-NULL pointer (callers do
+   // free(res) unconditionally, and NULL would trip Python's "Failed to
+   // extract" error path in _core.pyx).
+   if (len == 0) {
+      *out_len = 0;
+      return malloc(1);
+   }
+
    char* res = malloc(len);
    if (!res)
       return NULL;

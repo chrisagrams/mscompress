@@ -29,7 +29,7 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
           - platform: macos
             runner: macos-15-intel
@@ -40,16 +40,16 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
-      
-      - name: Setup MSVC Developer Command Prompt (Windows)
+
+      - name: Setup MSBuild (Windows)
         if: matrix.platform == 'windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
-      
+          msbuild-architecture: x64
+
       - name: Configure CMake (Unix)
         if: matrix.platform != 'windows'
         working-directory: ./cli
@@ -58,7 +58,7 @@ jobs:
       - name: Configure CMake (Windows)
         if: matrix.platform == 'windows'
         working-directory: ./cli
-        run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
+        run: cmake -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
       
       - name: Build CLI (Unix)
         if: matrix.platform != 'windows'
@@ -103,14 +103,14 @@ jobs:
       
       - name: Upload CLI artifact (Unix)
         if: matrix.platform != 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./cli/mscompress
       
       - name: Upload CLI artifact (Windows)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -143,7 +143,7 @@ jobs:
 
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./cli/release/*
         env:
@@ -164,7 +164,7 @@ jobs:
             cibw_arch: aarch64
             os_name: Linux
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
-          - runner: windows-latest
+          - runner: windows-2025-vs2026
             cibw_arch: AMD64
             os_name: Windows
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
@@ -180,26 +180,26 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
-      
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      
-      - name: Setup MSVC Developer Command Prompt (Windows)
+
+      - name: Setup MSBuild (Windows)
         if: matrix.os_name == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
-      
+          msbuild-architecture: x64
+
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
-      
+
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21
+        uses: pypa/cibuildwheel@v3.4
         env:
           CIBW_BUILD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
@@ -209,7 +209,8 @@ jobs:
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_BUILD: "python {package}/../vendor/generate_config.py"
           # Run tests inside cibuildwheel so each Python version is tested with its own wheel
-          CIBW_TEST_REQUIRES: "pytest torch"
+          CIBW_TEST_REQUIRES: "pytest"
+          CIBW_TEST_EXTRAS: "pytorch"
           CIBW_TEST_COMMAND: "cd {project}/python && pytest test -v"
           CIBW_TEST_COMMAND_WINDOWS: "cd /d {project}\\python && pytest test -v"
           CIBW_BUILD_VERBOSITY: 1
@@ -236,7 +237,7 @@ jobs:
           fi
 
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: python-package-${{ matrix.os_name }}-${{ matrix.cibw_arch }}
           path: |
@@ -260,30 +261,30 @@ jobs:
             runner: macos-15-intel
             arch: x86_64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Setup MSVC Developer Command Prompt (Windows)
+      - name: Setup MSBuild (Windows)
         if: matrix.platform == 'windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
+          msbuild-architecture: x64
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
@@ -311,7 +312,7 @@ jobs:
         run: npm test
 
       - name: Upload prebuild artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./node-ts/prebuilds/*.tar.gz
@@ -329,7 +330,7 @@ jobs:
     
     steps:
       - name: Download all Python artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: python-package-*
           merge-multiple: true
@@ -354,15 +355,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Extract version from tag
         if: startsWith(github.ref, 'refs/tags/v')
@@ -371,14 +372,14 @@ jobs:
 
       - name: Log in to Docker Hub
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -386,7 +387,7 @@ jobs:
 
       - name: Build and push Docker image
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -409,24 +410,24 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
       - name: Download all prebuild artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: prebuild-*
           path: ./node-ts/prebuilds
           merge-multiple: true
 
       - name: Upload prebuilds to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./node-ts/prebuilds/*.tar.gz
         env:

@@ -1,5 +1,7 @@
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")
+
 from mscompress.datasets.torch import MSCompressDataset
 from mscompress.types import AnnotationFormat
 
