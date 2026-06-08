@@ -141,6 +141,10 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    r->encoded_cache_len = 0;
    r->encoded_cache_lens = NULL;
 
+   r->lru_prev = NULL;
+   r->lru_next = NULL;
+   r->lru_pinned = 0;
+
    return r;
 }
 
@@ -425,4 +429,145 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset,
                        *(size_t*)(input_ptr + i + sizeof(size_t)));
 
    return r;
+}
+
+/**
+ * @brief Frees a block's decompressed-block caches without deallocating the node.
+ *
+ * Frees `cache`, `encoded_cache`, and `encoded_cache_lens` if non-NULL and resets
+ * them to NULL/zero. Used by the LRU eviction path and by `clear_cache`-style
+ * APIs. Does not touch the block's structural fields (sizes, `next`) or LRU links.
+ */
+void block_drop_cache(block_len_t* blk) {
+   if (!blk)
+      return;
+   if (blk->cache) {
+      free(blk->cache);
+      blk->cache = NULL;
+   }
+   if (blk->encoded_cache) {
+      free(blk->encoded_cache);
+      blk->encoded_cache = NULL;
+   }
+   if (blk->encoded_cache_lens) {
+      free(blk->encoded_cache_lens);
+      blk->encoded_cache_lens = NULL;
+   }
+   blk->encoded_cache_fmt = 0;
+   blk->encoded_cache_len = 0;
+}
+
+/**
+ * @brief Allocates a bounded LRU for `block_len_t` caches.
+ *
+ * @param cap Maximum number of cached blocks held at once. Must be > 0; a cap
+ *            of 0 or negative means "no limit", and callers should pass NULL
+ *            instead of allocating an LRU at all.
+ */
+block_lru_t* alloc_block_lru(int cap) {
+   block_lru_t* lru = malloc(sizeof(block_lru_t));
+   if (!lru) {
+      fprintf(stderr, "alloc_block_lru: malloc failed\n");
+      exit(-1);
+   }
+   lru->head = NULL;
+   lru->tail = NULL;
+   lru->count = 0;
+   lru->cap = cap > 0 ? cap : 0;
+   return lru;
+}
+
+/**
+ * @brief Frees the LRU struct.
+ *
+ * Does not touch the `block_len_t` nodes referenced by the LRU — those remain
+ * owned by their containing `block_len_queue_t` and will be freed (along with
+ * any still-attached cache buffers) by `dealloc_block_len_queue()`.
+ *
+ * Call this before freeing the underlying queues. If you want the cached
+ * buffers freed before that, call `lru_evict_all()` first.
+ */
+void dealloc_block_lru(block_lru_t* lru) {
+   if (!lru)
+      return;
+   free(lru);
+}
+
+/* Internal: detach `blk` from `lru`'s doubly-linked list. Does not touch
+ * `blk->lru_pinned` or `lru->count`; callers do that. */
+static void lru_unlink(block_lru_t* lru, block_len_t* blk) {
+   if (blk->lru_prev)
+      blk->lru_prev->lru_next = blk->lru_next;
+   else
+      lru->head = blk->lru_next;
+   if (blk->lru_next)
+      blk->lru_next->lru_prev = blk->lru_prev;
+   else
+      lru->tail = blk->lru_prev;
+   blk->lru_prev = NULL;
+   blk->lru_next = NULL;
+}
+
+/**
+ * @brief Touch a block in the LRU. Inserts on first touch, bumps to head
+ *        on subsequent touches, and evicts the tail when over capacity.
+ *
+ * Eviction frees the evicted block's cache buffers via `block_drop_cache()`.
+ * Pass NULL for `lru` to disable LRU behavior entirely (legacy mode); the
+ * block is then cached without any cap.
+ */
+void lru_touch_block(block_lru_t* lru, block_len_t* blk) {
+   if (!lru || !blk)
+      return;
+   if (lru->cap <= 0)
+      return;  // unbounded — nothing to do
+
+   if (blk->lru_pinned) {
+      // Already in LRU: move to head if not already there.
+      if (lru->head == blk)
+         return;
+      lru_unlink(lru, blk);
+   } else {
+      blk->lru_pinned = 1;
+      lru->count++;
+   }
+
+   // Insert at head.
+   blk->lru_prev = NULL;
+   blk->lru_next = lru->head;
+   if (lru->head)
+      lru->head->lru_prev = blk;
+   lru->head = blk;
+   if (!lru->tail)
+      lru->tail = blk;
+
+   // Evict from tail until within capacity.
+   while (lru->count > lru->cap && lru->tail) {
+      block_len_t* victim = lru->tail;
+      lru_unlink(lru, victim);
+      victim->lru_pinned = 0;
+      lru->count--;
+      block_drop_cache(victim);
+   }
+}
+
+/**
+ * @brief Evict every block currently held by the LRU, freeing their cache
+ *        buffers. The LRU struct itself is left allocated and empty.
+ */
+void lru_evict_all(block_lru_t* lru) {
+   if (!lru)
+      return;
+   block_len_t* curr = lru->head;
+   while (curr) {
+      block_len_t* nx = curr->lru_next;
+      curr->lru_prev = NULL;
+      curr->lru_next = NULL;
+      curr->lru_pinned = 0;
+      block_drop_cache(curr);
+      curr = nx;
+   }
+   lru->head = NULL;
+   lru->tail = NULL;
+   lru->count = 0;
 }

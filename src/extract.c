@@ -371,7 +371,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
-                                 size_t* out_len) {
+                                 size_t* out_len, block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -431,6 +431,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = xml_end_position - xml_start_position - xml_start_offset;
    res = malloc(*out_len);
@@ -464,7 +465,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
-                                 size_t* out_len) {
+                                 size_t* out_len, block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -524,6 +525,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = xml_end_position - xml_start_position;
    res = malloc(*out_len);
@@ -556,7 +558,8 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
                                 data_format_t* df,
                                 block_len_queue_t* xml_block_lens, long xml_pos,
                                 divisions_t* divisions, uint64_t spectrum_start,
-                                uint64_t spectrum_end, size_t* out_len) {
+                                uint64_t spectrum_end, size_t* out_len,
+                                block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -616,6 +619,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = (xml_end_position - xml_start_position) -
               (xml_end_position - spectrum_end) + 1;  //+1 For newline
@@ -815,7 +819,8 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
-                          long index, size_t* out_len, int encode) {
+                          long index, size_t* out_len, int encode,
+                          block_lru_t* lru) {
    data_positions_t* mz;
    long mz_off = 0;
    int division_index = 0;
@@ -863,6 +868,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       mz_blk_len->cache = decmp_mz;
    } else
       decmp_mz = mz_blk_len->cache;
+   lru_touch_block(lru, mz_blk_len);
 
    if (!encode) {
       encode_binary_block(
@@ -905,7 +911,8 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
                              long inten_binary_blk_pos, divisions_t* divisions,
-                             long index, size_t* out_len, int encode) {
+                             long index, size_t* out_len, int encode,
+                             block_lru_t* lru) {
    data_positions_t* inten;
    long inten_off = 0;
    int division_index = 0;
@@ -955,6 +962,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       inten_blk_len->cache = decmp_inten;
    } else
       decmp_inten = inten_blk_len->cache;
+   lru_touch_block(lru, inten_blk_len);
 
    if (!encode) {
       int ret = encode_binary_block(
@@ -1013,7 +1021,8 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* mz_binary_block_lens,
                       block_len_queue_t* inten_binary_block_lens, long xml_pos,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
-                      divisions_t* divisions, long index, size_t* out_len) {
+                      divisions_t* divisions, long index, size_t* out_len,
+                      block_lru_t* lru) {
    uint64_t spectrum_start;
    uint64_t spectrum_end;
 
@@ -1034,7 +1043,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t start_xml_len = 0;
    char* spectrum_start_xml = extract_spectrum_start_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &start_xml_len);
+       spectrum_end, &start_xml_len, lru);
    memcpy(res, spectrum_start_xml, start_xml_len);
    *out_len += start_xml_len;
    free(spectrum_start_xml);
@@ -1042,7 +1051,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t mz_len = 0;
    char* spectrum_mz =
        extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos,
-                           divisions, index, &mz_len, TRUE);
+                           divisions, index, &mz_len, TRUE, lru);
 
    if (spectrum_mz == NULL) {
       error(
@@ -1059,7 +1068,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t inner_xml_len = 0;
    char* spectrum_inner_xml = extract_spectrum_inner_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &inner_xml_len);
+       spectrum_end, &inner_xml_len, lru);
 
    if (spectrum_inner_xml == NULL) {
       error(
@@ -1077,7 +1086,8 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t inten_len = 0;
    char* spectrum_inten =
        extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens,
-                              inten_pos, divisions, index, &inten_len, TRUE);
+                              inten_pos, divisions, index, &inten_len, TRUE,
+                              lru);
    if (spectrum_inten == NULL) {
       error(
           "extract_spectra: Failed to extract intensity values for spectrum "
@@ -1094,7 +1104,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t last_xml_len = 0;
    char* spectrum_last_xml = extract_spectrum_last_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &last_xml_len);
+       spectrum_end, &last_xml_len, lru);
    if (spectrum_last_xml == NULL) {
       error(
           "extract_spectra: Failed to extract last XML for spectrum index "
@@ -1213,7 +1223,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
           inten_binary_block_lens, msz_footer->xml_pos,
           msz_footer->mz_binary_pos, msz_footer->inten_binary_pos,
           msz_footer->mz_fmt, msz_footer->inten_fmt, divisions, indicies[i],
-          &spectra_len);
+          &spectra_len, NULL);
       write_to_file(output_fd, spectrum, spectra_len);
       free(spectrum);
    }

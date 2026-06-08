@@ -795,15 +795,33 @@ cdef class MZMLFile(BaseFile):
         return element
 
 
+DEFAULT_BLOCK_CACHE = 4
+"""Default per-file bounded LRU size for decompressed block caches.
+
+When iterating spectra (especially at random), each unique division's
+decompressed mz/intensity/xml block is otherwise held forever; with this cap,
+the LRU evicts the least-recently-touched block once the cap is exceeded, at
+the cost of re-decompressing it on a future cache miss. Pass ``cache_blocks=0``
+to ``MSZFile`` / ``MSZXFile`` to disable the LRU and restore unbounded caching
+(legacy behavior; useful only for sequential single-pass workloads on small
+files)."""
+
+
 cdef class MSZFile(BaseFile):
     cdef footer_t* _footer
     cdef ZSTD_DCtx* _dctx
     cdef block_len_queue_t* _xml_block_lens
     cdef block_len_queue_t* _mz_binary_block_lens
     cdef block_len_queue_t* _inten_binary_block_lens
+    cdef block_lru_t* _block_lru
+    cdef int _cache_blocks
 
-    def __init__(self, bytes path):
+    def __init__(self, bytes path, int cache_blocks=DEFAULT_BLOCK_CACHE):
         super(MSZFile, self).__init__(path)
+        self._cache_blocks = cache_blocks
+        self._block_lru = NULL
+        if cache_blocks > 0:
+            self._block_lru = _alloc_block_lru(cache_blocks)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -865,6 +883,13 @@ cdef class MSZFile(BaseFile):
         self._divisions = NULL
         self._positions = NULL
 
+        # Bounded-LRU init. Callers using cls.__new__(cls) must set
+        # self._cache_blocks before invoking _init_from_archive (MSZFile.from_mszx
+        # and MSZXFile.open both do so). 0 means LRU disabled.
+        self._block_lru = NULL
+        if self._cache_blocks > 0:
+            self._block_lru = _alloc_block_lru(self._cache_blocks)
+
         # Run the MSZFile-specific init body.
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
@@ -877,7 +902,8 @@ cdef class MSZFile(BaseFile):
         _set_decompress_runtime_variables(self._df, self._footer)
 
     @classmethod
-    def from_mszx(cls, bytes mszx_path, bytes entry_name):
+    def from_mszx(cls, bytes mszx_path, bytes entry_name,
+                  int cache_blocks=DEFAULT_BLOCK_CACHE):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -889,8 +915,12 @@ cdef class MSZFile(BaseFile):
             Path to the .mszx archive.
         entry_name : bytes
             Name of the MSZ entry within the archive (e.g. b"spectra.msz").
+        cache_blocks : int
+            Per-file LRU cap for decompressed mz/intensity/xml blocks.
+            Default ``DEFAULT_BLOCK_CACHE``; 0 disables the LRU.
         """
         cdef MSZFile self = cls.__new__(cls)
+        self._cache_blocks = cache_blocks
         self._init_from_archive(mszx_path, entry_name)
         return self
 
@@ -909,6 +939,13 @@ cdef class MSZFile(BaseFile):
         if self._dctx != NULL:
             ZSTD_freeDCtx(self._dctx)
             self._dctx = NULL
+
+        # Free the LRU struct first — it only holds pointers into the queues
+        # below, so dropping it before the queue dealloc avoids dangling refs.
+        # The cache buffers themselves are released by dealloc_block_len_queue.
+        if self._block_lru != NULL:
+            _dealloc_block_lru(self._block_lru)
+            self._block_lru = NULL
 
         # Free block length queues
         if self._xml_block_lens != NULL:
@@ -930,6 +967,17 @@ cdef class MSZFile(BaseFile):
 
         # Call parent cleanup
         super(MSZFile, self)._cleanup()
+
+    def clear_cache(self):
+        """Evict all decompressed block caches without closing the file.
+
+        Frees the per-block ``cache`` / ``encoded_cache`` buffers held by the
+        bounded LRU. The file remains open and subsequent reads will re-decompress
+        on demand. No-op when ``cache_blocks=0`` (LRU disabled) — in that mode
+        the unbounded legacy caches are only released at file close.
+        """
+        if self._block_lru != NULL:
+            _lru_evict_all(self._block_lru)
     
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         output = os.fspath(output)
@@ -1142,7 +1190,7 @@ cdef class MSZFile(BaseFile):
         cdef double* double_ptr
         cdef float* float_ptr
 
-        res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE)
+        res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE, self._block_lru)
 
         if res == NULL:
             raise ValueError(f"Failed to extract m/z binary for index {index}")
@@ -1181,7 +1229,7 @@ cdef class MSZFile(BaseFile):
         cdef double* double_ptr
         cdef float* float_ptr
 
-        res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE)
+        res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE, self._block_lru)
 
         if res == NULL:
             raise ValueError(f"Failed to extract intensity binary for index {index}")
@@ -1228,7 +1276,8 @@ cdef class MSZFile(BaseFile):
             <char*>self._mapping, self._dctx, self._df,
             self._xml_block_lens, self._mz_binary_block_lens,
             self._inten_binary_block_lens, xml_pos, mz_pos,
-            inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
+            inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len,
+            self._block_lru
         )
 
         if res == NULL:
@@ -1322,7 +1371,7 @@ cdef class MSZXFile(MSZFile):
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
-    def open(cls, path):
+    def open(cls, path, int cache_blocks=DEFAULT_BLOCK_CACHE):
         """
         Open an MSZX archive for reading.
 
@@ -1333,6 +1382,8 @@ cdef class MSZXFile(MSZFile):
 
         Args:
             path: Path to the .mszx file.
+            cache_blocks: Per-file LRU cap for decompressed mz/intensity/xml
+                blocks. Default ``DEFAULT_BLOCK_CACHE``; 0 disables the LRU.
         """
         # Local imports break the circular module load between _core and
         # the Python-side annotation/tarfile machinery (mscompress.mszx
@@ -1385,6 +1436,7 @@ cdef class MSZXFile(MSZFile):
 
         # Construct and populate via the shared MSZ-from-archive helper.
         cdef MSZXFile self = cls.__new__(cls)
+        self._cache_blocks = cache_blocks
         self._init_from_archive(
             str(archive_path).encode(),
             manifest.spectra_file.encode(),
