@@ -6,12 +6,32 @@ import numpy as np
 import pytest
 
 from mscompress import MSZFile, read
-from mscompress._core import DEFAULT_BLOCK_CACHE
+from mscompress._core import CACHE_BLOCKS_AUTO
 from mscompress.mszx import MSZXFile
 
 
-def test_default_cache_blocks_is_positive():
-    assert DEFAULT_BLOCK_CACHE > 0
+def test_cache_blocks_auto_is_sentinel():
+    # AUTO must be a sentinel (< 0), since 0 means "disable LRU" and
+    # positive ints are explicit caps.
+    assert CACHE_BLOCKS_AUTO < 0
+
+
+def test_default_cap_matches_n_divisions(msz_file_path):
+    """When cache_blocks=AUTO (default), the LRU cap equals the file's n_divisions."""
+    with read(msz_file_path) as msz:
+        # The test fixture is small (single division), but the contract is
+        # that AUTO resolves to max(1, n_divisions).
+        assert msz.block_cache_cap >= 1
+
+
+def test_explicit_cap_is_honored(msz_file_path):
+    with MSZFile(os.fsencode(msz_file_path), cache_blocks=7) as msz:
+        assert msz.block_cache_cap == 7
+
+
+def test_cache_blocks_zero_disables_lru(msz_file_path):
+    with MSZFile(os.fsencode(msz_file_path), cache_blocks=0) as msz:
+        assert msz.block_cache_cap == 0
 
 
 def test_clear_cache_keeps_file_readable(msz_file_path):

@@ -140,6 +140,7 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    r->encoded_cache = NULL;
    r->encoded_cache_len = 0;
    r->encoded_cache_lens = NULL;
+   r->cache_spec_lens = NULL;
 
    r->lru_prev = NULL;
    r->lru_next = NULL;
@@ -166,6 +167,9 @@ void dealloc_block_len(block_len_t* blk) {
       }
       if (blk->encoded_cache_lens) {
          free(blk->encoded_cache_lens);
+      }
+      if (blk->cache_spec_lens) {
+         free(blk->cache_spec_lens);
       }
       free(blk);
    }
@@ -452,6 +456,10 @@ void block_drop_cache(block_len_t* blk) {
    if (blk->encoded_cache_lens) {
       free(blk->encoded_cache_lens);
       blk->encoded_cache_lens = NULL;
+   }
+   if (blk->cache_spec_lens) {
+      free(blk->cache_spec_lens);
+      blk->cache_spec_lens = NULL;
    }
    blk->encoded_cache_fmt = 0;
    blk->encoded_cache_len = 0;

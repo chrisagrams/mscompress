@@ -189,6 +189,14 @@ typedef struct block_len_t {
    uint64_t encoded_cache_len;
    size_t* encoded_cache_lens;
 
+   // Per-spectrum raw payload lengths within `cache`, as parsed from the
+   // ZLIB_SIZE_OFFSET-byte headers (lens[i]=0 for empty spectra that were
+   // skipped during compression). Populated lazily by the Python no-encode
+   // fast path (extract.c:extract_no_encode_from_cache) so subsequent
+   // accesses skip the cache walk. Distinct from `encoded_cache_lens`, which
+   // holds RE-encoded sizes from the slow path's `encode_binary_block`.
+   size_t* cache_spec_lens;
+
    // Bounded-LRU bookkeeping. Membership and ordering are maintained by
    // lru_touch_block(); these fields are unused when the block is not in any
    // LRU. See `block_lru_t` below.
