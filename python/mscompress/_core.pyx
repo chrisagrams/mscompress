@@ -47,6 +47,43 @@ _set_error_callback(_python_error_handler)
 _set_warning_callback(_python_warning_handler)
 
 
+# ---------------------------------------------------------------------------
+# Cache-size sentinels. Defined here (above any class that uses them as
+# default-arg values) because Cython evaluates def-default values at
+# class-definition time, not at call time. See MSZFile/MZMLFile constructors.
+# ---------------------------------------------------------------------------
+
+CACHE_BLOCKS_AUTO = -1
+"""Sentinel for ``cache_blocks`` meaning "use one slot per division".
+
+When passed (the default), the bounded-LRU cap is sized to the file's own
+``n_divisions`` after the footer is read, so a single in-flight access never
+evicts in steady state, while still bounding total cached blocks to one
+file's worth of divisions. Use ``cache_blocks=0`` to disable the LRU and
+restore unbounded legacy caching, or a positive int for an explicit cap."""
+
+# Back-compat alias for the old constant name. Will be removed in a future
+# release; new code should use CACHE_BLOCKS_AUTO.
+DEFAULT_BLOCK_CACHE = CACHE_BLOCKS_AUTO
+
+CACHE_SPECTRA_AUTO = -1
+"""Sentinel for ``cache_spectra`` meaning "use the bundled default".
+
+When passed (the default), ``Spectra`` caches the last ``_DEFAULT_CACHE_SPECTRA``
+returned ``Spectrum`` objects in a bounded LRU. Repeated access to a cached
+index hands back the same ``Spectrum`` instance (so its lazily-loaded ``_mz``
+/ ``_intensity`` / ``_xml`` payloads survive). Pass ``cache_spectra=N`` for an
+explicit cap, or ``cache_spectra=0`` to disable eviction (legacy: the cache
+grows unboundedly, one entry per ever-accessed index)."""
+
+_DEFAULT_CACHE_SPECTRA = 128
+# Tuned for two cases at once: (a) a single iteration over a Division's worth
+# of spectra revisits each Spectrum at most a handful of times via the
+# .mz/.intensity/.xml lazy properties, (b) ML batch loaders rarely revisit
+# the same index within a batch. Bigger than typical batch sizes so it doesn't
+# thrash on contiguous reads.
+
+
 def _pipe_stream(c_func, args, chunk_size=1_048_576):
     """
     Pipe-based streaming bridge between C fd-oriented writes and Python iterators.
@@ -392,14 +429,15 @@ cdef class Division:
 
 
 cdef class MZMLFile(BaseFile):
-    def __init__(self, bytes path):
+    def __init__(self, bytes path, int cache_spectra=CACHE_SPECTRA_AUTO):
         super(MZMLFile, self).__init__(path)
+        self._cache_spectra = cache_spectra
         if self._mapping is NULL:
              raise RuntimeError("File mapping is NULL. Filesize might be 0.")
         self._df = _pattern_detect(<char*> self._mapping)
         if self._df is NULL:
              raise RuntimeError("pattern_detect returned NULL. Failed to detect mzML pattern.")
-        
+
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
         if self._positions is NULL:
              raise RuntimeError("scan_mzml returned NULL. The file might be empty or invalid.")
@@ -795,20 +833,6 @@ cdef class MZMLFile(BaseFile):
         return element
 
 
-CACHE_BLOCKS_AUTO = -1
-"""Sentinel for ``cache_blocks`` meaning "use one slot per division".
-
-When passed (the default), the bounded-LRU cap is sized to the file's own
-``n_divisions`` after the footer is read, so a single in-flight access never
-evicts in steady state, while still bounding total cached blocks to one
-file's worth of divisions. Use ``cache_blocks=0`` to disable the LRU and
-restore unbounded legacy caching, or a positive int for an explicit cap."""
-
-# Back-compat alias for the old constant name. Will be removed in a future
-# release; new code should use CACHE_BLOCKS_AUTO.
-DEFAULT_BLOCK_CACHE = CACHE_BLOCKS_AUTO
-
-
 cdef class MSZFile(BaseFile):
     cdef footer_t* _footer
     cdef ZSTD_DCtx* _dctx
@@ -820,9 +844,11 @@ cdef class MSZFile(BaseFile):
                             # *effective* cap is on self._block_lru.cap once
                             # resolved post-footer.
 
-    def __init__(self, bytes path, int cache_blocks=CACHE_BLOCKS_AUTO):
+    def __init__(self, bytes path, int cache_blocks=CACHE_BLOCKS_AUTO,
+                 int cache_spectra=CACHE_SPECTRA_AUTO):
         super(MSZFile, self).__init__(path)
         self._cache_blocks = cache_blocks
+        self._cache_spectra = cache_spectra
         self._block_lru = NULL
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
@@ -917,7 +943,8 @@ cdef class MSZFile(BaseFile):
 
     @classmethod
     def from_mszx(cls, bytes mszx_path, bytes entry_name,
-                  int cache_blocks=CACHE_BLOCKS_AUTO):
+                  int cache_blocks=CACHE_BLOCKS_AUTO,
+                  int cache_spectra=CACHE_SPECTRA_AUTO):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -933,9 +960,14 @@ cdef class MSZFile(BaseFile):
             Per-file LRU cap for decompressed mz/intensity/xml blocks.
             Default ``CACHE_BLOCKS_AUTO`` (-1) sizes the cap to the file's
             own ``n_divisions``; 0 disables the LRU entirely.
+        cache_spectra : int
+            Per-file LRU cap for cached ``Spectrum`` Python objects. Default
+            ``CACHE_SPECTRA_AUTO`` (-1) resolves to a bundled default; 0
+            restores the legacy unbounded cache. Forwarded to ``Spectra``.
         """
         cdef MSZFile self = cls.__new__(cls)
         self._cache_blocks = cache_blocks
+        self._cache_spectra = cache_spectra
         self._init_from_archive(mszx_path, entry_name)
         return self
 
@@ -1398,7 +1430,8 @@ cdef class MSZXFile(MSZFile):
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
-    def open(cls, path, int cache_blocks=CACHE_BLOCKS_AUTO):
+    def open(cls, path, int cache_blocks=CACHE_BLOCKS_AUTO,
+             int cache_spectra=CACHE_SPECTRA_AUTO):
         """
         Open an MSZX archive for reading.
 
@@ -1412,6 +1445,9 @@ cdef class MSZXFile(MSZFile):
             cache_blocks: Per-file LRU cap for decompressed mz/intensity/xml
                 blocks. Default ``CACHE_BLOCKS_AUTO`` (-1) sizes the cap to
                 this file's ``n_divisions``; 0 disables the LRU entirely.
+            cache_spectra: Per-file LRU cap for cached ``Spectrum`` Python
+                objects. Default ``CACHE_SPECTRA_AUTO`` (-1) resolves to a
+                bundled default; 0 restores the legacy unbounded cache.
         """
         # Local imports break the circular module load between _core and
         # the Python-side annotation/tarfile machinery (mscompress.mszx
@@ -1465,6 +1501,7 @@ cdef class MSZXFile(MSZFile):
         # Construct and populate via the shared MSZ-from-archive helper.
         cdef MSZXFile self = cls.__new__(cls)
         self._cache_blocks = cache_blocks
+        self._cache_spectra = cache_spectra
         self._init_from_archive(
             str(archive_path).encode(),
             manifest.spectra_file.encode(),
@@ -1707,6 +1744,8 @@ cdef class BaseFile:
     cdef divisions_t* _divisions
     cdef division_t* _positions
     cdef Spectra _spectra
+    cdef int _cache_spectra    # Cap forwarded to Spectra; CACHE_SPECTRA_AUTO
+                               # (-1) by default. Set by subclass constructors.
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
     cdef int output_fd
@@ -1723,6 +1762,7 @@ cdef class BaseFile:
         self._map_length = self.filesize
         self._opened_from_archive = False
         self._spectra = None
+        self._cache_spectra = -1  # CACHE_SPECTRA_AUTO; subclass may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
@@ -1809,7 +1849,12 @@ cdef class BaseFile:
     @property
     def spectra(self):
         if self._spectra is None:
-            self._spectra = Spectra(self, DataFormat.from_ptr(self._df), Division.from_ptr(self._positions))
+            self._spectra = Spectra(
+                self,
+                DataFormat.from_ptr(self._df),
+                Division.from_ptr(self._positions),
+                cap=self._cache_spectra,
+            )
         return self._spectra
     
     @property
@@ -2003,8 +2048,8 @@ cdef class Spectra:
     A class to represent and manage a collection of spectra, allowing (lazy) iteration and access by index.
 
     Methods:
-    __init__(self, DataFormat df, Division positions):
-        Initializes the Spectra object with a data format and a list of postions.
+    __init__(self, DataFormat df, Division positions, int cap=CACHE_SPECTRA_AUTO):
+        Initializes the Spectra object with a data format, positions, and bounded LRU cap.
 
     __iter__(self):
         Resets the iteration index and returns the iterator object.
@@ -2018,21 +2063,34 @@ cdef class Spectra:
 
     __len__(self) -> int:
         Returns the total number of spectra.
+
+    clear_cache(self):
+        Drop all cached ``Spectrum`` objects (and any payloads they had lazily loaded).
+
+    cache_cap (property):
+        The effective LRU cap. 0 means unbounded; positive ints are the maximum
+        number of ``Spectrum`` objects held at once.
     """
     cdef BaseFile _f
     cdef object _df
     cdef object _positions
-    cdef object _cache  # Store computed spectra
+    cdef object _cache  # dict[size_t, Spectrum] — insertion-ordered LRU
+    cdef int _cap       # 0 = unbounded; positive = bounded
     cdef int _index
     cdef size_t length
     cdef object _transform
 
-    def __init__(self, BaseFile f, DataFormat df, Division positions):
+    def __init__(self, BaseFile f, DataFormat df, Division positions,
+                 int cap=CACHE_SPECTRA_AUTO):
         self._f = f
         self._df = df
         self._positions = positions
         self.length = self._df.source_total_spec
-        self._cache = [None] * self.length  # Initialize cache
+        self._cache = {}
+        if cap == CACHE_SPECTRA_AUTO:
+            self._cap = _DEFAULT_CACHE_SPECTRA
+        else:
+            self._cap = cap if cap > 0 else 0
         self._index = 0
         self._transform = None
 
@@ -2052,10 +2110,38 @@ cdef class Spectra:
         if index >= self.length:
             raise IndexError("Spectra index out of range")
 
-        if self._cache[index] is None:
-            self._cache[index] = self._compute_spectrum(index)
+        # LRU hit: bump to most-recently-used by reinserting at the dict tail.
+        # Python 3.7+ dicts preserve insertion order, which gives us LRU
+        # ordering for free (oldest = first iter, newest = last insertion).
+        if index in self._cache:
+            sp = self._cache.pop(index)
+            self._cache[index] = sp
+            return sp
 
-        return self._cache[index]
+        sp = self._compute_spectrum(index)
+        self._cache[index] = sp
+
+        # Evict oldest while over cap. cap=0 means unbounded — never evict.
+        if self._cap > 0:
+            while len(self._cache) > self._cap:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+
+        return sp
+
+    @property
+    def cache_cap(self):
+        return self._cap
+
+    def clear_cache(self):
+        """Drop all cached ``Spectrum`` objects.
+
+        Subsequent ``spectra[i]`` calls will construct fresh objects and
+        re-fetch their ``mz`` / ``intensity`` / ``xml`` lazily. The file
+        remains open. Does not touch the C-level block cache — call
+        ``file.clear_cache()`` for that.
+        """
+        self._cache.clear()
 
     cdef Spectrum _compute_spectrum(self, size_t index):
         if self._positions.ret_times is not None:
@@ -2092,7 +2178,7 @@ cdef class Spectra:
             )
         self._transform = transform
         # Invalidate cache so spectra are recomputed with new transform
-        self._cache = [None] * self.length
+        self._cache.clear()
 
     def with_transform(self, transform):
         """Return a new Spectra instance with the given transform applied.
@@ -2106,7 +2192,7 @@ cdef class Spectra:
         Returns:
             A new Spectra instance with the transform set.
         """
-        new = Spectra(self._f, self._df, self._positions)
+        new = Spectra(self._f, self._df, self._positions, cap=self._cap)
         new.set_transform(transform)
         return new
 
