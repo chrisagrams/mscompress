@@ -47,6 +47,138 @@ _set_error_callback(_python_error_handler)
 _set_warning_callback(_python_warning_handler)
 
 
+# ---------------------------------------------------------------------------
+# Shared, byte-budgeted decompressed-block cache.
+#
+# A single BlockCache can be shared across many open MSZ/MSZX files so that the
+# AGGREGATE decompressed-block memory obeys one ceiling, instead of each file
+# holding its own unbounded cache (which sums to hundreds of GB across a
+# multi-shard random-access dataloader). The cap is in BYTES, measured exactly
+# from each block's decompressed size.
+#
+# By default every file shares one process-wide BlockCache sized to
+# DEFAULT_CACHE_BYTES (overridable via MSCOMPRESS_CACHE_BYTES or
+# set_cache_budget()). Pass cache=BlockCache(n) to read()/MSZFile(...) to use a
+# private pool, or cache=0 to opt out of bounding entirely (legacy unbounded).
+# ---------------------------------------------------------------------------
+
+DEFAULT_CACHE_BYTES = 4 * 1024 * 1024 * 1024  # 4 GiB
+
+_default_block_cache = None
+
+
+cdef _resolve_default_budget():
+    env = os.environ.get("MSCOMPRESS_CACHE_BYTES")
+    if env:
+        try:
+            return int(env)
+        except (TypeError, ValueError):
+            warnings.warn(
+                f"Ignoring invalid MSCOMPRESS_CACHE_BYTES={env!r}; "
+                f"using {DEFAULT_CACHE_BYTES} bytes",
+                RuntimeWarning,
+            )
+    return DEFAULT_CACHE_BYTES
+
+
+cdef class BlockCache:
+    """A shared, byte-budgeted LRU over decompressed mz/intensity/xml blocks.
+
+    Pass one instance to several files (``read(path, cache=shared)``) and the
+    total decompressed-block memory they hold together is bounded by ``budget``
+    bytes; least-recently-used blocks are evicted (and re-decompressed on demand)
+    past the cap.
+
+    Args:
+        budget_bytes: Maximum total cached bytes. ``None`` resolves to the
+            process default (``MSCOMPRESS_CACHE_BYTES`` or ``DEFAULT_CACHE_BYTES``).
+    """
+    cdef block_lru_t* _lru
+    cdef readonly object budget
+
+    def __cinit__(self, budget_bytes=None):
+        if budget_bytes is None:
+            budget_bytes = _resolve_default_budget()
+        budget_bytes = int(budget_bytes)
+        if budget_bytes < 0:
+            raise ValueError("budget_bytes must be >= 0")
+        self.budget = budget_bytes
+        self._lru = _alloc_block_lru(<size_t>budget_bytes)
+
+    def __dealloc__(self):
+        if self._lru != NULL:
+            # Free any cache buffers still pinned, then the struct. Open files
+            # hold a Python ref to this BlockCache, so this only runs once no
+            # file references it — there are no live block pointers to dangle.
+            _lru_evict_all(self._lru)
+            _dealloc_block_lru(self._lru)
+            self._lru = NULL
+
+    @property
+    def usage(self):
+        """Current total decompressed bytes held across all sharing files."""
+        return _block_cache_usage(self._lru)
+
+    def clear(self):
+        """Evict every cached block (frees buffers; files re-decompress lazily)."""
+        if self._lru != NULL:
+            _lru_evict_all(self._lru)
+
+    def __repr__(self):
+        return (f"<BlockCache budget={self.budget} bytes "
+                f"usage={self.usage} bytes>")
+
+
+def get_default_cache():
+    """Return the process-wide default BlockCache, creating it on first use."""
+    global _default_block_cache
+    if _default_block_cache is None:
+        _default_block_cache = BlockCache(_resolve_default_budget())
+    return _default_block_cache
+
+
+def set_cache_budget(budget_bytes):
+    """Set the process-default block-cache budget (in bytes).
+
+    Installs a fresh default ``BlockCache`` of the given size. Files opened
+    afterward (without an explicit ``cache=``) share it. Files already open keep
+    the cache they were opened with. Call once at startup for predictable
+    behavior; under a multiprocessing DataLoader each worker has its own default,
+    so size for ``RAM_target / n_workers``.
+    """
+    global _default_block_cache
+    _default_block_cache = BlockCache(int(budget_bytes))
+    return _default_block_cache
+
+
+def get_cache_usage():
+    """Current bytes held by the process-default BlockCache (0 if unused)."""
+    if _default_block_cache is None:
+        return 0
+    return _default_block_cache.usage
+
+
+cdef BlockCache _coerce_cache(object cache):
+    """Resolve a user-supplied ``cache=`` argument to a BlockCache instance.
+
+    - None        -> the shared process default
+    - 0           -> None (opt out: unbounded legacy caching, no LRU)
+    - int > 0     -> a fresh private BlockCache of that byte budget
+    - BlockCache  -> used as-is (shared)
+    """
+    if cache is None:
+        return get_default_cache()
+    if isinstance(cache, BlockCache):
+        return <BlockCache>cache
+    if isinstance(cache, int):
+        if cache == 0:
+            return None
+        return BlockCache(cache)
+    raise TypeError(
+        "cache must be a BlockCache, an int byte-budget, 0 to disable, or None"
+    )
+
+
 def _pipe_stream(c_func, args, chunk_size=1_048_576):
     """
     Pipe-based streaming bridge between C fd-oriented writes and Python iterators.
@@ -801,9 +933,12 @@ cdef class MSZFile(BaseFile):
     cdef block_len_queue_t* _xml_block_lens
     cdef block_len_queue_t* _mz_binary_block_lens
     cdef block_len_queue_t* _inten_binary_block_lens
+    cdef BlockCache _block_cache   # shared/owned decompressed-block cache;
+                                   # None disables bounding (legacy unbounded)
 
-    def __init__(self, bytes path):
+    def __init__(self, bytes path, cache=None):
         super(MSZFile, self).__init__(path)
+        self._block_cache = _coerce_cache(cache)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -814,9 +949,38 @@ cdef class MSZFile(BaseFile):
         self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
         _set_decompress_runtime_variables(self._df, self._footer)
 
+    cdef block_lru_t* _lru_ptr(self):
+        """The shared LRU pointer for extract calls, or NULL if bounding is
+        disabled (cache=0)."""
+        if self._block_cache is None:
+            return NULL
+        return self._block_cache._lru
+
     @staticmethod
     def _reopen(path: bytes):
         return MSZFile(path)
+
+    @property
+    def block_cache(self):
+        """The shared ``BlockCache`` bounding this file's decompressed blocks,
+        or ``None`` if bounding is disabled (opened with ``cache=0``)."""
+        return self._block_cache
+
+    def clear_cache(self):
+        """Evict this file's decompressed blocks from the shared cache.
+
+        Frees the per-block buffers held on this file's behalf without closing
+        the file; subsequent reads re-decompress on demand. No-op when bounding
+        is disabled (``cache=0``)."""
+        cdef block_lru_t* lru = self._lru_ptr()
+        if lru == NULL:
+            return
+        if self._xml_block_lens != NULL:
+            _lru_remove_queue_blocks(lru, self._xml_block_lens)
+        if self._mz_binary_block_lens != NULL:
+            _lru_remove_queue_blocks(lru, self._mz_binary_block_lens)
+        if self._inten_binary_block_lens != NULL:
+            _lru_remove_queue_blocks(lru, self._inten_binary_block_lens)
 
     def _init_from_archive(self, bytes mszx_path, bytes entry_name):
         """
@@ -877,7 +1041,7 @@ cdef class MSZFile(BaseFile):
         _set_decompress_runtime_variables(self._df, self._footer)
 
     @classmethod
-    def from_mszx(cls, bytes mszx_path, bytes entry_name):
+    def from_mszx(cls, bytes mszx_path, bytes entry_name, cache=None):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -889,8 +1053,13 @@ cdef class MSZFile(BaseFile):
             Path to the .mszx archive.
         entry_name : bytes
             Name of the MSZ entry within the archive (e.g. b"spectra.msz").
+        cache : BlockCache | int | None
+            Shared decompressed-block cache. None (default) uses the process
+            default; a ``BlockCache`` shares an explicit pool; an int sets a
+            private byte budget; 0 disables bounding (legacy unbounded).
         """
         cdef MSZFile self = cls.__new__(cls)
+        self._block_cache = _coerce_cache(cache)
         self._init_from_archive(mszx_path, entry_name)
         return self
 
@@ -909,6 +1078,21 @@ cdef class MSZFile(BaseFile):
         if self._dctx != NULL:
             ZSTD_freeDCtx(self._dctx)
             self._dctx = NULL
+
+        # Detach this file's blocks from the shared cache BEFORE freeing the
+        # queues, or the shared LRU would retain dangling pointers into freed
+        # nodes. This also frees any cache buffers those blocks still hold and
+        # decrements the cache's byte usage. Safe when cache is disabled (None).
+        cdef block_lru_t* lru = self._lru_ptr()
+        if lru != NULL:
+            if self._xml_block_lens != NULL:
+                _lru_remove_queue_blocks(lru, self._xml_block_lens)
+            if self._mz_binary_block_lens != NULL:
+                _lru_remove_queue_blocks(lru, self._mz_binary_block_lens)
+            if self._inten_binary_block_lens != NULL:
+                _lru_remove_queue_blocks(lru, self._inten_binary_block_lens)
+        # Drop our reference to the shared cache (it outlives us if shared).
+        self._block_cache = None
 
         # Free block length queues
         if self._xml_block_lens != NULL:
@@ -1142,7 +1326,7 @@ cdef class MSZFile(BaseFile):
         cdef double* double_ptr
         cdef float* float_ptr
 
-        res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE)
+        res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE, self._lru_ptr())
 
         if res == NULL:
             raise ValueError(f"Failed to extract m/z binary for index {index}")
@@ -1181,7 +1365,7 @@ cdef class MSZFile(BaseFile):
         cdef double* double_ptr
         cdef float* float_ptr
 
-        res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE)
+        res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE, self._lru_ptr())
 
         if res == NULL:
             raise ValueError(f"Failed to extract intensity binary for index {index}")
@@ -1228,7 +1412,8 @@ cdef class MSZFile(BaseFile):
             <char*>self._mapping, self._dctx, self._df,
             self._xml_block_lens, self._mz_binary_block_lens,
             self._inten_binary_block_lens, xml_pos, mz_pos,
-            inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len
+            inten_pos, mz_fmt, inten_fmt, self._divisions, index, &out_len,
+            self._lru_ptr()
         )
 
         if res == NULL:
@@ -1322,7 +1507,7 @@ cdef class MSZXFile(MSZFile):
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
-    def open(cls, path):
+    def open(cls, path, cache=None):
         """
         Open an MSZX archive for reading.
 
@@ -1333,6 +1518,9 @@ cdef class MSZXFile(MSZFile):
 
         Args:
             path: Path to the .mszx file.
+            cache: Shared decompressed-block cache. None (default) uses the
+                process default BlockCache; a ``BlockCache`` shares an explicit
+                pool; an int sets a private byte budget; 0 disables bounding.
         """
         # Local imports break the circular module load between _core and
         # the Python-side annotation/tarfile machinery (mscompress.mszx
@@ -1385,6 +1573,7 @@ cdef class MSZXFile(MSZFile):
 
         # Construct and populate via the shared MSZ-from-archive helper.
         cdef MSZXFile self = cls.__new__(cls)
+        self._block_cache = _coerce_cache(cache)
         self._init_from_archive(
             str(archive_path).encode(),
             manifest.spectra_file.encode(),

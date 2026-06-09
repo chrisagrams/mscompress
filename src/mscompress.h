@@ -197,6 +197,14 @@ typedef struct block_len_t {
    // holds RE-encoded sizes from the slow path's `encode_binary_block`.
    size_t* cache_spec_lens;
 
+   // Shared-LRU bookkeeping. Membership and ordering are maintained by
+   // lru_touch_block(); these fields are unused when the block is not in any
+   // LRU. A block belongs to at most one block_lru_t at a time. See
+   // `block_lru_t` below.
+   struct block_len_t* lru_prev;
+   struct block_len_t* lru_next;
+   int lru_pinned;  // 1 if currently in an LRU's list, 0 otherwise.
+
 } block_len_t;
 
 typedef struct {
@@ -205,6 +213,31 @@ typedef struct {
 
    int populated;
 } block_len_queue_t;
+
+/**
+ * @brief Process-wide shared, byte-budgeted LRU of decompressed block caches.
+ *
+ * Caps the cumulative memory held in `block_len_t->cache` (and the associated
+ * encoded_cache / *_lens buffers) across ALL block queues that touch it —
+ * typically every open MSZFile's xml/mz/intensity queues share one instance,
+ * so aggregate decompressed-cache memory obeys a single ceiling regardless of
+ * how many files are open. Eviction frees the cache buffers on the evicted
+ * block but never frees the `block_len_t` node itself (owned by its queue).
+ *
+ * Budget is in BYTES (`blk->original_size` per cached block), not block count,
+ * so it behaves correctly across files with very different block sizes.
+ *
+ * `lock` is an opaque pointer to a platform mutex (allocated in queue.c) so the
+ * heavy platform headers stay out of this widely-included header. All public
+ * operations take the lock; pass NULL for `lru` to disable caching bounds.
+ */
+typedef struct {
+   block_len_t* head;   // Most-recently-touched block.
+   block_len_t* tail;   // Least-recently-touched block (eviction victim).
+   size_t cur_bytes;    // Sum of original_size over currently-cached blocks.
+   size_t cap_bytes;    // Maximum cur_bytes before eviction. 0 = unbounded.
+   void* lock;          // Opaque platform mutex (see queue.c).
+} block_lru_t;
 
 typedef struct {
    uint64_t xml_pos;  // msz file position of start of compressed XML data.
@@ -489,20 +522,23 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
-                          long index, size_t* out_len, int encode);
+                          long index, size_t* out_len, int encode,
+                          block_lru_t* lru);
 
 char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
                              long inten_binary_blk_pos, divisions_t* divisions,
-                             long index, size_t* out_len, int encode);
+                             long index, size_t* out_len, int encode,
+                             block_lru_t* lru);
 
 char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* xml_block_lens,
                       block_len_queue_t* mz_binary_block_lens,
                       block_len_queue_t* inten_binary_block_lens, long xml_pos,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
-                      divisions_t* divisions, long index, size_t* out_len);
+                      divisions_t* divisions, long index, size_t* out_len,
+                      block_lru_t* lru);
 
 char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len);
@@ -641,6 +677,17 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
                       size_t compressed_size);
 block_len_t* get_block_by_index(block_len_queue_t* queue, int index);
 long get_block_offset_by_index(block_len_queue_t* queue, int index);
+
+/* Shared, byte-budgeted LRU over `block_len_t` decompressed-block caches. */
+block_lru_t* alloc_block_lru(size_t cap_bytes);
+void dealloc_block_lru(block_lru_t* lru);
+void lru_touch_block(block_lru_t* lru, block_len_t* blk);
+void lru_remove_queue_blocks(block_lru_t* lru, block_len_queue_t* queue);
+void lru_evict_all(block_lru_t* lru);
+size_t block_cache_usage(block_lru_t* lru);
+size_t block_cache_cap(block_lru_t* lru);
+void block_drop_cache(block_len_t* blk);
+
 block_len_t* pop_block_len(block_len_queue_t* queue);
 size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
