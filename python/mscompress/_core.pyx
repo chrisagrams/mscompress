@@ -935,14 +935,22 @@ cdef class MSZFile(BaseFile):
     cdef block_len_queue_t* _inten_binary_block_lens
     cdef BlockCache _block_cache   # shared/owned decompressed-block cache;
                                    # None disables bounding (legacy unbounded)
+    # Prefix sum of per-division spectrum counts (length n_divisions+1) used to
+    # resolve a global spectrum index -> (division, local index) WITHOUT
+    # materializing the flattened per-spectrum position arrays. _positions (the
+    # flattened division) is now built lazily, only if .positions/.describe()
+    # are accessed. This is the ~22.6 GB/90-shard metadata saving.
+    cdef long* _div_spec_offsets
 
     def __init__(self, bytes path, cache=None):
         super(MSZFile, self).__init__(path)
         self._block_cache = _coerce_cache(cache)
+        self._div_spec_offsets = NULL
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
-        self._positions = _flatten_divisions(self._divisions)
+        self._positions = NULL  # built lazily via _ensure_positions()
+        self._build_offsets()
         self._dctx = _alloc_dctx()
         self._xml_block_lens = _read_block_len_queue(self._mapping, self._footer.xml_blk_pos, self._footer.mz_binary_blk_pos)
         self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
@@ -955,6 +963,56 @@ cdef class MSZFile(BaseFile):
         if self._block_cache is None:
             return NULL
         return self._block_cache._lru
+
+    cdef void _build_offsets(self):
+        """Build the per-division spectrum-count prefix sum so a global index
+        resolves to (division, local) in O(log n_divisions) without flattening
+        the per-spectrum position arrays into one contiguous heap copy."""
+        cdef int n = self._divisions.n_divisions
+        self._div_spec_offsets = <long*>malloc(sizeof(long) * (n + 1))
+        if self._div_spec_offsets == NULL:
+            raise MemoryError("MSZFile._build_offsets: malloc failed")
+        cdef long acc = 0
+        cdef int i
+        for i in range(n):
+            self._div_spec_offsets[i] = acc
+            acc += self._divisions.divisions[i].mz.total_spec
+        self._div_spec_offsets[n] = acc
+
+    cdef int _resolve_division(self, size_t index, size_t* local) except -1:
+        """Resolve a global spectrum index to its division index, writing the
+        in-division offset to *local. Binary search over the prefix sum."""
+        cdef int lo = 0
+        cdef int hi = self._divisions.n_divisions - 1
+        cdef int mid
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if <size_t>self._div_spec_offsets[mid] <= index:
+                lo = mid
+            else:
+                hi = mid - 1
+        local[0] = index - <size_t>self._div_spec_offsets[lo]
+        return lo
+
+    cdef int _spectrum_meta(self, size_t index, uint32_t* scan,
+                            uint16_t* ms_level, float* ret_time,
+                            bint* has_rt) except -1:
+        """Per-spectrum metadata for the given global index, read straight from
+        the mmap-backed per-division scan/ms_level arrays (no flattened copy).
+        MSZ stores no per-spectrum retention times, so has_rt is always 0."""
+        cdef size_t local = 0
+        cdef int d = self._resolve_division(index, &local)
+        cdef division_t* div = self._divisions.divisions[d]
+        scan[0] = div.scans[local]
+        ms_level[0] = div.ms_levels[local]
+        has_rt[0] = False
+        return 0
+
+    cdef void _ensure_positions(self):
+        """Materialize the flattened position arrays on demand (only when
+        .positions / describe() need a contiguous Division). Cached thereafter."""
+        if self._positions == NULL:
+            self._positions = _flatten_divisions(self._divisions)
 
     @staticmethod
     def _reopen(path: bytes):
@@ -1028,12 +1086,14 @@ cdef class MSZFile(BaseFile):
         self._df = NULL
         self._divisions = NULL
         self._positions = NULL
+        self._div_spec_offsets = NULL
 
         # Run the MSZFile-specific init body.
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
-        self._positions = _flatten_divisions(self._divisions)
+        self._positions = NULL  # built lazily via _ensure_positions()
+        self._build_offsets()
         self._dctx = _alloc_dctx()
         self._xml_block_lens = _read_block_len_queue(self._mapping, self._footer.xml_blk_pos, self._footer.mz_binary_blk_pos)
         self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
@@ -1078,6 +1138,11 @@ cdef class MSZFile(BaseFile):
         if self._dctx != NULL:
             ZSTD_freeDCtx(self._dctx)
             self._dctx = NULL
+
+        # Free the division prefix-sum table.
+        if self._div_spec_offsets != NULL:
+            free(self._div_spec_offsets)
+            self._div_spec_offsets = NULL
 
         # Detach this file's blocks from the shared cache BEFORE freeing the
         # queues, or the shared LRU would retain dangling pointers into freed
@@ -1840,6 +1905,33 @@ cdef class BaseFile:
         self._divisions = NULL
         self._positions = NULL
 
+    cdef void _ensure_positions(self):
+        """Ensure self._positions (the flattened Division) is materialized.
+
+        Default: a no-op — subclasses whose _positions is populated at open
+        (e.g. MZMLFile from scan_mzml) need nothing. MSZFile overrides this to
+        flatten lazily, since it now resolves spectrum metadata without the
+        flattened arrays."""
+        pass
+
+    cdef int _spectrum_meta(self, size_t index, uint32_t* scan,
+                            uint16_t* ms_level, float* ret_time,
+                            bint* has_rt) except -1:
+        """Per-spectrum metadata (scan number, MS level, retention time) for a
+        global index. Default reads from the flat self._positions division;
+        MSZFile overrides to read from the mmap-backed per-division arrays
+        without flattening. has_rt=0 means no retention time (caller uses NaN)."""
+        if self._positions == NULL:
+            raise RuntimeError("_spectrum_meta: positions unavailable")
+        scan[0] = self._positions.scans[index]
+        ms_level[0] = self._positions.ms_levels[index]
+        if self._positions.ret_times != NULL:
+            ret_time[0] = self._positions.ret_times[index]
+            has_rt[0] = True
+        else:
+            has_rt[0] = False
+        return 0
+
 
     def __enter__(self):
         # Only open if not already open (e.g., from __init__)
@@ -1918,11 +2010,19 @@ cdef class BaseFile:
     @property
     def spectra(self):
         if self._spectra is None:
-            self._spectra = Spectra(self, DataFormat.from_ptr(self._df), Division.from_ptr(self._positions))
+            # Spectra resolves per-spectrum metadata via _spectrum_meta(), so it
+            # does NOT need the flattened Division. Pass it only if already
+            # materialized (MZMLFile); MSZFile keeps _positions lazy/NULL here.
+            positions_div = (Division.from_ptr(self._positions)
+                             if self._positions != NULL else None)
+            self._spectra = Spectra(self, DataFormat.from_ptr(self._df), positions_div)
         return self._spectra
-    
+
     @property
     def positions(self):
+        # Materializes the flattened Division on demand (MSZFile). For mzML it
+        # is already populated, so this is a no-op there.
+        self._ensure_positions()
         return Division.from_ptr(self._positions)
 
     @property
@@ -1956,6 +2056,7 @@ cdef class BaseFile:
         raise NotImplementedError("This method should be overridden in subclasses")
 
     def describe(self) -> dict:
+        self._ensure_positions()
         return {
             "path": self.path,
             "filesize": self.filesize,
@@ -2167,15 +2268,20 @@ cdef class Spectra:
         return self._cache[index]
 
     cdef Spectrum _compute_spectrum(self, size_t index):
-        if self._positions.ret_times is not None:
-            retention_time = self._positions.ret_times[index]
-        else:
-            retention_time = nan("1")
+        # Pull metadata via the file's resolver instead of a flattened position
+        # array. For MSZ this reads the mmap-backed per-division scan/ms_level
+        # arrays directly (no 22.6 GB/90-shard flatten); for mzML it reads the
+        # scan division populated at open.
+        cdef uint32_t scan = 0
+        cdef uint16_t ms_level = 0
+        cdef float ret_time = 0.0
+        cdef bint has_rt = False
+        self._f._spectrum_meta(index, &scan, &ms_level, &ret_time, &has_rt)
         return Spectrum(
             index=index,
-            scan=self._positions.scans[index],
-            ms_level=self._positions.ms_levels[index],
-            retention_time=retention_time,
+            scan=scan,
+            ms_level=ms_level,
+            retention_time=(ret_time if has_rt else nan("1")),
             file=self._f,
             transform=self._transform
         )
