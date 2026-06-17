@@ -1,13 +1,5 @@
 # Changelog
 
-All notable changes to this project are documented in this file. Going forward it is
-maintained automatically by [release-please](https://github.com/googleapis/release-please)
-from [Conventional Commits](https://www.conventionalcommits.org/). Entries for v1.0.16 and
-earlier were backfilled from the project's [GitHub Releases](https://github.com/chrisagrams/mscompress/releases);
-`chore`/`ci`/`test`/`docs` changes and release-bump pull requests are omitted to match
-release-please's configured changelog sections, and prerelease/post CI iterations are
-consolidated.
-
 ## [1.0.16](https://github.com/chrisagrams/mscompress/compare/v1.0.15...v1.0.16) (2026-05-18)
 
 
