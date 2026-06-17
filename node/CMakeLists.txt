@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
-# Version is read from .cz.toml (commitizen), the single source of truth.
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../.cz.toml" CZ_TOML)
-string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ "${CZ_TOML}")
-project(mscompress VERSION ${CMAKE_MATCH_1})
+# Version is read from version.txt (maintained by release-please), the source of truth.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version.txt" MSC_VERSION LIMIT_COUNT 1)
+string(STRIP "${MSC_VERSION}" MSC_VERSION)
+project(mscompress VERSION ${MSC_VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
 
