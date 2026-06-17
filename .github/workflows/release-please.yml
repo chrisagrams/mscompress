@@ -1,0 +1,40 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # The default GITHUB_TOKEN is sufficient: we do NOT rely on the created tag
+      # to trigger build.yml (GITHUB_TOKEN-created tags don't trigger workflows).
+      # Instead we chain the build/publish job below in this same run.
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-publish:
+    name: Build and Publish Release
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write
+    with:
+      publish: true
+      release_tag: ${{ needs.release-please.outputs.tag_name }}
