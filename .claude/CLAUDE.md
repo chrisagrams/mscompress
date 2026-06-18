@@ -149,23 +149,27 @@ These are critical for avoiding leaks and use-after-free:
 
 ## Versioning
 
-The project version is defined in `.cz.toml` (commitizen) — this is the single source of truth. All other files read from it:
+The project version lives in `version.txt` at the repo root — this is the single source of truth. It is maintained automatically by **release-please** (do NOT bump it by hand). All other files read from or are synced to it:
 
-- **CMake** — each `CMakeLists.txt` parses `.cz.toml` with a regex to set `PROJECT_VERSION`
+- **CMake** — each `CMakeLists.txt` reads `version.txt` via `file(STRINGS ...)` to set `PROJECT_VERSION` (root, `cli/`, `node-ts/`, `node/`, `modules/python/`)
 - **C code** — `cli/CMakeLists.txt` passes `VERSION` via `target_compile_definitions`
-- **Python** — `python/pyproject.toml` has a static `version` field, updated by `cz bump`
-- **npm** — all `package.json` files are updated by `cz bump`
+- **Python** — `python/pyproject.toml` (`$.project.version`) and `python/mscompress/__init__.py` (`__version__`, carries an `# x-release-please-version` annotation) are updated by release-please via `release-please-config.json` `extra-files`
+- **npm** — all `package.json` files are updated by release-please `extra-files`
 
-To bump: `cz bump --increment <PATCH|MINOR|MAJOR>`
+Releases are automated. On push to `main`, `.github/workflows/release-please.yml` opens/updates a **release PR** (bumping `version.txt`, the package files, and `CHANGELOG.md`). Merging it creates the `vX.Y.Z` tag + GitHub Release and chains the build/publish pipeline (`build.yml` called via `workflow_call` with `publish: true`). Bump sizing: `feat:` → minor; `fix:`/`perf:`/`refactor:` → patch; `feat!:`/`BREAKING CHANGE` → major (the patch-triggering set is configured in `release-please-config.json` `changelog-sections`).
 
-Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — it comes from `.cz.toml`.
+Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — it comes from `version.txt`.
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/build.yml`) runs:
+`.github/workflows/release-please.yml` (push to `main`) maintains the release PR and, when a release is cut, calls `build.yml` as a reusable workflow with `publish: true` + `release_tag`.
+
+`.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_call` from release-please:
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
-2. **build-python** — cibuildwheel for CPython 3.9–3.13 + pytest
+2. **build-python** — cibuildwheel for CPython 3.10–3.14 + pytest
 3. **build-node** — prebuild + cmake-js compile + vitest on Linux/macOS/Windows (x64, arm64)
-4. **publish-python** — PyPI publish on version tags
-5. **publish-node** — npm publish on version tags (uploads prebuilds to GitHub Release)
-6. **build-docker** — Multi-arch Docker image on version tags
+4. **publish-python** — PyPI publish (gated on `inputs.publish`)
+5. **publish-node** — npm publish (gated on `inputs.publish`; uploads prebuilds to GitHub Release)
+6. **build-docker** — Multi-arch Docker image (pushes on `inputs.publish`)
+
+> Operational note: PyPI trusted publishing matches the OIDC `job_workflow_ref` claim — the workflow file that *defines the publish job* — not the entry/caller workflow. The `publish-python` job stays in `build.yml`, so `job_workflow_ref` remains `build.yml` even when called from `release-please.yml`. The existing PyPI trusted-publisher config (workflow `build.yml`, environment `pypi`) therefore needs no change. It would only need updating if the publish step itself were moved into `release-please.yml`.
