@@ -469,6 +469,8 @@ decode_fun set_decode_fun(int compression_method, int algo, int accession);
 /* encode.c */
 
 encode_fun set_encode_fun(int compression_method, int algo, int accession);
+void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
+                         size_t* out_len);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len);
 

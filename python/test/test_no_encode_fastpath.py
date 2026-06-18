@@ -72,16 +72,11 @@ def test_fastpath_matches_slow_path(lossless_msz, ground_truth):
             assert mz_fast.shape == ground_truth[i][0].shape
 
 
-@pytest.mark.xfail(
-    reason="Direct .mz/.intensity reads on lossy-transformed .msz are not "
-    "decoded by the no-encode path (pre-existing on dev: returns raw "
-    "transformed payload). Tracked separately; use decompress() for lossy.",
-    strict=True,
-)
-def test_fastpath_lossy_direct_read_is_broken(tmp_path, ground_truth):
-    """Documents the known limitation: lossy direct reads do NOT match source.
-    strict xfail — if this ever starts passing, the limitation was fixed and
-    this test should become a real assertion."""
+def test_lossy_direct_read_reconstructs(tmp_path, ground_truth):
+    """Lossy (.mz delta32) direct reads must NOT use the lossless no-encode
+    fast path — that path slices the still-transformed payload and crashes.
+    Lossy reads route through the inverse transform with a header-less writer
+    and reconstruct the source within the algorithm's tolerance."""
     out = tmp_path / "mzdelta.msz"
     with read(SRC) as f:
         f.arguments.mz_lossy = "delta32"
@@ -90,4 +85,5 @@ def test_fastpath_lossy_direct_read_is_broken(tmp_path, ground_truth):
         sp = f.spectra
         mz0 = ground_truth[0][0]
         mz1 = np.asarray(sp[0].mz)
-        assert mz1.shape == mz0.shape and np.allclose(mz1, mz0, rtol=1e-2, atol=1e-2)
+        assert mz1.shape == mz0.shape
+        assert np.allclose(mz1, mz0, rtol=1e-2, atol=1e-2)

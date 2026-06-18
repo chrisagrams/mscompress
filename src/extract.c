@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "mscompress.h"
+#include "algos/algos.h"
 
 /**
  * @brief Updates the spectrumList count value in an mzML header.
@@ -951,10 +952,23 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       decmp_mz = mz_blk_len->cache;
 
    if (!encode) {
-      // Python lossless path: read the spectrum's payload directly from the
-      // cached decompressed block. Avoids the full-block alloc + per-spectrum
-      // walk that encode_binary_block performs.
-      return extract_no_encode_from_cache(mz_blk_len, mz, mz_off, out_len);
+      // Fast path is valid only for lossless reads. For a lossy .msz the
+      // cached payload is still in its transformed form (e.g. delta32), so
+      // slicing it raw would both return wrong bytes and mis-walk the block
+      // (the headers/sizes don't match a plain payload) — a crash. Lossy
+      // no-encode reads fall through to encode_binary_block below, which
+      // applies the inverse transform (df->target_mz_fun) without base64.
+      if (df->target_mz_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(mz_blk_len, mz, mz_off, out_len);
+
+      // Lossy: target_mz_fun reconstructs samples into a fresh, header-less
+      // buffer, so the writer must copy raw bytes (no_encode_no_header) — not
+      // the header-popping no_encode_w_header that the lossless path uses.
+      encode_binary_block(mz_blk_len, mz, df->source_mz_fmt, _no_encode_,
+                          no_encode_no_header, df->mz_scale_factor,
+                          df->target_mz_fun);
+      res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
+      return res;
    }
 
    encode_binary_block(mz_blk_len, mz, df->source_mz_fmt,
@@ -1042,9 +1056,21 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       decmp_inten = inten_blk_len->cache;
 
    if (!encode) {
-      // Python lossless path — see extract_spectrum_mz for the rationale.
-      return extract_no_encode_from_cache(inten_blk_len, inten, inten_off,
-                                          out_len);
+      // Lossless-only fast path — see extract_spectrum_mz for the rationale.
+      if (df->target_inten_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(inten_blk_len, inten, inten_off,
+                                             out_len);
+
+      // Lossy: see extract_spectrum_mz — reconstructed samples are header-less.
+      int ret = encode_binary_block(
+          inten_blk_len, inten, df->source_inten_fmt, _no_encode_,
+          no_encode_no_header, df->int_scale_factor, df->target_inten_fun);
+      if (ret != 0) {
+         error("extract_spectrum_inten: Failed to encode intensity block.\n");
+         return NULL;
+      }
+      res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
+      return res;
    }
 
    int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
