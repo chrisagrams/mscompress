@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from ._types import DataCollectionInfo, FileDistribution, RecordSetDefinition
+from mscompress.metadata._types import DataCollectionInfo, FileDistribution, RecordSetDefinition
 
 
 class MetadataBuilder(ABC):

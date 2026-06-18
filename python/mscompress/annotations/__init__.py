@@ -52,20 +52,20 @@ Example:
 from __future__ import annotations
 
 # Core types
-from .psms._types import PSM
+from mscompress.annotations.psms._types import PSM
 
 # PSM Base class
-from .psms._base import BasePSMReader
+from mscompress.annotations.psms._base import BasePSMReader
 
 # Generic PSM reader
-from .psms.reader import PSMReader
+from mscompress.annotations.psms.reader import PSMReader
 
 # Specific PSM readers
-from .psms.percolator import TSVReader
-from .psms.pepxml import PepXMLReader
+from mscompress.annotations.psms.percolator import TSVReader
+from mscompress.annotations.psms.pepxml import PepXMLReader
 
 # Annotation file abstraction
-from ._base import (
+from mscompress.annotations._base import (
     BaseAnnotationFile,
     MSZXAnnotationFile,
     PathAnnotationFile,

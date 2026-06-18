@@ -1,181 +1,152 @@
 /**
- * MSZX bundled archive file handler
+ * MSZX bundled archive file handler.
+ *
+ * MSZXFile extends MSZFile, so all spectrum-access machinery
+ * (`spectra`, `positions`, `getMzBinary`, `getIntenBinary`, `getXml`,
+ * `decompress`, `extract`) is inherited directly. Constructed via
+ * `MSZXFile.open(...)`, which mmaps the embedded MSZ payload at its
+ * byte offset inside the .mszx tar — no temp-dir extraction.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import * as tar from "tar";
 import native from "@/core/bindings.js";
 import type { BaseFile } from "@/files/base-file.js";
 import { MSZFile } from "@/files/msz-file.js";
+import { MSZXBuilder } from "@/mszx/mszx-builder.js";
 import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
-import { DataFormat } from "@/types/data-format.js";
-import { Spectra } from "@/spectrum/spectra.js";
-import { Division } from "@/types/division.js";
-import { RuntimeArguments } from "@/types/runtime-arguments.js";
 import type { ExtractOptions } from "@/types/types.js";
+
+interface CapturedTarEntries {
+  manifest: MSZXManifest;
+  annotations: Map<string, Buffer>;
+}
+
+/**
+ * Walk a tar archive synchronously, capturing every regular-file entry's
+ * payload into a Map keyed by entry name. Single pass — cheap because the
+ * `tar` package's sync mode reads the whole file into memory anyway.
+ */
+function collectTarEntries(filePath: string): Map<string, Buffer> {
+  const entries = new Map<string, Buffer>();
+  tar.list({
+    file: filePath,
+    sync: true,
+    onReadEntry: (entry) => {
+      const chunks: Buffer[] = [];
+      entry.on("data", (chunk: Buffer) => chunks.push(chunk));
+      entry.on("end", () => {
+        entries.set(entry.path, Buffer.concat(chunks));
+      });
+    },
+  });
+  return entries;
+}
+
+/**
+ * Read manifest + annotation buffers without extracting to a temp dir.
+ * Annotation entries listed by the manifest as `compressed: true` are
+ * decompressed via the addon's zstd helper.
+ */
+function readManifestAndAnnotations(filePath: string): CapturedTarEntries {
+  const entries = collectTarEntries(filePath);
+
+  const manifestBuf = entries.get("manifest.json");
+  if (!manifestBuf) {
+    throw new Error("Invalid MSZX archive: missing manifest.json");
+  }
+  const manifest = MSZXManifest.parse(manifestBuf.toString("utf-8"));
+
+  const annotations = new Map<string, Buffer>();
+  for (const entry of manifest.annotations) {
+    const raw = entries.get(entry.filename);
+    if (!raw) {
+      console.warn(`Warning: Annotation file '${entry.filename}' not found in archive`);
+      continue;
+    }
+    annotations.set(entry.filename, entry.compressed ? native.zstdDecompress(raw) : raw);
+  }
+
+  return { manifest, annotations };
+}
 
 /**
  * Handler for MSZX bundled archive files.
  *
- * Provides access to spectra via the same interface as MSZFile,
- * plus access to bundled annotation files and metadata.
+ * Inherits the full MSZFile API. `mszx instanceof MSZFile === true`.
  *
  * @example
  * ```typescript
- * import { MSZXFile } from 'mscompress';
+ * import { MSZXFile } from "mscompress";
  *
- * const mszx = MSZXFile.open('sample.mszx');
+ * const mszx = MSZXFile.open("sample.mszx");
  * try {
  *   console.log(`Spectra: ${mszx.spectra.length}`);
- *
- *   // Access first 10 spectra
- *   const limit = Math.min(mszx.spectra.length, 10);
- *   for (let i = 0; i < limit; i++) {
- *     const spectrum = mszx.spectra.get(i);
- *     console.log(spectrum.scan);
- *   }
- *
- *   // Access manifest
+ *   const buf = mszx.getMzBinary(0);
  *   console.log(mszx.manifest.description);
  * } finally {
  *   mszx.close();
  * }
  * ```
  */
-export class MSZXFile {
-  private archivePath: string;
-  private manifestData: MSZXManifest;
-  private mszFile: MSZFile;
-  private tempDir: string;
-  private closed: boolean = false;
-  private annotationFiles: Map<string, Buffer> = new Map();
+export class MSZXFile extends MSZFile {
+  readonly archivePath: string;
+  readonly manifest: MSZXManifest;
+  readonly annotations: Map<string, Buffer>;
 
   private constructor(
     archivePath: string,
     manifest: MSZXManifest,
-    mszFile: MSZFile,
-    tempDir: string,
-    annotationFiles: Map<string, Buffer>
+    annotations: Map<string, Buffer>
   ) {
+    const handle = native.openMszFromArchive(archivePath, manifest.spectra_file);
+    super({ handle, path: archivePath });
     this.archivePath = archivePath;
-    this.manifestData = manifest;
-    this.mszFile = mszFile;
-    this.tempDir = tempDir;
-    this.annotationFiles = annotationFiles;
+    this.manifest = manifest;
+    this.annotations = annotations;
   }
 
   /**
-   * Open an MSZX archive for reading.
+   * Open an MSZX archive for reading. Mmaps the embedded MSZ in place.
    *
-   * @param filePath - Path to the .mszx file
-   * @returns MSZXFile instance
-   * @throws Error if the archive doesn't exist or is invalid
+   * @param filePath - Path to the .mszx file.
+   * @returns MSZXFile instance.
+   * @throws Error if the archive doesn't exist or is invalid.
    */
   static open(filePath: string): MSZXFile {
     if (!fs.existsSync(filePath)) {
       throw new Error(`MSZX file not found: ${filePath}`);
     }
-
-    // Create temp directory for extraction
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-"));
-
-    try {
-      // Extract archive to temp directory
-      tar.extract({
-        file: filePath,
-        cwd: tempDir,
-        sync: true,
-      });
-
-      // Read manifest
-      const manifestPath = path.join(tempDir, "manifest.json");
-      if (!fs.existsSync(manifestPath)) {
-        throw new Error("Invalid MSZX archive: missing manifest.json");
-      }
-
-      const manifestJson = fs.readFileSync(manifestPath, "utf-8");
-      const manifest = MSZXManifest.parse(manifestJson);
-
-      // Open MSZ file
-      const mszPath = path.join(tempDir, manifest.spectra_file);
-      if (!fs.existsSync(mszPath)) {
-        throw new Error(`Invalid MSZX archive: missing spectra file ${manifest.spectra_file}`);
-      }
-
-      const mszFile = new MSZFile(mszPath);
-
-      // Read annotation files into memory (decompress if needed)
-      const annotationFiles = new Map<string, Buffer>();
-      for (const entry of manifest.annotations) {
-        const annotationPath = path.join(tempDir, entry.filename);
-        if (fs.existsSync(annotationPath)) {
-          const raw = fs.readFileSync(annotationPath);
-          const content = entry.compressed ? native.zstdDecompress(raw) : raw;
-          annotationFiles.set(entry.filename, content);
-        } else {
-          console.warn(`Warning: Annotation file '${entry.filename}' not found in archive`);
-        }
-      }
-
-      return new MSZXFile(filePath, manifest, mszFile, tempDir, annotationFiles);
-    } catch (error) {
-      // Clean up temp dir on failure
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {}
-      throw error;
-    }
+    const { manifest, annotations } = readManifestAndAnnotations(filePath);
+    return new MSZXFile(filePath, manifest, annotations);
   }
 
   /**
-   * Close the archive and clean up temporary files.
-   */
-  close(): void {
-    if (!this.closed) {
-      this.mszFile.close();
-      try {
-        fs.rmSync(this.tempDir, { recursive: true, force: true });
-      } catch (error) {
-        console.warn(
-          `Warning: Failed to clean up temp directory: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-      this.closed = true;
-    }
-  }
-
-  /**
-   * Path to the MSZX archive.
+   * Path to the MSZX archive (alias matching the Python binding's snake_case
+   * property; the inherited `path` returns the same value).
    */
   get archive_path(): string {
     return this.archivePath;
   }
 
   /**
-   * The archive manifest.
-   */
-  get manifest(): MSZXManifest {
-    return this.manifestData;
-  }
-
-  /**
-   * List of annotation entries in the archive.
+   * List of annotation entries in the archive's manifest.
    */
   get annotation_files(): AnnotationEntry[] {
-    return this.manifestData.annotations;
+    return this.manifest.annotations;
   }
 
   /**
-   * Get the raw content of an annotation file.
+   * Get the raw (decompressed) content of an annotation file.
    *
-   * @param filename - Name of the annotation file
-   * @returns Buffer containing the file content
-   * @throws Error if the file is not in the archive
+   * @param filename - Name of the annotation file in the manifest.
+   * @returns Buffer containing the file content.
+   * @throws Error if the file is not in the archive.
    */
   getAnnotationFile(filename: string): Buffer {
-    const content = this.annotationFiles.get(filename);
+    const content = this.annotations.get(filename);
     if (!content) {
       throw new Error(`Annotation file not found: ${filename}`);
     }
@@ -183,172 +154,112 @@ export class MSZXFile {
   }
 
   /**
-   * Get annotation files by format.
+   * List annotation filenames matching a given format.
    *
-   * @param format - The annotation format to filter by
-   * @returns Array of filenames matching the format
+   * @param format - The annotation format to filter by.
+   * @returns Array of filenames matching the format.
    */
   getAnnotationFilesByFormat(format: string): string[] {
-    return this.manifestData.annotations
+    return this.manifest.annotations
       .filter((entry) => entry.format === format)
       .map((entry) => entry.filename);
   }
 
-  // Proxy properties to underlying MSZ file
-
   /**
-   * Path to the underlying MSZ file.
-   */
-  get path(): string {
-    return this.mszFile.path;
-  }
-
-  /**
-   * Size of the underlying MSZ file.
-   */
-  get filesize(): number {
-    return this.mszFile.filesize;
-  }
-
-  /**
-   * Data format information.
-   */
-  get format(): DataFormat {
-    return this.mszFile.format;
-  }
-
-  /**
-   * Collection of spectra with lazy loading.
-   */
-  get spectra(): Spectra {
-    return this.mszFile.spectra;
-  }
-
-  /**
-   * Position information for data blocks.
-   */
-  get positions(): Division {
-    return this.mszFile.positions;
-  }
-
-  /**
-   * Runtime configuration arguments.
-   */
-  get arguments(): RuntimeArguments {
-    return this.mszFile.arguments;
-  }
-
-  /**
-   * Extract m/z binary array for a spectrum at the given index.
+   * Decompress to mzML.
    *
-   * @param index - Zero-based spectrum index
-   * @returns m/z array (Float32Array or Float64Array)
-   */
-  getMzBinary(index: number): Float32Array | Float64Array {
-    return this.mszFile.getMzBinary(index);
-  }
-
-  /**
-   * Extract intensity binary array for a spectrum at the given index.
+   * If `output` has no extension (treated as a directory), writes
+   * `<archive_stem>.mzML` plus all cached annotation buffers as siblings
+   * (with any trailing `.zst` suffix stripped, since annotations are
+   * stored decompressed in memory). Otherwise, behaves like the inherited
+   * MSZFile.decompress and writes the mzML to the given file path.
    *
-   * @param index - Zero-based spectrum index
-   * @returns Intensity array (Float32Array or Float64Array)
-   */
-  getIntenBinary(index: number): Float32Array | Float64Array {
-    return this.mszFile.getIntenBinary(index);
-  }
-
-  /**
-   * Extract XML string for a spectrum at the given index.
-   *
-   * @param index - Zero-based spectrum index
-   * @returns XML string representation of the spectrum
-   */
-  getXml(index: number): string {
-    return this.mszFile.getXml(index);
-  }
-
-  /**
-   * Get description of the file.
-   *
-   * @returns Object containing file metadata and archive information
-   */
-  describe(): Record<string, unknown> {
-    const desc = this.mszFile.describe();
-    desc.archive = {
-      path: this.archivePath,
-      annotations: this.manifestData.annotations,
-    };
-    return desc;
-  }
-
-  /**
-   * Decompress the MSZ file to mzML format.
-   *
-   * @param output - Output file path for decompressed mzML
-   * @returns BaseFile instance for the decompressed file
+   * @param output - Output file path or directory.
+   * @returns BaseFile for the produced mzML.
    */
   decompress(output: string): BaseFile {
-    return this.mszFile.decompress(output);
+    const isDir = path.extname(output) === "";
+    if (!isDir) {
+      return super.decompress(output);
+    }
+
+    fs.mkdirSync(output, { recursive: true });
+    const stem = path.basename(this.archivePath, path.extname(this.archivePath));
+    const mzmlPath = path.join(output, `${stem}.mzML`);
+    const result = super.decompress(mzmlPath);
+
+    for (const [name, buf] of this.annotations) {
+      const outName = name.endsWith(".zst") ? name.slice(0, -4) : name;
+      fs.writeFileSync(path.join(output, outName), buf);
+    }
+    return result;
   }
 
   /**
-   * Extract a subset of spectra to a new MSZ file.
+   * Extract a subset of spectra to a new file. For .mzML / .msz output,
+   * inherits the standard MSZFile.extract behavior. For .mszx output,
+   * builds a filtered MSZX archive containing the selected spectra plus
+   * all annotation files (annotations are not currently filtered to the
+   * scan subset — TODO if a use case appears).
    *
-   * Note: This extracts only the MSZ portion, not a full MSZX archive.
-   * For MSZX extraction with annotations, use extractMSZX.
-   *
-   * @param output - Output file path
-   * @param options - Optional extraction filters (indices, scanNumbers, msLevel)
-   * @returns BaseFile instance for the extracted data
+   * @param output - Output file path. Extension determines format.
+   * @param options - Optional filters (indices, scanNumbers, msLevel).
+   * @returns BaseFile for the produced output. For .mszx output the
+   *          returned value is a fresh MSZXFile.
    */
   extract(output: string, options?: ExtractOptions): BaseFile {
-    return this.mszFile.extract(output, options);
+    if (path.extname(output).toLowerCase() !== ".mszx") {
+      return super.extract(output, options);
+    }
+    return this.extractToMszx(output, options);
   }
 
   /**
-   * Extract a subset of spectra and annotations to a new MSZX archive.
-   *
-   * @param output - Path to the output .mszx file
-   * @param options - Extraction options
-   * @returns New MSZXFile instance for the created archive
+   * Build a filtered MSZX archive synchronously: extract a temp .msz with
+   * the selected spectra, then bundle it together with the original
+   * annotation buffers via MSZXBuilder.save.
    */
-  async extractMSZX(output: string, options?: ExtractOptions): Promise<MSZXFile> {
-    // Create a temporary MSZ file with extracted spectra
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-extract-"));
-    const tempMszPath = path.join(tempDir, "temp.msz");
+  private extractToMszx(output: string, options?: ExtractOptions): MSZXFile {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-extract-"));
+    const tmpMszPath = path.join(tmpDir, "temp.msz");
+    let extractedMsz: MSZFile | null = null;
 
     try {
-      // Extract MSZ
-      this.mszFile.extract(tempMszPath, options);
-      const extractedMsz = new MSZFile(tempMszPath);
+      // Use parent's prototype to avoid recursing through this override.
+      MSZFile.prototype.extract.call(this, tmpMszPath, options);
+      extractedMsz = new MSZFile(tmpMszPath);
 
-      // Create new MSZX archive using builder
-      const { MSZXBuilder } = await import("./mszx-builder.js");
       const builder = new MSZXBuilder(extractedMsz);
 
-      if (this.manifestData.description) {
-        builder.setDescription(this.manifestData.description);
+      if (this.manifest.description) {
+        builder.setDescription(this.manifest.description);
       }
-
-      // Copy extra metadata
-      for (const [key, value] of Object.entries(this.manifestData.extra)) {
+      for (const [key, value] of Object.entries(this.manifest.extra)) {
         builder.setExtra(key, value);
       }
-
-      // For now, we don't filter annotations - just include them all
-      // In a full implementation, we would filter based on scan numbers
-      // TODO: Implement annotation filtering
-
-      const outputPath = await builder.save(output);
-      extractedMsz.close();
+      // TODO: filter annotation buffers to the extracted scan subset.
+      const outputPath = builder.saveSync(output);
 
       return MSZXFile.open(outputPath);
     } finally {
-      // Clean up temp directory
+      if (extractedMsz) extractedMsz.close();
       try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {}
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
     }
+  }
+
+  /**
+   * File metadata, augmented with archive info.
+   */
+  describe(): Record<string, unknown> {
+    const desc = super.describe();
+    desc.archive = {
+      path: this.archivePath,
+      annotations: this.manifest.annotations,
+    };
+    return desc;
   }
 }

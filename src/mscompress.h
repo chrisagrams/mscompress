@@ -78,6 +78,7 @@
 #define EXTRACT_MSZ 4
 #define EXTERNAL 5
 #define DESCRIBE 6
+#define DECOMPRESS_MSZX 7
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -317,6 +318,14 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 /* file.c */
 
 void* get_mapping(int fd);
+void* get_mapping_range(int fd, int64_t offset, size_t length,
+                        size_t* out_pad, size_t* out_map_length);
+int find_tar_entry(int fd, const char* name, int64_t* out_offset,
+                   size_t* out_size);
+int walk_tar_entries(int fd,
+                     int (*cb)(const char* name, int64_t data_offset,
+                               size_t data_size, void* user),
+                     void* user);
 int remove_mapping(void* addr, size_t length);
 int flush(int fd);
 int remove_file(char* path);
@@ -340,6 +349,18 @@ int open_output_file(char* path);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
 int close_file(int fd);
+
+/* mszx.c */
+
+typedef struct {
+   char* name;     /* heap-allocated, NUL-terminated entry name */
+   int64_t offset; /* data byte offset in the archive */
+   size_t size;    /* logical size from the tar header */
+} mszx_entry_t;
+
+int mszx_list_entries(int fd, mszx_entry_t** out, size_t* out_count);
+void mszx_free_entries(mszx_entry_t* entries, size_t count);
+int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
 
 /* mem.c */
 

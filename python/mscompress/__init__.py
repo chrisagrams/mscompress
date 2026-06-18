@@ -1,9 +1,9 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.0.15"
+__version__ = "1.0.16"  # x-release-please-version
 
 
-from ._core import (
+from mscompress._core import (
     RuntimeArguments,
     DataFormat,
     DataPositions,
@@ -18,9 +18,9 @@ from ._core import (
     list_algorithms,
 )
 
-from .utils import read
+from mscompress.utils import read
 
-from .metadata import (
+from mscompress.metadata import (
     # Core abstractions
     MetadataBuilder,
     FieldDefinition,
@@ -40,13 +40,13 @@ from .metadata import (
     build_composite_metadata,
 )
 
-from .types import (
+from mscompress.types import (
     AlgorithmInfo,
     SpectrumDict,
     SpectrumTransform,
 )
 
-from .mszx import (
+from mscompress.mszx import (
     # MSZX classes
     MSZXFile,
     MSZXBuilder,
@@ -56,7 +56,7 @@ from .mszx import (
     create_mszx,
 )
 
-from .annotations import (
+from mscompress.annotations import (
     # Search results types
     PSM,
     TSVReader,
@@ -65,7 +65,7 @@ from .annotations import (
 
 # Optional parquet support (requires the [parquet] extra).
 try:
-    from .parquet import (
+    from mscompress.parquet import (
         from_parquet,
         to_parquet,
     )

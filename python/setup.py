@@ -4,7 +4,7 @@ import platform
 import shutil
 import atexit
 import tomli
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.sdist import sdist as _sdist
 from setuptools.command.build_ext import build_ext as _build_ext
 from Cython.Build import cythonize
@@ -409,14 +409,7 @@ setup(
     description=description,
     author="Chris Grams",
     author_email="chrisagrams@gmail.com",
-    packages=[
-        "mscompress",
-        "mscompress.annotations",
-        "mscompress.annotations.psms",
-        "mscompress.datasets",
-        "mscompress.metadata",
-        "mscompress.parquet",
-    ],
+    packages=find_packages(include=["mscompress", "mscompress.*"]),
     ext_modules=cythonize(
         extensions,
         compiler_directives={'linetrace': linetrace, 'binding': linetrace},

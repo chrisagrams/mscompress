@@ -88,8 +88,10 @@ private:
     void Cleanup();
 
     int fd_ = -1;
-    void* mapping_ = nullptr;
-    size_t filesize_ = 0;
+    void* mapping_ = nullptr;          // user-facing pointer (== map_base_ + pad)
+    void* map_base_ = nullptr;         // true mmap base, used for unmap
+    size_t map_length_ = 0;            // true mapped length (≥ filesize_)
+    size_t filesize_ = 0;              // logical MSZ size
     int filetype_ = 0;
     data_format_t* df_ = nullptr;
     division_t* positions_ = nullptr;

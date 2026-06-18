@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 # Core types
-from ._types import (
+from mscompress.metadata._types import (
     DataCollectionInfo,
     FieldDefinition,
     FileDistribution,
@@ -63,21 +63,21 @@ from ._types import (
 )
 
 # Base class
-from ._base import MetadataBuilder
+from mscompress.metadata._base import MetadataBuilder
 
 # Composite builder
-from ._composite import CompositeMetadataBuilder
+from mscompress.metadata._composite import CompositeMetadataBuilder
 
 # Concrete builders
-from .msz import MSZMetadataBuilder
-from .search import (
+from mscompress.metadata.msz import MSZMetadataBuilder
+from mscompress.metadata.search import (
     PepXMLMetadataBuilder,
     PercolatorMetadataBuilder,
     SearchResultsMetadataBuilder,
 )
 
 if TYPE_CHECKING:
-    from .._core import MSZFile
+    from mscompress._core import MSZFile
 
 
 __all__ = [

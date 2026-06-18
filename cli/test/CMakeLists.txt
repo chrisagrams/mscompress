@@ -56,6 +56,14 @@ add_test(NAME DecompressTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
 )
 
+add_test(NAME MSZXDecompressTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_FILE=${TEST_DATA_DIR}/mszx/test.mszx
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_mszx
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_mszx.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}
