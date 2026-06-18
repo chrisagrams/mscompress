@@ -401,6 +401,93 @@ class MSZFile(BaseFile):
         """
         ...
 
+class MSZXFile(MSZFile):
+    """First-class reader for MSZX (tar) archives.
+
+    Extends MSZFile so all spectrum properties and methods work directly on
+    the embedded MSZ payload, while adding access to the archive manifest and
+    bundled annotation readers. Open via the `open()` classmethod.
+    """
+
+    _closed: bool
+
+    @classmethod
+    def open(cls, path: Union[str, PathLike]) -> "MSZXFile":
+        """Open an MSZX archive for reading.
+
+        Mmaps the embedded MSZ payload directly out of the archive (no temp
+        extraction) and eagerly reads annotation entries into memory.
+
+        Args:
+            path: Path to the .mszx file.
+        """
+        ...
+
+    def close(self) -> None:
+        """Close the archive and release all resources. Idempotent."""
+        ...
+
+    @property
+    def manifest(self) -> Any:
+        """The archive manifest (`MSZXManifest`)."""
+        ...
+
+    @property
+    def archive_path(self) -> Any:
+        """Path to the MSZX archive."""
+        ...
+
+    @property
+    def annotations(self) -> Any:
+        """Primary annotation reader, or None if no annotations."""
+        ...
+
+    @property
+    def annotation_readers(self) -> Dict[str, Any]:
+        """Dict of all annotation readers, keyed by filename."""
+        ...
+
+    @property
+    def annotation_files(self) -> list:
+        """List of annotation entries in the archive."""
+        ...
+
+    def get_annotation_reader(self, filename: str) -> Any:
+        """Get the annotation reader for a specific file by name."""
+        ...
+
+    def get_annotation_readers_by_format(self, format: str) -> list:
+        """Get all annotation readers matching a specific format."""
+        ...
+
+    def describe(self) -> Dict[str, Any]:
+        """Description including the archive metadata."""
+        ...
+
+    def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
+        """Decompress the embedded MSZ to mzML.
+
+        If `output` is an existing directory or has no file extension, the
+        mzML is written inside it as `<archive_stem>.mzML` and any cached
+        annotation readers are written alongside. Otherwise `output` is
+        treated as a single file path and only the mzML is written.
+        """
+        ...
+
+    def extract(self, output: str | PathLike, indicies: list[int] | None = ..., scan_numbers: list[int] | None = ..., ms_level: int | None = ...) -> "MSZXFile":
+        """Extract a subset of spectra and annotations to a new MSZX archive.
+
+        Args:
+            output: Path to the output .mszx file.
+            indicies: List of spectrum indices to extract.
+            scan_numbers: List of scan numbers to extract.
+            ms_level: Filter by MS level.
+
+        Returns:
+            New MSZXFile instance for the created archive.
+        """
+        ...
+
 class Spectrum:
     """Represents a single mass spectrum."""
 
