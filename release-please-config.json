@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance Improvements" },
+    { "type": "refactor", "section": "Code Refactoring" },
+    { "type": "revert", "section": "Reverts" },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "ci", "section": "Continuous Integration", "hidden": true },
+    { "type": "build", "section": "Build System", "hidden": true },
+    { "type": "style", "section": "Styles", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "mscompress",
+      "extra-files": [
+        { "type": "json", "path": "node/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "node-ts/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "electron/package.json", "jsonpath": "$.version" },
+        { "type": "toml", "path": "python/pyproject.toml", "jsonpath": "$.project.version" },
+        { "type": "generic", "path": "python/mscompress/__init__.py" }
+      ]
+    }
+  }
+}

@@ -115,14 +115,11 @@ or
 
 ## Versioning
 
-The project version is managed by [commitizen](https://commitizen-tools.github.io/commitizen/) via `.cz.toml`. This is the single source of truth — CMake, pyproject.toml, and all package.json files are kept in sync by `cz bump`.
+Versioning and releases are automated with [release-please](https://github.com/googleapis/release-please), driven by [Conventional Commits](https://www.conventionalcommits.org/). The version source of truth is `version.txt` at the repo root; CMake reads it, and `pyproject.toml`, `python/mscompress/__init__.py`, and all `package.json` files are kept in sync by release-please.
 
-To bump the version:
-```
-cz bump --increment <PATCH|MINOR|MAJOR>
-```
+You do not bump the version manually. On every push to `main`, release-please opens (or updates) a **release PR** that bumps `version.txt` and the package files and updates `CHANGELOG.md` based on the commits since the last release. Merging that release PR creates the `vX.Y.Z` tag and GitHub Release, which in turn builds and publishes the CLI binaries, Python wheels (PyPI), Node packages (npm), and Docker image.
 
-This updates `.cz.toml` and all files listed in `version_files` (package.json files and pyproject.toml).
+Bump sizing follows commit types: `feat:` → minor, `fix:`/`perf:`/`refactor:` → patch, and `feat!:`/`BREAKING CHANGE` → major.
 
 ## Compilation
 Our repository relies on CMake to support cross-platform compilation. Ensure that the necessary dependencies are installed for compilation.

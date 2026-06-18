@@ -2,8 +2,6 @@ name: Build and Test
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - 'stage'
       - 'dev'
@@ -11,6 +9,18 @@ on:
     branches:
       - 'dev'
   workflow_dispatch:
+  # Called by release-please.yml once a release is cut. Releases flow exclusively
+  # through release-please now, so there is no tag-push trigger here.
+  workflow_call:
+    inputs:
+      publish:
+        description: 'Publish artifacts (PyPI, npm, Docker, GitHub Release)'
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Tag to build/publish (e.g. v1.0.17)'
+        type: string
+        default: ''
 
 jobs:
   build-cli:
@@ -42,6 +52,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Setup MSBuild (Windows)
@@ -119,19 +130,20 @@ jobs:
             ./cli/mscompress.exe
 
       - name: Prepare release binary (Unix)
-        if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/v')
+        if: matrix.platform != 'windows' && inputs.publish
         working-directory: ./cli
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ inputs.release_tag }}"
+          VERSION=${VERSION#v}
           mkdir -p release
           cp mscompress release/mscompress-cli-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Prepare release binary (Windows)
-        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        if: matrix.platform == 'windows' && inputs.publish
         working-directory: ./cli
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $version = "${{ inputs.release_tag }}".TrimStart('v')
           New-Item -ItemType Directory -Force -Path release
           if (Test-Path "./build/Release/mscompress.exe") {
             Copy-Item "./build/Release/mscompress.exe" "release/mscompress-cli-${version}-${{ matrix.platform }}-${{ matrix.arch }}.exe"
@@ -142,9 +154,10 @@ jobs:
           }
 
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: inputs.publish
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.release_tag }}
           files: ./cli/release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,6 +195,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
@@ -201,7 +215,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4
         env:
-          CIBW_BUILD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
+          CIBW_BUILD: ${{ (inputs.publish || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ARCHS: "${{ matrix.cibw_arch }}"
           # Use manylinux_2_28 so pre-built scipy wheels (required by mlcroissant) are available
@@ -268,6 +282,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
@@ -321,7 +336,7 @@ jobs:
     name: Publish Python Package to PyPI
     needs: build-python
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish
     environment:
       name: pypi
       url: https://pypi.org/p/mscompress
@@ -357,6 +372,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up QEMU
@@ -366,19 +382,21 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Extract version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: inputs.publish
         id: extract_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${{ inputs.release_tag }}"
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: inputs.publish
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !inputs.publish }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -386,7 +404,7 @@ jobs:
           push: false
 
       - name: Build and push Docker image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: inputs.publish
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -400,7 +418,7 @@ jobs:
     name: Publish Node Package to npm
     needs: build-node
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish
     environment:
       name: npm
       url: https://www.npmjs.com/package/mscompress
@@ -412,6 +430,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js
@@ -429,6 +448,7 @@ jobs:
       - name: Upload prebuilds to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.release_tag }}
           files: ./node-ts/prebuilds/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
