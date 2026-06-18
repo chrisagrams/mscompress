@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "mscompress.h"
+#include "algos/algos.h"
 
 /**
  * @brief Updates the spectrumList count value in an mzML header.
@@ -626,6 +627,92 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
 }
 
 /**
+ * @brief Fast-path extraction of a single spectrum's payload from a cached
+ *        decompressed block, bypassing `encode_binary_block`.
+ *
+ * The decompressed block layout is per-spectrum `{ZLIB_TYPE header}{payload}`
+ * (see `no_encode_w_header`). When the caller doesn't need the block re-encoded
+ * (Python lossless path), we can read the index'th payload directly out of
+ * `blk->cache` — saving the full-block allocation + per-spectrum walk that
+ * `encode_binary_block` performs.
+ *
+ * O(index) over the per-spectrum headers. For typical block sizes the walk is
+ * dominated by L1 cache hits; the saved full-block malloc + memcpy round-trip
+ * is the real win.
+ *
+ * @return Newly-malloc'd buffer of size `*out_len` (caller frees). NULL on error.
+ */
+static char* extract_no_encode_from_cache(block_len_t* blk,
+                                          data_positions_t* dp, long index,
+                                          size_t* out_len) {
+   if (!blk || !blk->cache || !dp) {
+      error("extract_no_encode_from_cache: NULL block/cache/dp");
+      return NULL;
+   }
+   if (index < 0 || (uint64_t)index >= dp->total_spec) {
+      error("extract_no_encode_from_cache: index %ld out of range [0, %lu)",
+            index, (unsigned long)dp->total_spec);
+      return NULL;
+   }
+
+   // Lazy-populate cache_spec_lens with the per-spectrum payload sizes parsed
+   // out of the cache headers. Once populated, subsequent calls only walk this
+   // small contiguous array to compute offsets. Empty spectra (skipped by the
+   // compressor — see compress.c "if (len == 0) continue") get lens[i]=0 and
+   // contribute no bytes to the cache.
+   //
+   // Note: distinct from `encoded_cache_lens`, which the slow-path
+   // (encode_binary_block) uses for *re-encoded* sizes — reusing that field
+   // here would conflate two different semantics when both paths touch the
+   // same block (e.g. spectrum.xml then spectrum.mz on the same MSZFile).
+   if (!blk->cache_spec_lens) {
+      size_t* lens = malloc(dp->total_spec * sizeof(size_t));
+      if (!lens) {
+         error("extract_no_encode_from_cache: malloc(lens, %lu) failed",
+               (unsigned long)(dp->total_spec * sizeof(size_t)));
+         return NULL;
+      }
+      const char* cursor = blk->cache;
+      for (uint64_t i = 0; i < dp->total_spec; i++) {
+         if (dp->end_positions[i] == dp->start_positions[i]) {
+            lens[i] = 0;
+            continue;
+         }
+         ZLIB_TYPE plen = *(const ZLIB_TYPE*)cursor;
+         lens[i] = (size_t)plen;
+         cursor += ZLIB_SIZE_OFFSET + plen;
+      }
+      blk->cache_spec_lens = lens;
+   }
+
+   // Compute byte offset of the target spectrum's payload within the cache.
+   size_t offset = 0;
+   for (long i = 0; i < index; i++) {
+      size_t L = blk->cache_spec_lens[i];
+      if (L > 0)
+         offset += ZLIB_SIZE_OFFSET + L;
+   }
+
+   size_t len = blk->cache_spec_lens[index];
+   *out_len = len;
+   // Empty spectrum: callers free(res) unconditionally; return a freeable
+   // non-NULL (matching extract_from_encoded_block convention).
+   if (len == 0)
+      return malloc(1);
+
+   offset += ZLIB_SIZE_OFFSET;  // skip the target spectrum's own header
+
+   char* res = malloc(len);
+   if (!res) {
+      error("extract_no_encode_from_cache: malloc(%lu) failed",
+            (unsigned long)len);
+      return NULL;
+   }
+   memcpy(res, blk->cache + offset, len);
+   return res;
+}
+
+/**
  * @brief Encodes a binary block using the specified encoding function and
  * algorithm.
  * @param blk A pointer to the `block_len_t` structure containing the binary
@@ -865,17 +952,29 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       decmp_mz = mz_blk_len->cache;
 
    if (!encode) {
-      encode_binary_block(
-          mz_blk_len, mz, df->source_mz_fmt, _no_encode_,
-          set_encode_fun(_no_encode_, _lossless_,
-                         _64d_), /* Disables encoding for python library*/
-          df->mz_scale_factor, df->target_mz_fun);
-   } else {
-      encode_binary_block(mz_blk_len, mz, df->source_mz_fmt,
-                          df->target_mz_format,
-                          df->encode_source_compression_mz_fun,
-                          df->mz_scale_factor, df->target_mz_fun);
+      // Fast path is valid only for lossless reads. For a lossy .msz the
+      // cached payload is still in its transformed form (e.g. delta32), so
+      // slicing it raw would both return wrong bytes and mis-walk the block
+      // (the headers/sizes don't match a plain payload) — a crash. Lossy
+      // no-encode reads fall through to encode_binary_block below, which
+      // applies the inverse transform (df->target_mz_fun) without base64.
+      if (df->target_mz_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(mz_blk_len, mz, mz_off, out_len);
+
+      // Lossy: target_mz_fun reconstructs samples into a fresh, header-less
+      // buffer, so the writer must copy raw bytes (no_encode_no_header) — not
+      // the header-popping no_encode_w_header that the lossless path uses.
+      encode_binary_block(mz_blk_len, mz, df->source_mz_fmt, _no_encode_,
+                          no_encode_no_header, df->mz_scale_factor,
+                          df->target_mz_fun);
+      res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
+      return res;
    }
+
+   encode_binary_block(mz_blk_len, mz, df->source_mz_fmt,
+                       df->target_mz_format,
+                       df->encode_source_compression_mz_fun,
+                       df->mz_scale_factor, df->target_mz_fun);
    res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
 
    return res;
@@ -957,24 +1056,30 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       decmp_inten = inten_blk_len->cache;
 
    if (!encode) {
+      // Lossless-only fast path — see extract_spectrum_mz for the rationale.
+      if (df->target_inten_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(inten_blk_len, inten, inten_off,
+                                             out_len);
+
+      // Lossy: see extract_spectrum_mz — reconstructed samples are header-less.
       int ret = encode_binary_block(
           inten_blk_len, inten, df->source_inten_fmt, _no_encode_,
-          set_encode_fun(_no_encode_, _lossless_,
-                         _64d_), /* Disables encoding for python library*/
-          df->int_scale_factor, df->target_inten_fun);
+          no_encode_no_header, df->int_scale_factor, df->target_inten_fun);
       if (ret != 0) {
          error("extract_spectrum_inten: Failed to encode intensity block.\n");
          return NULL;
       }
-   } else {
-      int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
-                                    df->target_inten_format,
-                                    df->encode_source_compression_inten_fun,
-                                    df->int_scale_factor, df->target_inten_fun);
-      if (ret != 0) {
-         error("extract_spectrum_inten: Failed to encode intensity block.\n");
-         return NULL;
-      }
+      res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
+      return res;
+   }
+
+   int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
+                                 df->target_inten_format,
+                                 df->encode_source_compression_inten_fun,
+                                 df->int_scale_factor, df->target_inten_fun);
+   if (ret != 0) {
+      error("extract_spectrum_inten: Failed to encode intensity block.\n");
+      return NULL;
    }
 
    res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);

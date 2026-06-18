@@ -140,6 +140,7 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    r->encoded_cache = NULL;
    r->encoded_cache_len = 0;
    r->encoded_cache_lens = NULL;
+   r->cache_spec_lens = NULL;
 
    return r;
 }
@@ -147,8 +148,9 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
 /**
  * @brief Deallocates a `block_len_t` node and all of its owned memory.
  *
- * Frees the cache, `encoded_cache`, and `encoded_cache_lens` fields if they are
- * non-NULL, then frees the `block_len_t` struct itself. Safe to call with NULL.
+ * Frees the cache, `encoded_cache`, `encoded_cache_lens`, and `cache_spec_lens`
+ * fields if they are non-NULL, then frees the `block_len_t` struct itself. Safe
+ * to call with NULL.
  *
  * @param blk A pointer to the `block_len_t` to deallocate.
  */
@@ -162,6 +164,9 @@ void dealloc_block_len(block_len_t* blk) {
       }
       if (blk->encoded_cache_lens) {
          free(blk->encoded_cache_lens);
+      }
+      if (blk->cache_spec_lens) {
+         free(blk->cache_spec_lens);
       }
       free(blk);
    }

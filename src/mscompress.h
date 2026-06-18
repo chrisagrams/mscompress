@@ -189,6 +189,14 @@ typedef struct block_len_t {
    uint64_t encoded_cache_len;
    size_t* encoded_cache_lens;
 
+   // Per-spectrum raw payload lengths within `cache`, as parsed from the
+   // ZLIB_SIZE_OFFSET-byte headers (lens[i]=0 for empty spectra that were
+   // skipped during compression). Populated lazily by the Python no-encode
+   // fast path (extract.c:extract_no_encode_from_cache) so subsequent
+   // accesses skip the cache walk. Distinct from `encoded_cache_lens`, which
+   // holds RE-encoded sizes from the slow path's `encode_binary_block`.
+   size_t* cache_spec_lens;
+
 } block_len_t;
 
 typedef struct {
@@ -461,6 +469,8 @@ decode_fun set_decode_fun(int compression_method, int algo, int accession);
 /* encode.c */
 
 encode_fun set_encode_fun(int compression_method, int algo, int accession);
+void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
+                         size_t* out_len);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len);
 
