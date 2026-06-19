@@ -7,6 +7,8 @@ Task-oriented recipes. For full API surfaces, see the
 - [Working with spectra](spectra.md) — `Spectrum`, `Spectra`, transforms
 - [Compressing files](compressing.md) — `RuntimeArguments`, threads,
   blocksize
+- [Rechunking files](rechunking.md) — `rechunk()`, changing block size for
+  random-access reads
 - [Extracting subsets](extracting.md) — index/scan/MS-level filters
 - [MSZX archives](mszx.md) — `MSZXBuilder`, `MSZXFile`, `create_mszx`
 - [Annotation readers](annotations.md) — pepXML, Percolator TSV

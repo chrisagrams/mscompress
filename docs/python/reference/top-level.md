@@ -7,6 +7,8 @@ The entry-point module. Re-exports everything from
 
 ::: mscompress.utils.read
 
+::: mscompress.rechunk.rechunk
+
 ## Utility functions
 
 ::: mscompress

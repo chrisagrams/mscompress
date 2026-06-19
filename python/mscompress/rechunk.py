@@ -23,7 +23,10 @@ import os
 import tempfile
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
+
+if TYPE_CHECKING:
+    from mscompress._core import MSZFile, MSZXFile
 
 __all__ = ["rechunk"]
 
@@ -194,7 +197,7 @@ def rechunk(
     output: Optional[Union[str, PathLike]] = None,
     *,
     threads: Optional[int] = None,
-):
+) -> "Union[MSZFile, MSZXFile]":
     """Rewrite an ``.msz`` or ``.mszx`` file at a different ZSTD block size.
 
     Smaller blocks reduce random-read amplification -- reading one spectrum

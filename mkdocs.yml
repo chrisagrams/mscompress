@@ -124,6 +124,7 @@ nav:
       - Reading files: python/guides/reading-files.md
       - Working with spectra: python/guides/spectra.md
       - Compressing files: python/guides/compressing.md
+      - Rechunking files: python/guides/rechunking.md
       - Extracting subsets: python/guides/extracting.md
       - MSZX archives: python/guides/mszx.md
       - Annotation readers: python/guides/annotations.md
