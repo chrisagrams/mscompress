@@ -29,12 +29,14 @@ class PepXMLReader(BasePSMReader):
     tar archive members, or raw bytes via AnnotationSource.
 
     Example:
-        >>> reader = PepXMLReader("results.pepXML")
-        >>> for psm in reader:
-        ...     print(psm.peptide, psm.score)
-        >>>
-        >>> # Get PSMs for a specific scan
-        >>> psms = reader.get_by_scan(1234)
+        ```python
+        reader = PepXMLReader("results.pepXML")
+        for psm in reader:
+            print(psm.peptide, psm.score)
+
+        # Get PSMs for a specific scan
+        psms = reader.get_by_scan(1234)
+        ```
     """
 
     # pepXML namespace

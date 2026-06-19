@@ -31,11 +31,13 @@ class MSZXBuilder:
     Builder for creating MSZX archives from MSZ files and annotations.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> builder = MSZXBuilder(msz)
-        >>> builder.add_annotations(reader, description="Percolator results")
-        >>> builder.set_description("Proteomics dataset with PSM annotations")
-        >>> builder.save("sample.mszx")
+        ```python
+        msz = mscompress.read("sample.msz")
+        builder = MSZXBuilder(msz)
+        builder.add_annotations(reader, description="Percolator results")
+        builder.set_description("Proteomics dataset with PSM annotations")
+        builder.save("sample.mszx")
+        ```
     """
 
     def __init__(
@@ -181,13 +183,15 @@ def create_mszx(
         Path to the created archive.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> create_mszx(
-        ...     msz,
-        ...     "sample.mszx",
-        ...     annotations=["sample.pin", "sample.pepXML"],
-        ...     description="Annotated proteomics dataset"
-        ... )
+        ```python
+        msz = mscompress.read("sample.msz")
+        create_mszx(
+            msz,
+            "sample.mszx",
+            annotations=["sample.pin", "sample.pepXML"],
+            description="Annotated proteomics dataset",
+        )
+        ```
     """
     builder = MSZXBuilder(msz)
 
