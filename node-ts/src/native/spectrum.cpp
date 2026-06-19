@@ -197,7 +197,8 @@ Napi::Value GetMzBinaryMsz(const Napi::CallbackInfo& info) {
         handle->GetDivisions(),
         static_cast<long>(index),
         &out_len,
-        FALSE
+        FALSE,
+        nullptr
     );
 
     if (res == nullptr) {
@@ -250,7 +251,8 @@ Napi::Value GetIntenBinaryMsz(const Napi::CallbackInfo& info) {
         handle->GetDivisions(),
         static_cast<long>(index),
         &out_len,
-        FALSE
+        FALSE,
+        nullptr
     );
 
     if (res == nullptr) {
@@ -310,7 +312,8 @@ Napi::Value GetXmlMsz(const Napi::CallbackInfo& info) {
         footer->inten_fmt,
         handle->GetDivisions(),
         static_cast<long>(index),
-        &out_len
+        &out_len,
+        nullptr
     );
 
     if (res == nullptr) {

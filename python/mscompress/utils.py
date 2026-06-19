@@ -11,6 +11,7 @@ from typing import Union
 def read(
     path: Union[str, PathLike, bytes],
     *,
+    cache=None,
     cache_spectra: int = CACHE_SPECTRA_AUTO,
 ) -> Union[MZMLFile, MSZFile, MSZXFile]:
     """
@@ -18,10 +19,19 @@ def read(
 
     Args:
         path (Union[str, PathLike, bytes]): Path to the file to read.
+        cache: Shared decompressed-block cache for MSZ/MSZX files. ``None``
+            (default) uses the process-wide default ``BlockCache``; pass a
+            ``BlockCache`` to share an explicit pool across files, an int to set
+            a private byte budget, or 0 to disable bounding (legacy unbounded).
+            Ignored for mzML inputs.
         cache_spectra (int): Per-file LRU cap for cached ``Spectrum`` objects.
             ``CACHE_SPECTRA_AUTO`` (-1, default) uses the bundled default;
             ``0`` disables eviction (legacy unbounded); ``N > 0`` sets an
-            explicit cap. Forwarded to the underlying file constructor.
+            explicit cap.
+
+        Both ``cache`` and ``cache_spectra`` are exposed only here; the file
+        constructors deliberately don't expose them. ``read()`` is the single
+        entry point for both knobs.
     Returns:
         Union[MZMLFile, MSZFile, MSZXFile]: Parsed file object.
     """
@@ -58,10 +68,13 @@ def read(
     else:
         raise OSError(f"Could not determine file type for: {path_str}")
 
-    # Set before the first `.spectra` access so the Spectra LRU is built with
-    # this cap. The file constructors deliberately don't expose this knob;
-    # read() is the single entry point for it.
+    # Install both caches before the first spectrum/block access so nothing is
+    # built or attached under the constructors' defaults. The constructors
+    # deliberately don't expose these knobs; read() is the single entry point.
+    # _set_block_cache only exists on MSZ/MSZX files (mzML has no block cache).
     f._cache_spectra = cache_spectra
+    if filetype in ("msz", "mszx"):
+        f._set_block_cache(cache)
     return f
 
 
