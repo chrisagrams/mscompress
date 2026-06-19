@@ -3,17 +3,25 @@ from os import PathLike
 import tarfile
 from pathlib import Path
 from typing import Literal, Optional
-from mscompress._core import MZMLFile, MSZFile
+from mscompress._core import MZMLFile, MSZFile, CACHE_SPECTRA_AUTO
 from mscompress.mszx import MSZXFile
 from typing import Union
 
 
-def read(path: Union[str, PathLike, bytes]) -> Union[MZMLFile, MSZFile, MSZXFile]:
+def read(
+    path: Union[str, PathLike, bytes],
+    *,
+    cache_spectra: int = CACHE_SPECTRA_AUTO,
+) -> Union[MZMLFile, MSZFile, MSZXFile]:
     """
     Read and parse mzML, MSZ, or MSZX files.
-    
+
     Args:
         path (Union[str, PathLike, bytes]): Path to the file to read.
+        cache_spectra (int): Per-file LRU cap for cached ``Spectrum`` objects.
+            ``CACHE_SPECTRA_AUTO`` (-1, default) uses the bundled default;
+            ``0`` disables eviction (legacy unbounded); ``N > 0`` sets an
+            explicit cap. Forwarded to the underlying file constructor.
     Returns:
         Union[MZMLFile, MSZFile, MSZXFile]: Parsed file object.
     """
@@ -42,13 +50,19 @@ def read(path: Union[str, PathLike, bytes]) -> Union[MZMLFile, MSZFile, MSZXFile
     path_bytes = path_str.encode('utf-8')
 
     if filetype == "mzML":
-        return MZMLFile(path_bytes)
+        f = MZMLFile(path_bytes)
     elif filetype == "msz":
-        return MSZFile(path_bytes)
+        f = MSZFile(path_bytes)
     elif filetype == "mszx":
-        return MSZXFile.open(path_str)
+        f = MSZXFile.open(path_str)
     else:
         raise OSError(f"Could not determine file type for: {path_str}")
+
+    # Set before the first `.spectra` access so the Spectra LRU is built with
+    # this cap. The file constructors deliberately don't expose this knob;
+    # read() is the single entry point for it.
+    f._cache_spectra = cache_spectra
+    return f
 
 
 def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "mszx"]]:

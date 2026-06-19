@@ -13,6 +13,7 @@ from mscompress._core import (
     MSZFile,
     Spectrum,
     Spectra,
+    CACHE_SPECTRA_AUTO,
     get_num_threads,
     get_filesize,
     list_algorithms,
