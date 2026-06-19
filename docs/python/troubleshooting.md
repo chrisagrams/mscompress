@@ -1,5 +1,31 @@
 # Troubleshooting
 
+## Errors vs. warnings
+
+The C core reports two kinds of conditions, and the Python bindings map them to
+two different Python mechanisms:
+
+- **Fatal errors** raise `mscompress.MSCompressError` (a subclass of
+  `RuntimeError`). These are genuine failures with no usable result — e.g. a
+  write failing on a broken pipe during `compress`/`decompress`/`extract` or
+  their `*_stream()` variants. Catch them:
+
+  ```python
+  from mscompress import read, MSCompressError
+
+  try:
+      with read("data.msz") as f:
+          f.decompress("out.mzML")
+  except MSCompressError as e:
+      print(f"decompression failed: {e}")
+  ```
+
+- **Recoverable conditions** emit a `RuntimeWarning` and let the call return a
+  degraded-but-usable result — e.g. a single corrupt-base64 spectrum decoding to
+  an empty array while the rest of the file reads fine. Promote them to
+  exceptions with `warnings.simplefilter("error", RuntimeWarning)` if you want
+  strict handling.
+
 ## "Corrupt base64" or "Invalid base64 character" on extraction
 
 The input mzML has malformed base64-encoded binary arrays. `mscompress`

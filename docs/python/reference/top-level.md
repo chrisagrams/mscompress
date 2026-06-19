@@ -27,3 +27,12 @@ The entry-point module. Re-exports everything from
         - SpectrumDict
         - SpectrumTransform
       show_root_heading: false
+
+## Exceptions
+
+::: mscompress
+    options:
+      members:
+        - MSCompressError
+      show_root_heading: false
+      show_root_toc_entry: false
