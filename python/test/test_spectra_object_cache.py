@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from mscompress import read
-from mscompress._core import CACHE_SPECTRA_AUTO, _DEFAULT_CACHE_SPECTRA, MSZFile
+from mscompress._core import CACHE_SPECTRA_AUTO, _DEFAULT_CACHE_SPECTRA
 
 SRC = os.path.join(os.path.dirname(__file__), "..", "..", "test", "data", "test.mzML")
 
@@ -34,12 +34,12 @@ def test_default_cap_positive(msz):
 
 
 def test_explicit_cap_honored(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=4) as f:
+    with read(msz, cache_spectra=4) as f:
         assert f.spectra.cache_cap == 4
 
 
 def test_zero_disables_eviction(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=0) as f:
+    with read(msz, cache_spectra=0) as f:
         sp = f.spectra
         assert sp.cache_cap == 0
         n = min(20, len(sp))
@@ -50,7 +50,7 @@ def test_zero_disables_eviction(msz):
 
 
 def test_bounded_cap_evicts(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=4) as f:
+    with read(msz, cache_spectra=4) as f:
         sp = f.spectra
         for i in range(min(12, len(sp))):
             _ = sp[i]
@@ -58,7 +58,7 @@ def test_bounded_cap_evicts(msz):
 
 
 def test_lru_hit_bumps_to_mru(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=3) as f:
+    with read(msz, cache_spectra=3) as f:
         sp = f.spectra
         a, b, c = sp[0], sp[1], sp[2]      # cache: {0,1,2}
         _ = sp[0]                           # touch 0 -> MRU; order {1,2,0}
@@ -68,15 +68,15 @@ def test_lru_hit_bumps_to_mru(msz):
 
 
 def test_same_instance_returned_on_hit(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=8) as f:
+    with read(msz, cache_spectra=8) as f:
         sp = f.spectra
         assert sp[0] is sp[0]
 
 
 def test_values_match_across_eviction(msz):
     """Tight cap (forces eviction) returns identical data to unbounded."""
-    with MSZFile(os.fsencode(msz), cache_spectra=2) as bounded, \
-         MSZFile(os.fsencode(msz), cache_spectra=0) as unbounded:
+    with read(msz, cache_spectra=2) as bounded, \
+         read(msz, cache_spectra=0) as unbounded:
         n = min(20, len(bounded.spectra))
         for i in range(n):
             assert np.array_equal(
@@ -101,7 +101,7 @@ def test_clear_cache(msz):
 
 
 def test_iteration_completes_under_tight_cap(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=2) as f:
+    with read(msz, cache_spectra=2) as f:
         count = sum(1 for _ in f.spectra)
         assert count == len(f.spectra)
 
@@ -116,6 +116,6 @@ def test_set_transform_invalidates(msz):
 
 
 def test_with_transform_preserves_cap(msz):
-    with MSZFile(os.fsencode(msz), cache_spectra=7) as f:
+    with read(msz, cache_spectra=7) as f:
         sp2 = f.spectra.with_transform(None)
         assert sp2.cache_cap == 7

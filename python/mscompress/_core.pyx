@@ -414,9 +414,8 @@ cdef class Division:
 
 
 cdef class MZMLFile(BaseFile):
-    def __init__(self, bytes path, int cache_spectra=CACHE_SPECTRA_AUTO):
+    def __init__(self, bytes path):
         super(MZMLFile, self).__init__(path)
-        self._cache_spectra = cache_spectra
         if self._mapping is NULL:
              raise RuntimeError("File mapping is NULL. Filesize might be 0.")
         self._df = _pattern_detect(<char*> self._mapping)
@@ -825,9 +824,8 @@ cdef class MSZFile(BaseFile):
     cdef block_len_queue_t* _mz_binary_block_lens
     cdef block_len_queue_t* _inten_binary_block_lens
 
-    def __init__(self, bytes path, int cache_spectra=CACHE_SPECTRA_AUTO):
+    def __init__(self, bytes path):
         super(MSZFile, self).__init__(path)
-        self._cache_spectra = cache_spectra
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -882,6 +880,7 @@ cdef class MSZFile(BaseFile):
         self.filesize = sz
         self._opened_from_archive = True
         self._spectra = None
+        self._cache_spectra = CACHE_SPECTRA_AUTO  # read() may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
@@ -901,8 +900,7 @@ cdef class MSZFile(BaseFile):
         _set_decompress_runtime_variables(self._df, self._footer)
 
     @classmethod
-    def from_mszx(cls, bytes mszx_path, bytes entry_name,
-                  int cache_spectra=CACHE_SPECTRA_AUTO):
+    def from_mszx(cls, bytes mszx_path, bytes entry_name):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -914,13 +912,8 @@ cdef class MSZFile(BaseFile):
             Path to the .mszx archive.
         entry_name : bytes
             Name of the MSZ entry within the archive (e.g. b"spectra.msz").
-        cache_spectra : int
-            Per-file LRU cap for cached ``Spectrum`` Python objects. Default
-            ``CACHE_SPECTRA_AUTO`` (-1) resolves to a bundled default; 0
-            restores the legacy unbounded cache. Forwarded to ``Spectra``.
         """
         cdef MSZFile self = cls.__new__(cls)
-        self._cache_spectra = cache_spectra
         self._init_from_archive(mszx_path, entry_name)
         return self
 
@@ -1352,7 +1345,7 @@ cdef class MSZXFile(MSZFile):
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
-    def open(cls, path, int cache_spectra=CACHE_SPECTRA_AUTO):
+    def open(cls, path):
         """
         Open an MSZX archive for reading.
 
@@ -1363,9 +1356,6 @@ cdef class MSZXFile(MSZFile):
 
         Args:
             path: Path to the .mszx file.
-            cache_spectra: Per-file LRU cap for cached ``Spectrum`` Python
-                objects. Default ``CACHE_SPECTRA_AUTO`` (-1) resolves to a
-                bundled default; 0 restores the legacy unbounded cache.
         """
         # Local imports break the circular module load between _core and
         # the Python-side annotation/tarfile machinery (mscompress.mszx
@@ -1418,7 +1408,6 @@ cdef class MSZXFile(MSZFile):
 
         # Construct and populate via the shared MSZ-from-archive helper.
         cdef MSZXFile self = cls.__new__(cls)
-        self._cache_spectra = cache_spectra
         self._init_from_archive(
             str(archive_path).encode(),
             manifest.spectra_file.encode(),
@@ -1661,8 +1650,10 @@ cdef class BaseFile:
     cdef divisions_t* _divisions
     cdef division_t* _positions
     cdef Spectra _spectra
-    cdef int _cache_spectra    # Cap forwarded to Spectra; CACHE_SPECTRA_AUTO
-                               # (-1) by default. Set by subclass constructors.
+    cdef public int _cache_spectra  # Cap forwarded to Spectra; CACHE_SPECTRA_AUTO
+                                    # (-1) by default. Set by read() before the
+                                    # first .spectra access; public so the
+                                    # pure-Python read() factory can assign it.
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
     cdef int output_fd
@@ -1679,7 +1670,7 @@ cdef class BaseFile:
         self._map_length = self.filesize
         self._opened_from_archive = False
         self._spectra = None
-        self._cache_spectra = CACHE_SPECTRA_AUTO  # subclass may override
+        self._cache_spectra = CACHE_SPECTRA_AUTO  # read() may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
