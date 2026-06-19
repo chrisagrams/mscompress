@@ -30,17 +30,65 @@ def _install_mscompress_warning_formatter():
     warnings.formatwarning = _mscompress_formatwarning
 
 _install_mscompress_warning_formatter()
+
+
+class MSCompressError(RuntimeError):
+    """Raised when the mscompress C core reports a fatal ``error()``.
+
+    Subclasses :class:`RuntimeError` so existing ``except RuntimeError`` handlers
+    keep working. Distinct from the :class:`RuntimeWarning` emitted for the
+    C core's non-fatal ``warning()`` (graceful-degradation) path. See issue #171.
+    """
+
+
+# Pending fatal-error state, shared across threads. The C ``error()`` callback
+# may fire from worker threads in the compress/decompress pipelines, so we cannot
+# raise from inside the callback (the C frames running after it would keep
+# executing). Instead the callback stashes the first message here and the next
+# C<->Python boundary (a GIL-holding Python frame) turns it into a raise via
+# ``_raise_pending_error()``. A list cell avoids needing ``global`` declarations.
+_error_lock = threading.Lock()
+_pending_error = [None]
+
 # `with gil` is required because these callbacks may be invoked from C code
 # running without the GIL (e.g., streaming methods release the GIL for I/O).
 cdef void _python_error_handler(const char* message) noexcept with gil:
-    """Callback function to handle C errors in Python"""
+    """Record a fatal C ``error()`` to be re-raised at the next boundary.
+
+    Cannot raise here: the callback is invoked from C (potentially a worker
+    thread) that does not check for a pending Python exception, so the remaining
+    C frames would keep running. We stash the first message and let
+    ``_raise_pending_error()`` surface it as :class:`MSCompressError`.
+    """
+    msg = message.decode('utf-8') if isinstance(message, bytes) else message
+    with _error_lock:
+        if _pending_error[0] is None:
+            _pending_error[0] = msg.strip()
+
+cdef void _python_warning_handler(const char* message) noexcept with gil:
+    """Callback function to handle non-fatal C warnings in Python.
+
+    ``warning()`` denotes graceful degradation (e.g. corrupt-base64 input that
+    yields an empty array by design), so it stays a :class:`RuntimeWarning`.
+    """
     msg = message.decode('utf-8') if isinstance(message, bytes) else message
     warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
 
-cdef void _python_warning_handler(const char* message) noexcept with gil:
-    """Callback function to handle C warnings in Python"""
-    msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+
+def _clear_pending_error():
+    """Drop any stashed C error. Call at the start of a C-backed operation so a
+    stale error from an abandoned/early-closed stream cannot leak into it."""
+    with _error_lock:
+        _pending_error[0] = None
+
+
+def _raise_pending_error():
+    """Raise (and clear) any C error stashed by the error callback."""
+    with _error_lock:
+        msg = _pending_error[0]
+        _pending_error[0] = None
+    if msg is not None:
+        raise MSCompressError(msg)
 
 # Initialize callbacks when module is imported
 _set_error_callback(_python_error_handler)
@@ -625,11 +673,13 @@ cdef class MZMLFile(BaseFile):
         # that hits a base64 decode failure (or any other warning path) blocks
         # in PyGILState_Ensure while the main thread is parked in pthread_join,
         # producing an unrecoverable deadlock.
+        _clear_pending_error()
         with nogil:
             rv = _compress_mzml(mapping, filesize, args, df, divisions, fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        _raise_pending_error()
         if rv != 0:
             raise RuntimeError("Compression failed: write error during compression.")
         return MSZFile(output.encode('utf-8'))
@@ -645,9 +695,11 @@ cdef class MZMLFile(BaseFile):
         cdef divisions_t* divisions = self._divisions
         # Release the GIL so the reader thread can drain the pipe; without this,
         # write() blocks on a full pipe while holding the GIL → deadlock.
+        _clear_pending_error()
         with nogil:
             rv = _compress_mzml(mapping, filesize, args, df, divisions, write_fd)
             _flush(write_fd)
+        _raise_pending_error()
         if rv != 0:
             raise RuntimeError("Compression failed: write error during compression.")
 
@@ -735,6 +787,7 @@ cdef class MZMLFile(BaseFile):
             # Prepare output file
             self.output_fd = self._prepare_output_fd(str(output))
 
+            _clear_pending_error()
             _extract_mzml_filtered(
                 <char*>self._mapping,
                 self.filesize,
@@ -751,6 +804,7 @@ cdef class MZMLFile(BaseFile):
             _flush(self.output_fd)
             _close_file(self.output_fd)
             self.output_fd = -1
+            _raise_pending_error()
             return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
@@ -774,6 +828,7 @@ cdef class MZMLFile(BaseFile):
             scans_length = len(scans_arr)
 
         # Release the GIL so the reader thread can drain the pipe.
+        _clear_pending_error()
         with nogil:
             _extract_mzml_filtered(
                 mapping,
@@ -787,6 +842,7 @@ cdef class MZMLFile(BaseFile):
                 write_fd
             )
             _flush(write_fd)
+        _raise_pending_error()
 
     def extract_stream(
         self,
@@ -1219,11 +1275,13 @@ cdef class MSZFile(BaseFile):
         # Release the GIL so worker threads can re-enter Python via the
         # error/warning callbacks. See MZMLFile.compress for the deadlock
         # this avoids.
+        _clear_pending_error()
         with nogil:
             rv = _decompress_msz(mapping, filesize, args, fd)
         _flush(self.output_fd)
         _close_file(self.output_fd)
         self.output_fd = -1
+        _raise_pending_error()
         if rv != 0:
             raise RuntimeError("Decompression failed: error during decompression.")
         return MZMLFile(output.encode('utf-8'))
@@ -1235,9 +1293,11 @@ cdef class MSZFile(BaseFile):
         cdef size_t filesize = self.filesize
         cdef Arguments* args = self._arguments.get_ptr()
         # Release the GIL so the reader thread can drain the pipe.
+        _clear_pending_error()
         with nogil:
             rv = _decompress_msz(mapping, filesize, args, write_fd)
             _flush(write_fd)
+        _raise_pending_error()
         if rv != 0:
             raise RuntimeError("Decompression failed: error during decompression.")
 
@@ -1330,6 +1390,7 @@ cdef class MSZFile(BaseFile):
             self.output_fd = self._prepare_output_fd(str(output))
             
             # Call the C extraction function
+            _clear_pending_error()
             _extract_msz(
                 <char*>self._mapping,
                 self.filesize,
@@ -1340,11 +1401,12 @@ cdef class MSZFile(BaseFile):
                 c_ms_level,
                 self.output_fd
             )
-            
+
             # Flush and close output
             _flush(self.output_fd)
             _close_file(self.output_fd)
             self.output_fd = -1
+            _raise_pending_error()
             return MZMLFile(str(output).encode('utf-8'))
         else:
             raise ValueError(f"Unsupported output file extension: {output_ext}. Use .msz or .mzML")
@@ -1367,6 +1429,7 @@ cdef class MSZFile(BaseFile):
             scans_length = len(scans_arr)
 
         # Release the GIL so the reader thread can drain the pipe.
+        _clear_pending_error()
         with nogil:
             _extract_msz(
                 mapping,
@@ -1379,6 +1442,7 @@ cdef class MSZFile(BaseFile):
                 write_fd
             )
             _flush(write_fd)
+        _raise_pending_error()
 
     def extract_stream(
         self,
