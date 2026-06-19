@@ -9,6 +9,13 @@ from mscompress.datasets.torch import MSCompressDataset, MSCompressDatasetMember
 from mscompress.types import AnnotationFormat
 
 
+def _collate(batch):
+    # Module-level so it's picklable: macOS/Windows DataLoader workers use the
+    # 'spawn' start method, which pickles collate_fn. A test-local closure
+    # raises AttributeError on spawn (passes only under fork).
+    return [b[0] for b in batch], [b[1] for b in batch]
+
+
 def test_mscompress_dataset_single_file(msz_file_path):
     dataset = MSCompressDataset(msz_file_path)
     assert len(dataset.members) == 1
@@ -90,11 +97,8 @@ def test_dataloader_multiworker(test_data_dir):
     """End-to-end: a multi-worker DataLoader iterates the whole dataset."""
     dataset = MSCompressDataset(test_data_dir, cache_bytes=8 * 1024 * 1024)
 
-    def collate(batch):
-        return [b[0] for b in batch], [b[1] for b in batch]
-
     loader = DataLoader(
-        dataset, batch_size=4, shuffle=True, num_workers=2, collate_fn=collate
+        dataset, batch_size=4, shuffle=True, num_workers=2, collate_fn=_collate
     )
     seen = 0
     for mzs, intens in loader:
