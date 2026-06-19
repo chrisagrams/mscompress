@@ -60,3 +60,11 @@ includes collation helpers for ragged peak arrays.
 Both adapters lazily decode spectra and annotations — opening an MSZX
 archive is O(1), and a given example is fetched only when it's requested
 by the loader.
+
+## Block size and random reads
+
+Shuffled training is a random-access workload, and every fetch decompresses
+the whole ZSTD block holding that spectrum. Archives written with large blocks
+(the 100 MB default) make shuffled `DataLoader` reads slow. If your shards were
+compressed for archival, [rechunk](rechunking.md) them to a smaller block size
+(e.g. `1–4 MB`) first to cut per-read decompression cost.

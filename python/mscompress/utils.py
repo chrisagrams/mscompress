@@ -86,7 +86,8 @@ def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "
         path: Path to the file to check
         
     Returns:
-        "mzML" if the file is an mzML file (contains "indexedmzML" in first 512 bytes)
+        "mzML" if the file is an mzML file (indexed or plain: the first 512
+            bytes contain "indexedmzML" or an "<mzML" element)
         "msz" if the file is an msz file (starts with magic tag 0x035F51B5)
         "mszx" if the file is a tar archive containing manifest.json
         None if the file type cannot be determined
@@ -110,8 +111,13 @@ def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "
             if magic == 0x035F51B5:
                 return "msz"
         
-        # Check for mzML (contains "indexedmzML" string)
-        if b"indexedmzML" in header:
+        # Check for mzML in either form. Indexed mzML carries the "indexedmzML"
+        # wrapper; plain mzML starts straight at the "<mzML" root element.
+        # mscompress reproduces whichever form the source used, so decompressing
+        # a non-indexed source yields the plain form. Accept both -- note
+        # "<indexedmzML" does not contain the substring "<mzML", so the two
+        # checks don't overlap.
+        if b"indexedmzML" in header or b"<mzML" in header:
             return "mzML"
         
         # Check for mszx (tar file with manifest.json)

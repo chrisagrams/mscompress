@@ -25,6 +25,7 @@ from mscompress._core import (
 )
 
 from mscompress.utils import read
+from mscompress.rechunk import rechunk
 
 from mscompress.metadata import (
     # Core abstractions
@@ -99,6 +100,7 @@ __all__ = [
     "__version__",
     # Utility functions
     "read",
+    "rechunk",
     # Metadata abstractions
     "MetadataBuilder",
     "FieldDefinition",

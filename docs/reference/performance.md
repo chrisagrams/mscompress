@@ -23,6 +23,12 @@ committing to a setting.
 A spectrum-count blocksize (e.g., `1000` spectra per block) is exposed
 through the Python `RuntimeArguments` API for finer control.
 
+Already have a compressed file written with large blocks? Use
+[`rechunk`](../python/guides/rechunking.md) to rewrite it at a smaller block
+size — in place or to a new file — without re-deriving anything from the source
+mzML. Handy for producing a random-access-friendly copy for ML training from an
+archival, large-block original.
+
 ## ZSTD level
 
 - `3` (default) — fastest reasonable level.

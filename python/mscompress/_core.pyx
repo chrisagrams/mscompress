@@ -413,6 +413,20 @@ def list_algorithms():
     return result
 
 
+cdef str _lossy_name_from_type(int fmt):
+    """Invert ``get_algo_type``: map a stored lossy-algorithm code back to its
+    registry name. The footer records ``get_algo_type(mz_lossy/int_lossy)``, so
+    this recovers the name needed to re-apply the same transform when
+    re-compressing (e.g. during ``rechunk``)."""
+    if fmt == _lossless_:
+        return "lossless"
+    cdef int i
+    for i in range(algo_registry_size):
+        if algo_registry[i].type == fmt:
+            return algo_registry[i].name.decode('utf-8')
+    raise ValueError(f"Unknown lossy algorithm code in file: {fmt}")
+
+
 cdef class DataBlock:
     cdef data_block_t _data_block
 
@@ -1228,6 +1242,50 @@ cdef class MSZFile(BaseFile):
             raise RuntimeError("Decompression failed: error during decompression.")
         return MZMLFile(output.encode('utf-8'))
 
+    @property
+    def n_divisions(self):
+        """Number of independently compressed blocks (divisions) in this file.
+        Smaller block sizes yield more divisions; see ``rechunk``."""
+        return <int>self._footer.n_divisions
+
+    def _compression_config(self):
+        """Recover the compression settings this file was written with, so a
+        re-compression (e.g. ``rechunk``) can faithfully reproduce everything
+        except the block size. Target formats and scale factors come from the
+        512-byte header; the lossy-algorithm codes come from the footer."""
+        return {
+            "mz_lossy": _lossy_name_from_type(<int>self._footer.mz_fmt),
+            "int_lossy": _lossy_name_from_type(<int>self._footer.inten_fmt),
+            "target_xml_format": <int>self._df.target_xml_format,
+            "target_mz_format": <int>self._df.target_mz_format,
+            "target_inten_format": <int>self._df.target_inten_format,
+            "mz_scale_factor": <float>self._df.mz_scale_factor,
+            "int_scale_factor": <float>self._df.int_scale_factor,
+        }
+
+    def rechunk(self, blocksize, output=None, *, threads=None):
+        """Rewrite this MSZ file at a different ZSTD block size.
+
+        Smaller blocks reduce random-read amplification (reading one spectrum
+        decompresses its whole block) at a modest compression-ratio cost. The
+        file is round-tripped through mzML in a temporary directory and
+        re-compressed with the original lossy algorithms, scale factors, and
+        stream formats preserved -- only ``blocksize`` changes.
+
+        Args:
+            blocksize: Target block size in bytes (int) or a size string such
+                as ``"8MB"``.
+            output: Destination path. ``None`` (default) rewrites this file in
+                place; in-place mode releases this object's mapping (the handle
+                is closed) before atomically replacing the file.
+            threads: Optional worker-thread count for the re-compression.
+
+        Returns:
+            A freshly opened ``MSZFile`` for the re-chunked output.
+        """
+        from mscompress.rechunk import _rechunk_msz_file
+        return _rechunk_msz_file(self, blocksize, output, threads)
+
     def _decompress_to_fd(self, int write_fd):
         """Internal helper: run decompression pipeline writing to the given fd."""
         cdef int rv
@@ -1772,6 +1830,28 @@ cdef class MSZXFile(MSZFile):
             (out_path / out_name).write_bytes(reader.source.read())
 
         return result
+
+    def rechunk(self, blocksize, output=None, *, threads=None):
+        """Rewrite this MSZX archive at a different ZSTD block size.
+
+        The embedded MSZ is re-compressed at the new block size (preserving its
+        original lossy algorithms, scale factors, and stream formats) and the
+        archive is rebuilt with its manifest metadata and annotations intact.
+        See ``MSZFile.rechunk`` for the block-size trade-off.
+
+        Args:
+            blocksize: Target block size in bytes (int) or a size string such
+                as ``"8MB"``.
+            output: Destination ``.mszx`` path. ``None`` (default) rewrites this
+                archive in place; in-place mode closes this object before
+                atomically replacing the file.
+            threads: Optional worker-thread count for the re-compression.
+
+        Returns:
+            A freshly opened ``MSZXFile`` for the re-chunked output.
+        """
+        from mscompress.rechunk import _rechunk_mszx_file
+        return _rechunk_mszx_file(self, blocksize, output, threads)
 
     def extract(self, output, indicies=None, scan_numbers=None, ms_level=None):
         """

@@ -321,6 +321,40 @@ class MSZFile(BaseFile):
 
     def __init__(self, path: bytes) -> None: ...
 
+    @property
+    def n_divisions(self) -> int:
+        """Number of independently compressed blocks (divisions) in this file.
+
+        Smaller block sizes yield more divisions; see `rechunk`.
+        """
+        ...
+
+    def rechunk(
+        self,
+        blocksize: Union[int, str],
+        output: Optional[Union[str, PathLike]] = ...,
+        *,
+        threads: Optional[int] = ...,
+    ) -> "MSZFile":
+        """Rewrite this MSZ file at a different ZSTD block size.
+
+        The file is round-tripped through mzML in a temporary directory and
+        re-compressed with the original lossy algorithms, scale factors, and
+        stream formats preserved -- only `blocksize` changes.
+
+        Args:
+            blocksize: Target block size in bytes (int) or a size string such
+                as `"8MB"`.
+            output: Destination path. `None` (default) rewrites this file in
+                place (atomic replace; the source handle is closed). A path
+                writes a new file and leaves the input untouched.
+            threads: Optional worker-thread count for the re-compression.
+
+        Returns:
+            A freshly opened MSZFile for the re-chunked output.
+        """
+        ...
+
     def decompress(self, output: Union[str, PathLike]) -> MZMLFile:
         """
         Decompress an MSZ file to mzML format.
@@ -485,6 +519,32 @@ class MSZXFile(MSZFile):
 
         Returns:
             New MSZXFile instance for the created archive.
+        """
+        ...
+
+    def rechunk(
+        self,
+        blocksize: Union[int, str],
+        output: Optional[Union[str, PathLike]] = ...,
+        *,
+        threads: Optional[int] = ...,
+    ) -> "MSZXFile":
+        """Rewrite this MSZX archive at a different ZSTD block size.
+
+        The embedded MSZ is re-compressed at the new block size (preserving its
+        original lossy algorithms, scale factors, and stream formats) and the
+        archive is rebuilt with its manifest metadata and annotations intact.
+
+        Args:
+            blocksize: Target block size in bytes (int) or a size string such
+                as `"8MB"`.
+            output: Destination `.mszx` path. `None` (default) rewrites this
+                archive in place (atomic replace; this object is closed). A path
+                writes a new archive and leaves the input untouched.
+            threads: Optional worker-thread count for the re-compression.
+
+        Returns:
+            A freshly opened MSZXFile for the re-chunked output.
         """
         ...
 
