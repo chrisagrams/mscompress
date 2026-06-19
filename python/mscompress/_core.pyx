@@ -80,8 +80,10 @@ _DEFAULT_CACHE_SPECTRA = 128
 #
 # By default every file shares one process-wide BlockCache sized to
 # DEFAULT_CACHE_BYTES (overridable via MSCOMPRESS_CACHE_BYTES or
-# set_cache_budget()). Pass cache=BlockCache(n) to read()/MSZFile(...) to use a
-# private pool, or cache=0 to opt out of bounding entirely (legacy unbounded).
+# set_cache_budget()). Pass cache=BlockCache(n) to read() to use a private
+# pool, or cache=0 to opt out of bounding entirely (legacy unbounded). read()
+# is the only public entry point for the knob; the file constructors don't
+# expose it.
 # ---------------------------------------------------------------------------
 
 DEFAULT_CACHE_BYTES = 4 * 1024 * 1024 * 1024  # 4 GiB
@@ -958,9 +960,9 @@ cdef class MSZFile(BaseFile):
     cdef BlockCache _block_cache   # shared/owned decompressed-block cache;
                                    # None disables bounding (legacy unbounded)
 
-    def __init__(self, bytes path, cache=None):
+    def __init__(self, bytes path):
         super(MSZFile, self).__init__(path)
-        self._block_cache = _coerce_cache(cache)
+        self._block_cache = _coerce_cache(None)  # read() may override
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -977,6 +979,13 @@ cdef class MSZFile(BaseFile):
         if self._block_cache is None:
             return NULL
         return self._block_cache._lru
+
+    def _set_block_cache(self, cache):
+        """Install the block cache, coercing None/int/0/BlockCache the same way
+        the old ``cache=`` constructor argument did. Used by ``read()``, which
+        is the only public entry point for the knob. Must be called before any
+        spectrum/block access so no blocks are attached under the old cache."""
+        self._block_cache = _coerce_cache(cache)
 
     @staticmethod
     def _reopen(path: bytes):
@@ -1045,6 +1054,7 @@ cdef class MSZFile(BaseFile):
         self._opened_from_archive = True
         self._spectra = None
         self._cache_spectra = CACHE_SPECTRA_AUTO  # read() may override
+        self._block_cache = _coerce_cache(None)   # read() may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
         self.output_fd = -1
@@ -1064,7 +1074,7 @@ cdef class MSZFile(BaseFile):
         _set_decompress_runtime_variables(self._df, self._footer)
 
     @classmethod
-    def from_mszx(cls, bytes mszx_path, bytes entry_name, cache=None):
+    def from_mszx(cls, bytes mszx_path, bytes entry_name):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -1076,13 +1086,8 @@ cdef class MSZFile(BaseFile):
             Path to the .mszx archive.
         entry_name : bytes
             Name of the MSZ entry within the archive (e.g. b"spectra.msz").
-        cache : BlockCache | int | None
-            Shared decompressed-block cache. None (default) uses the process
-            default; a ``BlockCache`` shares an explicit pool; an int sets a
-            private byte budget; 0 disables bounding (legacy unbounded).
         """
         cdef MSZFile self = cls.__new__(cls)
-        self._block_cache = _coerce_cache(cache)
         self._init_from_archive(mszx_path, entry_name)
         return self
 
@@ -1530,7 +1535,7 @@ cdef class MSZXFile(MSZFile):
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
-    def open(cls, path, cache=None):
+    def open(cls, path):
         """
         Open an MSZX archive for reading.
 
@@ -1541,9 +1546,6 @@ cdef class MSZXFile(MSZFile):
 
         Args:
             path: Path to the .mszx file.
-            cache: Shared decompressed-block cache. None (default) uses the
-                process default BlockCache; a ``BlockCache`` shares an explicit
-                pool; an int sets a private byte budget; 0 disables bounding.
         """
         # Local imports break the circular module load between _core and
         # the Python-side annotation/tarfile machinery (mscompress.mszx
@@ -1596,7 +1598,6 @@ cdef class MSZXFile(MSZFile):
 
         # Construct and populate via the shared MSZ-from-archive helper.
         cdef MSZXFile self = cls.__new__(cls)
-        self._block_cache = _coerce_cache(cache)
         self._init_from_archive(
             str(archive_path).encode(),
             manifest.spectra_file.encode(),

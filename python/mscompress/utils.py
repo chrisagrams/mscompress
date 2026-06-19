@@ -10,8 +10,8 @@ from typing import Union
 
 def read(
     path: Union[str, PathLike, bytes],
-    cache=None,
     *,
+    cache=None,
     cache_spectra: int = CACHE_SPECTRA_AUTO,
 ) -> Union[MZMLFile, MSZFile, MSZXFile]:
     """
@@ -28,6 +28,10 @@ def read(
             ``CACHE_SPECTRA_AUTO`` (-1, default) uses the bundled default;
             ``0`` disables eviction (legacy unbounded); ``N > 0`` sets an
             explicit cap.
+
+        Both ``cache`` and ``cache_spectra`` are exposed only here; the file
+        constructors deliberately don't expose them. ``read()`` is the single
+        entry point for both knobs.
     Returns:
         Union[MZMLFile, MSZFile, MSZXFile]: Parsed file object.
     """
@@ -58,16 +62,19 @@ def read(
     if filetype == "mzML":
         f = MZMLFile(path_bytes)
     elif filetype == "msz":
-        f = MSZFile(path_bytes, cache=cache)
+        f = MSZFile(path_bytes)
     elif filetype == "mszx":
-        f = MSZXFile.open(path_str, cache=cache)
+        f = MSZXFile.open(path_str)
     else:
         raise OSError(f"Could not determine file type for: {path_str}")
 
-    # Set before the first `.spectra` access so the Spectra LRU is built with
-    # this cap. The file constructors deliberately don't expose this knob;
-    # read() is the single entry point for it.
+    # Install both caches before the first spectrum/block access so nothing is
+    # built or attached under the constructors' defaults. The constructors
+    # deliberately don't expose these knobs; read() is the single entry point.
+    # _set_block_cache only exists on MSZ/MSZX files (mzML has no block cache).
     f._cache_spectra = cache_spectra
+    if filetype in ("msz", "mszx"):
+        f._set_block_cache(cache)
     return f
 
 

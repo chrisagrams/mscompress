@@ -24,7 +24,6 @@ from mscompress import (
     set_cache_budget,
     get_cache_usage,
 )
-from mscompress._core import MSZFile, MSZXFile
 
 
 @pytest.fixture()
@@ -209,7 +208,7 @@ def test_invalid_cache_type_rejected(msz):
 
 def test_mszx_accepts_cache(mszx_file_path):
     c = BlockCache(64 * 1024 * 1024)
-    with MSZXFile.open(mszx_file_path, cache=c) as f:
+    with read(mszx_file_path, cache=c) as f:
         _ = np.asarray(f.spectra[0].mz)
         assert c.usage > 0
     assert c.usage == 0  # detached on close
