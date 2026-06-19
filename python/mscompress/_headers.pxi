@@ -20,6 +20,7 @@ cdef extern from "../vendor/zstd/lib/zstd.h":
 cdef extern from "../src/mscompress.h":
     int TRUE
     int FALSE
+    int _lossless_
     int _ZSTD_compression_
     int ZLIB_SIZE_OFFSET
     int _32f_
