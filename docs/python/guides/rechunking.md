@@ -33,6 +33,23 @@ Rechunk lets you compress once for archival (large blocks, best ratio) and
 later produce a random-access-friendly copy (small blocks) for training,
 without re-deriving anything from the source mzML yourself.
 
+### Measured trade-off
+
+The curve below sweeps the block size of an ~12 GB MSZX dataset and measures
+shuffled random reads through a single PyTorch `DataLoader`. Throughput (left
+axis) peaks sharply, while on-disk size (right axis) keeps shrinking with larger
+blocks but flattens quickly — so the best operating point is the smallest block
+that still compresses well.
+
+--8<-- "docs/_charts/blocksize_sweep.html"
+
+For this dataset the knee is around **1 MB**: ~35× the random-read throughput of
+the 64 MB default, for only ~6% more on disk. Past ~4 MB the compression gain is
+marginal while throughput collapses. Your numbers will shift with cache size,
+worker count, and data, but the shape of the curve — and the location of the
+knee — is the thing to look for. To find it on your own data, rechunk a sample
+of shards at several block sizes and time random reads through a `DataLoader`.
+
 See [Performance notes](../../reference/performance.md#blocksize) for the
 broader trade-off and [ML dataset adapters](ml-datasets.md) for the workload
 that motivates it.
