@@ -277,6 +277,21 @@ else:
         extra_compile_args = ["-O3"]
         extra_link_args = []
 
+# Hide ELF/Mach-O symbol visibility by default. Without this, the vendored C
+# core's globally-visible `error()` (src/sys.c) is subject to Linux symbol
+# interposition against glibc's own `error(int, int, const char*, ...)`
+# (declared in <error.h> and always exported by libc.so): the dynamic linker
+# can bind our internal calls to the libc symbol instead, silently
+# misinterpreting our arguments (e.g. a small int like a file descriptor gets
+# read as a format-string pointer) and crashing. `-fvisibility=hidden` makes
+# the compiler bind same-module calls directly instead of going through the
+# global PLT lookup, so our `error()` can no longer be shadowed. Cython's
+# module init function stays exported regardless (PyMODINIT_FUNC forces
+# default visibility via Py_EXPORTED_SYMBOL), so this is safe. Not applicable
+# on Windows, where symbols are hidden by default (dllexport-only). See #171.
+if sys.platform != 'win32':
+    extra_compile_args.append('-fvisibility=hidden')
+
 
 # TODO: Ideally we don't need to disable assembly optimizations, but for now we do.
 # Look for a better solution in the future.
