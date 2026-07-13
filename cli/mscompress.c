@@ -411,10 +411,13 @@ int main(int argc, char* argv[]) {
          break;
       };
       case EXTERNAL: {
-         preprocess_external(input_map, input_filesize,
-                             &(arguments.blocksize), &arguments, &df,
-                             &divisions);
-         
+         if (preprocess_external(input_map, input_filesize,
+                                 &(arguments.blocksize), &arguments, &df,
+                                 &divisions)) {
+            error_status = 1;
+            break;
+         }
+
          if (compress_mzml(input_map, input_filesize, &arguments, df,
                            divisions, local_fds[1])) {
             error_status = 1;
