@@ -30,8 +30,15 @@ function detectFiletype(filePath: string): "mzML" | "msz" | null {
     }
   }
 
-  // Check for mzML (contains "indexedmzML" in first 512 bytes)
-  if (buf.toString("utf-8").includes("indexedmzML")) {
+  // Check for mzML: "indexedmzML" wrapper, "<mzML" root element, or the mzML
+  // namespace URI (non-indexed mzML, e.g. Waters exports, has no
+  // "indexedmzML" wrapper)
+  const text = buf.toString("utf-8");
+  if (
+    text.includes("indexedmzML") ||
+    text.includes("<mzML") ||
+    text.includes("http://psi.hupo.org/ms/mzml")
+  ) {
     return "mzML";
   }
 

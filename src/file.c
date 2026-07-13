@@ -556,7 +556,10 @@ int is_msz(void* input_map, size_t input_length) {
 
 /**
  * @brief Determines if file mapped in input_map is an mzML file.
- *        Reads first 512 bytes of file and looks for substring "indexedmzML".
+ *        Reads first 512 bytes of file and looks for the "indexedmzML"
+ *        wrapper, the "<mzML" root element, or the mzML namespace URI, so
+ *        that both indexed and non-indexed mzML (e.g. Waters exports) are
+ *        recognized.
  *
  * @param input_map Pointer to the memory-mapped file.
  *
@@ -570,6 +573,12 @@ int is_mzml(void* input_map, size_t input_length) {
    buffer[check_length] = '\0';  // null-terminate
 
    if (strstr(buffer, "indexedmzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "<mzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "http://psi.hupo.org/ms/mzml") != NULL)
       return 1;
 
    return 0;

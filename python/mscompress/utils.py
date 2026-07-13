@@ -86,7 +86,9 @@ def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "
         path: Path to the file to check
         
     Returns:
-        "mzML" if the file is an mzML file (contains "indexedmzML" in first 512 bytes)
+        "mzML" if the file is an mzML file: contains "indexedmzML", the "<mzML"
+            root element, or the mzML namespace URI in the first 512 bytes
+            (covers both indexed and non-indexed mzML, e.g. Waters exports)
         "msz" if the file is an msz file (starts with magic tag 0x035F51B5)
         "mszx" if the file is a tar archive containing manifest.json
         None if the file type cannot be determined
@@ -110,8 +112,11 @@ def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "
             if magic == 0x035F51B5:
                 return "msz"
         
-        # Check for mzML (contains "indexedmzML" string)
-        if b"indexedmzML" in header:
+        # Check for mzML: "indexedmzML" wrapper, "<mzML" root element, or the
+        # mzML namespace URI (non-indexed mzML, e.g. Waters exports, has no
+        # "indexedmzML" wrapper)
+        if (b"indexedmzML" in header or b"<mzML" in header or
+                b"http://psi.hupo.org/ms/mzml" in header):
             return "mzML"
         
         # Check for mszx (tar file with manifest.json)

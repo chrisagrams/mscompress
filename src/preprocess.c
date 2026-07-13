@@ -2496,7 +2496,7 @@ data_format_t* create_external_df() {
  * @param arguments Pointer to the Arguments struct (thread count used for division count).
  * @param df Output pointer set to the created data_format_t.
  * @param divisions Output pointer set to the created divisions_t.
- * @return 0 on success.
+ * @return 0 on success, 1 on error.
  */
 int preprocess_external(char* input_map, long input_filesize, long* blocksize,
                         Arguments* arguments, data_format_t** df,
@@ -2511,7 +2511,11 @@ int preprocess_external(char* input_map, long input_filesize, long* blocksize,
 
    divisions_t* div = divide_external(input_filesize, arguments->threads);
 
-   set_compress_runtime_variables(arguments, *df);
+   if (set_compress_runtime_variables(arguments, *df)) {
+      error("preprocess_external: Failed to set compression runtime variables.\n");
+      dealloc_divisions(div);
+      return 1;
+   }
 
    *divisions = div;
 
