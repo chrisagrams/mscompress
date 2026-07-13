@@ -2,8 +2,6 @@ name: Build and Test
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - 'stage'
       - 'dev'
@@ -11,6 +9,18 @@ on:
     branches:
       - 'dev'
   workflow_dispatch:
+  # Called by release-please.yml once a release is cut. Releases flow exclusively
+  # through release-please now, so there is no tag-push trigger here.
+  workflow_call:
+    inputs:
+      publish:
+        description: 'Publish artifacts (PyPI, npm, Docker, GitHub Release)'
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Tag to build/publish (e.g. v1.0.17)'
+        type: string
+        default: ''
 
 jobs:
   build-cli:
@@ -29,7 +39,7 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
           - platform: macos
             runner: macos-15-intel
@@ -40,16 +50,17 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
-      
-      - name: Setup MSVC Developer Command Prompt (Windows)
+
+      - name: Setup MSBuild (Windows)
         if: matrix.platform == 'windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
-      
+          msbuild-architecture: x64
+
       - name: Configure CMake (Unix)
         if: matrix.platform != 'windows'
         working-directory: ./cli
@@ -58,7 +69,7 @@ jobs:
       - name: Configure CMake (Windows)
         if: matrix.platform == 'windows'
         working-directory: ./cli
-        run: cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
+        run: cmake -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
       
       - name: Build CLI (Unix)
         if: matrix.platform != 'windows'
@@ -103,14 +114,14 @@ jobs:
       
       - name: Upload CLI artifact (Unix)
         if: matrix.platform != 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./cli/mscompress
       
       - name: Upload CLI artifact (Windows)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -119,19 +130,20 @@ jobs:
             ./cli/mscompress.exe
 
       - name: Prepare release binary (Unix)
-        if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/v')
+        if: matrix.platform != 'windows' && inputs.publish
         working-directory: ./cli
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ inputs.release_tag }}"
+          VERSION=${VERSION#v}
           mkdir -p release
           cp mscompress release/mscompress-cli-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Prepare release binary (Windows)
-        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        if: matrix.platform == 'windows' && inputs.publish
         working-directory: ./cli
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $version = "${{ inputs.release_tag }}".TrimStart('v')
           New-Item -ItemType Directory -Force -Path release
           if (Test-Path "./build/Release/mscompress.exe") {
             Copy-Item "./build/Release/mscompress.exe" "release/mscompress-cli-${version}-${{ matrix.platform }}-${{ matrix.arch }}.exe"
@@ -142,9 +154,10 @@ jobs:
           }
 
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        if: inputs.publish
+        uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.release_tag }}
           files: ./cli/release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,7 +177,7 @@ jobs:
             cibw_arch: aarch64
             os_name: Linux
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
-          - runner: windows-latest
+          - runner: windows-2025-vs2026
             cibw_arch: AMD64
             os_name: Windows
             cibw_build_full: "cp310-* cp311-* cp312-* cp313-* cp314-*"
@@ -180,28 +193,29 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
-      
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      
-      - name: Setup MSVC Developer Command Prompt (Windows)
+
+      - name: Setup MSBuild (Windows)
         if: matrix.os_name == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
-      
+          msbuild-architecture: x64
+
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
-      
+
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21
+        uses: pypa/cibuildwheel@v3.4
         env:
-          CIBW_BUILD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
+          CIBW_BUILD: ${{ (inputs.publish || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ARCHS: "${{ matrix.cibw_arch }}"
           # Use manylinux_2_28 so pre-built scipy wheels (required by mlcroissant) are available
@@ -209,7 +223,8 @@ jobs:
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_BUILD: "python {package}/../vendor/generate_config.py"
           # Run tests inside cibuildwheel so each Python version is tested with its own wheel
-          CIBW_TEST_REQUIRES: "pytest torch"
+          CIBW_TEST_REQUIRES: "pytest"
+          CIBW_TEST_EXTRAS: "pytorch"
           CIBW_TEST_COMMAND: "cd {project}/python && pytest test -v"
           CIBW_TEST_COMMAND_WINDOWS: "cd /d {project}\\python && pytest test -v"
           CIBW_BUILD_VERBOSITY: 1
@@ -236,7 +251,7 @@ jobs:
           fi
 
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: python-package-${{ matrix.os_name }}-${{ matrix.cibw_arch }}
           path: |
@@ -260,30 +275,31 @@ jobs:
             runner: macos-15-intel
             arch: x86_64
           - platform: windows
-            runner: windows-latest
+            runner: windows-2025-vs2026
             arch: x86_64
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Setup MSVC Developer Command Prompt (Windows)
+      - name: Setup MSBuild (Windows)
         if: matrix.platform == 'windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: microsoft/setup-msbuild@v3
         with:
-          arch: x64
+          msbuild-architecture: x64
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
@@ -311,7 +327,7 @@ jobs:
         run: npm test
 
       - name: Upload prebuild artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./node-ts/prebuilds/*.tar.gz
@@ -320,7 +336,7 @@ jobs:
     name: Publish Python Package to PyPI
     needs: build-python
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish
     environment:
       name: pypi
       url: https://pypi.org/p/mscompress
@@ -329,7 +345,7 @@ jobs:
     
     steps:
       - name: Download all Python artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: python-package-*
           merge-multiple: true
@@ -354,39 +370,42 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Extract version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: inputs.publish
         id: extract_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${{ inputs.release_tag }}"
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/login-action@v3
+        if: inputs.publish
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/build-push-action@v5
+        if: ${{ !inputs.publish }}
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: false
 
       - name: Build and push Docker image
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/build-push-action@v5
+        if: inputs.publish
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -399,7 +418,7 @@ jobs:
     name: Publish Node Package to npm
     needs: build-node
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish
     environment:
       name: npm
       url: https://www.npmjs.com/package/mscompress
@@ -409,25 +428,27 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
       - name: Download all prebuild artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: prebuild-*
           path: ./node-ts/prebuilds
           merge-multiple: true
 
       - name: Upload prebuilds to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.release_tag }}
           files: ./node-ts/prebuilds/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

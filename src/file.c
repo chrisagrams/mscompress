@@ -556,7 +556,10 @@ int is_msz(void* input_map, size_t input_length) {
 
 /**
  * @brief Determines if file mapped in input_map is an mzML file.
- *        Reads first 512 bytes of file and looks for substring "indexedmzML".
+ *        Reads first 512 bytes of file and looks for the "indexedmzML"
+ *        wrapper, the "<mzML" root element, or the mzML namespace URI, so
+ *        that both indexed and non-indexed mzML (e.g. Waters exports) are
+ *        recognized.
  *
  * @param input_map Pointer to the memory-mapped file.
  *
@@ -570,6 +573,12 @@ int is_mzml(void* input_map, size_t input_length) {
    buffer[check_length] = '\0';  // null-terminate
 
    if (strstr(buffer, "indexedmzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "<mzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "http://psi.hupo.org/ms/mzml") != NULL)
       return 1;
 
    return 0;
@@ -889,4 +898,287 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
    fds[1] = output_fd;
 
    return type;
+}
+
+/* ---------- USTAR archive support (used by MSZX) ---------- */
+
+#define TAR_BLOCK_SIZE 512
+
+/* USTAR header field offsets per POSIX.1-1988 */
+#define USTAR_NAME_OFF 0
+#define USTAR_NAME_LEN 100
+#define USTAR_SIZE_OFF 124
+#define USTAR_SIZE_LEN 12
+#define USTAR_TYPEFLAG_OFF 156
+#define USTAR_MAGIC_OFF 257
+#define USTAR_MAGIC_LEN 6 /* "ustar\0" */
+#define USTAR_PREFIX_OFF 345
+#define USTAR_PREFIX_LEN 155
+
+/* Parse the 12-byte octal "size" field. Tar size fields are NUL- or
+ * space-terminated octal ASCII; copy to a NUL-terminated buffer first
+ * because strtoull on a non-terminated buffer is UB. */
+static uint64_t parse_octal(const char* field, size_t len) {
+   char buf[24];
+   size_t copy = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;
+   memcpy(buf, field, copy);
+   buf[copy] = '\0';
+   return (uint64_t)strtoull(buf, NULL, 8);
+}
+
+/* Build the full entry name by concatenating the optional 155-byte prefix
+ * with the 100-byte name, separated by '/'. Returns a malloc'd NUL-terminated
+ * string. Caller must free. */
+static char* tar_entry_name(const char* hdr) {
+   const char* name = hdr + USTAR_NAME_OFF;
+   const char* prefix = hdr + USTAR_PREFIX_OFF;
+
+   size_t name_len = strnlen(name, USTAR_NAME_LEN);
+   size_t prefix_len = strnlen(prefix, USTAR_PREFIX_LEN);
+
+   if (prefix_len == 0) {
+      char* out = malloc(name_len + 1);
+      if (!out) return NULL;
+      memcpy(out, name, name_len);
+      out[name_len] = '\0';
+      return out;
+   }
+
+   char* out = malloc(prefix_len + 1 + name_len + 1);
+   if (!out) return NULL;
+   memcpy(out, prefix, prefix_len);
+   out[prefix_len] = '/';
+   memcpy(out + prefix_len + 1, name, name_len);
+   out[prefix_len + 1 + name_len] = '\0';
+   return out;
+}
+
+/* Internal walker: iterate ustar headers, invoking cb for each regular-file
+ * entry. cb returns 0 to continue, non-zero to stop the walk early.
+ *
+ * Stops on two consecutive zero blocks (end-of-archive marker), on read EOF,
+ * or on the first header missing the ustar magic.
+ *
+ * Restores the fd position to 0 on return.
+ *
+ * Returns:
+ *   0 on success (full walk completed or cb requested stop)
+ *  -1 on I/O error or invalid (non-ustar) archive
+ */
+typedef int (*tar_entry_cb)(const char* name, int64_t data_offset,
+                            size_t data_size, void* user);
+
+static int walk_tar_headers(int fd, tar_entry_cb cb, void* user) {
+   char hdr[TAR_BLOCK_SIZE];
+   int zero_run = 0;
+   int rc = 0;
+
+#ifdef _WIN32
+   if (_lseeki64(fd, 0, SEEK_SET) < 0) return -1;
+#else
+   if (lseek(fd, 0, SEEK_SET) < 0) return -1;
+#endif
+
+   for (;;) {
+      ssize_t n = read(fd, hdr, TAR_BLOCK_SIZE);
+      if (n == 0) break; /* EOF before end-of-archive marker — tolerate */
+      if (n != TAR_BLOCK_SIZE) {
+         rc = -1;
+         break;
+      }
+
+      /* Detect zero block (end-of-archive marker is two zero blocks). */
+      int is_zero = 1;
+      for (size_t i = 0; i < TAR_BLOCK_SIZE; ++i) {
+         if (hdr[i] != 0) { is_zero = 0; break; }
+      }
+      if (is_zero) {
+         if (++zero_run >= 2) break;
+         continue;
+      }
+      zero_run = 0;
+
+      /* Validate ustar magic. Empty magic is not ustar — bail. */
+      if (memcmp(hdr + USTAR_MAGIC_OFF, "ustar", 5) != 0) {
+         rc = -1;
+         break;
+      }
+
+      uint64_t size = parse_octal(hdr + USTAR_SIZE_OFF, USTAR_SIZE_LEN);
+      char typeflag = hdr[USTAR_TYPEFLAG_OFF];
+
+      int64_t data_off;
+#ifdef _WIN32
+      data_off = _lseeki64(fd, 0, SEEK_CUR);
+#else
+      data_off = lseek(fd, 0, SEEK_CUR);
+#endif
+      if (data_off < 0) { rc = -1; break; }
+
+      /* Regular file: typeflag '0' (POSIX) or '\0' (legacy). Pax/GNU
+       * extended-header typeflags ('x', 'g', 'L') are not handled — skip
+       * them so the search continues to subsequent entries. */
+      int is_regular = (typeflag == '0' || typeflag == '\0');
+
+      if (is_regular) {
+         char* name = tar_entry_name(hdr);
+         if (!name) { rc = -1; break; }
+         int stop = cb(name, data_off, (size_t)size, user);
+         free(name);
+         if (stop) break;
+      }
+
+      /* Advance past payload (rounded up to 512). */
+      uint64_t padded = (size + (TAR_BLOCK_SIZE - 1)) & ~((uint64_t)(TAR_BLOCK_SIZE - 1));
+#ifdef _WIN32
+      if (_lseeki64(fd, (int64_t)padded, SEEK_CUR) < 0) { rc = -1; break; }
+#else
+      if (lseek(fd, (off_t)padded, SEEK_CUR) < 0) { rc = -1; break; }
+#endif
+   }
+
+#ifdef _WIN32
+   _lseeki64(fd, 0, SEEK_SET);
+#else
+   lseek(fd, 0, SEEK_SET);
+#endif
+   return rc;
+}
+
+struct find_ctx {
+   const char* target;
+   int64_t offset;
+   size_t size;
+   int found;
+};
+
+static int find_cb(const char* name, int64_t data_offset, size_t data_size,
+                   void* user) {
+   struct find_ctx* ctx = (struct find_ctx*)user;
+   if (strcmp(name, ctx->target) == 0) {
+      ctx->offset = data_offset;
+      ctx->size = data_size;
+      ctx->found = 1;
+      return 1; /* stop walk */
+   }
+   return 0;
+}
+
+/**
+ * @brief Locate a regular file entry in a USTAR tar archive by name.
+ *
+ * Walks the tar headers from byte 0, comparing each entry's full name
+ * (prefix + '/' + name when prefix is non-empty) against `name`. Stops
+ * at the first match.
+ *
+ * @param fd Open file descriptor for the archive (positioned to anywhere;
+ *           restored to 0 on return).
+ * @param name Target entry name. Must match exactly.
+ * @param out_offset On success, set to the byte offset of the entry's data.
+ * @param out_size On success, set to the entry's size in bytes.
+ *
+ * @return 0 on success. -1 if the entry was not found, or if the archive
+ *         is not a valid USTAR tar (no magic).
+ */
+int find_tar_entry(int fd, const char* name, int64_t* out_offset,
+                   size_t* out_size) {
+   if (fd < 0 || !name || !out_offset || !out_size) return -1;
+   struct find_ctx ctx = {name, 0, 0, 0};
+   int rc = walk_tar_headers(fd, find_cb, &ctx);
+   if (rc != 0 && !ctx.found) return -1;
+   if (!ctx.found) return -1;
+   *out_offset = ctx.offset;
+   *out_size = ctx.size;
+   return 0;
+}
+
+/**
+ * @brief Iterate every regular-file entry in a USTAR tar via callback.
+ *
+ * Same walker as find_tar_entry but does not stop on a name match. Callback
+ * returns 0 to continue, non-zero to stop early.
+ *
+ * @return 0 on a clean walk; -1 on I/O error or invalid archive.
+ */
+int walk_tar_entries(int fd, int (*cb)(const char*, int64_t, size_t, void*),
+                     void* user) {
+   return walk_tar_headers(fd, cb, user);
+}
+
+/**
+ * @brief mmap a sub-range of a file with platform-correct alignment.
+ *
+ * The requested `offset` typically does not satisfy the platform's mmap
+ * alignment requirement (4 KiB on POSIX, 64 KiB on Windows). This helper
+ * rounds the offset down to the nearest aligned boundary, mmaps from there,
+ * and returns the alignment padding via *out_pad. Callers expose
+ * `(char*)returned_ptr + *out_pad` to downstream code, and unmap with
+ * `remove_mapping(returned_ptr, *out_map_length)`.
+ *
+ * Fails (returns NULL) when the requested range extends past EOF — does NOT
+ * silently clamp, since exposing a truncated MSZ would corrupt downstream
+ * footer reads.
+ *
+ * @param fd Open file descriptor.
+ * @param offset Byte offset within the file where the logical region begins.
+ * @param length Logical length of the region.
+ * @param out_pad On success, set to (offset - aligned_offset). Range 0..gran-1.
+ * @param out_map_length On success, set to the actual mapped length
+ *                       (out_pad + length).
+ *
+ * @return Pointer to the mapped region (the aligned base, NOT offset by pad)
+ *         on success. NULL on error.
+ */
+void* get_mapping_range(int fd, int64_t offset, size_t length,
+                        size_t* out_pad, size_t* out_map_length) {
+   if (fd < 0 || !out_pad || !out_map_length || offset < 0) return NULL;
+
+   /* Determine alignment granularity. */
+#ifdef _WIN32
+   SYSTEM_INFO si;
+   GetSystemInfo(&si);
+   uint64_t gran = (uint64_t)si.dwAllocationGranularity;
+#else
+   long page = sysconf(_SC_PAGE_SIZE);
+   if (page <= 0) return NULL;
+   uint64_t gran = (uint64_t)page;
+#endif
+
+   uint64_t off_u = (uint64_t)offset;
+   uint64_t aligned_off = off_u - (off_u % gran);
+   uint64_t pad = off_u - aligned_off;
+   uint64_t map_length = pad + (uint64_t)length;
+
+   /* Look up the file size to bounds-check before requesting the mapping. */
+   struct stat st;
+   if (fstat(fd, &st) < 0) return NULL;
+   uint64_t file_size = (uint64_t)st.st_size;
+
+   if (aligned_off >= file_size) return NULL;
+   uint64_t available = file_size - aligned_off;
+   if (map_length > available) {
+      /* Tar header claims more bytes than the archive contains. Refuse —
+       * silent clamping would expose a truncated MSZ to the parser. */
+      return NULL;
+   }
+
+   *out_pad = (size_t)pad;
+   *out_map_length = (size_t)map_length;
+
+#ifdef _WIN32
+   HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+   HANDLE hMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+   if (hMapping == NULL) return NULL;
+   void* base = MapViewOfFile(hMapping, FILE_MAP_READ,
+                              (DWORD)(aligned_off >> 32),
+                              (DWORD)(aligned_off & 0xFFFFFFFF),
+                              (SIZE_T)map_length);
+   CloseHandle(hMapping);
+   return base;
+#else
+   void* base = mmap(NULL, (size_t)map_length, PROT_READ, MAP_PRIVATE, fd,
+                     (off_t)aligned_off);
+   if (base == MAP_FAILED) return NULL;
+   return base;
+#endif
 }

@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
 
-# Version is read from .cz.toml (commitizen), the single source of truth.
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../.cz.toml" CZ_TOML)
-string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ "${CZ_TOML}")
-if(NOT CMAKE_MATCH_1)
-    message(FATAL_ERROR "Could not parse version from .cz.toml")
+# Version is read from version.txt (maintained by release-please), the source of truth.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version.txt" MSC_VERSION LIMIT_COUNT 1)
+string(STRIP "${MSC_VERSION}" MSC_VERSION)
+if(NOT MSC_VERSION)
+    message(FATAL_ERROR "Could not read version from version.txt")
 endif()
-project(mscompress VERSION ${CMAKE_MATCH_1})
+project(mscompress VERSION ${MSC_VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,6 +49,7 @@ set(CPP_SOURCE_FILES
   src/native/decompress.cpp
   src/native/extract.cpp
   src/native/zstd_utils.cpp
+  src/native/mszx.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})

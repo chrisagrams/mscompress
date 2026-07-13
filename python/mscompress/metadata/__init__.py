@@ -11,34 +11,40 @@ can be combined to create unified dataset metadata for ML training pipelines.
 Example:
     Simple usage with a single MSZ file:
 
-    >>> import mscompress
-    >>> from mscompress.metadata import build_msz_metadata
-    >>> msz = mscompress.read("sample.msz")
-    >>> metadata = build_msz_metadata(
-    ...     msz,
-    ...     dataset_name="My Dataset",
-    ...     description="Sample proteomics data",
-    ...     repo_id="username/my-dataset"
-    ... )
+    ```python
+    import mscompress
+    from mscompress.metadata import build_msz_metadata
+
+    msz = mscompress.read("sample.msz")
+    metadata = build_msz_metadata(
+        msz,
+        dataset_name="My Dataset",
+        description="Sample proteomics data",
+        repo_id="username/my-dataset",
+    )
+    ```
 
     Composite usage with search results:
 
-    >>> from mscompress.metadata import (
-    ...     MSZMetadataBuilder,
-    ...     PercolatorMetadataBuilder,
-    ...     CompositeMetadataBuilder,
-    ... )
-    >>> msz_builder = MSZMetadataBuilder(msz)
-    >>> pin_builder = PercolatorMetadataBuilder("sample.pin")
-    >>> composite = CompositeMetadataBuilder(
-    ...     dataset_name="Annotated Dataset",
-    ...     description="Proteomics with PSM annotations",
-    ...     repo_id="username/dataset"
-    ... )
-    >>> composite.add_builder(msz_builder, primary=True)
-    >>> composite.add_builder(pin_builder)
-    >>> composite.add_join(msz_builder, pin_builder, "scan_number")
-    >>> metadata = composite.build()
+    ```python
+    from mscompress.metadata import (
+        MSZMetadataBuilder,
+        PercolatorMetadataBuilder,
+        CompositeMetadataBuilder,
+    )
+
+    msz_builder = MSZMetadataBuilder(msz)
+    pin_builder = PercolatorMetadataBuilder("sample.pin")
+    composite = CompositeMetadataBuilder(
+        dataset_name="Annotated Dataset",
+        description="Proteomics with PSM annotations",
+        repo_id="username/dataset",
+    )
+    composite.add_builder(msz_builder, primary=True)
+    composite.add_builder(pin_builder)
+    composite.add_join(msz_builder, pin_builder, "scan_number")
+    metadata = composite.build()
+    ```
 """
 
 from __future__ import annotations
@@ -47,7 +53,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 # Core types
-from ._types import (
+from mscompress.metadata._types import (
     DataCollectionInfo,
     FieldDefinition,
     FileDistribution,
@@ -57,21 +63,21 @@ from ._types import (
 )
 
 # Base class
-from ._base import MetadataBuilder
+from mscompress.metadata._base import MetadataBuilder
 
 # Composite builder
-from ._composite import CompositeMetadataBuilder
+from mscompress.metadata._composite import CompositeMetadataBuilder
 
 # Concrete builders
-from .msz import MSZMetadataBuilder
-from .search import (
+from mscompress.metadata.msz import MSZMetadataBuilder
+from mscompress.metadata.search import (
     PepXMLMetadataBuilder,
     PercolatorMetadataBuilder,
     SearchResultsMetadataBuilder,
 )
 
 if TYPE_CHECKING:
-    from .._core import MSZFile
+    from mscompress._core import MSZFile
 
 
 __all__ = [
@@ -121,15 +127,18 @@ def build_msz_metadata(
         Dict containing Croissant metadata following the ML Croissant standard.
 
     Example:
-        >>> import mscompress
-        >>> from mscompress.metadata import build_msz_metadata
-        >>> msz = mscompress.read("sample.msz")
-        >>> metadata = build_msz_metadata(
-        ...     msz,
-        ...     dataset_name="My Dataset",
-        ...     description="Sample proteomics data",
-        ...     repo_id="username/my-dataset"
-        ... )
+        ```python
+        import mscompress
+        from mscompress.metadata import build_msz_metadata
+
+        msz = mscompress.read("sample.msz")
+        metadata = build_msz_metadata(
+            msz,
+            dataset_name="My Dataset",
+            description="Sample proteomics data",
+            repo_id="username/my-dataset",
+        )
+        ```
     """
     builder = MSZMetadataBuilder(msz)
     composite = CompositeMetadataBuilder(
@@ -169,17 +178,20 @@ def build_composite_metadata(
         Dict containing Croissant metadata.
 
     Example:
-        >>> import mscompress
-        >>> from mscompress.metadata import build_composite_metadata
-        >>> msz = mscompress.read("sample.msz")
-        >>> metadata = build_composite_metadata(
-        ...     msz,
-        ...     search_results="sample.pin",
-        ...     search_format="pin",
-        ...     dataset_name="Annotated Dataset",
-        ...     description="Proteomics with PSM annotations",
-        ...     repo_id="username/annotated-data"
-        ... )
+        ```python
+        import mscompress
+        from mscompress.metadata import build_composite_metadata
+
+        msz = mscompress.read("sample.msz")
+        metadata = build_composite_metadata(
+            msz,
+            search_results="sample.pin",
+            search_format="pin",
+            dataset_name="Annotated Dataset",
+            description="Proteomics with PSM annotations",
+            repo_id="username/annotated-data",
+        )
+        ```
     """
     composite = CompositeMetadataBuilder(
         dataset_name=dataset_name,

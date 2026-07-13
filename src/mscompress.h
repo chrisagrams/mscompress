@@ -80,6 +80,7 @@
 #define EXTRACT_MSZ 4
 #define EXTERNAL 5
 #define DESCRIBE 6
+#define DECOMPRESS_MSZX 7
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -193,6 +194,22 @@ typedef struct block_len_t {
    uint64_t encoded_cache_len;
    size_t* encoded_cache_lens;
 
+   // Per-spectrum raw payload lengths within `cache`, as parsed from the
+   // ZLIB_SIZE_OFFSET-byte headers (lens[i]=0 for empty spectra that were
+   // skipped during compression). Populated lazily by the Python no-encode
+   // fast path (extract.c:extract_no_encode_from_cache) so subsequent
+   // accesses skip the cache walk. Distinct from `encoded_cache_lens`, which
+   // holds RE-encoded sizes from the slow path's `encode_binary_block`.
+   size_t* cache_spec_lens;
+
+   // Shared-LRU bookkeeping. Membership and ordering are maintained by
+   // lru_touch_block(); these fields are unused when the block is not in any
+   // LRU. A block belongs to at most one block_lru_t at a time. See
+   // `block_lru_t` below.
+   struct block_len_t* lru_prev;
+   struct block_len_t* lru_next;
+   int lru_pinned;  // 1 if currently in an LRU's list, 0 otherwise.
+
 } block_len_t;
 
 typedef struct {
@@ -201,6 +218,31 @@ typedef struct {
 
    int populated;
 } block_len_queue_t;
+
+/**
+ * @brief Process-wide shared, byte-budgeted LRU of decompressed block caches.
+ *
+ * Caps the cumulative memory held in `block_len_t->cache` (and the associated
+ * encoded_cache / *_lens buffers) across ALL block queues that touch it —
+ * typically every open MSZFile's xml/mz/intensity queues share one instance,
+ * so aggregate decompressed-cache memory obeys a single ceiling regardless of
+ * how many files are open. Eviction frees the cache buffers on the evicted
+ * block but never frees the `block_len_t` node itself (owned by its queue).
+ *
+ * Budget is in BYTES (`blk->original_size` per cached block), not block count,
+ * so it behaves correctly across files with very different block sizes.
+ *
+ * `lock` is an opaque pointer to a platform mutex (allocated in queue.c) so the
+ * heavy platform headers stay out of this widely-included header. All public
+ * operations take the lock; pass NULL for `lru` to disable caching bounds.
+ */
+typedef struct {
+   block_len_t* head;   // Most-recently-touched block.
+   block_len_t* tail;   // Least-recently-touched block (eviction victim).
+   size_t cur_bytes;    // Sum of original_size over currently-cached blocks.
+   size_t cap_bytes;    // Maximum cur_bytes before eviction. 0 = unbounded.
+   void* lock;          // Opaque platform mutex (see queue.c).
+} block_lru_t;
 
 typedef struct {
    uint64_t xml_pos;  // msz file position of start of compressed XML data.
@@ -323,6 +365,14 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer);
 /* file.c */
 
 void* get_mapping(int fd);
+void* get_mapping_range(int fd, int64_t offset, size_t length,
+                        size_t* out_pad, size_t* out_map_length);
+int find_tar_entry(int fd, const char* name, int64_t* out_offset,
+                   size_t* out_size);
+int walk_tar_entries(int fd,
+                     int (*cb)(const char* name, int64_t data_offset,
+                               size_t data_size, void* user),
+                     void* user);
 int remove_mapping(void* addr, size_t length);
 int flush(int fd);
 int remove_file(char* path);
@@ -346,6 +396,18 @@ int open_output_file(char* path);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
 int close_file(int fd);
+
+/* mszx.c */
+
+typedef struct {
+   char* name;     /* heap-allocated, NUL-terminated entry name */
+   int64_t offset; /* data byte offset in the archive */
+   size_t size;    /* logical size from the tar header */
+} mszx_entry_t;
+
+int mszx_list_entries(int fd, mszx_entry_t** out, size_t* out_count);
+void mszx_free_entries(mszx_entry_t* entries, size_t count);
+int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
 
 /* mem.c */
 
@@ -446,6 +508,8 @@ decode_fun set_decode_fun(int compression_method, int algo, int accession);
 /* encode.c */
 
 encode_fun set_encode_fun(int compression_method, int algo, int accession);
+void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
+                         size_t* out_len);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len);
 
@@ -466,20 +530,23 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
-                          long index, size_t* out_len, int encode);
+                          long index, size_t* out_len, int encode,
+                          block_lru_t* lru);
 
 char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
                              long inten_binary_blk_pos, divisions_t* divisions,
-                             long index, size_t* out_len, int encode);
+                             long index, size_t* out_len, int encode,
+                             block_lru_t* lru);
 
 char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* xml_block_lens,
                       block_len_queue_t* mz_binary_block_lens,
                       block_len_queue_t* inten_binary_block_lens, long xml_pos,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
-                      divisions_t* divisions, long index, size_t* out_len);
+                      divisions_t* divisions, long index, size_t* out_len,
+                      block_lru_t* lru);
 
 char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len);
@@ -628,6 +695,17 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
                       size_t compressed_size);
 block_len_t* get_block_by_index(block_len_queue_t* queue, int index);
 long get_block_offset_by_index(block_len_queue_t* queue, int index);
+
+/* Shared, byte-budgeted LRU over `block_len_t` decompressed-block caches. */
+block_lru_t* alloc_block_lru(size_t cap_bytes);
+void dealloc_block_lru(block_lru_t* lru);
+void lru_touch_block(block_lru_t* lru, block_len_t* blk);
+void lru_remove_queue_blocks(block_lru_t* lru, block_len_queue_t* queue);
+void lru_evict_all(block_lru_t* lru);
+size_t block_cache_usage(block_lru_t* lru);
+size_t block_cache_cap(block_lru_t* lru);
+void block_drop_cache(block_len_t* blk);
+
 block_len_t* pop_block_len(block_len_queue_t* queue);
 size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);

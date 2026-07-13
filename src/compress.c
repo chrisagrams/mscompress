@@ -556,6 +556,11 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
    a_args->dest = &binary_buff;
    a_args->dest_len = &binary_len;
 
+   if (a_args->algo_fun == NULL) {
+      error("cmp_binary_routine: algo_fun is NULL, cannot compress binary block.\n");
+      return;
+   }
+
    a_args->algo_fun((void*)a_args);
 
    if (binary_buff == NULL)
@@ -886,9 +891,16 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
 
    start = get_time();
 
-   set_compress_runtime_variables(
-       arguments, df);  // Set compression variables (e.g. compression level,
-                        // compression function, etc.)
+   if (set_compress_runtime_variables(
+           arguments, df)) {  // Set compression variables (e.g. compression
+                              // level, compression function, etc.)
+      error("compress_mzml: Failed to set compression runtime variables.\n");
+      free(footer);
+      free(xml_divisions);
+      free(mz_divisions);
+      free(inten_divisions);
+      return -1;
+   }
 
    // Store format integer in footer.
    footer->mz_fmt = get_algo_type(arguments->mz_lossy);

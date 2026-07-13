@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ._base import MetadataBuilder
-from ._types import DataCollectionInfo, JoinDefinition
+from mscompress.metadata._base import MetadataBuilder
+from mscompress.metadata._types import DataCollectionInfo, JoinDefinition
 
 
 class CompositeMetadataBuilder:
@@ -22,20 +22,22 @@ class CompositeMetadataBuilder:
     results, with defined relationships between them.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> msz_builder = MSZMetadataBuilder(msz)
-        >>> pin_builder = PercolatorMetadataBuilder("sample.pin")
-        >>>
-        >>> composite = CompositeMetadataBuilder(
-        ...     dataset_name="Proteomics Dataset",
-        ...     description="Mass spec data with search results",
-        ...     repo_id="username/dataset"
-        ... )
-        >>> composite.add_builder(msz_builder, primary=True)
-        >>> composite.add_builder(pin_builder)
-        >>> composite.add_join(msz_builder, pin_builder, "scan_number")
-        >>>
-        >>> metadata = composite.build()
+        ```python
+        msz = mscompress.read("sample.msz")
+        msz_builder = MSZMetadataBuilder(msz)
+        pin_builder = PercolatorMetadataBuilder("sample.pin")
+
+        composite = CompositeMetadataBuilder(
+            dataset_name="Proteomics Dataset",
+            description="Mass spec data with search results",
+            repo_id="username/dataset",
+        )
+        composite.add_builder(msz_builder, primary=True)
+        composite.add_builder(pin_builder)
+        composite.add_join(msz_builder, pin_builder, "scan_number")
+
+        metadata = composite.build()
+        ```
     """
 
     def __init__(

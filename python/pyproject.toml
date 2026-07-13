@@ -1,16 +1,16 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "cython", "oldest-supported-numpy", "tomli"]
+requires = ["setuptools>=45", "wheel", "cython", "numpy>=2.0", "tomli"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mscompress"
-version = "1.0.13"
+version = "1.0.16"
 description = "Python bindings for mscompress, a compression library for mass spectrometry data"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "mlcroissant>=1.0.0",
-    "numpy<2",
+    "numpy>=1.19",
     "zstandard>=0.19.0",
 ]
 
@@ -24,13 +24,20 @@ dev = [
     "tomli"
 ]
 
-pytorch = ["torch>=2.0"]
+pytorch = ["torch>=2.3; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
+
+parquet = ["pyarrow>=14"]
+
+jax = ["jax>=0.4", "grain>=0.2"]
 
 all = [
     "mlcroissant>=1.0.0",
-    "numpy<2",
+    "numpy>=1.19",
     "zstandard>=0.19.0",
-    "torch>=2.0",
+    "torch>=2.3; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "pyarrow>=14",
+    "jax>=0.4",
+    "grain>=0.2",
 ]
 
 [tool.setuptools]

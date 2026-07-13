@@ -326,6 +326,31 @@ void no_encode_w_header(z_stream* z, char** src, size_t src_len, char* dest,
 }
 
 /**
+ * @brief Copies raw binary data verbatim into the destination buffer, without a
+ *        length header. Used by the Python no-encode read path for *lossy*
+ *        streams.
+ *
+ * Unlike `no_encode_w_header`, the source here is a standalone buffer produced
+ * by a lossy decode algo (e.g. `algo_encode_delta32_transform_64d`): freshly
+ * reconstructed samples with no `{ZLIB_TYPE len}{payload}` prefix. We therefore
+ * copy `src_len` bytes straight through and do NOT advance `*src` — the algo
+ * owns and advances its own cache cursor separately.
+ *
+ * @param z Unused; present for `encode_fun` signature compatibility.
+ * @param src Pointer to the source buffer pointer (the reconstructed samples).
+ * @param src_len Number of bytes to copy.
+ * @param dest Pre-allocated destination buffer.
+ * @param out_len Receives the number of bytes copied (`src_len`).
+ */
+void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
+                         size_t* out_len)
+{
+   (void)z;
+   memcpy(dest, *src, src_len);
+   *out_len = src_len;
+}
+
+/**
  * @brief Sets the encode function pointer based on the compression method, algorithm, and accession.
  * @param compression_method The compression method to use (e.g. `_zlib_`, `_no_comp_`, `_no_encode_`).
  * @param algo The algorithm to use (e.g. `_lossless_`, `_cast_64_to_32_`).

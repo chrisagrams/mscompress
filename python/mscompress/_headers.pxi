@@ -2,6 +2,7 @@ cdef extern from "stdint.h":
     ctypedef unsigned int uint64_t
     ctypedef unsigned int uint32_t
     ctypedef unsigned int uint16_t
+    ctypedef long long int64_t
 
 cdef extern from "../vendor/zlib/zlib.h":
     ctypedef struct z_stream:
@@ -75,7 +76,11 @@ cdef extern from "../src/mscompress.h":
         block_len_t* tail
 
         int populated
-    
+
+    # Opaque to Cython — manipulated only via the C functions below.
+    ctypedef struct block_lru_t:
+        pass
+
     ctypedef struct data_format_t:
         uint32_t source_mz_fmt
         uint32_t source_inten_fmt
@@ -142,6 +147,8 @@ cdef extern from "../src/mscompress.h":
     int _flush "flush"(int fd) nogil
     size_t _get_filesize "get_filesize"(char* path)
     void* _get_mapping "get_mapping"(int fd)
+    void* _get_mapping_range "get_mapping_range"(int fd, int64_t offset, size_t length, size_t* out_pad, size_t* out_map_length)
+    int _find_tar_entry "find_tar_entry"(int fd, const char* name, int64_t* out_offset, size_t* out_size)
     int _determine_filetype "determine_filetype"(void* input_map, size_t input_length)
 
     data_format_t* _pattern_detect "pattern_detect"(char* input_map)
@@ -172,9 +179,16 @@ cdef extern from "../src/mscompress.h":
     block_len_t* _get_block_by_index "get_block_by_index"(block_len_queue_t* queue, int index)
     void* _decmp_block "decmp_block"(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 
-    char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
-    char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
-    char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
+    char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode, block_lru_t* lru)
+    char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode, block_lru_t* lru)
+    char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len, block_lru_t* lru)
+
+    block_lru_t* _alloc_block_lru "alloc_block_lru"(size_t cap_bytes)
+    void _dealloc_block_lru "dealloc_block_lru"(block_lru_t* lru)
+    void _lru_remove_queue_blocks "lru_remove_queue_blocks"(block_lru_t* lru, block_len_queue_t* queue)
+    void _lru_evict_all "lru_evict_all"(block_lru_t* lru)
+    size_t _block_cache_usage "block_cache_usage"(block_lru_t* lru)
+    size_t _block_cache_cap "block_cache_cap"(block_lru_t* lru)
     char* _extract_mzml_header "extract_mzml_header"(char* blk, division_t* first_division, size_t* out_len)
     char* _extract_mzml_footer "extract_mzml_footer"(char* blk, divisions_t* divisions, size_t* out_len)
     # `nogil` allows these to be called from `with nogil:` blocks in the streaming

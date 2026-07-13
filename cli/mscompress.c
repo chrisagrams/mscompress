@@ -322,8 +322,30 @@ int main(int argc, char* argv[]) {
 
    prepare_threads(&arguments);  // Populate threads variable if not set.
 
+   // Detect .mszx input — handled by a dedicated path that mmaps into the tar
+   // and writes mzML + annotations into an output directory. Bypasses
+   // prepare_fds entirely.
+   int is_mszx = 0;
+   if (arguments.input_file) {
+      size_t ilen = strlen(arguments.input_file);
+      if (ilen > 5 &&
+          strcmp(arguments.input_file + ilen - 5, ".mszx") == 0) {
+         is_mszx = 1;
+      }
+   }
+
    // Open file descriptors and mmap.
-   if (arguments.describe_only) {
+   if (is_mszx) {
+      operation = DECOMPRESS_MSZX;
+      // Default output directory is the input path with ".mszx" stripped.
+      if (arguments.output_file == NULL) {
+         size_t ilen = strlen(arguments.input_file);
+         arguments.output_file = malloc(ilen - 5 + 1);
+         if (!arguments.output_file) exit(1);
+         memcpy(arguments.output_file, arguments.input_file, ilen - 5);
+         arguments.output_file[ilen - 5] = '\0';
+      }
+   } else if (arguments.describe_only) {
       local_fds[0] = open_input_file(arguments.input_file);
       input_map = get_mapping(local_fds[0]);
       input_filesize = get_filesize(arguments.input_file);
@@ -410,10 +432,13 @@ int main(int argc, char* argv[]) {
          break;
       };
       case EXTERNAL: {
-         preprocess_external(input_map, input_filesize,
-                             &(arguments.blocksize), &arguments, &df,
-                             &divisions);
-         
+         if (preprocess_external(input_map, input_filesize,
+                                 &(arguments.blocksize), &arguments, &df,
+                                 &divisions)) {
+            error_status = 1;
+            break;
+         }
+
          if (compress_mzml(input_map, input_filesize, &arguments, df,
                            divisions, local_fds[1])) {
             error_status = 1;
@@ -429,6 +454,15 @@ int main(int argc, char* argv[]) {
             print_footer_json(footer);
          else
             print_footer_csv(footer);
+         break;
+      };
+      case DECOMPRESS_MSZX: {
+         print("\tDetected .mszx archive, extracting to %s\n",
+               arguments.output_file);
+         if (decompress_mszx(arguments.input_file, arguments.output_file,
+                             &arguments)) {
+            error_status = 1;
+         }
          break;
       };
    }

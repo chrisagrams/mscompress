@@ -1,6 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+#include <windows.h>
+typedef CRITICAL_SECTION ms_mutex_t;
+#define MS_MUTEX_INIT(m) InitializeCriticalSection(m)
+#define MS_MUTEX_DESTROY(m) DeleteCriticalSection(m)
+#define MS_MUTEX_LOCK(m) EnterCriticalSection(m)
+#define MS_MUTEX_UNLOCK(m) LeaveCriticalSection(m)
+#else
+#include <pthread.h>
+typedef pthread_mutex_t ms_mutex_t;
+#define MS_MUTEX_INIT(m) pthread_mutex_init((m), NULL)
+#define MS_MUTEX_DESTROY(m) pthread_mutex_destroy(m)
+#define MS_MUTEX_LOCK(m) pthread_mutex_lock(m)
+#define MS_MUTEX_UNLOCK(m) pthread_mutex_unlock(m)
+#endif
+
 #include "mscompress.h"
 
 /**
@@ -140,6 +156,11 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
    r->encoded_cache = NULL;
    r->encoded_cache_len = 0;
    r->encoded_cache_lens = NULL;
+   r->cache_spec_lens = NULL;
+
+   r->lru_prev = NULL;
+   r->lru_next = NULL;
+   r->lru_pinned = 0;
 
    return r;
 }
@@ -147,8 +168,9 @@ block_len_t* alloc_block_len(size_t original_size, size_t compressed_size) {
 /**
  * @brief Deallocates a `block_len_t` node and all of its owned memory.
  *
- * Frees the cache, `encoded_cache`, and `encoded_cache_lens` fields if they are
- * non-NULL, then frees the `block_len_t` struct itself. Safe to call with NULL.
+ * Frees the cache, `encoded_cache`, `encoded_cache_lens`, and `cache_spec_lens`
+ * fields if they are non-NULL, then frees the `block_len_t` struct itself. Safe
+ * to call with NULL.
  *
  * @param blk A pointer to the `block_len_t` to deallocate.
  */
@@ -162,6 +184,9 @@ void dealloc_block_len(block_len_t* blk) {
       }
       if (blk->encoded_cache_lens) {
          free(blk->encoded_cache_lens);
+      }
+      if (blk->cache_spec_lens) {
+         free(blk->cache_spec_lens);
       }
       free(blk);
    }
@@ -425,4 +450,248 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset,
                        *(size_t*)(input_ptr + i + sizeof(size_t)));
 
    return r;
+}
+/* ======================================================================
+ * Shared, byte-budgeted block-cache LRU.
+ *
+ * One block_lru_t can hold blocks from many files' queues at once — the
+ * block_len_t nodes don't know which file they belong to, so a single shared
+ * instance bounds aggregate decompressed-cache memory across all open files.
+ * ====================================================================== */
+
+/**
+ * @brief Frees a block's decompressed-block caches without deallocating the node.
+ *
+ * Frees `cache`, `encoded_cache`, `encoded_cache_lens`, and `cache_spec_lens`
+ * if non-NULL and resets them to NULL/zero. Used by the LRU eviction path and
+ * by `clear_cache`-style APIs. Does not touch structural fields (sizes, `next`)
+ * or LRU links.
+ */
+void block_drop_cache(block_len_t* blk) {
+   if (!blk)
+      return;
+   if (blk->cache) {
+      free(blk->cache);
+      blk->cache = NULL;
+   }
+   if (blk->encoded_cache) {
+      free(blk->encoded_cache);
+      blk->encoded_cache = NULL;
+   }
+   if (blk->encoded_cache_lens) {
+      free(blk->encoded_cache_lens);
+      blk->encoded_cache_lens = NULL;
+   }
+   if (blk->cache_spec_lens) {
+      free(blk->cache_spec_lens);
+      blk->cache_spec_lens = NULL;
+   }
+   blk->encoded_cache_fmt = 0;
+   blk->encoded_cache_len = 0;
+}
+
+/**
+ * @brief Allocates a shared, byte-budgeted block-cache LRU.
+ *
+ * @param cap_bytes Maximum total decompressed-cache bytes held at once. 0 means
+ *                  "no limit" (callers should pass NULL instead of allocating
+ *                  an unbounded LRU at all).
+ * @warning Terminates the program if allocation fails.
+ */
+block_lru_t* alloc_block_lru(size_t cap_bytes) {
+   block_lru_t* lru = malloc(sizeof(block_lru_t));
+   if (!lru) {
+      fprintf(stderr, "alloc_block_lru: malloc failed\n");
+      exit(-1);
+   }
+   lru->head = NULL;
+   lru->tail = NULL;
+   lru->cur_bytes = 0;
+   lru->cap_bytes = cap_bytes;
+
+   ms_mutex_t* lock = malloc(sizeof(ms_mutex_t));
+   if (!lock) {
+      fprintf(stderr, "alloc_block_lru: mutex malloc failed\n");
+      exit(-1);
+   }
+   MS_MUTEX_INIT(lock);
+   lru->lock = (void*)lock;
+   return lru;
+}
+
+/**
+ * @brief Frees the LRU struct and its mutex.
+ *
+ * Does NOT touch the `block_len_t` nodes referenced by the LRU — those remain
+ * owned by their containing queues. Callers that share an LRU across files must
+ * `lru_remove_queue_blocks()` a file's blocks before that file's queues are
+ * freed; see the close path. If you want the cached buffers freed before the
+ * LRU goes away, call `lru_evict_all()` first.
+ */
+void dealloc_block_lru(block_lru_t* lru) {
+   if (!lru)
+      return;
+   if (lru->lock) {
+      ms_mutex_t* lock = (ms_mutex_t*)lru->lock;
+      MS_MUTEX_DESTROY(lock);
+      free(lock);
+   }
+   free(lru);
+}
+
+/* Internal: detach `blk` from `lru`'s doubly-linked list. Caller holds the
+ * lock and updates `lru_pinned` / `cur_bytes`. */
+static void lru_unlink(block_lru_t* lru, block_len_t* blk) {
+   if (blk->lru_prev)
+      blk->lru_prev->lru_next = blk->lru_next;
+   else
+      lru->head = blk->lru_next;
+   if (blk->lru_next)
+      blk->lru_next->lru_prev = blk->lru_prev;
+   else
+      lru->tail = blk->lru_prev;
+   blk->lru_prev = NULL;
+   blk->lru_next = NULL;
+}
+
+/* Internal: evict tail blocks until within the byte budget. Caller holds lock.
+ *
+ * NEVER evicts the head (most-recently-touched) block: the caller touches a
+ * block immediately before reading its `cache`, so evicting the just-touched
+ * block here would free the buffer out from under that read (use-after-free).
+ * Consequently the budget is a SOFT cap — peak usage can exceed cap_bytes by up
+ * to one block (whenever a single block is larger than the whole budget). */
+static void lru_evict_to_budget(block_lru_t* lru) {
+   while (lru->cap_bytes > 0 && lru->cur_bytes > lru->cap_bytes && lru->tail &&
+          lru->tail != lru->head) {
+      block_len_t* victim = lru->tail;
+      lru_unlink(lru, victim);
+      victim->lru_pinned = 0;
+      if (lru->cur_bytes >= victim->original_size)
+         lru->cur_bytes -= victim->original_size;
+      else
+         lru->cur_bytes = 0;
+      block_drop_cache(victim);
+   }
+}
+
+/**
+ * @brief Touch a block in the shared LRU. Inserts on first touch (accounting
+ *        `blk->original_size` bytes), bumps to head on subsequent touches, and
+ *        evicts least-recently-used tail blocks until within the byte budget.
+ *
+ * Eviction frees the evicted block's cache buffers via `block_drop_cache()`.
+ * Pass NULL for `lru` to disable bounding entirely (legacy unbounded caching).
+ * Must be called AFTER `blk->cache` is populated so the accounted bytes match
+ * what an eviction would free.
+ */
+void lru_touch_block(block_lru_t* lru, block_len_t* blk) {
+   if (!lru || !blk)
+      return;
+   if (lru->cap_bytes == 0)
+      return;  // unbounded — nothing to bound
+
+   ms_mutex_t* lock = (ms_mutex_t*)lru->lock;
+   MS_MUTEX_LOCK(lock);
+
+   if (blk->lru_pinned) {
+      // Already cached: move to head if not already there.
+      if (lru->head != blk) {
+         lru_unlink(lru, blk);
+         blk->lru_prev = NULL;
+         blk->lru_next = lru->head;
+         if (lru->head)
+            lru->head->lru_prev = blk;
+         lru->head = blk;
+         if (!lru->tail)
+            lru->tail = blk;
+      }
+      MS_MUTEX_UNLOCK(lock);
+      return;
+   }
+
+   // First touch: insert at head and account its bytes.
+   blk->lru_pinned = 1;
+   lru->cur_bytes += blk->original_size;
+   blk->lru_prev = NULL;
+   blk->lru_next = lru->head;
+   if (lru->head)
+      lru->head->lru_prev = blk;
+   lru->head = blk;
+   if (!lru->tail)
+      lru->tail = blk;
+
+   lru_evict_to_budget(lru);
+   MS_MUTEX_UNLOCK(lock);
+}
+
+/**
+ * @brief Remove every block belonging to `queue` from the shared LRU, freeing
+ *        their cache buffers and subtracting their bytes.
+ *
+ * MUST be called for each of a file's block queues before those queues are
+ * deallocated, so the shared LRU never retains dangling pointers into a freed
+ * file. Walks the queue (O(blocks in file)) and unlinks any pinned node.
+ */
+void lru_remove_queue_blocks(block_lru_t* lru, block_len_queue_t* queue) {
+   if (!lru || !queue)
+      return;
+   ms_mutex_t* lock = (ms_mutex_t*)lru->lock;
+   MS_MUTEX_LOCK(lock);
+   block_len_t* curr = queue->head;
+   while (curr) {
+      if (curr->lru_pinned) {
+         lru_unlink(lru, curr);
+         curr->lru_pinned = 0;
+         if (lru->cur_bytes >= curr->original_size)
+            lru->cur_bytes -= curr->original_size;
+         else
+            lru->cur_bytes = 0;
+         block_drop_cache(curr);
+      }
+      curr = curr->next;
+   }
+   MS_MUTEX_UNLOCK(lock);
+}
+
+/**
+ * @brief Evict every block currently held by the LRU, freeing their cache
+ *        buffers. The LRU struct itself is left allocated and empty.
+ */
+void lru_evict_all(block_lru_t* lru) {
+   if (!lru)
+      return;
+   ms_mutex_t* lock = (ms_mutex_t*)lru->lock;
+   MS_MUTEX_LOCK(lock);
+   block_len_t* curr = lru->head;
+   while (curr) {
+      block_len_t* nx = curr->lru_next;
+      curr->lru_prev = NULL;
+      curr->lru_next = NULL;
+      curr->lru_pinned = 0;
+      block_drop_cache(curr);
+      curr = nx;
+   }
+   lru->head = NULL;
+   lru->tail = NULL;
+   lru->cur_bytes = 0;
+   MS_MUTEX_UNLOCK(lock);
+}
+
+/** @brief Current total cached bytes held by the LRU (0 if NULL). */
+size_t block_cache_usage(block_lru_t* lru) {
+   if (!lru)
+      return 0;
+   ms_mutex_t* lock = (ms_mutex_t*)lru->lock;
+   MS_MUTEX_LOCK(lock);
+   size_t v = lru->cur_bytes;
+   MS_MUTEX_UNLOCK(lock);
+   return v;
+}
+
+/** @brief Configured byte budget of the LRU (0 if NULL / unbounded). */
+size_t block_cache_cap(block_lru_t* lru) {
+   if (!lru)
+      return 0;
+   return lru->cap_bytes;
 }

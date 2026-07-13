@@ -56,6 +56,14 @@ add_test(NAME DecompressTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
 )
 
+add_test(NAME MSZXDecompressTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_FILE=${TEST_DATA_DIR}/mszx/test.mszx
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_mszx
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_mszx.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}
@@ -131,6 +139,19 @@ add_test(NAME CompressCorruptBase64
     "-DARGS="
     -DINPUT_FILE=${TEST_DATA_DIR}/corrupt_base64.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_corrupt_base64
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# Non-indexed mzML (no <indexedmzML> wrapper, e.g. Waters exports) with a lossy
+# scheme requested - regression test for GitHub issue #176 (segfault caused by
+# misclassifying non-indexed mzML as an external file, which led to a NULL
+# compression function pointer being invoked).
+add_test(NAME CompressNonIndexedMzMLLossy
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--mz-lossy;delta32"
+    -DINPUT_FILE=${TEST_DATA_DIR}/nonindexed_test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_nonindexed_mzml_lossy
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 

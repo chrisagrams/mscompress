@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from ._base import MetadataBuilder
-from ._types import (
+from mscompress.metadata._base import MetadataBuilder
+from mscompress.metadata._types import (
     DataCollectionInfo,
     FieldDefinition,
     FileDistribution,
@@ -15,7 +15,7 @@ from ._types import (
 )
 
 if TYPE_CHECKING:
-    from .._core import MSZFile
+    from mscompress._core import MSZFile
 
 
 class MSZMetadataBuilder(MetadataBuilder):

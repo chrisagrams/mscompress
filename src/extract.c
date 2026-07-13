@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "mscompress.h"
+#include "algos/algos.h"
 
 /**
  * @brief Updates the spectrumList count value in an mzML header.
@@ -371,7 +372,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
-                                 size_t* out_len) {
+                                 size_t* out_len, block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -431,6 +432,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = xml_end_position - xml_start_position - xml_start_offset;
    res = malloc(*out_len);
@@ -464,7 +466,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
                                  block_len_queue_t* xml_block_lens,
                                  long xml_pos, divisions_t* divisions,
                                  uint64_t spectrum_start, uint64_t spectrum_end,
-                                 size_t* out_len) {
+                                 size_t* out_len, block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -524,6 +526,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = xml_end_position - xml_start_position;
    res = malloc(*out_len);
@@ -556,7 +559,8 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
                                 data_format_t* df,
                                 block_len_queue_t* xml_block_lens, long xml_pos,
                                 divisions_t* divisions, uint64_t spectrum_start,
-                                uint64_t spectrum_end, size_t* out_len) {
+                                uint64_t spectrum_end, size_t* out_len,
+                                block_lru_t* lru) {
    char* res;
 
    char* decmp_xml;
@@ -616,12 +620,99 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       xml_blk_len->cache = decmp_xml;
    } else
       decmp_xml = xml_blk_len->cache;
+   lru_touch_block(lru, xml_blk_len);
 
    *out_len = (xml_end_position - xml_start_position) -
               (xml_end_position - spectrum_end) + 1;  //+1 For newline
    res = malloc(*out_len);
    memcpy(res, decmp_xml + xml_buff_offset, *out_len);
 
+   return res;
+}
+
+/**
+ * @brief Fast-path extraction of a single spectrum's payload from a cached
+ *        decompressed block, bypassing `encode_binary_block`.
+ *
+ * The decompressed block layout is per-spectrum `{ZLIB_TYPE header}{payload}`
+ * (see `no_encode_w_header`). When the caller doesn't need the block re-encoded
+ * (Python lossless path), we can read the index'th payload directly out of
+ * `blk->cache` — saving the full-block allocation + per-spectrum walk that
+ * `encode_binary_block` performs.
+ *
+ * O(index) over the per-spectrum headers. For typical block sizes the walk is
+ * dominated by L1 cache hits; the saved full-block malloc + memcpy round-trip
+ * is the real win.
+ *
+ * @return Newly-malloc'd buffer of size `*out_len` (caller frees). NULL on error.
+ */
+static char* extract_no_encode_from_cache(block_len_t* blk,
+                                          data_positions_t* dp, long index,
+                                          size_t* out_len) {
+   if (!blk || !blk->cache || !dp) {
+      error("extract_no_encode_from_cache: NULL block/cache/dp");
+      return NULL;
+   }
+   if (index < 0 || (uint64_t)index >= dp->total_spec) {
+      error("extract_no_encode_from_cache: index %ld out of range [0, %lu)",
+            index, (unsigned long)dp->total_spec);
+      return NULL;
+   }
+
+   // Lazy-populate cache_spec_lens with the per-spectrum payload sizes parsed
+   // out of the cache headers. Once populated, subsequent calls only walk this
+   // small contiguous array to compute offsets. Empty spectra (skipped by the
+   // compressor — see compress.c "if (len == 0) continue") get lens[i]=0 and
+   // contribute no bytes to the cache.
+   //
+   // Note: distinct from `encoded_cache_lens`, which the slow-path
+   // (encode_binary_block) uses for *re-encoded* sizes — reusing that field
+   // here would conflate two different semantics when both paths touch the
+   // same block (e.g. spectrum.xml then spectrum.mz on the same MSZFile).
+   if (!blk->cache_spec_lens) {
+      size_t* lens = malloc(dp->total_spec * sizeof(size_t));
+      if (!lens) {
+         error("extract_no_encode_from_cache: malloc(lens, %lu) failed",
+               (unsigned long)(dp->total_spec * sizeof(size_t)));
+         return NULL;
+      }
+      const char* cursor = blk->cache;
+      for (uint64_t i = 0; i < dp->total_spec; i++) {
+         if (dp->end_positions[i] == dp->start_positions[i]) {
+            lens[i] = 0;
+            continue;
+         }
+         ZLIB_TYPE plen = *(const ZLIB_TYPE*)cursor;
+         lens[i] = (size_t)plen;
+         cursor += ZLIB_SIZE_OFFSET + plen;
+      }
+      blk->cache_spec_lens = lens;
+   }
+
+   // Compute byte offset of the target spectrum's payload within the cache.
+   size_t offset = 0;
+   for (long i = 0; i < index; i++) {
+      size_t L = blk->cache_spec_lens[i];
+      if (L > 0)
+         offset += ZLIB_SIZE_OFFSET + L;
+   }
+
+   size_t len = blk->cache_spec_lens[index];
+   *out_len = len;
+   // Empty spectrum: callers free(res) unconditionally; return a freeable
+   // non-NULL (matching extract_from_encoded_block convention).
+   if (len == 0)
+      return malloc(1);
+
+   offset += ZLIB_SIZE_OFFSET;  // skip the target spectrum's own header
+
+   char* res = malloc(len);
+   if (!res) {
+      error("extract_no_encode_from_cache: malloc(%lu) failed",
+            (unsigned long)len);
+      return NULL;
+   }
+   memcpy(res, blk->cache + offset, len);
    return res;
 }
 
@@ -703,8 +794,18 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    a_args->dest_len = &algo_output_len;
 
    for (int i = 0; i < total_spec; i++) {
+      size_t src_len = curr_dp->end_positions[i] - curr_dp->start_positions[i];
+
+      // Empty <binary></binary>: compression skipped it, so the cache holds
+      // no bytes for this spectrum. Calling target_fun with src_len==0 would
+      // walk into the next spectrum's payload and shift every later index.
+      if (src_len == 0) {
+         res_lens[i] = 0;
+         continue;
+      }
+
       a_args->src = (char**)&decmp_binary;
-      a_args->src_len = curr_dp->end_positions[i] - curr_dp->start_positions[i];
+      a_args->src_len = src_len;
       a_args->dest = (char **)(buff + buff_off);
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
@@ -760,6 +861,15 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
                                  size_t* out_len) {
    size_t offset = 0;
    size_t len = blk->encoded_cache_lens[index];
+
+   // Empty spectrum: return a freeable non-NULL pointer (callers do
+   // free(res) unconditionally, and NULL would trip Python's "Failed to
+   // extract" error path in _core.pyx).
+   if (len == 0) {
+      *out_len = 0;
+      return malloc(1);
+   }
+
    char* res = malloc(len);
    if (!res)
       return NULL;
@@ -796,7 +906,8 @@ char* extract_from_encoded_block(block_len_t* blk, long index,
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
-                          long index, size_t* out_len, int encode) {
+                          long index, size_t* out_len, int encode,
+                          block_lru_t* lru) {
    data_positions_t* mz;
    long mz_off = 0;
    int division_index = 0;
@@ -844,19 +955,32 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       mz_blk_len->cache = decmp_mz;
    } else
       decmp_mz = mz_blk_len->cache;
+   lru_touch_block(lru, mz_blk_len);
 
    if (!encode) {
-      encode_binary_block(
-          mz_blk_len, mz, df->source_mz_fmt, _no_encode_,
-          set_encode_fun(_no_encode_, _lossless_,
-                         _64d_), /* Disables encoding for python library*/
-          df->mz_scale_factor, df->target_mz_fun);
-   } else {
-      encode_binary_block(mz_blk_len, mz, df->source_mz_fmt,
-                          df->target_mz_format,
-                          df->encode_source_compression_mz_fun,
-                          df->mz_scale_factor, df->target_mz_fun);
+      // Fast path is valid only for lossless reads. For a lossy .msz the
+      // cached payload is still in its transformed form (e.g. delta32), so
+      // slicing it raw would both return wrong bytes and mis-walk the block
+      // (the headers/sizes don't match a plain payload) — a crash. Lossy
+      // no-encode reads fall through to encode_binary_block below, which
+      // applies the inverse transform (df->target_mz_fun) without base64.
+      if (df->target_mz_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(mz_blk_len, mz, mz_off, out_len);
+
+      // Lossy: target_mz_fun reconstructs samples into a fresh, header-less
+      // buffer, so the writer must copy raw bytes (no_encode_no_header) — not
+      // the header-popping no_encode_w_header that the lossless path uses.
+      encode_binary_block(mz_blk_len, mz, df->source_mz_fmt, _no_encode_,
+                          no_encode_no_header, df->mz_scale_factor,
+                          df->target_mz_fun);
+      res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
+      return res;
    }
+
+   encode_binary_block(mz_blk_len, mz, df->source_mz_fmt,
+                       df->target_mz_format,
+                       df->encode_source_compression_mz_fun,
+                       df->mz_scale_factor, df->target_mz_fun);
    res = extract_from_encoded_block(mz_blk_len, mz_off, out_len);
 
    return res;
@@ -886,7 +1010,8 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
                              long inten_binary_blk_pos, divisions_t* divisions,
-                             long index, size_t* out_len, int encode) {
+                             long index, size_t* out_len, int encode,
+                             block_lru_t* lru) {
    data_positions_t* inten;
    long inten_off = 0;
    int division_index = 0;
@@ -936,26 +1061,33 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       inten_blk_len->cache = decmp_inten;
    } else
       decmp_inten = inten_blk_len->cache;
+   lru_touch_block(lru, inten_blk_len);
 
    if (!encode) {
+      // Lossless-only fast path — see extract_spectrum_mz for the rationale.
+      if (df->target_inten_fun == algo_encode_lossless)
+         return extract_no_encode_from_cache(inten_blk_len, inten, inten_off,
+                                             out_len);
+
+      // Lossy: see extract_spectrum_mz — reconstructed samples are header-less.
       int ret = encode_binary_block(
           inten_blk_len, inten, df->source_inten_fmt, _no_encode_,
-          set_encode_fun(_no_encode_, _lossless_,
-                         _64d_), /* Disables encoding for python library*/
-          df->int_scale_factor, df->target_inten_fun);
+          no_encode_no_header, df->int_scale_factor, df->target_inten_fun);
       if (ret != 0) {
          error("extract_spectrum_inten: Failed to encode intensity block.\n");
          return NULL;
       }
-   } else {
-      int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
-                                    df->target_inten_format,
-                                    df->encode_source_compression_inten_fun,
-                                    df->int_scale_factor, df->target_inten_fun);
-      if (ret != 0) {
-         error("extract_spectrum_inten: Failed to encode intensity block.\n");
-         return NULL;
-      }
+      res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
+      return res;
+   }
+
+   int ret = encode_binary_block(inten_blk_len, inten, df->source_inten_fmt,
+                                 df->target_inten_format,
+                                 df->encode_source_compression_inten_fun,
+                                 df->int_scale_factor, df->target_inten_fun);
+   if (ret != 0) {
+      error("extract_spectrum_inten: Failed to encode intensity block.\n");
+      return NULL;
    }
 
    res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
@@ -994,7 +1126,8 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* mz_binary_block_lens,
                       block_len_queue_t* inten_binary_block_lens, long xml_pos,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
-                      divisions_t* divisions, long index, size_t* out_len) {
+                      divisions_t* divisions, long index, size_t* out_len,
+                      block_lru_t* lru) {
    uint64_t spectrum_start;
    uint64_t spectrum_end;
 
@@ -1015,7 +1148,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t start_xml_len = 0;
    char* spectrum_start_xml = extract_spectrum_start_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &start_xml_len);
+       spectrum_end, &start_xml_len, lru);
    memcpy(res, spectrum_start_xml, start_xml_len);
    *out_len += start_xml_len;
    free(spectrum_start_xml);
@@ -1023,7 +1156,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t mz_len = 0;
    char* spectrum_mz =
        extract_spectrum_mz(input_map, dctx, df, mz_binary_block_lens, mz_pos,
-                           divisions, index, &mz_len, TRUE);
+                           divisions, index, &mz_len, TRUE, lru);
 
    if (spectrum_mz == NULL) {
       error(
@@ -1040,7 +1173,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t inner_xml_len = 0;
    char* spectrum_inner_xml = extract_spectrum_inner_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &inner_xml_len);
+       spectrum_end, &inner_xml_len, lru);
 
    if (spectrum_inner_xml == NULL) {
       error(
@@ -1058,7 +1191,8 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t inten_len = 0;
    char* spectrum_inten =
        extract_spectrum_inten(input_map, dctx, df, inten_binary_block_lens,
-                              inten_pos, divisions, index, &inten_len, TRUE);
+                              inten_pos, divisions, index, &inten_len, TRUE,
+                              lru);
    if (spectrum_inten == NULL) {
       error(
           "extract_spectra: Failed to extract intensity values for spectrum "
@@ -1075,7 +1209,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    size_t last_xml_len = 0;
    char* spectrum_last_xml = extract_spectrum_last_xml(
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
-       spectrum_end, &last_xml_len);
+       spectrum_end, &last_xml_len, lru);
    if (spectrum_last_xml == NULL) {
       error(
           "extract_spectra: Failed to extract last XML for spectrum index "
@@ -1194,7 +1328,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
           inten_binary_block_lens, msz_footer->xml_pos,
           msz_footer->mz_binary_pos, msz_footer->inten_binary_pos,
           msz_footer->mz_fmt, msz_footer->inten_fmt, divisions, indicies[i],
-          &spectra_len);
+          &spectra_len, NULL);
       write_to_file(output_fd, spectrum, spectra_len);
       free(spectrum);
    }
