@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Boxes,
   Sun,
@@ -11,6 +11,7 @@ import {
   Scissors,
 } from "lucide-react"
 import brandLogo from "@/assets/icon.png"
+import githubMark from "@/assets/github-mark.svg"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -27,6 +28,27 @@ function App() {
   const [dark, setDark] = useState(true)
   const [selected, setSelected] = useState("HEK293_rep1.mzML")
   const [tab, setTab] = useState("convert")
+  const [backendVersion, setBackendVersion] = useState<string | null>(null)
+  const [threads, setThreads] = useState<number | null>(null)
+
+  // Pull the real backend version + thread count from the native binding
+  // through the preload bridge (replaces the old hardcoded status values).
+  useEffect(() => {
+    window.api
+      .getVersion()
+      .then((v) => {
+        setBackendVersion(v)
+        console.log("[renderer] backend version from window.api:", v)
+      })
+      .catch((e) => console.error("[renderer] getVersion failed:", e))
+    window.api
+      .getNumThreads()
+      .then((n) => {
+        setThreads(n)
+        console.log("[renderer] backend threads from window.api:", n)
+      })
+      .catch((e) => console.error("[renderer] getNumThreads failed:", e))
+  }, [])
 
   const toggleTheme = () => {
     const el = document.documentElement
@@ -60,6 +82,17 @@ function App() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="View project on GitHub"
+              onClick={() =>
+                window.api.openExternal("https://github.com/chrisagrams/mscompress")
+              }
+            >
+              <img src={githubMark} alt="GitHub" className="size-4 dark:invert" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -131,13 +164,13 @@ function App() {
           </span>
           <div className="ml-auto flex items-center gap-4">
             <span className="mono flex items-center gap-1">
-              <Cpu className="size-3" /> 8 threads
+              <Cpu className="size-3" /> {threads ?? "—"} threads
             </span>
             <span className="mono flex items-center gap-1">
               <MemoryStick className="size-3" /> 3.2 / 32 GB
             </span>
             <span className="mono flex items-center gap-1">
-              <Boxes className="size-3" /> mscompress 2.4.1
+              <Boxes className="size-3" /> mscompress {backendVersion ?? "…"}
             </span>
             <span className="mono">UTF-8</span>
           </div>

@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/tooltip"
 import { sampleQueue, fmtBytes, type QueueItem, type FileKind } from "@/mockData"
 
-const openFiles: { name: string; kind: FileKind; size: number }[] = [
+type OpenFile = { name: string; kind: FileKind; size: number }
+
+const initialFiles: OpenFile[] = [
   { name: "HEK293_rep1.mzML", kind: "mzML", size: 2_411_724_800 },
   { name: "HEK293_rep2.mzML", kind: "mzML", size: 2_388_100_000 },
   { name: "Plasma_DIA_01.mzML", kind: "mzML", size: 5_120_400_000 },
@@ -79,8 +81,41 @@ export function LeftRail({
   onSelect: (name: string) => void
 }) {
   const [dragOver, setDragOver] = useState(false)
+  const [added, setAdded] = useState<OpenFile[]>([])
+  const openFiles = [...added, ...initialFiles]
 
   const running = sampleQueue.filter((q) => q.status === "running").length
+
+  // Open the native file dialog, analyze each pick through the binding, and
+  // add them to the Explorer list.
+  const handleOpenFiles = async () => {
+    const paths = await window.api.openFiles()
+    console.log("[renderer] openFiles ->", paths)
+    const summaries = await Promise.all(paths.map((p) => window.api.analyze(p)))
+    summaries.forEach((s) => console.log("[renderer] analyzed:", s))
+    setAdded((prev) => [
+      ...summaries.map((s) => ({
+        name: s.fileName,
+        kind: s.kind,
+        size: s.filesizeBytes,
+      })),
+      ...prev,
+    ])
+    if (summaries[0]) onSelect(summaries[0].fileName)
+  }
+
+  // Real files dropped onto the zone: resolve their paths and analyze them.
+  const handleDrop = async (files: FileList) => {
+    for (const f of Array.from(files)) {
+      const path = window.api.getPathForFile(f)
+      const summary = await window.api.analyze(path)
+      console.log("[renderer] dropped + analyzed:", summary)
+      setAdded((prev) => [
+        { name: summary.fileName, kind: summary.kind, size: summary.filesizeBytes },
+        ...prev,
+      ])
+    }
+  }
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -91,7 +126,12 @@ export function LeftRail({
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              onClick={handleOpenFiles}
+            >
               <FolderOpen className="size-3.5" />
             </Button>
           </TooltipTrigger>
@@ -114,6 +154,7 @@ export function LeftRail({
         onDrop={(e) => {
           e.preventDefault()
           setDragOver(false)
+          if (e.dataTransfer.files.length) void handleDrop(e.dataTransfer.files)
         }}
       >
         <Upload className="mx-auto mb-1 size-4" />

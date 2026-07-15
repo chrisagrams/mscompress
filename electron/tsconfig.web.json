@@ -16,7 +16,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "paths": {
-      "@/*": ["./src/renderer/src/*"]
+      "@/*": ["./src/renderer/src/*"],
+      "@shared/*": ["./src/shared/*"]
     },
     "noUnusedLocals": true,
     "noUnusedParameters": true,

@@ -73,6 +73,17 @@ export function ConvertTab({ selected }: { selected: string }) {
   const [intAlgo, setIntAlgo] = useState<LossyAlgo>("delta32")
   const [zstd, setZstd] = useState([9])
   const [extractBy, setExtractBy] = useState("mslevel")
+  const [outputDir, setOutputDir] = useState("/data/proteomics/compressed/")
+
+  // Seed the output directory from the OS default (Downloads) on mount.
+  useEffect(() => {
+    window.api.getDefaultOutputDir().then(setOutputDir).catch(() => {})
+  }, [])
+
+  const pickOutputDir = async () => {
+    const dir = await window.api.openOutputDir()
+    if (dir) setOutputDir(dir)
+  }
 
   // Snap to a valid operation whenever the file (and thus allowed ops) changes.
   useEffect(() => {
@@ -324,10 +335,15 @@ export function ConvertTab({ selected }: { selected: string }) {
               <div className="flex gap-2">
                 <Input
                   readOnly
-                  value="/data/proteomics/compressed/"
+                  value={outputDir}
                   className="mono text-xs"
                 />
-                <Button variant="secondary" size="icon" className="shrink-0">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={pickOutputDir}
+                >
                   <FolderOpen className="size-4" />
                 </Button>
               </div>
