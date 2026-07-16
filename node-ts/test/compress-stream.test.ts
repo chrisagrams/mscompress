@@ -5,12 +5,46 @@
  * identical to what compress(outputPath) writes to a file for the same args.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { read, MZMLFile, MSZFile } from "../src/index.js";
 import { MZML_PATH, SCIEX_MZML_PATH } from "./fixtures.js";
+
+/**
+ * Temp dirs created during a test, torn down in afterEach so nothing leaks even
+ * when a test throws mid-way.
+ */
+const tmpDirs = new Set<string>();
+
+/** Create a tracked temp dir that afterEach will remove. */
+function makeTmpDir(prefix: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tmpDirs.add(dir);
+  return dir;
+}
+
+/**
+ * Remove a temp dir. On Windows a file with an open mmap/handle throws EPERM on
+ * unlink, so retry a few times to ride out a transient lock. Handles must still
+ * be closed BEFORE calling this — the retries are only a backstop.
+ */
+function removeTmpDir(dir: string): void {
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  tmpDirs.delete(dir);
+}
+
+afterEach(() => {
+  for (const dir of tmpDirs) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    } catch {
+      // best-effort leak cleanup; individual tests already assert the happy path
+    }
+  }
+  tmpDirs.clear();
+});
 
 /** Collect a Readable stream into a single Buffer. */
 function collect(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -25,15 +59,19 @@ function collect(stream: NodeJS.ReadableStream): Promise<Buffer> {
 /** Compress a fresh MZMLFile to a temp file and return its bytes. */
 function compressToBuffer(mzmlPath: string, configure?: (f: MZMLFile) => void): Buffer {
   const file = read(mzmlPath) as MZMLFile;
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-cmp-"));
+  const tmpDir = makeTmpDir("mscompress-cmp-");
   const outputPath = path.join(tmpDir, "expected.msz");
+  // compress() returns an MSZFile that mmaps `outputPath`; it must be closed
+  // before the temp dir is removed or Windows throws EPERM on unlink.
+  let compressed: MSZFile | undefined;
   try {
     if (configure) configure(file);
-    file.compress(outputPath);
+    compressed = file.compress(outputPath) as MSZFile;
     return fs.readFileSync(outputPath);
   } finally {
+    compressed?.close();
     file.close();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    removeTmpDir(tmpDir);
   }
 }
 
@@ -75,13 +113,16 @@ describe("MZMLFile.compressStream", () => {
 
   it("streamed bytes re-open and round-trip to 50 spectra", async () => {
     const file = read(MZML_PATH) as MZMLFile;
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-rt-"));
+    const tmpDir = makeTmpDir("mscompress-rt-");
     const mszPath = path.join(tmpDir, "streamed.msz");
+    // The re-opened MSZFile mmaps `mszPath`; close it (even on assertion
+    // failure) before removing the temp dir, or Windows throws EPERM on unlink.
+    let msz: MSZFile | undefined;
     try {
       const streamed = await collect(file.compressStream());
       fs.writeFileSync(mszPath, streamed);
 
-      const msz = read(mszPath) as MSZFile;
+      msz = read(mszPath) as MSZFile;
       expect(msz).toBeInstanceOf(MSZFile);
       expect(msz.spectra.length).toBe(50);
 
@@ -89,10 +130,10 @@ describe("MZMLFile.compressStream", () => {
       const spectrum = msz.spectra.get(0);
       expect(spectrum.mz.length).toBeGreaterThan(0);
       expect(spectrum.intensity.length).toBeGreaterThan(0);
-      msz.close();
     } finally {
+      msz?.close();
       file.close();
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      removeTmpDir(tmpDir);
     }
   });
 
