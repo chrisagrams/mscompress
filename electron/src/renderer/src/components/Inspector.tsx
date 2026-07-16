@@ -12,7 +12,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span className="mono text-right text-xs">{value}</span>
+      <span className="selectable mono text-right text-xs">{value}</span>
     </div>
   )
 }
@@ -107,7 +107,7 @@ export function Inspector({ path, name, kind }: { path: string; name: string; ki
       <Separator />
 
       <div className="px-3 py-2.5">
-        <div className="truncate text-sm font-medium">{name}</div>
+        <div className="selectable truncate text-sm font-medium">{name}</div>
         <div className="mt-1 flex items-center gap-1.5">
           <Badge variant="outline" className="mono text-[10px]">
             {kind}

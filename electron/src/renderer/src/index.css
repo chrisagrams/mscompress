@@ -125,6 +125,23 @@
     margin: 0;
     overflow: hidden;
   }
+
+  /* Native desktop feel: the app chrome is not text-selectable, so click-drag
+     doesn't highlight labels like a web page. */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Keep selection where it's genuinely useful: editable fields and any value
+     worth copying (opt back in with `.selectable`). */
+  input,
+  textarea,
+  [contenteditable],
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Workbench utility: tabular monospace numerics */

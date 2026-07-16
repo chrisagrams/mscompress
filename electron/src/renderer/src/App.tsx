@@ -14,7 +14,6 @@ import {
 import brandLogo from "@/assets/icon.png"
 import githubMark from "@/assets/github-mark.svg"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -124,9 +123,6 @@ function App() {
           <div className="flex items-center gap-2">
             <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />
             <span className="text-sm font-semibold tracking-tight">MScompress</span>
-            <Badge variant="secondary" className="mono h-5 text-[10px]">
-              workbench
-            </Badge>
           </div>
 
           <div className="no-drag ml-auto flex items-center gap-2">
@@ -255,7 +251,7 @@ function App() {
         </div>
 
         {/* Bottom status bar */}
-        <footer className="flex h-6 shrink-0 items-center gap-4 border-t bg-primary/95 px-3 text-[11px] text-primary-foreground">
+        <footer className="flex h-6 shrink-0 items-center gap-4 border-t bg-muted px-3 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
             <Activity className="size-3" /> {currentOp}
           </span>
