@@ -179,7 +179,11 @@ function App() {
                   <ExtractQueueTab queue={queue} />
                 </TabsContent>
                 <TabsContent value="archive" className="m-0">
-                  <ArchiveTab />
+                  <ArchiveTab
+                    path={selectedEntry.path}
+                    kind={selectedEntry.kind}
+                    name={selectedEntry.name}
+                  />
                 </TabsContent>
               </ScrollArea>
             </Tabs>

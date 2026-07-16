@@ -16,6 +16,7 @@ const api: Api = {
   getFilesize: (path) => ipcRenderer.invoke(IPC.getFilesize, path),
   analyze: (path) => ipcRenderer.invoke(IPC.analyze, path),
   computeQC: (path, opts) => ipcRenderer.invoke(IPC.computeQC, path, opts),
+  readMszx: (path) => ipcRenderer.invoke(IPC.readMszx, path),
   compress: (path, opts) => ipcRenderer.invoke(IPC.compress, path, opts),
   decompress: (path, opts) => ipcRenderer.invoke(IPC.decompress, path, opts),
   extract: (path, opts) => ipcRenderer.invoke(IPC.extract, path, opts),

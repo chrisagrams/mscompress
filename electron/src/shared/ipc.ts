@@ -14,6 +14,7 @@ export const IPC = {
   getFilesize: 'fs:getFilesize',
   analyze: 'file:analyze',
   computeQC: 'qc:compute',
+  readMszx: 'archive:read',
   compress: 'convert:compress',
   decompress: 'convert:decompress',
   extract: 'convert:extract',
@@ -103,6 +104,31 @@ export interface ConvertProgress {
   file: string
   message?: string
   result?: ConvertResult
+  error?: string
+}
+
+// ---- MSZX archive ----------------------------------------------------------
+
+export interface MszxAnnotation {
+  filename: string
+  format: string
+  compressed: boolean
+  num_records: number | null
+  description: string | null
+}
+
+/** Plain, serializable MSZX manifest for the Archive tab. */
+export interface MszxManifest {
+  path: string
+  version: string
+  created_at: string
+  spectra_file: string
+  num_spectra: number
+  join_key: string
+  source_file: string | null
+  description: string | null
+  annotations: MszxAnnotation[]
+  /** Set instead of the manifest fields when the archive couldn't be read. */
   error?: string
 }
 
@@ -277,6 +303,8 @@ export interface Api {
   analyze(path: string): Promise<FileSummary>
   /** Compute QC dashboard data (TIC/BPC/heatmap/MS-levels/peaks) from spectra. */
   computeQC(path: string, opts?: QCOptions): Promise<QCData>
+  /** Read an .mszx archive's manifest + annotations. */
+  readMszx(path: string): Promise<MszxManifest>
   /** Compress an mzML file to .msz. */
   compress(path: string, opts: CompressOptions): Promise<ConvertResult>
   /** Decompress an .msz/.mszx file to .mzML. */

@@ -11,6 +11,7 @@ import {
   getNumThreads,
   analyze,
   computeQC,
+  readMszx,
   compress,
   decompress,
   extract
@@ -51,6 +52,21 @@ for (const rel of ['test.mzML', 'sciex_ttof6600_100.mzML']) {
   )
   console.log(`  msLevelCounts=${JSON.stringify(q.msLevelCounts)}`)
   console.log(`  peaksPerSpectrum=${JSON.stringify(q.peaksPerSpectrum)}`)
+}
+console.log('')
+
+// ---- MSZX archive (T7) ----
+{
+  const m = readMszx(resolve(dataDir, 'mszx/test.mszx'))
+  console.log('readMszx(test.mszx):')
+  console.log(
+    `  version=${m.version} num_spectra=${m.num_spectra} join_key=${m.join_key} source_file=${m.source_file} err=${m.error ?? '-'}`
+  )
+  console.log(`  description=${JSON.stringify(m.description)}`)
+  console.log(`  annotations(${m.annotations.length})=${JSON.stringify(m.annotations)}`)
+
+  const bad = readMszx(resolve(dataDir, 'mszx/does-not-exist.mszx'))
+  console.log(`readMszx(bad path): error="${bad.error}" (num_spectra=${bad.num_spectra})`)
 }
 console.log('')
 

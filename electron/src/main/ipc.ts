@@ -108,6 +108,8 @@ export function registerIpcHandlers(): void {
     bindings.computeQC(path, opts)
   )
 
+  ipcMain.handle(IPC.readMszx, (_event, path: string) => bindings.readMszx(path))
+
   ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
     runConvert(event.sender, 'compress', basename(path), () => bindings.compress(path, opts))
   )

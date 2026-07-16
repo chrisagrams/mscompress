@@ -14,6 +14,7 @@ import type {
   FileKind,
   FileSummary,
   MsLevelCount,
+  MszxManifest,
   LossyAlgo,
   QCData,
   QCOptions
@@ -78,12 +79,33 @@ interface MsFile {
   close(): void
 }
 
+interface MsManifestData {
+  version: string
+  created_at: string
+  spectra_file: string
+  num_spectra: number | bigint
+  join_key: string
+  source_file?: string
+  description?: string
+  annotations: {
+    filename: string
+    format: string
+    compressed: boolean
+    num_records?: number | bigint
+    description?: string
+  }[]
+}
+
+interface MsMszxFile extends MsFile {
+  manifest: { toJSON(): MsManifestData }
+}
+
 interface MscompressModule {
   getVersion(): string
   getNumThreads(): number
   getFilesize(filePath: string): number
   read(filePath: string): MsFile
-  MSZXFile: { open(filePath: string): MsFile }
+  MSZXFile: { open(filePath: string): MsMszxFile }
 }
 
 let cached: MscompressModule | null = null
@@ -260,6 +282,55 @@ export function analyze(path: string): FileSummary {
       filesizeBytes,
       error: err instanceof Error ? err.message : String(err)
     }
+  } finally {
+    file?.close()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MSZX archive
+// ---------------------------------------------------------------------------
+
+/**
+ * Read an .mszx archive's manifest + annotations into a plain, serializable
+ * object. Always resolves — a bad/missing archive is reported via `error`.
+ */
+export function readMszx(path: string): MszxManifest {
+  const base: MszxManifest = {
+    path,
+    version: '',
+    created_at: '',
+    spectra_file: '',
+    num_spectra: 0,
+    join_key: '',
+    source_file: null,
+    description: null,
+    annotations: []
+  }
+
+  let file: MsMszxFile | null = null
+  try {
+    file = mod().MSZXFile.open(path)
+    const m = file.manifest.toJSON()
+    return {
+      path,
+      version: m.version,
+      created_at: m.created_at,
+      spectra_file: m.spectra_file,
+      num_spectra: toNumber(m.num_spectra),
+      join_key: m.join_key,
+      source_file: m.source_file ?? null,
+      description: m.description ?? null,
+      annotations: (m.annotations ?? []).map((a) => ({
+        filename: a.filename,
+        format: a.format,
+        compressed: Boolean(a.compressed),
+        num_records: a.num_records != null ? toNumber(a.num_records) : null,
+        description: a.description ?? null
+      }))
+    }
+  } catch (err) {
+    return { ...base, error: err instanceof Error ? err.message : String(err) }
   } finally {
     file?.close()
   }
