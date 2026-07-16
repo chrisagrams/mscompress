@@ -24,16 +24,26 @@ export type FileKind = 'mzML' | 'msz' | 'mszx'
  * the native `mscompress` binding. All numeric fields are plain numbers (any
  * native BigInt is coerced) so it crosses the IPC boundary cleanly.
  */
+export interface MsLevelCount {
+  /** "MS1" | "MS2" | "MSn" */
+  level: string
+  count: number
+}
+
 export interface FileSummary {
   path: string
   fileName: string
   kind: FileKind
   filesizeBytes: number
-  /** null when not cheaply available (e.g. mszx archives, or on parse error). */
+  /** null when not available (e.g. on parse error). */
   spectrumCount: number | null
   mzFormat: string | null
   intensityFormat: string | null
   sourceCompression: string | null
+  /** Per-MS-level spectrum counts, ordered MS1, MS2, MSn (empty on error). */
+  msLevelCounts: MsLevelCount[]
+  /** Retention-time span in seconds, [min, max]. [0, 0] when unavailable. */
+  rtRangeSec: [number, number]
   /** PSI-MS accession dict from DataFormat.toDict(), when available. */
   accessions: Record<string, string | number> | null
   /** Populated instead of the format fields when analysis failed. */

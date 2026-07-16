@@ -23,11 +23,26 @@ import { ConvertTab } from "@/components/ConvertTab"
 import { QCTab } from "@/components/QCTab"
 import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
+import { INITIAL_FILES, type FileEntry } from "@/files"
 
 function App() {
   const [dark, setDark] = useState(true)
-  const [selected, setSelected] = useState("HEK293_rep1.mzML")
+  const [files, setFiles] = useState<FileEntry[]>(INITIAL_FILES)
+  const [selectedPath, setSelectedPath] = useState<string>(INITIAL_FILES[0].path)
   const [tab, setTab] = useState("convert")
+
+  const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
+
+  // Add opened/dropped files (deduped by path) and select the first new one.
+  const addFiles = (entries: FileEntry[]) => {
+    if (entries.length === 0) return
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => f.path))
+      const fresh = entries.filter((e) => !seen.has(e.path))
+      return [...fresh, ...prev]
+    })
+    setSelectedPath(entries[0].path)
+  }
   const [backendVersion, setBackendVersion] = useState<string | null>(null)
   const [threads, setThreads] = useState<number | null>(null)
 
@@ -108,7 +123,12 @@ function App() {
         <div className="flex min-h-0 flex-1">
           {/* Left rail */}
           <aside className="w-64 shrink-0 border-r">
-            <LeftRail selected={selected} onSelect={setSelected} />
+            <LeftRail
+              files={files}
+              selected={selectedPath}
+              onSelect={setSelectedPath}
+              onAddFiles={addFiles}
+            />
           </aside>
 
           {/* Center workspace */}
@@ -130,13 +150,13 @@ function App() {
                   </TabsTrigger>
                 </TabsList>
                 <span className="mono ml-auto pr-2 text-[11px] text-muted-foreground">
-                  {selected}
+                  {selectedEntry.name}
                 </span>
               </div>
 
               <ScrollArea className="min-h-0 flex-1">
                 <TabsContent value="convert" className="m-0">
-                  <ConvertTab selected={selected} />
+                  <ConvertTab kind={selectedEntry.kind} />
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
                   <QCTab />
@@ -153,7 +173,11 @@ function App() {
 
           {/* Right inspector */}
           <aside className="w-72 shrink-0 border-l">
-            <Inspector selected={selected} />
+            <Inspector
+              path={selectedEntry.path}
+              name={selectedEntry.name}
+              kind={selectedEntry.kind}
+            />
           </aside>
         </div>
 

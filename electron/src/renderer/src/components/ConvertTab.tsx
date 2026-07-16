@@ -48,13 +48,6 @@ const opsForKind: Record<FileKind, Record<Op, boolean>> = {
   mszx: { compress: false, decompress: true, extract: true },
 }
 
-function kindFromName(name: string): FileKind {
-  const n = name.toLowerCase()
-  if (n.endsWith(".msz")) return "msz"
-  if (n.endsWith(".mszx")) return "mszx"
-  return "mzML"
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -63,8 +56,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function ConvertTab({ selected }: { selected: string }) {
-  const kind = kindFromName(selected)
+export function ConvertTab({ kind }: { kind: FileKind }) {
   const allowed = opsForKind[kind]
 
   const [op, setOp] = useState<Op>("compress")
@@ -91,7 +83,7 @@ export function ConvertTab({ selected }: { selected: string }) {
       const next = (["compress", "decompress", "extract"] as Op[]).find((o) => allowed[o])
       if (next) setOp(next)
     }
-  }, [selected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kind]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const opItems: { value: Op; label: string; icon: typeof FileArchive; hint: string }[] = [
     { value: "compress", label: "Compress → .msz", icon: FileArchive, hint: "Only mzML files can be compressed" },

@@ -3,17 +3,18 @@
 // them against native mscompress + real test data. Run: node scripts/smoke-bindings.ts
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { getVersion, getNumThreads, getFilesize, analyze } from '../src/main/bindings.ts'
+import { getVersion, getNumThreads, analyze } from '../src/main/bindings.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const dataDir = resolve(here, '../../test/data')
 
-console.log('getVersion()      =', JSON.stringify(getVersion()))
-console.log('getNumThreads()   =', getNumThreads())
+console.log('getVersion()    =', JSON.stringify(getVersion()))
+console.log('getNumThreads() =', getNumThreads())
+console.log('')
 
-const mzml = resolve(dataDir, 'test.mzML')
-console.log('getFilesize(mzML) =', getFilesize(mzml))
-console.log('analyze(mzML)     =', JSON.stringify(analyze(mzml)))
-
-const msz = resolve(dataDir, 'test.msz')
-console.log('analyze(msz)      =', JSON.stringify(analyze(msz)))
+for (const rel of ['test.mzML', 'test.msz', 'mszx/test.mszx', 'corrupt_base64.mzML']) {
+  const summary = analyze(resolve(dataDir, rel))
+  console.log(`analyze(${rel}) =`)
+  console.log(JSON.stringify(summary, null, 2))
+  console.log('')
+}

@@ -26,17 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { sampleQueue, fmtBytes, type QueueItem, type FileKind } from "@/mockData"
-
-type OpenFile = { name: string; kind: FileKind; size: number }
-
-const initialFiles: OpenFile[] = [
-  { name: "HEK293_rep1.mzML", kind: "mzML", size: 2_411_724_800 },
-  { name: "HEK293_rep2.mzML", kind: "mzML", size: 2_388_100_000 },
-  { name: "Plasma_DIA_01.mzML", kind: "mzML", size: 5_120_400_000 },
-  { name: "QC_pool_A.mzML", kind: "mzML", size: 1_002_000_000 },
-  { name: "archive_2023.msz", kind: "msz", size: 640_200_000 },
-  { name: "HEK293_rep1.mszx", kind: "mszx", size: 671_000_000 },
-]
+import type { FileEntry } from "@/files"
 
 function kindIcon(kind: FileKind) {
   if (kind === "msz") return <FileArchive className="size-3.5 text-chart-4" />
@@ -74,47 +64,51 @@ function statusBadge(status: QueueItem["status"]) {
 }
 
 export function LeftRail({
+  files,
   selected,
   onSelect,
+  onAddFiles,
 }: {
+  files: FileEntry[]
+  /** Path of the currently selected file. */
   selected: string
-  onSelect: (name: string) => void
+  onSelect: (path: string) => void
+  onAddFiles: (entries: FileEntry[]) => void
 }) {
   const [dragOver, setDragOver] = useState(false)
-  const [added, setAdded] = useState<OpenFile[]>([])
-  const openFiles = [...added, ...initialFiles]
 
   const running = sampleQueue.filter((q) => q.status === "running").length
 
-  // Open the native file dialog, analyze each pick through the binding, and
-  // add them to the Explorer list.
+  // Analyze paths through the binding and turn each into a real FileEntry.
+  const ingest = async (paths: string[]) => {
+    if (paths.length === 0) return
+    const entries = await Promise.all(
+      paths.map(async (p) => {
+        const s = await window.api.analyze(p)
+        console.log("[renderer] analyzed:", s)
+        return {
+          name: s.fileName,
+          path: s.path,
+          kind: s.kind,
+          size: s.filesizeBytes,
+        } satisfies FileEntry
+      }),
+    )
+    onAddFiles(entries)
+  }
+
+  // Open the native file dialog and add the picked files.
   const handleOpenFiles = async () => {
     const paths = await window.api.openFiles()
     console.log("[renderer] openFiles ->", paths)
-    const summaries = await Promise.all(paths.map((p) => window.api.analyze(p)))
-    summaries.forEach((s) => console.log("[renderer] analyzed:", s))
-    setAdded((prev) => [
-      ...summaries.map((s) => ({
-        name: s.fileName,
-        kind: s.kind,
-        size: s.filesizeBytes,
-      })),
-      ...prev,
-    ])
-    if (summaries[0]) onSelect(summaries[0].fileName)
+    await ingest(paths)
   }
 
-  // Real files dropped onto the zone: resolve their paths and analyze them.
-  const handleDrop = async (files: FileList) => {
-    for (const f of Array.from(files)) {
-      const path = window.api.getPathForFile(f)
-      const summary = await window.api.analyze(path)
-      console.log("[renderer] dropped + analyzed:", summary)
-      setAdded((prev) => [
-        { name: summary.fileName, kind: summary.kind, size: summary.filesizeBytes },
-        ...prev,
-      ])
-    }
+  // Real files dropped onto the zone: resolve their absolute paths, then analyze.
+  const handleDrop = async (dropped: FileList) => {
+    const paths = Array.from(dropped).map((f) => window.api.getPathForFile(f))
+    console.log("[renderer] dropped ->", paths)
+    await ingest(paths)
   }
 
   return (
@@ -167,12 +161,12 @@ export function LeftRail({
       </div>
       <ScrollArea className="min-h-0 flex-[0_0_auto] max-h-[40%]">
         <div className="px-1 pb-2">
-          {openFiles.map((f) => {
-            const active = f.name === selected
+          {files.map((f) => {
+            const active = f.path === selected
             return (
               <button
-                key={f.name}
-                onClick={() => onSelect(f.name)}
+                key={f.path}
+                onClick={() => onSelect(f.path)}
                 className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
