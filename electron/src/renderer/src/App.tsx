@@ -60,7 +60,10 @@ function App() {
     maxConcurrency: 1,
   })
   useEffect(() => {
-    window.api.getQueueState().then(setQueue).catch(() => {})
+    window.api
+      .getQueueState()
+      .then(setQueue)
+      .catch(() => {})
     return window.api.onQueueUpdate(setQueue)
   }, [])
 
@@ -78,12 +81,18 @@ function App() {
 
   // Backend version for the status bar.
   useEffect(() => {
-    window.api.getVersion().then(setBackendVersion).catch(() => {})
+    window.api
+      .getVersion()
+      .then(setBackendVersion)
+      .catch(() => {})
   }, [])
 
   // Load + subscribe to persisted settings; apply the theme app-wide.
   useEffect(() => {
-    window.api.getSettings().then(setSettings).catch(() => {})
+    window.api
+      .getSettings()
+      .then(setSettings)
+      .catch(() => {})
     return window.api.onSettingsChange(setSettings)
   }, [])
   useEffect(() => {
@@ -111,11 +120,7 @@ function App() {
         {/* Top toolbar */}
         <header className="flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
           <div className="flex items-center gap-2">
-            <img
-              src={brandLogo}
-              alt="MScompress"
-              className="size-6 object-contain"
-            />
+            <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />
             <span className="text-sm font-semibold tracking-tight">MScompress</span>
             <Badge variant="secondary" className="mono h-5 text-[10px]">
               workbench
@@ -128,9 +133,7 @@ function App() {
               size="icon"
               className="size-7"
               title="View project on GitHub"
-              onClick={() =>
-                window.api.openExternal("https://github.com/chrisagrams/mscompress")
-              }
+              onClick={() => window.api.openExternal("https://github.com/chrisagrams/mscompress")}
             >
               <img src={githubMark} alt="GitHub" className="size-4 dark:invert" />
             </Button>
@@ -143,23 +146,14 @@ function App() {
             >
               <SettingsIcon className="size-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={toggleTheme}
-            >
+            <Button variant="ghost" size="icon" className="size-7" onClick={toggleTheme}>
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
           </div>
         </header>
 
         {settings && (
-          <SettingsDialog
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-            settings={settings}
-          />
+          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} />
         )}
 
         {/* Body: three panes */}
@@ -180,16 +174,25 @@ function App() {
             <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
               <div className="flex h-10 shrink-0 items-center border-b bg-card px-2">
                 <TabsList className="h-8 bg-transparent p-0">
-                  <TabsTrigger value="convert" className="gap-1.5 text-xs data-[state=active]:bg-accent">
+                  <TabsTrigger
+                    value="convert"
+                    className="gap-1.5 text-xs data-[state=active]:bg-accent"
+                  >
                     <FileArchive className="size-3.5" /> Convert
                   </TabsTrigger>
                   <TabsTrigger value="qc" className="gap-1.5 text-xs data-[state=active]:bg-accent">
                     <Activity className="size-3.5" /> QC
                   </TabsTrigger>
-                  <TabsTrigger value="extract" className="gap-1.5 text-xs data-[state=active]:bg-accent">
+                  <TabsTrigger
+                    value="extract"
+                    className="gap-1.5 text-xs data-[state=active]:bg-accent"
+                  >
                     <Scissors className="size-3.5" /> Queue
                   </TabsTrigger>
-                  <TabsTrigger value="archive" className="gap-1.5 text-xs data-[state=active]:bg-accent">
+                  <TabsTrigger
+                    value="archive"
+                    className="gap-1.5 text-xs data-[state=active]:bg-accent"
+                  >
                     <Database className="size-3.5" /> Archive
                   </TabsTrigger>
                 </TabsList>

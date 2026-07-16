@@ -1,17 +1,17 @@
-import { app, shell, BrowserWindow } from 'electron'
-import { join } from 'path'
-import { fileURLToPath } from 'url'
-import { registerIpcHandlers } from './ipc'
-import { configureQueue } from './queue'
-import { configureSettings, loadSettings, onSettingsChange } from './settings'
-import { getNumThreads } from './bindings'
+import { app, shell, BrowserWindow } from "electron"
+import { join } from "path"
+import { fileURLToPath } from "url"
+import { registerIpcHandlers } from "./ipc"
+import { configureQueue } from "./queue"
+import { configureSettings, loadSettings, onSettingsChange } from "./settings"
+import { getNumThreads } from "./bindings"
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
 // App icon (reused from electron/assets). Packaged builds place it under resources.
 const iconPath = app.isPackaged
-  ? join(process.resourcesPath, 'icon.png')
-  : join(__dirname, '../../assets/icons/icon.png')
+  ? join(process.resourcesPath, "icon.png")
+  : join(__dirname, "../../assets/icons/icon.png")
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -21,53 +21,53 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
-    title: 'MScompress',
+    title: "MScompress",
     icon: iconPath,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: "#0a0a0a",
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   })
 
-  mainWindow.on('ready-to-show', () => {
+  mainWindow.on("ready-to-show", () => {
     mainWindow.show()
-    console.log('[main] window ready-to-show')
+    console.log("[main] window ready-to-show")
   })
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[main] renderer did-finish-load — window loaded OK')
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("[main] renderer did-finish-load — window loaded OK")
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
-    return { action: 'deny' }
+    return { action: "deny" }
   })
 
   // Load the renderer: dev server URL in development, built HTML in production.
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (devUrl) {
     void mainWindow.loadURL(devUrl)
   } else {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"))
   }
 }
 
 app.whenReady().then(() => {
   // Persisted global settings (userData/settings.json); defaults from the env.
   configureSettings({
-    dir: app.getPath('userData'),
+    dir: app.getPath("userData"),
     defaultThreads: getNumThreads(),
-    defaultOutputDir: app.getPath('downloads')
+    defaultOutputDir: app.getPath("downloads"),
   })
   const settings = loadSettings()
 
   // The `local-archive` remote destination copies finished outputs here.
   configureQueue({
-    localArchiveDir: join(app.getPath('downloads'), 'MScompress-Archive'),
-    threads: settings.threads
+    localArchiveDir: join(app.getPath("downloads"), "MScompress-Archive"),
+    threads: settings.threads,
   })
   // Keep the queue's thread count in sync with settings.
   onSettingsChange((s) => configureQueue({ threads: s.threads }))
@@ -75,11 +75,11 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   createWindow()
 
-  app.on('activate', () => {
+  app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit()
 })

@@ -20,11 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fmtBytes } from "@/lib/format"
 import type { FileKind } from "@shared/ipc"
 import type { FileEntry } from "@/files"
@@ -175,9 +171,7 @@ export function LeftRail({
                 data-path={f.path}
                 onClick={() => onSelect(f.path)}
                 className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
-                  active
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50"
+                  active ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
                 }`}
               >
                 <ChevronRight
@@ -243,19 +237,14 @@ export function LeftRail({
             </div>
           )}
           {queue.jobs.map((q) => (
-            <div
-              key={q.id}
-              className="rounded-md border border-border/60 bg-card/40 p-2"
-            >
+            <div key={q.id} className="rounded-md border border-border/60 bg-card/40 p-2">
               <div className="flex items-center gap-1.5">
                 {kindIcon(q.kind)}
                 <span className="truncate text-xs">{q.fileName}</span>
               </div>
               <div className="mt-1 flex items-center justify-between">
                 {statusBadge(q.status)}
-                <span className="mono text-[10px] text-muted-foreground">
-                  {q.op}
-                </span>
+                <span className="mono text-[10px] text-muted-foreground">{q.op}</span>
               </div>
               {(q.status === "running" || q.status === "queued") && (
                 <Progress value={q.progress} className="mt-1.5 h-1" />

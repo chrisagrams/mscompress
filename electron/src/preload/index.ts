@@ -1,12 +1,12 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from "electron"
+import type { IpcRendererEvent } from "electron"
 import {
   IPC,
   type Api,
   type AppSettings,
   type ConvertProgress,
-  type QueueState
-} from '../shared/ipc'
+  type QueueState,
+} from "../shared/ipc"
 
 // Typed, channel-whitelisted bridge. The renderer can ONLY reach the main
 // process through these explicit methods — no raw ipcRenderer, no channel
@@ -49,11 +49,11 @@ const api: Api = {
     ipcRenderer.on(IPC.queueUpdate, listener)
     return () => ipcRenderer.removeListener(IPC.queueUpdate, listener)
   },
-  getPathForFile: (file) => webUtils.getPathForFile(file)
+  getPathForFile: (file) => webUtils.getPathForFile(file),
 }
 
 if (process.contextIsolated) {
-  contextBridge.exposeInMainWorld('api', api)
+  contextBridge.exposeInMainWorld("api", api)
 } else {
   // contextIsolation is always on in this app; this branch is a dev safety net.
   ;(globalThis as unknown as { api: Api }).api = api

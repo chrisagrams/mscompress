@@ -18,10 +18,21 @@
     "smoke:bindings": "node scripts/smoke-bindings.ts",
     "test": "node --test test/e2e/app.test.js",
     "test:e2e": "node --test test/e2e/app.test.js",
-    "lint": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "lint": "npm run typecheck && oxlint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.{js,mjs,ts,tsx}\" \"*.{ts,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.{js,mjs,ts,tsx}\" \"*.{ts,json}\"",
     "dist": "npm run build && electron-builder",
     "dist:dir": "npm run build && electron-builder --dir",
     "dist:linux": "npm run build && electron-builder --linux"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write",
+      "oxlint"
+    ],
+    "*.{css,html,json}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -43,6 +54,9 @@
     "electron": "^38.0.0",
     "electron-builder": "^25.1.8",
     "electron-vite": "^5.0.0",
+    "lint-staged": "^17.0.8",
+    "oxlint": "^1.74.0",
+    "prettier": "^3.9.5",
     "puppeteer": "^25.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

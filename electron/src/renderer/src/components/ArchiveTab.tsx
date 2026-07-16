@@ -16,9 +16,7 @@ import type { FileKind, MszxManifest } from "@shared/ipc"
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
       <span className="mono text-right text-xs">{value}</span>
     </div>
   )
@@ -29,15 +27,7 @@ function fmtCreated(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso || "—" : d.toLocaleString()
 }
 
-export function ArchiveTab({
-  path,
-  kind,
-  name,
-}: {
-  path: string
-  kind: FileKind
-  name: string
-}) {
+export function ArchiveTab({ path, kind, name }: { path: string; kind: FileKind; name: string }) {
   const [manifest, setManifest] = useState<MszxManifest | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -76,8 +66,8 @@ export function ArchiveTab({
         <span className="text-sm font-medium">No archive selected</span>
         <p className="max-w-sm text-xs">
           <span className="mono">{name}</span> is a {kind} file. Select an{" "}
-          <span className="mono">.mszx</span> archive in the Explorer to inspect its
-          manifest and annotations.
+          <span className="mono">.mszx</span> archive in the Explorer to inspect its manifest and
+          annotations.
         </p>
       </div>
     )
@@ -110,7 +100,9 @@ export function ArchiveTab({
       <div className="flex items-center gap-2">
         <Database className="size-4 text-chart-2" />
         <h2 className="text-sm font-semibold">MSZX Archive</h2>
-        <Badge variant="secondary" className="mono">v{m.version}</Badge>
+        <Badge variant="secondary" className="mono">
+          v{m.version}
+        </Badge>
         <span className="mono ml-auto text-[11px] text-muted-foreground">{name}</span>
       </div>
 
@@ -166,8 +158,12 @@ export function ArchiveTab({
                   <TableHead className="text-[11px] uppercase tracking-wider">Filename</TableHead>
                   <TableHead className="text-[11px] uppercase tracking-wider">Format</TableHead>
                   <TableHead className="text-[11px] uppercase tracking-wider">Compressed</TableHead>
-                  <TableHead className="text-right text-[11px] uppercase tracking-wider">Records</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider">Description</TableHead>
+                  <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                    Records
+                  </TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-wider">
+                    Description
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -175,7 +171,9 @@ export function ArchiveTab({
                   <TableRow key={a.filename}>
                     <TableCell className="mono text-xs font-medium">{a.filename}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="mono text-[10px]">{a.format}</Badge>
+                      <Badge variant="secondary" className="mono text-[10px]">
+                        {a.format}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {a.compressed ? (

@@ -43,9 +43,7 @@ export function ExtractQueueTab({ queue }: { queue: QueueState }) {
           <Badge variant="secondary" className="mono">
             {done}/{jobs.length} done
           </Badge>
-          <span className="mono text-xs text-muted-foreground">
-            {fmtBytes(total)} total
-          </span>
+          <span className="mono text-xs text-muted-foreground">{fmtBytes(total)} total</span>
           {queue.paused ? (
             <span className="mono text-[11px] text-muted-foreground">paused</span>
           ) : (
@@ -88,9 +86,15 @@ export function ExtractQueueTab({ queue }: { queue: QueueState }) {
                 <TableHead className="text-[11px] uppercase tracking-wider">Op</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Dest</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Status</TableHead>
-                <TableHead className="w-[200px] text-[11px] uppercase tracking-wider">Progress</TableHead>
-                <TableHead className="text-right text-[11px] uppercase tracking-wider">Size</TableHead>
-                <TableHead className="text-right text-[11px] uppercase tracking-wider">Ratio</TableHead>
+                <TableHead className="w-[200px] text-[11px] uppercase tracking-wider">
+                  Progress
+                </TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                  Size
+                </TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                  Ratio
+                </TableHead>
                 <TableHead className="w-8" />
               </TableRow>
             </TableHeader>
@@ -105,7 +109,10 @@ export function ExtractQueueTab({ queue }: { queue: QueueState }) {
                   <TableCell>
                     <StatusPill status={q.status} />
                     {q.status === "error" && q.error && (
-                      <div className="mono mt-0.5 max-w-[220px] truncate text-[10px] text-destructive" title={q.error}>
+                      <div
+                        className="mono mt-0.5 max-w-[220px] truncate text-[10px] text-destructive"
+                        title={q.error}
+                      >
                         {q.error}
                       </div>
                     )}

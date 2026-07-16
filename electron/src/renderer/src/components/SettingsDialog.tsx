@@ -41,7 +41,10 @@ export function SettingsDialog({
   const [maxThreads, setMaxThreads] = useState(16)
 
   useEffect(() => {
-    window.api.getNumThreads().then((n) => setMaxThreads(Math.max(n, settings.threads))).catch(() => {})
+    window.api
+      .getNumThreads()
+      .then((n) => setMaxThreads(Math.max(n, settings.threads)))
+      .catch(() => {})
   }, [settings.threads])
 
   const update = (partial: Partial<AppSettings>) => {
@@ -58,9 +61,7 @@ export function SettingsDialog({
       <DialogContent data-testid="settings-dialog" className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            Persisted to disk and applied across the app.
-          </DialogDescription>
+          <DialogDescription>Persisted to disk and applied across the app.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">

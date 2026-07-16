@@ -2,19 +2,19 @@
 // launches Puppeteer against it. The renderer only ever talks to the main
 // process through `window.api`, so tests inject a deterministic stub for it
 // (see stub.js) — this exercises the real UI wiring without the native binding.
-import { createServer } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import puppeteer from 'puppeteer'
-import { existsSync, readdirSync } from 'node:fs'
-import { resolve, dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { homedir } from 'node:os'
-import { installApiStub, fixtures } from './stub.js'
+import { createServer } from "vite"
+import react from "@vitejs/plugin-react"
+import tailwindcss from "@tailwindcss/vite"
+import puppeteer from "puppeteer"
+import { existsSync, readdirSync } from "node:fs"
+import { resolve, dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { homedir } from "node:os"
+import { installApiStub, fixtures } from "./stub.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const electronRoot = resolve(__dirname, '../..')
-const rendererRoot = resolve(electronRoot, 'src/renderer')
+const electronRoot = resolve(__dirname, "../..")
+const rendererRoot = resolve(electronRoot, "src/renderer")
 
 /** Start a Vite dev server serving just the renderer. Returns { url, close }. */
 export async function startRenderer() {
@@ -23,13 +23,13 @@ export async function startRenderer() {
     root: rendererRoot,
     resolve: {
       alias: {
-        '@': resolve(electronRoot, 'src/renderer/src'),
-        '@shared': resolve(electronRoot, 'src/shared')
-      }
+        "@": resolve(electronRoot, "src/renderer/src"),
+        "@shared": resolve(electronRoot, "src/shared"),
+      },
     },
     plugins: [react(), tailwindcss()],
-    logLevel: 'error',
-    server: { host: '127.0.0.1', strictPort: false }
+    logLevel: "error",
+    server: { host: "127.0.0.1", strictPort: false },
   })
   await server.listen()
   const { port } = server.httpServer.address()
@@ -49,26 +49,26 @@ function browserCandidates() {
   } catch {
     /* no bundled browser configured */
   }
-  const pwRoot = join(homedir(), '.cache', 'ms-playwright')
+  const pwRoot = join(homedir(), ".cache", "ms-playwright")
   if (existsSync(pwRoot)) {
     for (const dir of readdirSync(pwRoot)) {
-      if (dir.startsWith('chromium-') && !dir.includes('headless')) {
-        out.push(join(pwRoot, dir, 'chrome-linux', 'chrome'))
+      if (dir.startsWith("chromium-") && !dir.includes("headless")) {
+        out.push(join(pwRoot, dir, "chrome-linux", "chrome"))
       }
     }
   }
   out.push(
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser'
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
   )
   return out
 }
 
 /** Launch a headless Chromium, trying candidates until one actually starts. */
 export async function launchBrowser() {
-  const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+  const args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
   let lastErr
   for (const executablePath of browserCandidates()) {
     if (!existsSync(executablePath)) continue
@@ -83,9 +83,9 @@ export async function launchBrowser() {
     return await puppeteer.launch({ headless: true, args })
   } catch (e) {
     throw new Error(
-      `Could not launch any Chromium. Tried: ${browserCandidates().join(', ')}\nLast error: ${
+      `Could not launch any Chromium. Tried: ${browserCandidates().join(", ")}\nLast error: ${
         lastErr?.message ?? e.message
-      }`
+      }`,
     )
   }
 }
@@ -98,11 +98,11 @@ export async function openApp(browser, url) {
   const page = await browser.newPage()
   await page.setViewport({ width: 1440, height: 900 })
   const errors = []
-  page.on('pageerror', (e) => errors.push(e))
+  page.on("pageerror", (e) => errors.push(e))
   page._errors = errors
   // Runs before any page script — bypasses the page CSP and defines window.api.
   await page.evaluateOnNewDocument(installApiStub, fixtures)
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.waitForSelector('header', { timeout: 60_000 })
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
+  await page.waitForSelector("header", { timeout: 60_000 })
   return page
 }

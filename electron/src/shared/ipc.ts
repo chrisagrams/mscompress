@@ -4,47 +4,47 @@
 
 /** Whitelisted IPC channels. The preload bridge only ever invokes these. */
 export const IPC = {
-  openFiles: 'dialog:openFiles',
-  openOutputDir: 'dialog:openOutputDir',
-  openExternal: 'shell:openExternal',
-  revealInFolder: 'shell:revealInFolder',
-  getDefaultOutputDir: 'app:getDefaultOutputDir',
-  getVersion: 'sys:getVersion',
-  getNumThreads: 'sys:getNumThreads',
-  getFilesize: 'fs:getFilesize',
-  analyze: 'file:analyze',
-  computeQC: 'qc:compute',
-  readMszx: 'archive:read',
-  settingsGet: 'settings:get',
-  settingsSet: 'settings:set',
+  openFiles: "dialog:openFiles",
+  openOutputDir: "dialog:openOutputDir",
+  openExternal: "shell:openExternal",
+  revealInFolder: "shell:revealInFolder",
+  getDefaultOutputDir: "app:getDefaultOutputDir",
+  getVersion: "sys:getVersion",
+  getNumThreads: "sys:getNumThreads",
+  getFilesize: "fs:getFilesize",
+  analyze: "file:analyze",
+  computeQC: "qc:compute",
+  readMszx: "archive:read",
+  settingsGet: "settings:get",
+  settingsSet: "settings:set",
   // main -> renderer settings-change broadcast (webContents.send)
-  settingsChange: 'settings:change',
-  compress: 'convert:compress',
-  decompress: 'convert:decompress',
-  extract: 'convert:extract',
+  settingsChange: "settings:change",
+  compress: "convert:compress",
+  decompress: "convert:decompress",
+  extract: "convert:extract",
   // main -> renderer streamed progress (webContents.send)
-  convertProgress: 'convert:progress',
+  convertProgress: "convert:progress",
   // MSTransfer batch queue
-  queueAdd: 'queue:add',
-  queueStart: 'queue:start',
-  queuePause: 'queue:pause',
-  queueClear: 'queue:clear',
-  queueRemove: 'queue:remove',
-  queueGetState: 'queue:getState',
+  queueAdd: "queue:add",
+  queueStart: "queue:start",
+  queuePause: "queue:pause",
+  queueClear: "queue:clear",
+  queueRemove: "queue:remove",
+  queueGetState: "queue:getState",
   // main -> renderer queue-state broadcast (webContents.send)
-  queueUpdate: 'queue:update'
+  queueUpdate: "queue:update",
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
 
 /** Lossy pre-processing algorithms for m/z and intensity arrays. */
-export type LossyAlgo = 'none' | 'cast' | 'log' | 'delta16' | 'delta32' | 'vbr'
+export type LossyAlgo = "none" | "cast" | "log" | "delta16" | "delta32" | "vbr"
 
 /** Compression presets shown in the Convert UI. */
-export type Preset = 'fastest' | 'fast' | 'default' | 'better'
+export type Preset = "fastest" | "fast" | "default" | "better"
 
 /** How an extract selects its spectra subset. */
-export type ExtractMode = 'mslevel' | 'scan' | 'index'
+export type ExtractMode = "mslevel" | "scan" | "index"
 
 /**
  * Preset → concrete settings. The Advanced accordion overrides these per-field.
@@ -55,10 +55,10 @@ export const COMPRESSION_PRESETS: Record<
   Preset,
   { zstdLevel: number; mzLossy: LossyAlgo; intLossy: LossyAlgo }
 > = {
-  fastest: { zstdLevel: 1, mzLossy: 'none', intLossy: 'none' },
-  fast: { zstdLevel: 3, mzLossy: 'none', intLossy: 'none' },
-  default: { zstdLevel: 9, mzLossy: 'none', intLossy: 'none' },
-  better: { zstdLevel: 19, mzLossy: 'none', intLossy: 'none' }
+  fastest: { zstdLevel: 1, mzLossy: "none", intLossy: "none" },
+  fast: { zstdLevel: 3, mzLossy: "none", intLossy: "none" },
+  default: { zstdLevel: 9, mzLossy: "none", intLossy: "none" },
+  better: { zstdLevel: 19, mzLossy: "none", intLossy: "none" },
 }
 
 export interface CompressOptions {
@@ -83,14 +83,14 @@ export interface ExtractOptions {
   toScan?: number
   fromIndex?: number
   toIndex?: number
-  outputFormat: 'mzML' | 'msz'
+  outputFormat: "mzML" | "msz"
   threads?: number
   outputDir?: string
 }
 
 /** Plain result of a convert operation (error reported structurally). */
 export interface ConvertResult {
-  op: 'compress' | 'decompress' | 'extract'
+  op: "compress" | "decompress" | "extract"
   outPath: string
   inputBytes: number
   outputBytes: number
@@ -103,8 +103,8 @@ export interface ConvertResult {
 /** Streamed progress event (main → renderer). */
 export interface ConvertProgress {
   id: string
-  op: 'compress' | 'decompress' | 'extract'
-  phase: 'start' | 'step' | 'done' | 'error'
+  op: "compress" | "decompress" | "extract"
+  phase: "start" | "step" | "done" | "error"
   file: string
   message?: string
   result?: ConvertResult
@@ -121,7 +121,7 @@ export interface AppSettings {
   defaultOutputDir: string
   /** Default compression preset. */
   defaultPreset: Preset
-  theme: 'dark' | 'light'
+  theme: "dark" | "light"
 }
 
 // ---- MSZX archive ----------------------------------------------------------
@@ -151,23 +151,28 @@ export interface MszxManifest {
 
 // ---- MSTransfer batch queue ------------------------------------------------
 
-export type QueueOp = 'compress' | 'decompress' | 'extract'
-export type QueueStatus = 'queued' | 'running' | 'done' | 'error'
+export type QueueOp = "compress" | "decompress" | "extract"
+export type QueueStatus = "queued" | "running" | "done" | "error"
 
 /** A remote destination for finished outputs. */
 export interface RemoteDestination {
   id: string
   label: string
-  type: 'local' | 'ssh' | 's3'
+  type: "local" | "ssh" | "s3"
   /** local destinations are wired end-to-end; ssh/s3 are input-validating stubs. */
   configured: boolean
 }
 
 /** Stub destination list (a real settings store arrives in a later task). */
 export const REMOTE_DESTINATIONS: RemoteDestination[] = [
-  { id: 'local-archive', label: 'local-archive · MScompress-Archive', type: 'local', configured: true },
-  { id: 'ssh-hpc', label: 'hpc · cgrams@aurora:/flare', type: 'ssh', configured: false },
-  { id: 's3-lab', label: 'storage-a · s3://lab-archive', type: 's3', configured: false }
+  {
+    id: "local-archive",
+    label: "local-archive · MScompress-Archive",
+    type: "local",
+    configured: true,
+  },
+  { id: "ssh-hpc", label: "hpc · cgrams@aurora:/flare", type: "ssh", configured: false },
+  { id: "s3-lab", label: "storage-a · s3://lab-archive", type: "s3", configured: false },
 ]
 
 /** A single serializable queue job (settings are held privately in main). */
@@ -207,11 +212,11 @@ export interface QueueAddRequest {
   settings: CompressOptions | DecompressOptions | ExtractOptions
   destinationId?: string
   remotePath?: string
-  transferMode?: 'copy' | 'move'
+  transferMode?: "copy" | "move"
 }
 
 /** Recognized source file kinds. */
-export type FileKind = 'mzML' | 'msz' | 'mszx'
+export type FileKind = "mzML" | "msz" | "mszx"
 
 /**
  * Plain, JSON-serializable summary of a file produced by the main process via

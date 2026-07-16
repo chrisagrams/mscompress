@@ -4,70 +4,70 @@
 // real repo test data in ../test/data (test.mzML has 50 spectra, etc.) but the
 // files are never actually read — this exercises UI wiring, not the C library.
 
-const mzML = '/fixtures/test.mzML'
-const msz = '/fixtures/test.msz'
-const mszx = '/fixtures/test.mszx'
+const mzML = "/fixtures/test.mzML"
+const msz = "/fixtures/test.msz"
+const mszx = "/fixtures/test.mszx"
 
 export const fixtures = {
-  version: '1.2.3-test',
+  version: "1.2.3-test",
   numThreads: 16,
-  defaultOutputDir: '/home/lab/Downloads',
+  defaultOutputDir: "/home/lab/Downloads",
   settings: {
     threads: 8,
-    defaultOutputDir: '/home/lab/Downloads',
-    defaultPreset: 'default',
-    theme: 'dark'
+    defaultOutputDir: "/home/lab/Downloads",
+    defaultPreset: "default",
+    theme: "dark",
   },
   openFilesResult: [mzML, msz, mszx],
   files: {
     [mzML]: {
       path: mzML,
-      fileName: 'test.mzML',
-      kind: 'mzML',
+      fileName: "test.mzML",
+      kind: "mzML",
       filesizeBytes: 4_946_404,
       spectrumCount: 50,
-      mzFormat: 'float64',
-      intensityFormat: 'float32',
-      sourceCompression: 'zlib',
+      mzFormat: "float64",
+      intensityFormat: "float32",
+      sourceCompression: "zlib",
       msLevelCounts: [
-        { level: 'MS1', count: 10 },
-        { level: 'MS2', count: 40 }
+        { level: "MS1", count: 10 },
+        { level: "MS2", count: 40 },
       ],
       rtRangeSec: [0.5, 1800.2],
-      accessions: null
+      accessions: null,
     },
     [msz]: {
       path: msz,
-      fileName: 'test.msz',
-      kind: 'msz',
+      fileName: "test.msz",
+      kind: "msz",
       filesizeBytes: 952_047,
       spectrumCount: 50,
-      mzFormat: 'float64',
-      intensityFormat: 'float32',
-      sourceCompression: 'zstd',
+      mzFormat: "float64",
+      intensityFormat: "float32",
+      sourceCompression: "zstd",
       msLevelCounts: [
-        { level: 'MS1', count: 10 },
-        { level: 'MS2', count: 40 }
+        { level: "MS1", count: 10 },
+        { level: "MS2", count: 40 },
       ],
       rtRangeSec: [0.5, 1800.2],
-      accessions: null
+      accessions: null,
     },
     [mszx]: {
       path: mszx,
-      fileName: 'test.mszx',
-      kind: 'mszx',
+      fileName: "test.mszx",
+      kind: "mszx",
       filesizeBytes: 931_811,
       spectrumCount: 50,
-      mzFormat: 'float64',
-      intensityFormat: 'float32',
-      sourceCompression: 'zstd',
+      mzFormat: "float64",
+      intensityFormat: "float32",
+      sourceCompression: "zstd",
       msLevelCounts: [
-        { level: 'MS1', count: 10 },
-        { level: 'MS2', count: 40 }
+        { level: "MS1", count: 10 },
+        { level: "MS2", count: 40 },
       ],
       rtRangeSec: [0.5, 1800.2],
-      accessions: null
-    }
+      accessions: null,
+    },
   },
   qc: {
     spectrumCount: 50,
@@ -77,14 +77,14 @@ export const fixtures = {
       { rt: 0.4, tic: 5_400_000 },
       { rt: 0.7, tic: 8_100_000 },
       { rt: 1.0, tic: 4_300_000 },
-      { rt: 1.3, tic: 2_600_000 }
+      { rt: 1.3, tic: 2_600_000 },
     ],
     bpc: [
       { rt: 0.1, bpc: 900_000 },
       { rt: 0.4, bpc: 2_100_000 },
       { rt: 0.7, bpc: 3_300_000 },
       { rt: 1.0, bpc: 1_600_000 },
-      { rt: 1.3, bpc: 1_050_000 }
+      { rt: 1.3, bpc: 1_050_000 },
     ],
     heatmap: {
       rtBins: 6,
@@ -99,48 +99,48 @@ export const fixtures = {
             cells.push({
               rt: (r / 6) * 1.3,
               mz: 300 + (m / 4) * 1200,
-              density: ((r + m) % 5) / 4
+              density: ((r + m) % 5) / 4,
             })
           }
         }
         return cells
-      })()
+      })(),
     },
     msLevelCounts: [
-      { level: 'MS1', count: 10 },
-      { level: 'MS2', count: 40 }
+      { level: "MS1", count: 10 },
+      { level: "MS2", count: 40 },
     ],
     peaksPerSpectrum: [
-      { bin: '0-100', count: 6 },
-      { bin: '100-250', count: 18 },
-      { bin: '250-500', count: 20 },
-      { bin: '500+', count: 6 }
-    ]
+      { bin: "0-100", count: 6 },
+      { bin: "100-250", count: 18 },
+      { bin: "250-500", count: 20 },
+      { bin: "500+", count: 6 },
+    ],
   },
   manifest: {
-    version: '1.0',
-    created_at: '2026-05-12T14:03:22Z',
-    spectra_file: 'spectra.msz',
+    version: "1.0",
+    created_at: "2026-05-12T14:03:22Z",
+    spectra_file: "spectra.msz",
     num_spectra: 50,
-    join_key: 'scan_number',
-    source_file: 'test.mzML',
-    description: 'HEK293 tryptic digest, Orbitrap, DDA',
+    join_key: "scan_number",
+    source_file: "test.mzML",
+    description: "HEK293 tryptic digest, Orbitrap, DDA",
     annotations: [
       {
-        filename: 'psms.percolator.tsv',
-        format: 'percolator_tsv',
+        filename: "psms.percolator.tsv",
+        format: "percolator_tsv",
         compressed: true,
         num_records: 128,
-        description: 'Percolator PSMs (q<0.01)'
+        description: "Percolator PSMs (q<0.01)",
       },
       {
-        filename: 'peptides.pep.xml',
-        format: 'pepxml',
+        filename: "peptides.pep.xml",
+        format: "pepxml",
         compressed: false,
         num_records: 96,
-        description: 'Comet search results'
-      }
-    ]
+        description: "Comet search results",
+      },
+    ],
   },
   queue: {
     running: 1,
@@ -148,29 +148,29 @@ export const fixtures = {
     maxConcurrency: 2,
     jobs: [
       {
-        id: 'q1',
+        id: "q1",
         filePath: mzML,
-        fileName: 'test.mzML',
-        kind: 'mzML',
-        op: 'compress',
-        status: 'done',
+        fileName: "test.mzML",
+        kind: "mzML",
+        op: "compress",
+        status: "done",
         progress: 100,
         sizeBytes: 4_946_404,
         ratio: 0.28,
-        destinationId: 'local-archive'
+        destinationId: "local-archive",
       },
       {
-        id: 'q2',
-        filePath: '/fixtures/sciex_ttof6600_100.mzML',
-        fileName: 'sciex_ttof6600_100.mzML',
-        kind: 'mzML',
-        op: 'compress',
-        status: 'running',
+        id: "q2",
+        filePath: "/fixtures/sciex_ttof6600_100.mzML",
+        fileName: "sciex_ttof6600_100.mzML",
+        kind: "mzML",
+        op: "compress",
+        status: "running",
         progress: 42,
-        sizeBytes: 909_920
-      }
-    ]
-  }
+        sizeBytes: 909_920,
+      },
+    ],
+  },
 }
 
 /**
@@ -191,8 +191,8 @@ export function installApiStub(fx) {
     // Unknown path → error summary (Inspector renders the failure branch).
     return {
       path,
-      fileName: path.split('/').pop() || path,
-      kind: 'mzML',
+      fileName: path.split("/").pop() || path,
+      kind: "mzML",
       filesizeBytes: 0,
       spectrumCount: null,
       mzFormat: null,
@@ -201,13 +201,13 @@ export function installApiStub(fx) {
       msLevelCounts: [],
       rtRangeSec: [0, 0],
       accessions: null,
-      error: 'unknown fixture'
+      error: "unknown fixture",
     }
   }
 
   window.api = {
     openFiles: () => Promise.resolve(fx.openFilesResult.slice()),
-    openOutputDir: () => Promise.resolve('/home/lab/picked'),
+    openOutputDir: () => Promise.resolve("/home/lab/picked"),
     openExternal: () => Promise.resolve(),
     revealInFolder: () => Promise.resolve(),
     getDefaultOutputDir: () => Promise.resolve(fx.defaultOutputDir),
@@ -233,33 +233,33 @@ export function installApiStub(fx) {
     },
     compress: (path) =>
       Promise.resolve({
-        op: 'compress',
-        outPath: path.replace(/\.mzML$/, '.msz'),
+        op: "compress",
+        outPath: path.replace(/\.mzML$/, ".msz"),
         inputBytes: 4_946_404,
         outputBytes: 1_384_993,
         ratio: 0.28,
-        elapsedMs: 812
+        elapsedMs: 812,
       }),
     decompress: (path) =>
       Promise.resolve({
-        op: 'decompress',
-        outPath: path.replace(/\.msz$/, '.mzML'),
+        op: "decompress",
+        outPath: path.replace(/\.msz$/, ".mzML"),
         inputBytes: 952_047,
         outputBytes: 4_946_404,
         ratio: 5.2,
-        elapsedMs: 420
+        elapsedMs: 420,
       }),
     extract: (path) =>
       Promise.resolve({
-        op: 'extract',
-        outPath: path.replace(/\.\w+$/, '.subset.mzML'),
+        op: "extract",
+        outPath: path.replace(/\.\w+$/, ".subset.mzML"),
         inputBytes: 4_946_404,
         outputBytes: 2_100_000,
         ratio: 0.42,
-        elapsedMs: 260
+        elapsedMs: 260,
       }),
     onConvertProgress: () => () => {},
-    addQueueJob: () => Promise.resolve('job-stub-1'),
+    addQueueJob: () => Promise.resolve("job-stub-1"),
     startQueue: () => Promise.resolve(),
     pauseQueue: () => Promise.resolve(),
     clearQueue: () => Promise.resolve(),
@@ -272,6 +272,6 @@ export function installApiStub(fx) {
         if (i >= 0) queueListeners.splice(i, 1)
       }
     },
-    getPathForFile: (file) => '/fixtures/' + (file && file.name ? file.name : 'dropped')
+    getPathForFile: (file) => "/fixtures/" + (file && file.name ? file.name : "dropped"),
   }
 }

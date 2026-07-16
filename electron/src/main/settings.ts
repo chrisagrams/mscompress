@@ -2,11 +2,11 @@
 // the main process injects the storage dir + environment-derived defaults via
 // configureSettings(); everything else is plain fs + JSON with validation and
 // safe fallbacks when the file is missing or corrupt.
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import type { AppSettings, Preset } from '../shared/ipc.ts'
+import { mkdirSync, readFileSync, writeFileSync } from "fs"
+import { join } from "path"
+import type { AppSettings, Preset } from "../shared/ipc.ts"
 
-const PRESETS: Preset[] = ['fastest', 'fast', 'default', 'better']
+const PRESETS: Preset[] = ["fastest", "fast", "default", "better"]
 
 type Listener = (settings: AppSettings) => void
 
@@ -17,7 +17,7 @@ interface SettingsEnv {
   defaultOutputDir: string
 }
 
-const env: SettingsEnv = { dir: '', defaultThreads: 1, defaultOutputDir: '' }
+const env: SettingsEnv = { dir: "", defaultThreads: 1, defaultOutputDir: "" }
 const listeners = new Set<Listener>()
 let cache: AppSettings | null = null
 
@@ -30,35 +30,35 @@ export function configureSettings(opts: Partial<SettingsEnv>): void {
 }
 
 function filePath(): string {
-  return join(env.dir, 'settings.json')
+  return join(env.dir, "settings.json")
 }
 
 function defaults(): AppSettings {
   return {
     threads: env.defaultThreads,
     defaultOutputDir: env.defaultOutputDir,
-    defaultPreset: 'default',
-    theme: 'dark'
+    defaultPreset: "default",
+    theme: "dark",
   }
 }
 
 /** Coerce arbitrary parsed JSON into a valid AppSettings, filling gaps. */
 function sanitize(raw: unknown): AppSettings {
   const d = defaults()
-  if (!raw || typeof raw !== 'object') return d
+  if (!raw || typeof raw !== "object") return d
   const o = raw as Record<string, unknown>
   const threads =
-    typeof o.threads === 'number' && Number.isFinite(o.threads)
+    typeof o.threads === "number" && Number.isFinite(o.threads)
       ? Math.min(1024, Math.max(1, Math.round(o.threads)))
       : d.threads
   const defaultOutputDir =
-    typeof o.defaultOutputDir === 'string' && o.defaultOutputDir.length > 0
+    typeof o.defaultOutputDir === "string" && o.defaultOutputDir.length > 0
       ? o.defaultOutputDir
       : d.defaultOutputDir
   const defaultPreset = PRESETS.includes(o.defaultPreset as Preset)
     ? (o.defaultPreset as Preset)
     : d.defaultPreset
-  const theme = o.theme === 'light' || o.theme === 'dark' ? o.theme : d.theme
+  const theme = o.theme === "light" || o.theme === "dark" ? o.theme : d.theme
   return { threads, defaultOutputDir, defaultPreset, theme }
 }
 
@@ -67,7 +67,7 @@ export function loadSettings(): AppSettings {
   if (cache) return cache
   let parsed: unknown = null
   try {
-    parsed = JSON.parse(readFileSync(filePath(), 'utf-8'))
+    parsed = JSON.parse(readFileSync(filePath(), "utf-8"))
   } catch {
     // Missing or corrupt → fall back to defaults and rewrite a clean file.
     parsed = null
@@ -86,7 +86,7 @@ export function getSettings(): AppSettings {
 function save(settings: AppSettings): void {
   try {
     mkdirSync(env.dir, { recursive: true })
-    writeFileSync(filePath(), JSON.stringify(settings, null, 2), 'utf-8')
+    writeFileSync(filePath(), JSON.stringify(settings, null, 2), "utf-8")
   } catch {
     // Non-fatal: keep the in-memory value even if the disk write fails.
   }

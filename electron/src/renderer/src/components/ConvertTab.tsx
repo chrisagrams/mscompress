@@ -25,21 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { compressionProfiles } from "@/lib/profiles"
 import { fmtBytes } from "@/lib/format"
 import { COMPRESSION_PRESETS, REMOTE_DESTINATIONS } from "@shared/ipc"
@@ -227,8 +220,18 @@ export function ConvertTab({
   }
 
   const opItems: { value: Op; label: string; icon: typeof FileArchive; hint: string }[] = [
-    { value: "compress", label: "Compress → .msz", icon: FileArchive, hint: "Only mzML files can be compressed" },
-    { value: "decompress", label: "Decompress → .mzML", icon: FileDown, hint: "Only compressed files can be decompressed" },
+    {
+      value: "compress",
+      label: "Compress → .msz",
+      icon: FileArchive,
+      hint: "Only mzML files can be compressed",
+    },
+    {
+      value: "decompress",
+      label: "Decompress → .mzML",
+      icon: FileDown,
+      hint: "Only compressed files can be decompressed",
+    },
     { value: "extract", label: "Extract", icon: Scissors, hint: "Extract a subset of spectra" },
   ]
 
@@ -261,7 +264,9 @@ export function ConvertTab({
               )
               // Wrap disabled items so the tooltip explains why they're greyed out.
               return enabled ? (
-                <div key={value} className="flex-1">{item}</div>
+                <div key={value} className="flex-1">
+                  {item}
+                </div>
               ) : (
                 <Tooltip key={value}>
                   <TooltipTrigger asChild>
@@ -346,13 +351,7 @@ export function ConvertTab({
                       <SectionLabel>zstd level</SectionLabel>
                       <span className="mono text-xs">{zstd[0]}</span>
                     </div>
-                    <Slider
-                      value={zstd}
-                      onValueChange={setZstd}
-                      min={1}
-                      max={22}
-                      step={1}
-                    />
+                    <Slider value={zstd} onValueChange={setZstd} min={1} max={22} step={1} />
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -488,11 +487,7 @@ export function ConvertTab({
             <TabsContent value="local" className="mt-3 space-y-1.5">
               <SectionLabel>Output directory</SectionLabel>
               <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={outputDir}
-                  className="mono text-xs"
-                />
+                <Input readOnly value={outputDir} className="mono text-xs" />
                 <Button
                   variant="secondary"
                   size="icon"
@@ -559,20 +554,15 @@ export function ConvertTab({
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Remote jobs are handed to the MSTransfer queue and run in the background.
-                Only local-archive is wired end-to-end; ssh/s3 are validated stubs.
+                Remote jobs are handed to the MSTransfer queue and run in the background. Only
+                local-archive is wired end-to-end; ssh/s3 are validated stubs.
               </p>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      <Button
-        size="lg"
-        className="w-full gap-2"
-        disabled={running || !allowed[op]}
-        onClick={run}
-      >
+      <Button size="lg" className="w-full gap-2" disabled={running || !allowed[op]} onClick={run}>
         {running ? (
           <Loader2 className="size-4 animate-spin" />
         ) : outputTarget === "remote" ? (
@@ -602,9 +592,7 @@ export function ConvertTab({
       {running && (
         <div className="space-y-1.5">
           <Progress value={progress} className="h-1.5" />
-          <div className="mono text-[11px] text-muted-foreground">
-            {phase || "starting"}…
-          </div>
+          <div className="mono text-[11px] text-muted-foreground">{phase || "starting"}…</div>
         </div>
       )}
 
@@ -617,9 +605,7 @@ export function ConvertTab({
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <div>
                   <div className="font-medium">{result.op} failed</div>
-                  <p className="mono mt-1 text-[11px] text-muted-foreground">
-                    {result.error}
-                  </p>
+                  <p className="mono mt-1 text-[11px] text-muted-foreground">{result.error}</p>
                 </div>
               </div>
             ) : (

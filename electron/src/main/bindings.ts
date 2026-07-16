@@ -1,11 +1,11 @@
 // Thin main-process wrapper around the native `mscompress` node-ts binding.
 // This module is the ONLY place the addon is required, and it must never be
 // imported from the renderer (it is externalized from the Vite bundle).
-import { createRequire } from 'module'
-import { existsSync, statSync } from 'fs'
-import { basename, dirname, extname, join } from 'path'
-import { hrtime } from 'process'
-import { COMPRESSION_PRESETS } from '../shared/ipc.ts'
+import { createRequire } from "module"
+import { existsSync, statSync } from "fs"
+import { basename, dirname, extname, join } from "path"
+import { hrtime } from "process"
+import { COMPRESSION_PRESETS } from "../shared/ipc.ts"
 import type {
   CompressOptions,
   ConvertResult,
@@ -17,8 +17,8 @@ import type {
   MszxManifest,
   LossyAlgo,
   QCData,
-  QCOptions
-} from '../shared/ipc.ts'
+  QCOptions,
+} from "../shared/ipc.ts"
 
 // The binding ships as ESM; require(ESM) (Node 22.12+/Electron 38) loads its
 // namespace synchronously, which is all we need for these cheap header reads.
@@ -121,12 +121,12 @@ let cached: MscompressModule | null = null
  */
 function loadModule(): MscompressModule {
   const resourced = process.resourcesPath
-    ? join(process.resourcesPath, 'node-ts', 'dist', 'index.js')
-    : ''
+    ? join(process.resourcesPath, "node-ts", "dist", "index.js")
+    : ""
   if (resourced && existsSync(resourced)) {
     return require(resourced) as MscompressModule
   }
-  return require('mscompress') as MscompressModule
+  return require("mscompress") as MscompressModule
 }
 
 function mod(): MscompressModule {
@@ -138,21 +138,21 @@ function mod(): MscompressModule {
 
 /** Coerce a possibly-BigInt native size to a plain, IPC-safe number. */
 function toNumber(v: number | bigint): number {
-  return typeof v === 'bigint' ? Number(v) : v
+  return typeof v === "bigint" ? Number(v) : v
 }
 
 // PSI-MS accession codes → human-readable labels (mirrors the C core).
 const MZ_FMT: Record<number, string> = {
-  1000519: 'int32',
-  1000520: 'float16',
-  1000521: 'float32',
-  1000522: 'int64',
-  1000523: 'float64'
+  1000519: "int32",
+  1000520: "float16",
+  1000521: "float32",
+  1000522: "int64",
+  1000523: "float64",
 }
 const COMPRESSION: Record<number, string> = {
-  1000574: 'zlib',
-  1000576: 'none',
-  4700001: 'zstd'
+  1000574: "zlib",
+  1000576: "none",
+  4700001: "zstd",
 }
 
 // Lossy algorithm → target-format accession code (from src/mscompress.h). "none"
@@ -163,7 +163,7 @@ const LOSSY_FORMAT: Record<LossyAlgo, number> = {
   log: 4700003, // _log2_transform_
   delta16: 4700004, // _delta16_transform_
   delta32: 4700006, // _delta32_transform_
-  vbr: 4700007 // _vbr_
+  vbr: 4700007, // _vbr_
 }
 
 // Cap the peak-decode integrity probe so huge files stay responsive; corruption
@@ -176,9 +176,9 @@ function fmtLabel(map: Record<number, string>, code: number): string | null {
 
 function kindFromPath(path: string): FileKind {
   const ext = extname(path).toLowerCase()
-  if (ext === '.msz') return 'msz'
-  if (ext === '.mszx') return 'mszx'
-  return 'mzML'
+  if (ext === ".msz") return "msz"
+  if (ext === ".mszx") return "mszx"
+  return "mzML"
 }
 
 /** Group per-spectrum MS levels into ordered MS1/MS2/MSn counts. */
@@ -192,9 +192,9 @@ function msLevelCounts(levels: Uint16Array): MsLevelCount[] {
     else ms1++
   }
   const out: MsLevelCount[] = []
-  if (ms1) out.push({ level: 'MS1', count: ms1 })
-  if (ms2) out.push({ level: 'MS2', count: ms2 })
-  if (msn) out.push({ level: 'MSn', count: msn })
+  if (ms1) out.push({ level: "MS1", count: ms1 })
+  if (ms2) out.push({ level: "MS2", count: ms2 })
+  if (msn) out.push({ level: "MSn", count: msn })
   return out
 }
 
@@ -230,7 +230,7 @@ function probeIntegrity(file: MsFile): void {
 
 /** Open a file by kind: mszx uses MSZXFile.open (read() can't detect the tar). */
 function openFile(path: string, kind: FileKind): MsFile {
-  return kind === 'mszx' ? mod().MSZXFile.open(path) : mod().read(path)
+  return kind === "mszx" ? mod().MSZXFile.open(path) : mod().read(path)
 }
 
 export function getVersion(): string {
@@ -265,7 +265,7 @@ export function analyze(path: string): FileSummary {
     sourceCompression: null,
     msLevelCounts: [],
     rtRangeSec: [0, 0],
-    accessions: null
+    accessions: null,
   }
 
   let file: MsFile | null = null
@@ -281,7 +281,7 @@ export function analyze(path: string): FileSummary {
       sourceCompression: fmtLabel(COMPRESSION, fmt.sourceCompression),
       msLevelCounts: msLevelCounts(file.positions.msLevels),
       rtRangeSec: rtRange(file.positions.retTimes),
-      accessions: fmt.toDict()
+      accessions: fmt.toDict(),
     }
     // Surfaces corrupt peak data that header parsing alone would miss.
     probeIntegrity(file)
@@ -297,7 +297,7 @@ export function analyze(path: string): FileSummary {
     return {
       ...base,
       filesizeBytes,
-      error: err instanceof Error ? err.message : String(err)
+      error: err instanceof Error ? err.message : String(err),
     }
   } finally {
     file?.close()
@@ -315,14 +315,14 @@ export function analyze(path: string): FileSummary {
 export function readMszx(path: string): MszxManifest {
   const base: MszxManifest = {
     path,
-    version: '',
-    created_at: '',
-    spectra_file: '',
+    version: "",
+    created_at: "",
+    spectra_file: "",
     num_spectra: 0,
-    join_key: '',
+    join_key: "",
     source_file: null,
     description: null,
-    annotations: []
+    annotations: [],
   }
 
   let file: MsMszxFile | null = null
@@ -343,8 +343,8 @@ export function readMszx(path: string): MszxManifest {
         format: a.format,
         compressed: Boolean(a.compressed),
         num_records: a.num_records != null ? toNumber(a.num_records) : null,
-        description: a.description ?? null
-      }))
+        description: a.description ?? null,
+      })),
     }
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : String(err) }
@@ -362,13 +362,13 @@ const QC_DEFAULT_TIC_POINTS = 300
 const QC_RT_BINS = 80
 const QC_MZ_BINS = 40
 const PEAK_BINS: { label: string; max: number }[] = [
-  { label: '0-100', max: 100 },
-  { label: '100-250', max: 250 },
-  { label: '250-500', max: 500 },
-  { label: '500-1k', max: 1000 },
-  { label: '1k-2k', max: 2000 },
-  { label: '2k-4k', max: 4000 },
-  { label: '4k+', max: Infinity }
+  { label: "0-100", max: 100 },
+  { label: "100-250", max: 250 },
+  { label: "250-500", max: 500 },
+  { label: "500-1k", max: 1000 },
+  { label: "1k-2k", max: 2000 },
+  { label: "2k-4k", max: 4000 },
+  { label: "4k+", max: Infinity },
 ]
 
 function peakBinLabel(size: number): string {
@@ -398,7 +398,7 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
     mzMin: 0,
     mzMax: 0,
     rtMax: 0,
-    cells: []
+    cells: [],
   }
   const base: QCData = {
     path,
@@ -408,7 +408,7 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
     bpc: [],
     heatmap: emptyHeatmap,
     msLevelCounts: [],
-    peaksPerSpectrum: []
+    peaksPerSpectrum: [],
   }
 
   let file: MsFile | null = null
@@ -484,14 +484,14 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
     const mzMin = Number.isFinite(mzMinInt) ? mzMinInt : 0
     const mzMax = Number.isFinite(mzMaxInt) && mzMaxInt > mzMin ? mzMaxInt : mzMin + 1
     const grid: number[][] = Array.from({ length: QC_RT_BINS }, () =>
-      new Array<number>(QC_MZ_BINS).fill(0)
+      new Array<number>(QC_MZ_BINS).fill(0),
     )
     for (const [key, val] of heatAccum) {
       const rtBin = Math.floor(key / 1_000_000)
       const mzInt = key % 1_000_000
       const mzBin = clampBin(
         Math.round(((mzInt - mzMin) / (mzMax - mzMin)) * (QC_MZ_BINS - 1)),
-        QC_MZ_BINS
+        QC_MZ_BINS,
       )
       grid[rtBin][mzBin] += val
     }
@@ -510,7 +510,7 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
 
     const peaksPerSpectrum = PEAK_BINS.map((b) => ({
       bin: b.label,
-      count: peakCounts.get(b.label) ?? 0
+      count: peakCounts.get(b.label) ?? 0,
     }))
 
     return {
@@ -521,7 +521,7 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
       bpc,
       heatmap: { rtBins: QC_RT_BINS, mzBins: QC_MZ_BINS, mzMin, mzMax, rtMax, cells },
       msLevelCounts: levelCounts,
-      peaksPerSpectrum
+      peaksPerSpectrum,
     }
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : String(err) }
@@ -540,12 +540,12 @@ interface TicPointLocal {
 function foldTic(
   raw: TicPointLocal[],
   ticPoints: number,
-  rtMax: number
+  rtMax: number,
 ): { tic: { rt: number; tic: number }[]; bpc: { rt: number; bpc: number }[] } {
   if (raw.length <= ticPoints) {
     return {
       tic: raw.map((p) => ({ rt: +p.rt.toFixed(4), tic: p.tic })),
-      bpc: raw.map((p) => ({ rt: +p.rt.toFixed(4), bpc: p.bpc }))
+      bpc: raw.map((p) => ({ rt: +p.rt.toFixed(4), bpc: p.bpc })),
     }
   }
   const sumBin = new Array<number>(ticPoints).fill(0)
@@ -580,7 +580,12 @@ function stripExt(name: string): string {
 }
 
 /** Compute an output path in `outputDir` (or alongside the input). */
-function outPathFor(inputPath: string, outputDir: string | undefined, newExt: string, suffix = ''): string {
+function outPathFor(
+  inputPath: string,
+  outputDir: string | undefined,
+  newExt: string,
+  suffix = "",
+): string {
   const dir = outputDir && outputDir.length > 0 ? outputDir : dirname(inputPath)
   const stem = stripExt(basename(inputPath))
   return join(dir, `${stem}${suffix}${newExt}`)
@@ -588,10 +593,10 @@ function outPathFor(inputPath: string, outputDir: string | undefined, newExt: st
 
 /** Build a ConvertResult from the finished output file. */
 function makeResult(
-  op: ConvertResult['op'],
+  op: ConvertResult["op"],
   inputPath: string,
   outPath: string,
-  startedAt: bigint
+  startedAt: bigint,
 ): ConvertResult {
   const inputBytes = getFilesize(inputPath)
   const outputBytes = statSync(outPath).size
@@ -601,19 +606,19 @@ function makeResult(
     inputBytes,
     outputBytes,
     ratio: inputBytes > 0 ? outputBytes / inputBytes : 0,
-    elapsedMs: Number(hrtime.bigint() - startedAt) / 1e6
+    elapsedMs: Number(hrtime.bigint() - startedAt) / 1e6,
   }
 }
 
-function errorResult(op: ConvertResult['op'], err: unknown): ConvertResult {
+function errorResult(op: ConvertResult["op"], err: unknown): ConvertResult {
   return {
     op,
-    outPath: '',
+    outPath: "",
     inputBytes: 0,
     outputBytes: 0,
     ratio: 0,
     elapsedMs: 0,
-    error: err instanceof Error ? err.message : String(err)
+    error: err instanceof Error ? err.message : String(err),
   }
 }
 
@@ -633,17 +638,17 @@ export function compress(path: string, opts: CompressOptions): ConvertResult {
   const startedAt = hrtime.bigint()
   let file: MsFile | null = null
   try {
-    if (kindFromPath(path) !== 'mzML') {
-      throw new Error('Only mzML files can be compressed.')
+    if (kindFromPath(path) !== "mzML") {
+      throw new Error("Only mzML files can be compressed.")
     }
     file = mod().read(path)
     applyCompressArgs(file, opts)
-    const outPath = outPathFor(path, opts.outputDir, '.msz')
+    const outPath = outPathFor(path, opts.outputDir, ".msz")
     const out = file.compress(outPath)
     out.close()
-    return makeResult('compress', path, outPath, startedAt)
+    return makeResult("compress", path, outPath, startedAt)
   } catch (err) {
-    return errorResult('compress', err)
+    return errorResult("compress", err)
   } finally {
     file?.close()
   }
@@ -655,17 +660,17 @@ export function decompress(path: string, opts: DecompressOptions): ConvertResult
   const kind = kindFromPath(path)
   let file: MsFile | null = null
   try {
-    if (kind === 'mzML') {
-      throw new Error('mzML files are already decompressed.')
+    if (kind === "mzML") {
+      throw new Error("mzML files are already decompressed.")
     }
     file = openFile(path, kind)
     file.arguments.threads = opts.threads ?? getNumThreads()
-    const outPath = outPathFor(path, opts.outputDir, '.mzML')
+    const outPath = outPathFor(path, opts.outputDir, ".mzML")
     const out = file.decompress(outPath)
     out.close()
-    return makeResult('decompress', path, outPath, startedAt)
+    return makeResult("decompress", path, outPath, startedAt)
   } catch (err) {
-    return errorResult('decompress', err)
+    return errorResult("decompress", err)
   } finally {
     file?.close()
   }
@@ -673,10 +678,10 @@ export function decompress(path: string, opts: DecompressOptions): ConvertResult
 
 /** Translate the UI extract options into the native filter object. */
 function nativeExtractOptions(opts: ExtractOptions): MsNativeExtractOptions {
-  if (opts.mode === 'mslevel') {
+  if (opts.mode === "mslevel") {
     return { msLevel: opts.msLevel ?? 2 }
   }
-  if (opts.mode === 'scan') {
+  if (opts.mode === "scan") {
     const from = opts.fromScan ?? 0
     const to = Math.max(from, opts.toScan ?? from)
     const scanNumbers: number[] = []
@@ -699,13 +704,13 @@ export function extract(path: string, opts: ExtractOptions): ConvertResult {
   try {
     file = openFile(path, kind)
     file.arguments.threads = opts.threads ?? getNumThreads()
-    const ext = opts.outputFormat === 'msz' ? '.msz' : '.mzML'
-    const outPath = outPathFor(path, opts.outputDir, ext, '.extracted')
+    const ext = opts.outputFormat === "msz" ? ".msz" : ".mzML"
+    const outPath = outPathFor(path, opts.outputDir, ext, ".extracted")
     const out = file.extract(outPath, nativeExtractOptions(opts))
     out.close()
-    return makeResult('extract', path, outPath, startedAt)
+    return makeResult("extract", path, outPath, startedAt)
   } catch (err) {
-    return errorResult('extract', err)
+    return errorResult("extract", err)
   } finally {
     file?.close()
   }

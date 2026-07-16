@@ -1,7 +1,7 @@
-import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
-import type { WebContents } from 'electron'
-import { basename } from 'path'
-import { IPC } from '../shared/ipc'
+import { app, dialog, ipcMain, shell, BrowserWindow } from "electron"
+import type { WebContents } from "electron"
+import { basename } from "path"
+import { IPC } from "../shared/ipc"
 import type {
   AppSettings,
   CompressOptions,
@@ -11,18 +11,18 @@ import type {
   ExtractOptions,
   QCOptions,
   QueueAddRequest,
-  QueueState
-} from '../shared/ipc'
-import * as bindings from './bindings'
-import { queue } from './queue'
-import { getSettings, setSettings, onSettingsChange } from './settings'
+  QueueState,
+} from "../shared/ipc"
+import * as bindings from "./bindings"
+import { queue } from "./queue"
+import { getSettings, setSettings, onSettingsChange } from "./settings"
 
 const FILE_FILTERS = [
-  { name: 'MS files', extensions: ['mzML', 'msz', 'mszx'] },
-  { name: 'mzML', extensions: ['mzML'] },
-  { name: 'MSZ', extensions: ['msz'] },
-  { name: 'MSZX', extensions: ['mszx'] },
-  { name: 'All files', extensions: ['*'] }
+  { name: "MS files", extensions: ["mzML", "msz", "mszx"] },
+  { name: "mzML", extensions: ["mzML"] },
+  { name: "MSZ", extensions: ["msz"] },
+  { name: "MSZX", extensions: ["mszx"] },
+  { name: "All files", extensions: ["*"] },
 ]
 
 let progressSeq = 0
@@ -36,19 +36,19 @@ let progressSeq = 0
  */
 async function runConvert(
   sender: WebContents,
-  op: ConvertProgress['op'],
+  op: ConvertProgress["op"],
   file: string,
-  work: () => ConvertResult
+  work: () => ConvertResult,
 ): Promise<ConvertResult> {
   const id = `cv${++progressSeq}`
-  const emit = (p: Omit<ConvertProgress, 'id' | 'op' | 'file'>): void => {
+  const emit = (p: Omit<ConvertProgress, "id" | "op" | "file">): void => {
     if (!sender.isDestroyed()) sender.send(IPC.convertProgress, { id, op, file, ...p })
   }
-  emit({ phase: 'start', message: `${op} ${file}` })
+  emit({ phase: "start", message: `${op} ${file}` })
   await new Promise((resolve) => setImmediate(resolve))
-  emit({ phase: 'step', message: 'working…' })
+  emit({ phase: "step", message: "working…" })
   const result = work()
-  emit(result.error ? { phase: 'error', error: result.error } : { phase: 'done', result })
+  emit(result.error ? { phase: "error", error: result.error } : { phase: "done", result })
   return result
 }
 
@@ -61,12 +61,12 @@ export function registerIpcHandlers(): void {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const result = win
       ? await dialog.showOpenDialog(win, {
-          properties: ['openFile', 'multiSelections'],
-          filters: FILE_FILTERS
+          properties: ["openFile", "multiSelections"],
+          filters: FILE_FILTERS,
         })
       : await dialog.showOpenDialog({
-          properties: ['openFile', 'multiSelections'],
-          filters: FILE_FILTERS
+          properties: ["openFile", "multiSelections"],
+          filters: FILE_FILTERS,
         })
     return result.canceled ? [] : result.filePaths
   })
@@ -74,29 +74,27 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.openOutputDir, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {
-      properties: ['openDirectory', 'createDirectory'] as Array<
-        'openDirectory' | 'createDirectory'
-      >
+      properties: ["openDirectory", "createDirectory"] as Array<
+        "openDirectory" | "createDirectory"
+      >,
     }
-    const result = win
-      ? await dialog.showOpenDialog(win, opts)
-      : await dialog.showOpenDialog(opts)
+    const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
   })
 
   ipcMain.handle(IPC.openExternal, async (_event, url: string) => {
     // Only open http(s); refuse anything else to avoid launching arbitrary
     // protocol handlers from renderer input.
-    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    if (typeof url === "string" && /^https?:\/\//i.test(url)) {
       await shell.openExternal(url)
     }
   })
 
   ipcMain.handle(IPC.revealInFolder, (_event, path: string) => {
-    if (typeof path === 'string' && path.length > 0) shell.showItemInFolder(path)
+    if (typeof path === "string" && path.length > 0) shell.showItemInFolder(path)
   })
 
-  ipcMain.handle(IPC.getDefaultOutputDir, () => app.getPath('downloads'))
+  ipcMain.handle(IPC.getDefaultOutputDir, () => app.getPath("downloads"))
 
   ipcMain.handle(IPC.getVersion, () => bindings.getVersion())
 
@@ -107,28 +105,28 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.analyze, (_event, path: string) => bindings.analyze(path))
 
   ipcMain.handle(IPC.computeQC, (_event, path: string, opts?: QCOptions) =>
-    bindings.computeQC(path, opts)
+    bindings.computeQC(path, opts),
   )
 
   ipcMain.handle(IPC.readMszx, (_event, path: string) => bindings.readMszx(path))
 
   // Threads come from global settings (not a per-job control).
   ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
-    runConvert(event.sender, 'compress', basename(path), () =>
-      bindings.compress(path, { ...opts, threads: getSettings().threads })
-    )
+    runConvert(event.sender, "compress", basename(path), () =>
+      bindings.compress(path, { ...opts, threads: getSettings().threads }),
+    ),
   )
 
   ipcMain.handle(IPC.decompress, (event, path: string, opts: DecompressOptions) =>
-    runConvert(event.sender, 'decompress', basename(path), () =>
-      bindings.decompress(path, { ...opts, threads: getSettings().threads })
-    )
+    runConvert(event.sender, "decompress", basename(path), () =>
+      bindings.decompress(path, { ...opts, threads: getSettings().threads }),
+    ),
   )
 
   ipcMain.handle(IPC.extract, (event, path: string, opts: ExtractOptions) =>
-    runConvert(event.sender, 'extract', basename(path), () =>
-      bindings.extract(path, { ...opts, threads: getSettings().threads })
-    )
+    runConvert(event.sender, "extract", basename(path), () =>
+      bindings.extract(path, { ...opts, threads: getSettings().threads }),
+    ),
   )
 
   // ---- Global settings ----

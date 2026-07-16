@@ -2,9 +2,9 @@
 // optionally transfers outputs to a remote destination. Electron-free so it can
 // be exercised directly from a Node smoke test; the main process wires it to
 // IPC + configures the local archive dir.
-import { copyFileSync, mkdirSync, rmSync, statSync } from 'fs'
-import { basename, join } from 'path'
-import { REMOTE_DESTINATIONS } from '../shared/ipc.ts'
+import { copyFileSync, mkdirSync, rmSync, statSync } from "fs"
+import { basename, join } from "path"
+import { REMOTE_DESTINATIONS } from "../shared/ipc.ts"
 import type {
   CompressOptions,
   ConvertResult,
@@ -12,9 +12,9 @@ import type {
   ExtractOptions,
   QueueAddRequest,
   QueueJob,
-  QueueState
-} from '../shared/ipc.ts'
-import * as bindings from './bindings.ts'
+  QueueState,
+} from "../shared/ipc.ts"
+import * as bindings from "./bindings.ts"
 
 type Listener = (state: QueueState) => void
 
@@ -22,7 +22,7 @@ interface JobInternal {
   job: QueueJob
   settings: CompressOptions | DecompressOptions | ExtractOptions
   remotePath?: string
-  transferMode: 'copy' | 'move'
+  transferMode: "copy" | "move"
 }
 
 interface QueueConfig {
@@ -33,7 +33,7 @@ interface QueueConfig {
   threads: number
 }
 
-const config: QueueConfig = { localArchiveDir: '', maxConcurrency: 1, threads: 0 }
+const config: QueueConfig = { localArchiveDir: "", maxConcurrency: 1, threads: 0 }
 
 /** Configure runtime bits the queue can't derive on its own (electron paths). */
 export function configureQueue(opts: Partial<QueueConfig>): void {
@@ -59,7 +59,7 @@ class JobQueue {
       jobs: this.items.map((it) => ({ ...it.job })),
       running: this.runningIds.size,
       paused: this.paused,
-      maxConcurrency: config.maxConcurrency
+      maxConcurrency: config.maxConcurrency,
     }
   }
 
@@ -87,17 +87,17 @@ class JobQueue {
       fileName: req.fileName ?? basename(req.filePath),
       kind: req.kind,
       op: req.op,
-      status: 'queued',
+      status: "queued",
       progress: 0,
       sizeBytes: this.safeSize(req.filePath),
       destinationId: dest?.id,
-      destinationLabel: dest?.label
+      destinationLabel: dest?.label,
     }
     this.items.push({
       job,
       settings: req.settings,
       remotePath: req.remotePath,
-      transferMode: req.transferMode ?? 'copy'
+      transferMode: req.transferMode ?? "copy",
     })
     this.emit()
     this.pump()
@@ -129,7 +129,7 @@ class JobQueue {
   private pump(): void {
     if (this.paused) return
     while (this.runningIds.size < config.maxConcurrency) {
-      const next = this.items.find((it) => it.job.status === 'queued')
+      const next = this.items.find((it) => it.job.status === "queued")
       if (!next) break
       void this.runJob(next)
     }
@@ -139,24 +139,24 @@ class JobQueue {
     const { op } = it.job
     // Threads come from global settings, not per-job (0 → binding default).
     const threads = config.threads > 0 ? config.threads : undefined
-    if (op === 'compress') {
+    if (op === "compress") {
       return bindings.compress(it.job.filePath, {
         ...(it.settings as CompressOptions),
         outputDir,
-        threads
+        threads,
       })
     }
-    if (op === 'decompress') {
+    if (op === "decompress") {
       return bindings.decompress(it.job.filePath, {
         ...(it.settings as DecompressOptions),
         outputDir,
-        threads
+        threads,
       })
     }
     return bindings.extract(it.job.filePath, {
       ...(it.settings as ExtractOptions),
       outputDir,
-      threads
+      threads,
     })
   }
 
@@ -164,24 +164,24 @@ class JobQueue {
   private transferRemote(it: JobInternal, outPath: string): { finalPath?: string; error?: string } {
     const dest = REMOTE_DESTINATIONS.find((d) => d.id === it.job.destinationId)
     if (!dest) return { error: `Unknown destination: ${it.job.destinationId}` }
-    if (dest.type !== 'local' || !dest.configured) {
+    if (dest.type !== "local" || !dest.configured) {
       // Honest stub: validate + refuse, never fake a successful upload.
       return { error: `Remote destination '${dest.label}' (${dest.type}) is not configured` }
     }
     if (!config.localArchiveDir) {
-      return { error: 'Local archive directory is not configured' }
+      return { error: "Local archive directory is not configured" }
     }
-    const targetDir = join(config.localArchiveDir, it.remotePath ?? '')
+    const targetDir = join(config.localArchiveDir, it.remotePath ?? "")
     mkdirSync(targetDir, { recursive: true })
     const target = join(targetDir, basename(outPath))
     copyFileSync(outPath, target)
-    if (it.transferMode === 'move') rmSync(outPath, { force: true })
+    if (it.transferMode === "move") rmSync(outPath, { force: true })
     return { finalPath: target }
   }
 
   private async runJob(it: JobInternal): Promise<void> {
     const { job } = it
-    job.status = 'running'
+    job.status = "running"
     job.progress = 10
     this.runningIds.add(job.id)
     this.emit()
@@ -193,8 +193,8 @@ class JobQueue {
       // the outputDir supplied in their settings.
       const staged = job.destinationId
       const outputDir = staged
-        ? join(config.localArchiveDir || '.', '.staging')
-        : ((it.settings as { outputDir?: string }).outputDir ?? '')
+        ? join(config.localArchiveDir || ".", ".staging")
+        : ((it.settings as { outputDir?: string }).outputDir ?? "")
       if (staged) mkdirSync(outputDir, { recursive: true })
 
       job.progress = 45
@@ -203,7 +203,7 @@ class JobQueue {
 
       const result = this.execConvert(it, outputDir)
       if (result.error) {
-        job.status = 'error'
+        job.status = "error"
         job.error = result.error
         job.progress = 100
         return
@@ -216,19 +216,19 @@ class JobQueue {
         this.emit()
         const transfer = this.transferRemote(it, result.outPath)
         if (transfer.error) {
-          job.status = 'error'
+          job.status = "error"
           job.error = transfer.error
-          if (it.transferMode !== 'move') job.finalPath = undefined
+          if (it.transferMode !== "move") job.finalPath = undefined
         } else {
           job.finalPath = transfer.finalPath
-          job.status = 'done'
+          job.status = "done"
         }
         job.progress = 100
       } else {
-        job.status = 'done'
+        job.status = "done"
       }
     } catch (err) {
-      job.status = 'error'
+      job.status = "error"
       job.error = err instanceof Error ? err.message : String(err)
       job.progress = 100
     } finally {

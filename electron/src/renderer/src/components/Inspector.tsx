@@ -17,7 +17,13 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function GroupTitle({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
+function GroupTitle({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ElementType
+  children: React.ReactNode
+}) {
   return (
     <div className="flex items-center gap-1.5 px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
       <Icon className="size-3" /> {children}
@@ -32,15 +38,7 @@ function fmtRtRange([a, b]: [number, number]): string {
   return `${f(a)} – ${f(b)}`
 }
 
-export function Inspector({
-  path,
-  name,
-  kind,
-}: {
-  path: string
-  name: string
-  kind: FileKind
-}) {
+export function Inspector({ path, name, kind }: { path: string; name: string; kind: FileKind }) {
   const [summary, setSummary] = useState<FileSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [threads, setThreads] = useState<number | null>(null)
@@ -85,15 +83,24 @@ export function Inspector({
   }, [path, name, kind])
 
   useEffect(() => {
-    window.api.getNumThreads().then(setThreads).catch(() => {})
-    window.api.getVersion().then(setVersion).catch(() => {})
+    window.api
+      .getNumThreads()
+      .then(setThreads)
+      .catch(() => {})
+    window.api
+      .getVersion()
+      .then(setVersion)
+      .catch(() => {})
   }, [])
 
   const a = summary
   const totalMs = a?.msLevelCounts.reduce((s, m) => s + m.count, 0) ?? 0
 
   return (
-    <div data-testid="inspector" className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div
+      data-testid="inspector"
+      className="flex h-full flex-col bg-sidebar text-sidebar-foreground"
+    >
       <div className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Info className="size-3.5" /> Inspector
       </div>
@@ -102,7 +109,9 @@ export function Inspector({
       <div className="px-3 py-2.5">
         <div className="truncate text-sm font-medium">{name}</div>
         <div className="mt-1 flex items-center gap-1.5">
-          <Badge variant="outline" className="mono text-[10px]">{kind}</Badge>
+          <Badge variant="outline" className="mono text-[10px]">
+            {kind}
+          </Badge>
           {a?.sourceCompression && (
             <Badge variant="secondary" className="mono text-[10px]">
               {a.sourceCompression}
@@ -144,9 +153,7 @@ export function Inspector({
                   <Row
                     label="Est. compressed"
                     value={
-                      <span className="text-emerald-400">
-                        {fmtBytes(a.filesizeBytes * 0.28)}
-                      </span>
+                      <span className="text-emerald-400">{fmtBytes(a.filesizeBytes * 0.28)}</span>
                     }
                   />
                   <Row label="Est. ratio" value={<span className="text-emerald-400">×3.6</span>} />
