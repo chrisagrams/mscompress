@@ -15,6 +15,10 @@ export const IPC = {
   analyze: 'file:analyze',
   computeQC: 'qc:compute',
   readMszx: 'archive:read',
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  // main -> renderer settings-change broadcast (webContents.send)
+  settingsChange: 'settings:change',
   compress: 'convert:compress',
   decompress: 'convert:decompress',
   extract: 'convert:extract',
@@ -105,6 +109,19 @@ export interface ConvertProgress {
   message?: string
   result?: ConvertResult
   error?: string
+}
+
+// ---- Global settings -------------------------------------------------------
+
+/** Persisted, app-wide settings (userData/settings.json). */
+export interface AppSettings {
+  /** Worker threads used for compress/decompress/extract. */
+  threads: number
+  /** Default local output directory for the Convert tab. */
+  defaultOutputDir: string
+  /** Default compression preset. */
+  defaultPreset: Preset
+  theme: 'dark' | 'light'
 }
 
 // ---- MSZX archive ----------------------------------------------------------
@@ -305,6 +322,12 @@ export interface Api {
   computeQC(path: string, opts?: QCOptions): Promise<QCData>
   /** Read an .mszx archive's manifest + annotations. */
   readMszx(path: string): Promise<MszxManifest>
+  /** Current persisted settings. */
+  getSettings(): Promise<AppSettings>
+  /** Merge a partial update into settings, persist, and return the result. */
+  setSettings(partial: Partial<AppSettings>): Promise<AppSettings>
+  /** Subscribe to settings-change broadcasts. Returns an unsubscribe fn. */
+  onSettingsChange(cb: (settings: AppSettings) => void): () => void
   /** Compress an mzML file to .msz. */
   compress(path: string, opts: CompressOptions): Promise<ConvertResult>
   /** Decompress an .msz/.mszx file to .mzML. */

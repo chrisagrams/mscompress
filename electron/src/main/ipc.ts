@@ -3,6 +3,7 @@ import type { WebContents } from 'electron'
 import { basename } from 'path'
 import { IPC } from '../shared/ipc'
 import type {
+  AppSettings,
   CompressOptions,
   ConvertProgress,
   ConvertResult,
@@ -14,6 +15,7 @@ import type {
 } from '../shared/ipc'
 import * as bindings from './bindings'
 import { queue } from './queue'
+import { getSettings, setSettings, onSettingsChange } from './settings'
 
 const FILE_FILTERS = [
   { name: 'MS files', extensions: ['mzML', 'msz', 'mszx'] },
@@ -110,17 +112,33 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.readMszx, (_event, path: string) => bindings.readMszx(path))
 
+  // Threads come from global settings (not a per-job control).
   ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
-    runConvert(event.sender, 'compress', basename(path), () => bindings.compress(path, opts))
+    runConvert(event.sender, 'compress', basename(path), () =>
+      bindings.compress(path, { ...opts, threads: getSettings().threads })
+    )
   )
 
   ipcMain.handle(IPC.decompress, (event, path: string, opts: DecompressOptions) =>
-    runConvert(event.sender, 'decompress', basename(path), () => bindings.decompress(path, opts))
+    runConvert(event.sender, 'decompress', basename(path), () =>
+      bindings.decompress(path, { ...opts, threads: getSettings().threads })
+    )
   )
 
   ipcMain.handle(IPC.extract, (event, path: string, opts: ExtractOptions) =>
-    runConvert(event.sender, 'extract', basename(path), () => bindings.extract(path, opts))
+    runConvert(event.sender, 'extract', basename(path), () =>
+      bindings.extract(path, { ...opts, threads: getSettings().threads })
+    )
   )
+
+  // ---- Global settings ----
+  onSettingsChange((s: AppSettings) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.webContents.isDestroyed()) win.webContents.send(IPC.settingsChange, s)
+    }
+  })
+  ipcMain.handle(IPC.settingsGet, () => getSettings())
+  ipcMain.handle(IPC.settingsSet, (_event, partial: Partial<AppSettings>) => setSettings(partial))
 
   // ---- MSTransfer batch queue ----
   // Broadcast every queue-state change to all renderer windows.

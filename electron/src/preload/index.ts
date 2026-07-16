@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import { IPC, type Api, type ConvertProgress, type QueueState } from '../shared/ipc'
+import {
+  IPC,
+  type Api,
+  type AppSettings,
+  type ConvertProgress,
+  type QueueState
+} from '../shared/ipc'
 
 // Typed, channel-whitelisted bridge. The renderer can ONLY reach the main
 // process through these explicit methods — no raw ipcRenderer, no channel
@@ -17,6 +23,13 @@ const api: Api = {
   analyze: (path) => ipcRenderer.invoke(IPC.analyze, path),
   computeQC: (path, opts) => ipcRenderer.invoke(IPC.computeQC, path, opts),
   readMszx: (path) => ipcRenderer.invoke(IPC.readMszx, path),
+  getSettings: () => ipcRenderer.invoke(IPC.settingsGet),
+  setSettings: (partial) => ipcRenderer.invoke(IPC.settingsSet, partial),
+  onSettingsChange: (cb) => {
+    const listener = (_e: IpcRendererEvent, s: AppSettings): void => cb(s)
+    ipcRenderer.on(IPC.settingsChange, listener)
+    return () => ipcRenderer.removeListener(IPC.settingsChange, listener)
+  },
   compress: (path, opts) => ipcRenderer.invoke(IPC.compress, path, opts),
   decompress: (path, opts) => ipcRenderer.invoke(IPC.decompress, path, opts),
   extract: (path, opts) => ipcRenderer.invoke(IPC.extract, path, opts),

@@ -29,14 +29,17 @@ interface QueueConfig {
   /** Base directory for the `local-archive` remote destination + staging. */
   localArchiveDir: string
   maxConcurrency: number
+  /** Worker threads from global settings (0 → let the binding decide). */
+  threads: number
 }
 
-const config: QueueConfig = { localArchiveDir: '', maxConcurrency: 1 }
+const config: QueueConfig = { localArchiveDir: '', maxConcurrency: 1, threads: 0 }
 
 /** Configure runtime bits the queue can't derive on its own (electron paths). */
 export function configureQueue(opts: Partial<QueueConfig>): void {
   if (opts.localArchiveDir !== undefined) config.localArchiveDir = opts.localArchiveDir
   if (opts.maxConcurrency !== undefined) config.maxConcurrency = Math.max(1, opts.maxConcurrency)
+  if (opts.threads !== undefined) config.threads = Math.max(0, opts.threads)
 }
 
 class JobQueue {
@@ -134,21 +137,26 @@ class JobQueue {
 
   private execConvert(it: JobInternal, outputDir: string): ConvertResult {
     const { op } = it.job
+    // Threads come from global settings, not per-job (0 → binding default).
+    const threads = config.threads > 0 ? config.threads : undefined
     if (op === 'compress') {
       return bindings.compress(it.job.filePath, {
         ...(it.settings as CompressOptions),
-        outputDir
+        outputDir,
+        threads
       })
     }
     if (op === 'decompress') {
       return bindings.decompress(it.job.filePath, {
         ...(it.settings as DecompressOptions),
-        outputDir
+        outputDir,
+        threads
       })
     }
     return bindings.extract(it.job.filePath, {
       ...(it.settings as ExtractOptions),
-      outputDir
+      outputDir,
+      threads
     })
   }
 

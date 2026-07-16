@@ -3,7 +3,7 @@
 // them against native mscompress + real test data. Run: node scripts/smoke-bindings.ts
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join, basename } from 'node:path'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import {
@@ -17,6 +17,12 @@ import {
   extract
 } from '../src/main/bindings.ts'
 import { queue, configureQueue } from '../src/main/queue.ts'
+import {
+  configureSettings,
+  loadSettings,
+  getSettings,
+  setSettings
+} from '../src/main/settings.ts'
 import type { QueueState } from '../src/shared/ipc.ts'
 import { readdirSync } from 'node:fs'
 
@@ -169,4 +175,40 @@ console.log('\n=== queue ===')
   rmSync(qdir, { recursive: true, force: true })
   rmSync(archive, { recursive: true, force: true })
   console.log('  cleaned queue temp dirs')
+}
+
+// ---- Global settings (T8) ----
+console.log('\n=== settings ===')
+{
+  const sdir = mkdtempSync(join(tmpdir(), 'msc-settings-'))
+  const sfile = join(sdir, 'settings.json')
+  configureSettings({ dir: sdir, defaultThreads: 8, defaultOutputDir: '/tmp/out' })
+
+  const created = loadSettings()
+  console.log('  defaults created:', JSON.stringify(created))
+  console.log('  settings.json exists:', existsSync(sfile))
+
+  setSettings({ threads: 4, defaultPreset: 'better' })
+
+  // Reload from disk in a fresh module state to prove it persisted.
+  configureSettings({ dir: sdir, defaultThreads: 8, defaultOutputDir: '/tmp/out' })
+  const reloaded = loadSettings()
+  console.log('  reloaded from disk:', JSON.stringify(reloaded))
+  console.log('  on-disk file:', readFileSync(sfile, 'utf-8').replace(/\s+/g, ' '))
+  console.log(
+    `  round-trip OK: ${reloaded.threads === 4 && reloaded.defaultPreset === 'better'}`
+  )
+
+  // Corrupt the file → loader must fall back to defaults without crashing.
+  writeFileSync(sfile, '{ this is not: valid json ]]', 'utf-8')
+  configureSettings({ dir: sdir, defaultThreads: 8, defaultOutputDir: '/tmp/out' })
+  const recovered = loadSettings()
+  console.log('  after corruption, recovered:', JSON.stringify(recovered))
+  console.log(
+    `  corrupt fallback OK (no crash, defaults): ${recovered.threads === 8 && recovered.defaultPreset === 'default'}`
+  )
+  void getSettings
+
+  rmSync(sdir, { recursive: true, force: true })
+  console.log('  cleaned settings temp dir')
 }

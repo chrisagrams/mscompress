@@ -3,6 +3,8 @@ import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { registerIpcHandlers } from './ipc'
 import { configureQueue } from './queue'
+import { configureSettings, loadSettings, onSettingsChange } from './settings'
+import { getNumThreads } from './bindings'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -54,8 +56,22 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Persisted global settings (userData/settings.json); defaults from the env.
+  configureSettings({
+    dir: app.getPath('userData'),
+    defaultThreads: getNumThreads(),
+    defaultOutputDir: app.getPath('downloads')
+  })
+  const settings = loadSettings()
+
   // The `local-archive` remote destination copies finished outputs here.
-  configureQueue({ localArchiveDir: join(app.getPath('downloads'), 'MScompress-Archive') })
+  configureQueue({
+    localArchiveDir: join(app.getPath('downloads'), 'MScompress-Archive'),
+    threads: settings.threads
+  })
+  // Keep the queue's thread count in sync with settings.
+  onSettingsChange((s) => configureQueue({ threads: s.threads }))
+
   registerIpcHandlers()
   createWindow()
 

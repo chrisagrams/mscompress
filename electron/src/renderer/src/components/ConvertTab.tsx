@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   FileArchive,
   FileDown,
@@ -44,6 +44,7 @@ import { compressionProfiles, type FileKind } from "@/mockData"
 import { fmtBytes } from "@/mockData"
 import { COMPRESSION_PRESETS, REMOTE_DESTINATIONS } from "@shared/ipc"
 import type {
+  AppSettings,
   CompressOptions,
   ConvertResult,
   DecompressOptions,
@@ -72,7 +73,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
+export function ConvertTab({
+  kind,
+  path,
+  settings,
+}: {
+  kind: FileKind
+  path: string
+  settings: AppSettings | null
+}) {
   const allowed = opsForKind[kind]
 
   const [op, setOp] = useState<Op>("compress")
@@ -102,10 +111,14 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
   const [result, setResult] = useState<ConvertResult | null>(null)
   const [enqueued, setEnqueued] = useState<string | null>(null)
 
-  // Seed the output directory from the OS default (Downloads) on mount.
+  // Seed the output dir + preset from persisted settings once they load.
+  const seeded = useRef(false)
   useEffect(() => {
-    window.api.getDefaultOutputDir().then(setOutputDir).catch(() => {})
-  }, [])
+    if (!settings || seeded.current) return
+    seeded.current = true
+    setOutputDir(settings.defaultOutputDir)
+    selectPreset(settings.defaultPreset)
+  }, [settings]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to streamed progress events (proves the main->renderer channel).
   useEffect(() => {

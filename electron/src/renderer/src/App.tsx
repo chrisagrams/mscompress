@@ -9,6 +9,7 @@ import {
   Activity,
   Database,
   Scissors,
+  Settings as SettingsIcon,
 } from "lucide-react"
 import brandLogo from "@/assets/icon.png"
 import githubMark from "@/assets/github-mark.svg"
@@ -23,14 +24,16 @@ import { ConvertTab } from "@/components/ConvertTab"
 import { QCTab } from "@/components/QCTab"
 import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
+import { SettingsDialog } from "@/components/SettingsDialog"
 import { INITIAL_FILES, type FileEntry } from "@/files"
-import type { QueueState } from "@shared/ipc"
+import type { AppSettings, QueueState } from "@shared/ipc"
 
 function App() {
-  const [dark, setDark] = useState(true)
   const [files, setFiles] = useState<FileEntry[]>(INITIAL_FILES)
   const [selectedPath, setSelectedPath] = useState<string>(INITIAL_FILES[0].path)
   const [tab, setTab] = useState("convert")
+  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
 
@@ -57,37 +60,32 @@ function App() {
     setSelectedPath(entries[0].path)
   }
   const [backendVersion, setBackendVersion] = useState<string | null>(null)
-  const [threads, setThreads] = useState<number | null>(null)
 
-  // Pull the real backend version + thread count from the native binding
-  // through the preload bridge (replaces the old hardcoded status values).
+  // Backend version for the status bar.
   useEffect(() => {
-    window.api
-      .getVersion()
-      .then((v) => {
-        setBackendVersion(v)
-        console.log("[renderer] backend version from window.api:", v)
-      })
-      .catch((e) => console.error("[renderer] getVersion failed:", e))
-    window.api
-      .getNumThreads()
-      .then((n) => {
-        setThreads(n)
-        console.log("[renderer] backend threads from window.api:", n)
-      })
-      .catch((e) => console.error("[renderer] getNumThreads failed:", e))
+    window.api.getVersion().then(setBackendVersion).catch(() => {})
   }, [])
 
-  const toggleTheme = () => {
+  // Load + subscribe to persisted settings; apply the theme app-wide.
+  useEffect(() => {
+    window.api.getSettings().then(setSettings).catch(() => {})
+    return window.api.onSettingsChange(setSettings)
+  }, [])
+  useEffect(() => {
+    if (!settings) return
     const el = document.documentElement
-    if (dark) {
-      el.classList.remove("dark")
+    if (settings.theme === "light") {
       el.classList.add("light")
+      el.classList.remove("dark")
     } else {
       el.classList.add("dark")
       el.classList.remove("light")
     }
-    setDark(!dark)
+  }, [settings?.theme])
+
+  const dark = settings ? settings.theme === "dark" : true
+  const toggleTheme = () => {
+    if (settings) void window.api.setSettings({ theme: dark ? "light" : "dark" })
   }
 
   const currentOp = "compress · HEK293_rep2.mzML (63%)"
@@ -125,12 +123,29 @@ function App() {
               variant="ghost"
               size="icon"
               className="size-7"
+              title="Settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SettingsIcon className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
               onClick={toggleTheme}
             >
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
           </div>
         </header>
+
+        {settings && (
+          <SettingsDialog
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            settings={settings}
+          />
+        )}
 
         {/* Body: three panes */}
         <div className="flex min-h-0 flex-1">
@@ -170,7 +185,11 @@ function App() {
 
               <ScrollArea className="min-h-0 flex-1">
                 <TabsContent value="convert" className="m-0">
-                  <ConvertTab kind={selectedEntry.kind} path={selectedEntry.path} />
+                  <ConvertTab
+                    kind={selectedEntry.kind}
+                    path={selectedEntry.path}
+                    settings={settings}
+                  />
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
                   <QCTab path={selectedEntry.path} name={selectedEntry.name} />
@@ -206,7 +225,7 @@ function App() {
           </span>
           <div className="ml-auto flex items-center gap-4">
             <span className="mono flex items-center gap-1">
-              <Cpu className="size-3" /> {threads ?? "—"} threads
+              <Cpu className="size-3" /> {settings?.threads ?? "…"} threads
             </span>
             <span className="mono flex items-center gap-1">
               <MemoryStick className="size-3" /> 3.2 / 32 GB
