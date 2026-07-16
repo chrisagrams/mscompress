@@ -1,0 +1,49 @@
+appId: gy.lab.mscompress
+productName: MScompress
+copyright: Copyright © 2026 Gao Lab
+
+directories:
+  output: release
+  buildResources: build
+
+# electron-vite emits the app to out/; the renderer/main/preload are already
+# bundled there. node_modules is intentionally excluded from the asar because
+# the only runtime native dependency (mscompress / node-ts) is shipped via
+# extraResources below and resolved from resources at runtime.
+files:
+  - out/**
+  - package.json
+  - '!node_modules/**'
+  - '!src/**'
+  - '!scripts/**'
+  - '!electron.vite.config.*'
+  - '!tsconfig*.json'
+  - '!components.json'
+
+# Ship the native mscompress binding (node-ts) outside the asar so its .node
+# addon can be dlopen'd at runtime. bindings.ts resolves resources/node-ts/dist.
+extraResources:
+  - from: ../node-ts/dist
+    to: node-ts/dist
+  - from: ../node-ts/build/Release/mscompress.node
+    to: node-ts/build/Release/mscompress.node
+  - from: ../node-ts/package.json
+    to: node-ts/package.json
+
+linux:
+  target:
+    - dir
+    - AppImage
+  icon: assets/icons/icon.png
+  category: Science
+
+mac:
+  target:
+    - dir
+  icon: assets/icons/icon.icns
+  category: public.app-category.utilities
+
+win:
+  target:
+    - dir
+  icon: assets/icons/icon.png
