@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import { IPC, type Api, type ConvertProgress } from '../shared/ipc'
+import { IPC, type Api, type ConvertProgress, type QueueState } from '../shared/ipc'
 
 // Typed, channel-whitelisted bridge. The renderer can ONLY reach the main
 // process through these explicit methods — no raw ipcRenderer, no channel
@@ -23,6 +23,17 @@ const api: Api = {
     const listener = (_e: IpcRendererEvent, p: ConvertProgress): void => cb(p)
     ipcRenderer.on(IPC.convertProgress, listener)
     return () => ipcRenderer.removeListener(IPC.convertProgress, listener)
+  },
+  addQueueJob: (req) => ipcRenderer.invoke(IPC.queueAdd, req),
+  startQueue: () => ipcRenderer.invoke(IPC.queueStart),
+  pauseQueue: () => ipcRenderer.invoke(IPC.queuePause),
+  clearQueue: () => ipcRenderer.invoke(IPC.queueClear),
+  removeJob: (id) => ipcRenderer.invoke(IPC.queueRemove, id),
+  getQueueState: () => ipcRenderer.invoke(IPC.queueGetState),
+  onQueueUpdate: (cb) => {
+    const listener = (_e: IpcRendererEvent, s: QueueState): void => cb(s)
+    ipcRenderer.on(IPC.queueUpdate, listener)
+    return () => ipcRenderer.removeListener(IPC.queueUpdate, listener)
   },
   getPathForFile: (file) => webUtils.getPathForFile(file)
 }

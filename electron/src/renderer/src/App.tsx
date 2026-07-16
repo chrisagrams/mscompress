@@ -24,6 +24,7 @@ import { QCTab } from "@/components/QCTab"
 import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { INITIAL_FILES, type FileEntry } from "@/files"
+import type { QueueState } from "@shared/ipc"
 
 function App() {
   const [dark, setDark] = useState(true)
@@ -32,6 +33,18 @@ function App() {
   const [tab, setTab] = useState("convert")
 
   const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
+
+  // Live MSTransfer queue state (single subscription shared by the rail + tab).
+  const [queue, setQueue] = useState<QueueState>({
+    jobs: [],
+    running: 0,
+    paused: true,
+    maxConcurrency: 1,
+  })
+  useEffect(() => {
+    window.api.getQueueState().then(setQueue).catch(() => {})
+    return window.api.onQueueUpdate(setQueue)
+  }, [])
 
   // Add opened/dropped files (deduped by path) and select the first new one.
   const addFiles = (entries: FileEntry[]) => {
@@ -128,6 +141,7 @@ function App() {
               selected={selectedPath}
               onSelect={setSelectedPath}
               onAddFiles={addFiles}
+              queue={queue}
             />
           </aside>
 
@@ -162,7 +176,7 @@ function App() {
                   <QCTab path={selectedEntry.path} name={selectedEntry.name} />
                 </TabsContent>
                 <TabsContent value="extract" className="m-0">
-                  <ExtractQueueTab />
+                  <ExtractQueueTab queue={queue} />
                 </TabsContent>
                 <TabsContent value="archive" className="m-0">
                   <ArchiveTab />

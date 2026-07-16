@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { registerIpcHandlers } from './ipc'
+import { configureQueue } from './queue'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -53,6 +54,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // The `local-archive` remote destination copies finished outputs here.
+  configureQueue({ localArchiveDir: join(app.getPath('downloads'), 'MScompress-Archive') })
   registerIpcHandlers()
   createWindow()
 

@@ -18,7 +18,16 @@ export const IPC = {
   decompress: 'convert:decompress',
   extract: 'convert:extract',
   // main -> renderer streamed progress (webContents.send)
-  convertProgress: 'convert:progress'
+  convertProgress: 'convert:progress',
+  // MSTransfer batch queue
+  queueAdd: 'queue:add',
+  queueStart: 'queue:start',
+  queuePause: 'queue:pause',
+  queueClear: 'queue:clear',
+  queueRemove: 'queue:remove',
+  queueGetState: 'queue:getState',
+  // main -> renderer queue-state broadcast (webContents.send)
+  queueUpdate: 'queue:update'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
@@ -95,6 +104,67 @@ export interface ConvertProgress {
   message?: string
   result?: ConvertResult
   error?: string
+}
+
+// ---- MSTransfer batch queue ------------------------------------------------
+
+export type QueueOp = 'compress' | 'decompress' | 'extract'
+export type QueueStatus = 'queued' | 'running' | 'done' | 'error'
+
+/** A remote destination for finished outputs. */
+export interface RemoteDestination {
+  id: string
+  label: string
+  type: 'local' | 'ssh' | 's3'
+  /** local destinations are wired end-to-end; ssh/s3 are input-validating stubs. */
+  configured: boolean
+}
+
+/** Stub destination list (a real settings store arrives in a later task). */
+export const REMOTE_DESTINATIONS: RemoteDestination[] = [
+  { id: 'local-archive', label: 'local-archive · MScompress-Archive', type: 'local', configured: true },
+  { id: 'ssh-hpc', label: 'hpc · cgrams@aurora:/flare', type: 'ssh', configured: false },
+  { id: 's3-lab', label: 'storage-a · s3://lab-archive', type: 's3', configured: false }
+]
+
+/** A single serializable queue job (settings are held privately in main). */
+export interface QueueJob {
+  id: string
+  filePath: string
+  fileName: string
+  kind: FileKind
+  op: QueueOp
+  status: QueueStatus
+  progress: number
+  sizeBytes: number
+  ratio?: number
+  etaSec?: number
+  /** local convert output path. */
+  outPath?: string
+  /** where the output finally landed after a remote transfer. */
+  finalPath?: string
+  destinationId?: string
+  destinationLabel?: string
+  error?: string
+}
+
+export interface QueueState {
+  jobs: QueueJob[]
+  running: number
+  paused: boolean
+  maxConcurrency: number
+}
+
+/** Request to enqueue a convert job (optionally routed to a remote dest). */
+export interface QueueAddRequest {
+  filePath: string
+  fileName?: string
+  kind: FileKind
+  op: QueueOp
+  settings: CompressOptions | DecompressOptions | ExtractOptions
+  destinationId?: string
+  remotePath?: string
+  transferMode?: 'copy' | 'move'
 }
 
 /** Recognized source file kinds. */
@@ -217,6 +287,20 @@ export interface Api {
    * Subscribe to streamed convert progress events. Returns an unsubscribe fn.
    */
   onConvertProgress(cb: (p: ConvertProgress) => void): () => void
+  /** Enqueue a convert job on the MSTransfer batch queue. Returns its id. */
+  addQueueJob(req: QueueAddRequest): Promise<string>
+  /** Start (unpause) the queue runner. */
+  startQueue(): Promise<void>
+  /** Pause the queue (running jobs finish; no new ones start). */
+  pauseQueue(): Promise<void>
+  /** Remove all non-running jobs. */
+  clearQueue(): Promise<void>
+  /** Remove a single non-running job by id. */
+  removeJob(id: string): Promise<void>
+  /** Current queue snapshot (for initial render). */
+  getQueueState(): Promise<QueueState>
+  /** Subscribe to queue-state broadcasts. Returns an unsubscribe fn. */
+  onQueueUpdate(cb: (state: QueueState) => void): () => void
   /**
    * Resolve the absolute filesystem path of a dropped/selected File. Electron
    * removed `File.path`, so this proxies `webUtils.getPathForFile` from preload.

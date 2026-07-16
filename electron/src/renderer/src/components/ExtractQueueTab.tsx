@@ -11,9 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { sampleQueue, fmtBytes, type QueueItem } from "@/mockData"
+import { fmtBytes } from "@/mockData"
+import type { QueueState, QueueStatus } from "@shared/ipc"
 
-function StatusPill({ status }: { status: QueueItem["status"] }) {
+function StatusPill({ status }: { status: QueueStatus }) {
   const map = {
     done: { icon: Check, cls: "border-emerald-500/40 text-emerald-400" },
     running: { icon: Loader2, cls: "border-sky-500/40 text-sky-400" },
@@ -29,9 +30,10 @@ function StatusPill({ status }: { status: QueueItem["status"] }) {
   )
 }
 
-export function ExtractQueueTab() {
-  const total = sampleQueue.reduce((a, b) => a + b.sizeBytes, 0)
-  const done = sampleQueue.filter((q) => q.status === "done").length
+export function ExtractQueueTab({ queue }: { queue: QueueState }) {
+  const jobs = queue.jobs
+  const total = jobs.reduce((a, b) => a + b.sizeBytes, 0)
+  const done = jobs.filter((q) => q.status === "done").length
 
   return (
     <div className="space-y-3 p-4">
@@ -39,70 +41,112 @@ export function ExtractQueueTab() {
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold">MSTransfer — Batch Queue</h2>
           <Badge variant="secondary" className="mono">
-            {done}/{sampleQueue.length} done
+            {done}/{jobs.length} done
           </Badge>
           <span className="mono text-xs text-muted-foreground">
             {fmtBytes(total)} total
           </span>
+          {queue.paused ? (
+            <span className="mono text-[11px] text-muted-foreground">paused</span>
+          ) : (
+            <span className="mono text-[11px] text-sky-400">{queue.running} running</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="gap-1.5">
+          <Button size="sm" className="gap-1.5" onClick={() => window.api.startQueue()}>
             <Play className="size-3.5" /> Start all
           </Button>
-          <Button size="sm" variant="secondary" className="gap-1.5">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => window.api.pauseQueue()}
+          >
             <Pause className="size-3.5" /> Pause
           </Button>
-          <Button size="sm" variant="ghost" className="gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5"
+            onClick={() => window.api.clearQueue()}
+          >
             <Trash2 className="size-3.5" /> Clear
           </Button>
         </div>
       </div>
 
-      <Card className="overflow-hidden py-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="text-[11px] uppercase tracking-wider">File</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Op</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Status</TableHead>
-              <TableHead className="w-[220px] text-[11px] uppercase tracking-wider">Progress</TableHead>
-              <TableHead className="text-right text-[11px] uppercase tracking-wider">Size</TableHead>
-              <TableHead className="text-right text-[11px] uppercase tracking-wider">Ratio / ETA</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sampleQueue.map((q) => (
-              <TableRow key={q.id}>
-                <TableCell className="font-medium">{q.fileName}</TableCell>
-                <TableCell className="mono text-xs text-muted-foreground">{q.op}</TableCell>
-                <TableCell><StatusPill status={q.status} /></TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Progress value={q.progress} className="h-1.5" />
-                    <span className="mono w-9 text-right text-[11px] text-muted-foreground">
-                      {q.progress}%
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="mono text-right text-xs">{fmtBytes(q.sizeBytes)}</TableCell>
-                <TableCell className="mono text-right text-xs">
-                  {q.status === "done" && q.ratio != null && (
-                    <span className="text-emerald-400">
-                      {(q.ratio * 100).toFixed(0)}% · ×{(1 / q.ratio).toFixed(1)}
-                    </span>
-                  )}
-                  {q.status === "running" && q.etaSec != null && (
-                    <span className="text-muted-foreground">{q.etaSec}s</span>
-                  )}
-                  {(q.status === "queued" || q.status === "error") && (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
+      {jobs.length === 0 ? (
+        <Card className="flex h-40 items-center justify-center text-xs text-muted-foreground">
+          Queue is empty — add a remote job from the Convert tab.
+        </Card>
+      ) : (
+        <Card className="overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-[11px] uppercase tracking-wider">File</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Op</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Dest</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Status</TableHead>
+                <TableHead className="w-[200px] text-[11px] uppercase tracking-wider">Progress</TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">Size</TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">Ratio</TableHead>
+                <TableHead className="w-8" />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+            </TableHeader>
+            <TableBody>
+              {jobs.map((q) => (
+                <TableRow key={q.id}>
+                  <TableCell className="font-medium">{q.fileName}</TableCell>
+                  <TableCell className="mono text-xs text-muted-foreground">{q.op}</TableCell>
+                  <TableCell className="mono text-[11px] text-muted-foreground">
+                    {q.destinationId ? q.destinationId : "local"}
+                  </TableCell>
+                  <TableCell>
+                    <StatusPill status={q.status} />
+                    {q.status === "error" && q.error && (
+                      <div className="mono mt-0.5 max-w-[220px] truncate text-[10px] text-destructive" title={q.error}>
+                        {q.error}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Progress value={q.progress} className="h-1.5" />
+                      <span className="mono w-9 text-right text-[11px] text-muted-foreground">
+                        {q.progress}%
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="mono text-right text-xs">{fmtBytes(q.sizeBytes)}</TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    {q.status === "done" && q.ratio != null ? (
+                      <span className="text-emerald-400">
+                        {(q.ratio * 100).toFixed(0)}% · ×{(1 / q.ratio).toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {q.status !== "running" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        title="Remove"
+                        onClick={() => window.api.removeJob(q.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   )
 }

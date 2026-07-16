@@ -2,7 +2,7 @@
 // src/main/bindings.ts (the same functions the IPC handlers call) and exercises
 // them against native mscompress + real test data. Run: node scripts/smoke-bindings.ts
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, join } from 'node:path'
+import { dirname, resolve, join, basename } from 'node:path'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
@@ -15,6 +15,9 @@ import {
   decompress,
   extract
 } from '../src/main/bindings.ts'
+import { queue, configureQueue } from '../src/main/queue.ts'
+import type { QueueState } from '../src/shared/ipc.ts'
+import { readdirSync } from 'node:fs'
 
 const require = createRequire(import.meta.url)
 const { read } = require('mscompress')
@@ -88,4 +91,66 @@ try {
 } finally {
   rmSync(out, { recursive: true, force: true })
   console.log('\ncleaned temp dir', out)
+}
+
+// ---- MSTransfer queue (T6) ----
+console.log('\n=== queue ===')
+{
+  const qdir = mkdtempSync(join(tmpdir(), 'msc-q-'))
+  const archive = mkdtempSync(join(tmpdir(), 'msc-archive-'))
+  configureQueue({ localArchiveDir: archive, maxConcurrency: 1 })
+  const src = resolve(dataDir, 'test.mzML')
+
+  const idOk = queue.add({
+    filePath: src,
+    kind: 'mzML',
+    op: 'compress',
+    settings: { preset: 'default', outputDir: qdir }
+  })
+  const idBad = queue.add({
+    filePath: resolve(dataDir, 'does-not-exist.mzML'),
+    kind: 'mzML',
+    op: 'compress',
+    settings: { preset: 'fast', outputDir: qdir }
+  })
+  const idRemote = queue.add({
+    filePath: src,
+    kind: 'mzML',
+    op: 'compress',
+    settings: { preset: 'fast' },
+    destinationId: 'local-archive',
+    remotePath: 'msz/2026'
+  })
+
+  const done = (s: QueueState) => s.running === 0 && s.jobs.every((j) => j.status === 'done' || j.status === 'error')
+  await new Promise<void>((resolve2) => {
+    const off = queue.onUpdate((s) => {
+      if (done(s)) {
+        off()
+        resolve2()
+      }
+    })
+    queue.start()
+  })
+
+  const state = queue.state()
+  for (const j of state.jobs) {
+    console.log(
+      `  job ${j.id} [${j.op}] ${j.fileName} -> status=${j.status} progress=${j.progress}` +
+        (j.status === 'done' ? ` ratio=${j.ratio?.toFixed(3)} out=${basename(j.outPath ?? '')}` : '') +
+        (j.finalPath ? ` finalPath=${j.finalPath}` : '') +
+        (j.error ? ` error="${j.error}"` : '')
+    )
+  }
+  const okJob = state.jobs.find((j) => j.id === idOk)!
+  const badJob = state.jobs.find((j) => j.id === idBad)!
+  const remoteJob = state.jobs.find((j) => j.id === idRemote)!
+  console.log(`  OK job done + output exists: ${okJob.status === 'done' && !!okJob.outPath && existsSync(okJob.outPath)}`)
+  console.log(`  BAD job errored (no crash): ${badJob.status === 'error'} error="${badJob.error}"`)
+  console.log(`  REMOTE job landed in archive: ${remoteJob.status === 'done' && !!remoteJob.finalPath && existsSync(remoteJob.finalPath ?? '')}`)
+  console.log('  archive dir contents:', JSON.stringify(readdirSync(join(archive, 'msz', '2026'))))
+
+  rmSync(qdir, { recursive: true, force: true })
+  rmSync(archive, { recursive: true, force: true })
+  console.log('  cleaned queue temp dirs')
 }

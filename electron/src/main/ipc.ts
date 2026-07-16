@@ -8,9 +8,12 @@ import type {
   ConvertResult,
   DecompressOptions,
   ExtractOptions,
-  QCOptions
+  QCOptions,
+  QueueAddRequest,
+  QueueState
 } from '../shared/ipc'
 import * as bindings from './bindings'
+import { queue } from './queue'
 
 const FILE_FILTERS = [
   { name: 'MS files', extensions: ['mzML', 'msz', 'mszx'] },
@@ -116,4 +119,19 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.extract, (event, path: string, opts: ExtractOptions) =>
     runConvert(event.sender, 'extract', basename(path), () => bindings.extract(path, opts))
   )
+
+  // ---- MSTransfer batch queue ----
+  // Broadcast every queue-state change to all renderer windows.
+  queue.onUpdate((state: QueueState) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.webContents.isDestroyed()) win.webContents.send(IPC.queueUpdate, state)
+    }
+  })
+
+  ipcMain.handle(IPC.queueAdd, (_event, req: QueueAddRequest) => queue.add(req))
+  ipcMain.handle(IPC.queueStart, () => queue.start())
+  ipcMain.handle(IPC.queuePause, () => queue.pause())
+  ipcMain.handle(IPC.queueClear, () => queue.clear())
+  ipcMain.handle(IPC.queueRemove, (_event, id: string) => queue.remove(id))
+  ipcMain.handle(IPC.queueGetState, () => queue.state())
 }

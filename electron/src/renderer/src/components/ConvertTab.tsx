@@ -42,10 +42,13 @@ import {
 } from "@/components/ui/tooltip"
 import { compressionProfiles, type FileKind } from "@/mockData"
 import { fmtBytes } from "@/mockData"
-import { COMPRESSION_PRESETS } from "@shared/ipc"
+import { COMPRESSION_PRESETS, REMOTE_DESTINATIONS } from "@shared/ipc"
 import type {
+  CompressOptions,
   ConvertResult,
+  DecompressOptions,
   ExtractMode,
+  ExtractOptions,
   LossyAlgo,
   Preset,
 } from "@shared/ipc"
@@ -86,11 +89,18 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
   const [outFormat, setOutFormat] = useState<"mzML" | "msz">("mzML")
   const [outputDir, setOutputDir] = useState("/data/proteomics/compressed/")
 
+  // Output routing.
+  const [outputTarget, setOutputTarget] = useState<"local" | "remote">("local")
+  const [destinationId, setDestinationId] = useState(REMOTE_DESTINATIONS[0].id)
+  const [remotePath, setRemotePath] = useState("msz/2026")
+  const [transferMode, setTransferMode] = useState<"copy" | "move">("copy")
+
   // Convert run state.
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [phase, setPhase] = useState<string>("")
   const [result, setResult] = useState<ConvertResult | null>(null)
+  const [enqueued, setEnqueued] = useState<string | null>(null)
 
   // Seed the output directory from the OS default (Downloads) on mount.
   useEffect(() => {
@@ -128,38 +138,71 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
       if (next) setOp(next)
     }
     setResult(null)
+    setEnqueued(null)
   }, [kind]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Run the selected operation through the bridge with a live (creeping) bar.
+  // Build the settings object for the current op (outputDir only for local).
+  const buildSettings = (
+    includeOutputDir: boolean,
+  ): CompressOptions | DecompressOptions | ExtractOptions => {
+    const dir = includeOutputDir ? { outputDir } : {}
+    if (op === "compress") {
+      return { preset: profile, mzLossy: mzAlgo, intLossy: intAlgo, zstdLevel: zstd[0], ...dir }
+    }
+    if (op === "decompress") {
+      return { ...dir }
+    }
+    return {
+      mode: extractBy,
+      msLevel: msLevel === "n" ? 3 : Number(msLevel),
+      fromScan: Number(scanFrom),
+      toScan: Number(scanTo),
+      fromIndex: Number(indexFrom),
+      toIndex: Number(indexTo),
+      outputFormat: outFormat,
+      ...dir,
+    }
+  }
+
+  // Run the selected operation. Local → run immediately with a live bar; Remote
+  // → enqueue on the MSTransfer queue and start it.
   const run = async () => {
     if (running || !allowed[op]) return
     setResult(null)
+    setEnqueued(null)
+
+    if (outputTarget === "remote") {
+      const dest = REMOTE_DESTINATIONS.find((d) => d.id === destinationId)
+      const id = await window.api.addQueueJob({
+        filePath: path,
+        kind,
+        op,
+        settings: buildSettings(false),
+        destinationId,
+        remotePath,
+        transferMode,
+      })
+      await window.api.startQueue()
+      setEnqueued(
+        `Queued ${op} job ${id} → ${dest?.label ?? destinationId}` +
+          (dest && !dest.configured
+            ? " — destination is a stub; the job will report “not configured”."
+            : ". Track it in the Queue tab."),
+      )
+      return
+    }
+
     setRunning(true)
     setProgress(8)
     const creep = setInterval(() => setProgress((p) => (p < 90 ? p + 4 : p)), 120)
     try {
       let res: ConvertResult
       if (op === "compress") {
-        res = await window.api.compress(path, {
-          preset: profile,
-          mzLossy: mzAlgo,
-          intLossy: intAlgo,
-          zstdLevel: zstd[0],
-          outputDir,
-        })
+        res = await window.api.compress(path, buildSettings(true) as CompressOptions)
       } else if (op === "decompress") {
-        res = await window.api.decompress(path, { outputDir })
+        res = await window.api.decompress(path, buildSettings(true) as DecompressOptions)
       } else {
-        res = await window.api.extract(path, {
-          mode: extractBy,
-          msLevel: msLevel === "n" ? 3 : Number(msLevel),
-          fromScan: Number(scanFrom),
-          toScan: Number(scanTo),
-          fromIndex: Number(indexFrom),
-          toIndex: Number(indexTo),
-          outputFormat: outFormat,
-          outputDir,
-        })
+        res = await window.api.extract(path, buildSettings(true) as ExtractOptions)
       }
       setResult(res)
     } finally {
@@ -413,7 +456,10 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
           <CardTitle className="text-sm">Output</CardTitle>
         </CardHeader>
         <CardContent className="px-4">
-          <Tabs defaultValue="local">
+          <Tabs
+            value={outputTarget}
+            onValueChange={(v) => v && setOutputTarget(v as "local" | "remote")}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="local" className="gap-1.5 text-xs">
                 <HardDrive className="size-3.5" /> Local
@@ -445,50 +491,60 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
             <TabsContent value="remote" className="mt-3 space-y-4">
               <div className="space-y-2">
                 <SectionLabel>Destination</SectionLabel>
-                <Select defaultValue="storage-a">
+                <Select value={destinationId} onValueChange={setDestinationId}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="storage-a">storage-a · s3://lab-archive</SelectItem>
-                    <SelectItem value="hpc">hpc · cgrams@aurora:/flare</SelectItem>
-                    <SelectItem value="nas">nas · smb://synology/k8</SelectItem>
+                    {REMOTE_DESTINATIONS.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.label}
+                        {!d.configured && " · stub"}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <SectionLabel>Remote path</SectionLabel>
-                <Input defaultValue="msz/2026/" className="mono text-xs" />
+                <Input
+                  value={remotePath}
+                  onChange={(e) => setRemotePath(e.target.value)}
+                  className="mono text-xs"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <SectionLabel>Transfer mode</SectionLabel>
-                  <Select defaultValue="copy">
+                  <Select
+                    value={transferMode}
+                    onValueChange={(v) => setTransferMode(v as "copy" | "move")}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="copy">Copy</SelectItem>
-                      <SelectItem value="move">Move (delete source)</SelectItem>
+                      <SelectItem value="move">Move (delete staged)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <SectionLabel>On conflict</SectionLabel>
-                  <Select defaultValue="skip">
+                  <Select defaultValue="overwrite">
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="skip">Skip existing</SelectItem>
                       <SelectItem value="overwrite">Overwrite</SelectItem>
-                      <SelectItem value="rename">Keep both</SelectItem>
+                      <SelectItem value="skip">Skip existing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Remote jobs are handed to the MSTransfer queue and run in the background.
+                Only local-archive is wired end-to-end; ssh/s3 are validated stubs.
               </p>
             </TabsContent>
           </Tabs>
@@ -501,15 +557,30 @@ export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
         disabled={running || !allowed[op]}
         onClick={run}
       >
-        {running ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+        {running ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : outputTarget === "remote" ? (
+          <Server className="size-4" />
+        ) : (
+          <Zap className="size-4" />
+        )}
         {running
           ? `Running${phase ? ` · ${phase}` : ""}…`
-          : op === "compress"
-            ? "Compress file"
-            : op === "decompress"
-              ? "Decompress file"
-              : "Extract spectra"}
+          : outputTarget === "remote"
+            ? `Queue ${op} → MSTransfer`
+            : op === "compress"
+              ? "Compress file"
+              : op === "decompress"
+                ? "Decompress file"
+                : "Extract spectra"}
       </Button>
+
+      {/* Enqueued confirmation (remote) */}
+      {!running && enqueued && (
+        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-[11px] text-sky-400">
+          {enqueued}
+        </div>
+      )}
 
       {/* Live progress while an operation runs */}
       {running && (

@@ -25,8 +25,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { sampleQueue, fmtBytes, type QueueItem, type FileKind } from "@/mockData"
+import { fmtBytes, type FileKind } from "@/mockData"
 import type { FileEntry } from "@/files"
+import type { QueueState, QueueStatus } from "@shared/ipc"
 
 function kindIcon(kind: FileKind) {
   if (kind === "msz") return <FileArchive className="size-3.5 text-chart-4" />
@@ -34,7 +35,7 @@ function kindIcon(kind: FileKind) {
   return <FileIcon className="size-3.5 text-chart-1" />
 }
 
-function statusBadge(status: QueueItem["status"]) {
+function statusBadge(status: QueueStatus) {
   switch (status) {
     case "done":
       return (
@@ -68,16 +69,18 @@ export function LeftRail({
   selected,
   onSelect,
   onAddFiles,
+  queue,
 }: {
   files: FileEntry[]
   /** Path of the currently selected file. */
   selected: string
   onSelect: (path: string) => void
   onAddFiles: (entries: FileEntry[]) => void
+  queue: QueueState
 }) {
   const [dragOver, setDragOver] = useState(false)
 
-  const running = sampleQueue.filter((q) => q.status === "running").length
+  const running = queue.running
 
   // Analyze paths through the binding and turn each into a real FileEntry.
   const ingest = async (paths: string[]) => {
@@ -201,20 +204,41 @@ export function LeftRail({
         </div>
       </div>
       <div className="flex items-center gap-1 px-2 pb-2">
-        <Button variant="secondary" size="sm" className="h-6 flex-1 gap-1 text-[11px]">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-6 flex-1 gap-1 text-[11px]"
+          onClick={() => window.api.startQueue()}
+        >
           <Play className="size-3" /> Start
         </Button>
-        <Button variant="ghost" size="sm" className="h-6 flex-1 gap-1 text-[11px]">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 flex-1 gap-1 text-[11px]"
+          onClick={() => window.api.pauseQueue()}
+        >
           <Pause className="size-3" /> Pause
         </Button>
-        <Button variant="ghost" size="icon" className="size-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title="Clear queue"
+          onClick={() => window.api.clearQueue()}
+        >
           <Trash2 className="size-3.5" />
         </Button>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-1 px-2 pb-3">
-          {sampleQueue.map((q) => (
+          {queue.jobs.length === 0 && (
+            <div className="px-2 py-3 text-center text-[11px] text-muted-foreground">
+              No jobs. Send one from Convert → Remote.
+            </div>
+          )}
+          {queue.jobs.map((q) => (
             <div
               key={q.id}
               className="rounded-md border border-border/60 bg-card/40 p-2"
@@ -229,7 +253,7 @@ export function LeftRail({
                   {q.op}
                 </span>
               </div>
-              {q.status === "running" && (
+              {(q.status === "running" || q.status === "queued") && (
                 <Progress value={q.progress} className="mt-1.5 h-1" />
               )}
               <div className="mono mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
@@ -239,9 +263,7 @@ export function LeftRail({
                     {(q.ratio * 100).toFixed(0)}% · ×{(1 / q.ratio).toFixed(1)}
                   </span>
                 )}
-                {q.status === "running" && q.etaSec != null && (
-                  <span>ETA {q.etaSec}s</span>
-                )}
+                {q.status === "error" && <span className="text-destructive">error</span>}
               </div>
             </div>
           ))}
