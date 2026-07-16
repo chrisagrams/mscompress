@@ -154,7 +154,7 @@ export function QCTab({ path, name }: { path: string; name: string }) {
   const totalSpectra = donutData.reduce((a, b) => a + b.value, 0) || 1
 
   return (
-    <div className="grid grid-cols-2 gap-3 p-4">
+    <div data-testid="qc-charts" className="grid grid-cols-2 gap-3 p-4">
       {/* TIC */}
       <Panel title="TIC Chromatogram" right={<span className="mono text-[10px] text-muted-foreground">intensity · RT(min)</span>}>
         <ResponsiveContainer width="100%" height={160}>

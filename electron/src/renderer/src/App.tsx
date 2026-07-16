@@ -31,7 +31,10 @@ import type { AppSettings, QueueState } from "@shared/ipc"
 /** Placeholder shown in the workspace/inspector when no file is open. */
 function NoFile() {
   return (
-    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+    <div
+      data-testid="empty-state"
+      className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground"
+    >
       <FileArchive className="size-8 opacity-40" />
       <p className="text-sm">No file open</p>
       <p className="text-xs">Open or drop an mzML / msz / mszx file to get started.</p>

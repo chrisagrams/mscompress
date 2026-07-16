@@ -36,7 +36,7 @@ export function ExtractQueueTab({ queue }: { queue: QueueState }) {
   const done = jobs.filter((q) => q.status === "done").length
 
   return (
-    <div className="space-y-3 p-4">
+    <div data-testid="queue-tab" className="space-y-3 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold">MSTransfer — Batch Queue</h2>

@@ -253,6 +253,7 @@ export function ConvertTab({
                 <ToggleGroupItem
                   value={value}
                   disabled={!enabled}
+                  data-testid={`op-${value}`}
                   className="flex-1 gap-1.5 text-xs disabled:opacity-40"
                 >
                   <Icon className="size-3.5" /> {label}
@@ -285,6 +286,7 @@ export function ConvertTab({
               {compressionProfiles.map((p) => (
                 <button
                   key={p.id}
+                  data-testid={`preset-${p.id}`}
                   onClick={() => selectPreset(p.id)}
                   className={`rounded-md border p-2 text-left transition-colors ${
                     profile === p.id
@@ -305,7 +307,7 @@ export function ConvertTab({
                 <AccordionTrigger className="py-2 text-xs font-medium text-muted-foreground hover:no-underline">
                   Advanced settings
                 </AccordionTrigger>
-                <AccordionContent className="space-y-4 pt-1">
+                <AccordionContent data-testid="advanced-content" className="space-y-4 pt-1">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <SectionLabel>Lossy m/z algorithm</SectionLabel>

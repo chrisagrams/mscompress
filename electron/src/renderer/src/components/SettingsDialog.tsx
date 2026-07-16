@@ -55,7 +55,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent data-testid="settings-dialog" className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>

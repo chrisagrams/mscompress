@@ -93,7 +93,7 @@ export function Inspector({
   const totalMs = a?.msLevelCounts.reduce((s, m) => s + m.count, 0) ?? 0
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div data-testid="inspector" className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Info className="size-3.5" /> Inspector
       </div>

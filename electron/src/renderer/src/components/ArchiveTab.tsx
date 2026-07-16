@@ -106,7 +106,7 @@ export function ArchiveTab({
 
   const m = manifest
   return (
-    <div className="space-y-3 p-4">
+    <div data-testid="archive-manifest" className="space-y-3 p-4">
       <div className="flex items-center gap-2">
         <Database className="size-4 text-chart-2" />
         <h2 className="text-sm font-semibold">MSZX Archive</h2>

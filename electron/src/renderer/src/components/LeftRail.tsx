@@ -128,6 +128,7 @@ export function LeftRail({
               variant="ghost"
               size="icon"
               className="size-6"
+              data-testid="open-files"
               onClick={handleOpenFiles}
             >
               <FolderOpen className="size-3.5" />
@@ -170,6 +171,8 @@ export function LeftRail({
             return (
               <button
                 key={f.path}
+                data-testid="file-entry"
+                data-path={f.path}
                 onClick={() => onSelect(f.path)}
                 className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
                   active
