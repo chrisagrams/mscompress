@@ -7,7 +7,7 @@ import { BaseFile } from "@/files/base-file.js";
 import { DataFormat } from "@/types/data-format.js";
 import { Division } from "@/types/division.js";
 import { createFile, registerFileFactory } from "@/files/file-registry.js";
-import type { CompressArgs, ExtractOptions } from "@/types/types.js";
+import type { CompressArgs, ExtractOptions, RuntimeArgumentsNative } from "@/types/types.js";
 
 /**
  * Handler for uncompressed mzML files.
@@ -124,6 +124,17 @@ export class MZMLFile extends BaseFile {
    * Native compression failures surface as an `'error'` event on the returned
    * stream (never a thrown exception or a hang).
    *
+   * ### Per-platform strategy
+   * - **POSIX (Linux/macOS):** true pipe streaming. Compression runs on a
+   *   background thread writing into an OS `pipe(2)`; this Readable drains the
+   *   read end. No temp file ever touches disk.
+   * - **Windows:** the raw-fd-over-pipe handoff to Node's `fs.createReadStream`
+   *   is not portable — a `_pipe()` read fd fed to libuv crashes the worker with
+   *   an access violation. So on `win32` we compress to a temp file, stream it
+   *   back, and unlink it once the read handle is closed (unlink-while-open is
+   *   itself an EPERM footgun on Windows). Bytes are byte-for-byte identical to
+   *   the POSIX path; only the transport differs.
+   *
    * @param options - Optional `chunkSize` (read highWaterMark, default 1 MiB)
    *                  plus any {@link CompressArgs} overrides. Omitted compression
    *                  args fall back to this file's current `arguments`.
@@ -142,6 +153,20 @@ export class MZMLFile extends BaseFile {
       }
     }
 
+    return process.platform === "win32"
+      ? this.compressStreamViaTempFile(args, highWaterMark)
+      : this.compressStreamViaPipe(args, highWaterMark);
+  }
+
+  /**
+   * POSIX true-pipe implementation of {@link MZMLFile.compressStream}. Runs
+   * compression on a background thread writing into an OS pipe and drains the
+   * read end — no temp file. Not used on Windows (see compressStream docs).
+   */
+  private compressStreamViaPipe(
+    args: RuntimeArgumentsNative,
+    highWaterMark: number
+  ): NodeJS.ReadableStream {
     // A pass-through the caller consumes. We route the pipe's read end into it
     // so that any setup failure (closed handle, prepareDivisions error) or
     // native compression failure surfaces as a single 'error' event here,
@@ -180,6 +205,63 @@ export class MZMLFile extends BaseFile {
     } catch (err) {
       // Synchronous setup failure (e.g. closed handle). Surface via the stream
       // on the next tick so listeners have a chance to attach.
+      const error = err instanceof Error ? err : new Error(String(err));
+      queueMicrotask(() => output.destroy(error));
+    }
+
+    return output;
+  }
+
+  /**
+   * Windows implementation of {@link MZMLFile.compressStream}. Compresses to a
+   * temp file (native.compressMzml opens/writes/closes its own fd — no lingering
+   * handle), then streams the file back and removes it once the read handle is
+   * fully closed. Produces the same bytes as the POSIX pipe path.
+   */
+  private compressStreamViaTempFile(
+    args: RuntimeArgumentsNative,
+    highWaterMark: number
+  ): NodeJS.ReadableStream {
+    const output = new PassThrough({ highWaterMark });
+    let tmpDir: string | undefined;
+
+    // Remove the temp dir. MUST run only after the read handle is closed —
+    // unlinking a file with an open handle throws EPERM on Windows. force +
+    // retries ride out any residual transient lock.
+    const cleanup = (): void => {
+      if (!tmpDir) return;
+      const dir = tmpDir;
+      tmpDir = undefined;
+      try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      } catch {
+        // best-effort; a leaked temp file must never crash the stream
+      }
+    };
+
+    try {
+      // Mirror compress(): prepare divisions and capture the resolved blocksize.
+      const divResult = native.prepareDivisions(this._handle, args);
+      args.blocksize = divResult.blocksize;
+      this._arguments.blocksize = divResult.blocksize;
+
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-stream-"));
+      const tmpPath = path.join(tmpDir, "stream.msz");
+
+      // Blocking compress; the native side owns and closes the output fd.
+      native.compressMzml(this._handle, tmpPath, args);
+
+      // autoClose closes the read fd exactly once on end/error/close. Only then
+      // is it safe to unlink on Windows, so cleanup hangs off 'close'.
+      const source = fs.createReadStream(tmpPath, { highWaterMark });
+      source.on("error", (err) => {
+        cleanup();
+        output.destroy(err);
+      });
+      source.on("close", cleanup);
+      source.pipe(output);
+    } catch (err) {
+      cleanup();
       const error = err instanceof Error ? err : new Error(String(err));
       queueMicrotask(() => output.destroy(error));
     }
