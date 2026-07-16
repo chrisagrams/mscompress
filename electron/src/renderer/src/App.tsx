@@ -117,8 +117,10 @@ function App() {
   return (
     <TooltipProvider>
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-        {/* Top toolbar */}
-        <header className="flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
+        {/* Top toolbar — drag region for the frameless macOS window (app-toolbar
+            gets the traffic-light inset on darwin; interactive controls opt out
+            of dragging via no-drag). */}
+        <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
           <div className="flex items-center gap-2">
             <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />
             <span className="text-sm font-semibold tracking-tight">MScompress</span>
@@ -127,7 +129,7 @@ function App() {
             </Badge>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="no-drag ml-auto flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"

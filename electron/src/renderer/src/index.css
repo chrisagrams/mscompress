@@ -149,3 +149,18 @@
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Frameless-window drag support (macOS hidden-inset title bar). The top toolbar
+   is a drag region so the window can be moved; interactive controls opt out. */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS only: inset the toolbar so its content clears the floating traffic-light
+   buttons (close/minimize/zoom). No effect on Linux/Windows. */
+.platform-darwin .app-toolbar {
+  padding-left: 78px;
+}

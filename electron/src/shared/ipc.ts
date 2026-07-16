@@ -363,4 +363,10 @@ export interface Api {
    * Synchronous (no IPC round-trip).
    */
   getPathForFile(file: File): string
+  /**
+   * Host platform (`process.platform`, e.g. "darwin" | "win32" | "linux").
+   * Used by the renderer for platform-aware chrome (e.g. the macOS toolbar
+   * inset past the traffic-light buttons). Plain value — no IPC round-trip.
+   */
+  platform: string
 }

@@ -24,6 +24,11 @@ function createWindow(): void {
     title: "MScompress",
     icon: iconPath,
     backgroundColor: "#0a0a0a",
+    // macOS: hide the native title bar for a cleaner look while keeping the
+    // traffic-light controls floating (inset) over the content. Other platforms
+    // keep their default window frame. The renderer makes its top toolbar a drag
+    // region and insets it past the traffic lights (see main.tsx / index.css).
+    ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,

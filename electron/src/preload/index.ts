@@ -50,6 +50,7 @@ const api: Api = {
     return () => ipcRenderer.removeListener(IPC.queueUpdate, listener)
   },
   getPathForFile: (file) => webUtils.getPathForFile(file),
+  platform: process.platform,
 }
 
 if (process.contextIsolated) {
