@@ -25,7 +25,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { fmtBytes, type FileKind } from "@/mockData"
+import { fmtBytes } from "@/lib/format"
+import type { FileKind } from "@shared/ipc"
 import type { FileEntry } from "@/files"
 import type { QueueState, QueueStatus } from "@shared/ipc"
 

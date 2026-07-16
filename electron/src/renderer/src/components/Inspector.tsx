@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fmtBytes } from "@/mockData"
+import { fmtBytes } from "@/lib/format"
 import type { FileKind } from "@shared/ipc"
 import type { FileSummary } from "@shared/ipc"
 

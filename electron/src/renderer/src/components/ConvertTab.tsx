@@ -40,8 +40,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { compressionProfiles, type FileKind } from "@/mockData"
-import { fmtBytes } from "@/mockData"
+import { compressionProfiles } from "@/lib/profiles"
+import { fmtBytes } from "@/lib/format"
 import { COMPRESSION_PRESETS, REMOTE_DESTINATIONS } from "@shared/ipc"
 import type {
   AppSettings,
@@ -50,6 +50,7 @@ import type {
   DecompressOptions,
   ExtractMode,
   ExtractOptions,
+  FileKind,
   LossyAlgo,
   Preset,
 } from "@shared/ipc"

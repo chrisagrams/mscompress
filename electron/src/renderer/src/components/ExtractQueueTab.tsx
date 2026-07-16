@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { fmtBytes } from "@/mockData"
+import { fmtBytes } from "@/lib/format"
 import type { QueueState, QueueStatus } from "@shared/ipc"
 
 function StatusPill({ status }: { status: QueueStatus }) {

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { compressionProfiles } from "@/mockData"
+import { compressionProfiles } from "@/lib/profiles"
 import type { AppSettings, Preset } from "@shared/ipc"
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

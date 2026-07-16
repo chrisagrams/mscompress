@@ -25,16 +25,28 @@ import { QCTab } from "@/components/QCTab"
 import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { SettingsDialog } from "@/components/SettingsDialog"
-import { INITIAL_FILES, type FileEntry } from "@/files"
+import { type FileEntry } from "@/files"
 import type { AppSettings, QueueState } from "@shared/ipc"
 
+/** Placeholder shown in the workspace/inspector when no file is open. */
+function NoFile() {
+  return (
+    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+      <FileArchive className="size-8 opacity-40" />
+      <p className="text-sm">No file open</p>
+      <p className="text-xs">Open or drop an mzML / msz / mszx file to get started.</p>
+    </div>
+  )
+}
+
 function App() {
-  const [files, setFiles] = useState<FileEntry[]>(INITIAL_FILES)
-  const [selectedPath, setSelectedPath] = useState<string>(INITIAL_FILES[0].path)
+  const [files, setFiles] = useState<FileEntry[]>([])
+  const [selectedPath, setSelectedPath] = useState<string>("")
   const [tab, setTab] = useState("convert")
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  // undefined when no files are open (empty state).
   const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
 
   // Live MSTransfer queue state (single subscription shared by the rail + tab).
@@ -179,30 +191,42 @@ function App() {
                   </TabsTrigger>
                 </TabsList>
                 <span className="mono ml-auto pr-2 text-[11px] text-muted-foreground">
-                  {selectedEntry.name}
+                  {selectedEntry?.name ?? "No file open"}
                 </span>
               </div>
 
               <ScrollArea className="min-h-0 flex-1">
                 <TabsContent value="convert" className="m-0">
-                  <ConvertTab
-                    kind={selectedEntry.kind}
-                    path={selectedEntry.path}
-                    settings={settings}
-                  />
+                  {selectedEntry ? (
+                    <ConvertTab
+                      kind={selectedEntry.kind}
+                      path={selectedEntry.path}
+                      settings={settings}
+                    />
+                  ) : (
+                    <NoFile />
+                  )}
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
-                  <QCTab path={selectedEntry.path} name={selectedEntry.name} />
+                  {selectedEntry ? (
+                    <QCTab path={selectedEntry.path} name={selectedEntry.name} />
+                  ) : (
+                    <NoFile />
+                  )}
                 </TabsContent>
                 <TabsContent value="extract" className="m-0">
                   <ExtractQueueTab queue={queue} />
                 </TabsContent>
                 <TabsContent value="archive" className="m-0">
-                  <ArchiveTab
-                    path={selectedEntry.path}
-                    kind={selectedEntry.kind}
-                    name={selectedEntry.name}
-                  />
+                  {selectedEntry ? (
+                    <ArchiveTab
+                      path={selectedEntry.path}
+                      kind={selectedEntry.kind}
+                      name={selectedEntry.name}
+                    />
+                  ) : (
+                    <NoFile />
+                  )}
                 </TabsContent>
               </ScrollArea>
             </Tabs>
@@ -210,11 +234,15 @@ function App() {
 
           {/* Right inspector */}
           <aside className="w-72 shrink-0 border-l">
-            <Inspector
-              path={selectedEntry.path}
-              name={selectedEntry.name}
-              kind={selectedEntry.kind}
-            />
+            {selectedEntry ? (
+              <Inspector
+                path={selectedEntry.path}
+                name={selectedEntry.name}
+                kind={selectedEntry.kind}
+              />
+            ) : (
+              <NoFile />
+            )}
           </aside>
         </div>
 
