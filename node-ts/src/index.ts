@@ -8,7 +8,7 @@ export { Division } from "@/types/division.js";
 export { DataPositions } from "@/types/data-positions.js";
 export { DataFormat } from "@/types/data-format.js";
 export { RuntimeArguments } from "@/types/runtime-arguments.js";
-export type { ExtractOptions } from "@/types/types.js";
+export type { CompressArgs, ExtractOptions } from "@/types/types.js";
 
 // MSZX support
 export { MSZXFile } from "@/mszx/mszx-file.js";

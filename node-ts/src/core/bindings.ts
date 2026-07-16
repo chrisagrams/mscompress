@@ -80,6 +80,16 @@ export interface NativeBindings {
 
   // Compression / decompression
   compressMzml(handle: NativeFileHandle, outputPath: string, args: RuntimeArgumentsNative): boolean;
+  /**
+   * Compress an mzML file to MSZ, streaming the output into an OS pipe instead
+   * of a file. Returns the read-end fd (wrap in a Readable) plus a promise that
+   * resolves when compression completes or rejects on failure. The write end is
+   * always closed by the native side, so the reader observes EOF.
+   */
+  compressMzmlStream(
+    handle: NativeFileHandle,
+    args: RuntimeArgumentsNative
+  ): { readFd: number; done: Promise<void> };
   decompressMsz(
     handle: NativeFileHandle,
     outputPath: string,

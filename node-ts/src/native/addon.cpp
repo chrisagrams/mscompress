@@ -25,6 +25,7 @@ Napi::Value GetIntenBinaryMsz(const Napi::CallbackInfo& info);
 Napi::Value GetXmlMsz(const Napi::CallbackInfo& info);
 
 Napi::Value CompressMzml(const Napi::CallbackInfo& info);
+Napi::Value CompressMzmlStream(const Napi::CallbackInfo& info);
 Napi::Value DecompressMsz(const Napi::CallbackInfo& info);
 
 Napi::Value ExtractMzmlFiltered(const Napi::CallbackInfo& info);
@@ -68,6 +69,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     // Compression / decompression
     exports.Set("compressMzml", Napi::Function::New(env, CompressMzml));
+    exports.Set("compressMzmlStream", Napi::Function::New(env, CompressMzmlStream));
     exports.Set("decompressMsz", Napi::Function::New(env, DecompressMsz));
 
     // Extraction

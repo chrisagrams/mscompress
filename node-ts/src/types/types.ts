@@ -60,6 +60,22 @@ export interface FooterNative {
   intenFmt: number;
 }
 
+/**
+ * Optional overrides for the compression runtime arguments. Every field mirrors
+ * a settable property on {@link RuntimeArguments}; anything omitted falls back to
+ * the file's current `arguments` (i.e. the same defaults `compress()` uses).
+ */
+export interface CompressArgs {
+  threads?: number;
+  blocksize?: number;
+  mzScaleFactor?: number;
+  intScaleFactor?: number;
+  targetXmlFormat?: number;
+  targetMzFormat?: number;
+  targetIntenFormat?: number;
+  zstdCompressionLevel?: number;
+}
+
 /** Arguments passed to native functions */
 export interface RuntimeArgumentsNative {
   threads: number;
