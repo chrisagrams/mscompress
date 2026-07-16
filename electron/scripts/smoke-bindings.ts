@@ -6,7 +6,15 @@ import { dirname, resolve, join } from 'node:path'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
-import { getVersion, getNumThreads, analyze, compress, decompress, extract } from '../src/main/bindings.ts'
+import {
+  getVersion,
+  getNumThreads,
+  analyze,
+  computeQC,
+  compress,
+  decompress,
+  extract
+} from '../src/main/bindings.ts'
 
 const require = createRequire(import.meta.url)
 const { read } = require('mscompress')
@@ -22,6 +30,24 @@ console.log('')
 for (const rel of ['test.mzML', 'test.msz', 'mszx/test.mszx', 'corrupt_base64.mzML']) {
   const s = analyze(resolve(dataDir, rel))
   console.log(`analyze(${rel}): kind=${s.kind} spectra=${s.spectrumCount} err=${s.error ?? '-'}`)
+}
+console.log('')
+
+// ---- QC (T5) ----
+for (const rel of ['test.mzML', 'sciex_ttof6600_100.mzML']) {
+  const q = computeQC(resolve(dataDir, rel))
+  const nonzero = q.heatmap.cells.length
+  console.log(`computeQC(${rel}):`)
+  console.log(`  spectrumCount=${q.spectrumCount} sampledCount=${q.sampledCount} err=${q.error ?? '-'}`)
+  console.log(
+    `  tic: len=${q.tic.length} first=${JSON.stringify(q.tic[0])} last=${JSON.stringify(q.tic[q.tic.length - 1])}`
+  )
+  console.log(`  bpc: len=${q.bpc.length}`)
+  console.log(
+    `  heatmap: ${q.heatmap.rtBins}x${q.heatmap.mzBins} mz[${q.heatmap.mzMin.toFixed(0)}..${q.heatmap.mzMax.toFixed(0)}] rtMax=${q.heatmap.rtMax.toFixed(3)} nonzeroCells=${nonzero}`
+  )
+  console.log(`  msLevelCounts=${JSON.stringify(q.msLevelCounts)}`)
+  console.log(`  peaksPerSpectrum=${JSON.stringify(q.peaksPerSpectrum)}`)
 }
 console.log('')
 

@@ -13,6 +13,7 @@ export const IPC = {
   getNumThreads: 'sys:getNumThreads',
   getFilesize: 'fs:getFilesize',
   analyze: 'file:analyze',
+  computeQC: 'qc:compute',
   compress: 'convert:compress',
   decompress: 'convert:decompress',
   extract: 'convert:extract',
@@ -130,6 +131,60 @@ export interface FileSummary {
   error?: string
 }
 
+// ---- QC dashboard ----------------------------------------------------------
+
+export interface TicPoint {
+  rt: number
+  tic: number
+}
+export interface BpcPoint {
+  rt: number
+  bpc: number
+}
+export interface HeatCell {
+  rt: number
+  mz: number
+  density: number
+}
+export interface QCHeatmap {
+  rtBins: number
+  mzBins: number
+  mzMin: number
+  mzMax: number
+  rtMax: number
+  cells: HeatCell[]
+}
+export interface PeaksBin {
+  bin: string
+  count: number
+}
+
+/**
+ * QC dashboard data derived from a single pass over (a sample of) the file's
+ * spectra. Same shapes the QCTab charts consume. `rt` values are in minutes
+ * (or spectrum index when the file has no usable retention times).
+ */
+export interface QCData {
+  path: string
+  spectrumCount: number
+  /** How many spectra were actually decoded (≤ spectrumCount when sampled). */
+  sampledCount: number
+  tic: TicPoint[]
+  bpc: BpcPoint[]
+  heatmap: QCHeatmap
+  msLevelCounts: MsLevelCount[]
+  peaksPerSpectrum: PeaksBin[]
+  /** Set instead of the data fields when QC failed. */
+  error?: string
+}
+
+export interface QCOptions {
+  /** Max spectra to decode (stride-sampled beyond this). */
+  maxSpectra?: number
+  /** Max TIC/BPC points (RT-binned beyond this). */
+  ticPoints?: number
+}
+
 /** The typed surface exposed on `window.api` in the renderer. */
 export interface Api {
   /** Open a multi-select file dialog (mzML/msz/mszx). Returns chosen paths. */
@@ -150,6 +205,8 @@ export interface Api {
   getFilesize(path: string): Promise<number>
   /** Analyze a file via the native binding and return a serializable summary. */
   analyze(path: string): Promise<FileSummary>
+  /** Compute QC dashboard data (TIC/BPC/heatmap/MS-levels/peaks) from spectra. */
+  computeQC(path: string, opts?: QCOptions): Promise<QCData>
   /** Compress an mzML file to .msz. */
   compress(path: string, opts: CompressOptions): Promise<ConvertResult>
   /** Decompress an .msz/.mszx file to .mzML. */

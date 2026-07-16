@@ -15,6 +15,7 @@ const api: Api = {
   getNumThreads: () => ipcRenderer.invoke(IPC.getNumThreads),
   getFilesize: (path) => ipcRenderer.invoke(IPC.getFilesize, path),
   analyze: (path) => ipcRenderer.invoke(IPC.analyze, path),
+  computeQC: (path, opts) => ipcRenderer.invoke(IPC.computeQC, path, opts),
   compress: (path, opts) => ipcRenderer.invoke(IPC.compress, path, opts),
   decompress: (path, opts) => ipcRenderer.invoke(IPC.decompress, path, opts),
   extract: (path, opts) => ipcRenderer.invoke(IPC.extract, path, opts),

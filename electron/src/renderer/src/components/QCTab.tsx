@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react"
+import { Loader2, AlertTriangle } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -13,13 +15,7 @@ import {
   CartesianGrid,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  ticChromatogram,
-  basePeakChromatogram,
-  heatmap,
-  peaksPerSpectrum,
-  sampleAnalysis,
-} from "@/mockData"
+import type { QCData } from "@shared/ipc"
 
 const donutColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"]
 
@@ -78,8 +74,62 @@ function Panel({
   )
 }
 
-export function QCTab() {
-  const maxDensity = Math.max(...heatmap.cells.map((c) => c.density))
+export function QCTab({ path, name }: { path: string; name: string }) {
+  const [qc, setQc] = useState<QCData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setQc(null)
+    window.api
+      .computeQC(path)
+      .then((data) => {
+        if (!active) return
+        setQc(data)
+        console.log(
+          "[renderer] QC:",
+          data.path,
+          "tic=",
+          data.tic.length,
+          "cells=",
+          data.heatmap.cells.length,
+        )
+      })
+      .catch((e) => {
+        if (active) setQc({ error: String(e) } as QCData)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [path])
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
+        <Loader2 className="size-6 animate-spin" />
+        <span className="text-xs">Computing QC for {name}…</span>
+      </div>
+    )
+  }
+
+  if (!qc || qc.error) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center text-destructive">
+        <AlertTriangle className="size-6" />
+        <span className="text-sm font-medium">QC failed</span>
+        <p className="mono max-w-md text-[11px] text-muted-foreground">
+          {qc?.error ?? "No data"}
+        </p>
+      </div>
+    )
+  }
+
+  const { heatmap, tic, bpc, msLevelCounts, peaksPerSpectrum } = qc
+  const maxDensity = heatmap.cells.reduce((m, c) => Math.max(m, c.density), 0) || 1
 
   // build 2D grid: rows = mz bins (top = high mz), cols = rt bins
   const grid: number[][] = Array.from({ length: heatmap.mzBins }, () =>
@@ -88,30 +138,27 @@ export function QCTab() {
   for (const c of heatmap.cells) {
     const r = Math.min(
       heatmap.rtBins - 1,
-      Math.round((c.rt / heatmap.rtMax) * (heatmap.rtBins - 1)),
+      Math.round((c.rt / (heatmap.rtMax || 1)) * (heatmap.rtBins - 1)),
     )
     const m = Math.min(
       heatmap.mzBins - 1,
       Math.round(
-        ((c.mz - heatmap.mzMin) / (heatmap.mzMax - heatmap.mzMin)) *
+        ((c.mz - heatmap.mzMin) / (heatmap.mzMax - heatmap.mzMin || 1)) *
           (heatmap.mzBins - 1),
       ),
     )
     grid[m][r] = c.density
   }
 
-  const donutData = sampleAnalysis.msLevelCounts.map((m) => ({
-    name: m.level,
-    value: m.count,
-  }))
-  const totalSpectra = donutData.reduce((a, b) => a + b.value, 0)
+  const donutData = msLevelCounts.map((m) => ({ name: m.level, value: m.count }))
+  const totalSpectra = donutData.reduce((a, b) => a + b.value, 0) || 1
 
   return (
     <div className="grid grid-cols-2 gap-3 p-4">
       {/* TIC */}
       <Panel title="TIC Chromatogram" right={<span className="mono text-[10px] text-muted-foreground">intensity · RT(min)</span>}>
         <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={ticChromatogram} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart data={tic} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="ticFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
@@ -119,7 +166,7 @@ export function QCTab() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="rt" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
+            <XAxis dataKey="rt" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toFixed(2)} />
             <YAxis tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={38} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
             <RTooltip {...chartTooltip} formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "TIC"]} />
             <Area type="monotone" dataKey="tic" stroke="var(--chart-1)" strokeWidth={1.5} fill="url(#ticFill)" />
@@ -130,7 +177,7 @@ export function QCTab() {
       {/* Base peak */}
       <Panel title="Base-Peak Chromatogram" right={<span className="mono text-[10px] text-muted-foreground">BPC · RT(min)</span>}>
         <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={basePeakChromatogram} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart data={bpc} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="bpcFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.5} />
@@ -138,7 +185,7 @@ export function QCTab() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="rt" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
+            <XAxis dataKey="rt" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v).toFixed(2)} />
             <YAxis tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={38} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
             <RTooltip {...chartTooltip} formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "BPC"]} />
             <Area type="monotone" dataKey="bpc" stroke="var(--chart-2)" strokeWidth={1.5} fill="url(#bpcFill)" />
@@ -166,9 +213,9 @@ export function QCTab() {
         <div className="flex gap-2">
           {/* m/z axis labels */}
           <div className="mono flex flex-col justify-between py-0.5 text-[9px] text-muted-foreground">
-            <span>{heatmap.mzMax}</span>
+            <span>{heatmap.mzMax.toFixed(0)}</span>
             <span>m/z</span>
-            <span>{heatmap.mzMin}</span>
+            <span>{heatmap.mzMin.toFixed(0)}</span>
           </div>
           <div className="flex-1">
             <div
@@ -181,7 +228,7 @@ export function QCTab() {
                 row.map((d, ci) => (
                   <div
                     key={`${ri}-${ci}`}
-                    title={`density ${d.toFixed(3)}`}
+                    title={`density ${d.toFixed(2)}`}
                     style={{
                       background: heatColor(d / maxDensity),
                       aspectRatio: "1 / 1",
@@ -192,7 +239,7 @@ export function QCTab() {
             </div>
             <div className="mono mt-1 flex justify-between text-[9px] text-muted-foreground">
               <span>RT 0</span>
-              <span>RT {heatmap.rtMax} min</span>
+              <span>RT {heatmap.rtMax.toFixed(2)} min</span>
             </div>
           </div>
         </div>
@@ -244,7 +291,7 @@ export function QCTab() {
           <BarChart data={peaksPerSpectrum} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
             <XAxis dataKey="bin" tick={{ fontSize: 8, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" height={40} />
-            <YAxis tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={38} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+            <YAxis tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={38} allowDecimals={false} />
             <RTooltip {...chartTooltip} formatter={(v) => [Number(v).toLocaleString(), "spectra"]} />
             <Bar dataKey="count" fill="var(--chart-4)" radius={[2, 2, 0, 0]} />
           </BarChart>

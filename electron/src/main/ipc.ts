@@ -7,7 +7,8 @@ import type {
   ConvertProgress,
   ConvertResult,
   DecompressOptions,
-  ExtractOptions
+  ExtractOptions,
+  QCOptions
 } from '../shared/ipc'
 import * as bindings from './bindings'
 
@@ -99,6 +100,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getFilesize, (_event, path: string) => bindings.getFilesize(path))
 
   ipcMain.handle(IPC.analyze, (_event, path: string) => bindings.analyze(path))
+
+  ipcMain.handle(IPC.computeQC, (_event, path: string, opts?: QCOptions) =>
+    bindings.computeQC(path, opts)
+  )
 
   ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
     runConvert(event.sender, 'compress', basename(path), () => bindings.compress(path, opts))

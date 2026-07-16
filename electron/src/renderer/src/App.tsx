@@ -159,7 +159,7 @@ function App() {
                   <ConvertTab kind={selectedEntry.kind} path={selectedEntry.path} />
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
-                  <QCTab />
+                  <QCTab path={selectedEntry.path} name={selectedEntry.name} />
                 </TabsContent>
                 <TabsContent value="extract" className="m-0">
                   <ExtractQueueTab />
