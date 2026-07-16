@@ -156,7 +156,7 @@ function App() {
 
               <ScrollArea className="min-h-0 flex-1">
                 <TabsContent value="convert" className="m-0">
-                  <ConvertTab kind={selectedEntry.kind} />
+                  <ConvertTab kind={selectedEntry.kind} path={selectedEntry.path} />
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
                   <QCTab />

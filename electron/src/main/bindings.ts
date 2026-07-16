@@ -2,8 +2,20 @@
 // This module is the ONLY place the addon is required, and it must never be
 // imported from the renderer (it is externalized from the Vite bundle).
 import { createRequire } from 'module'
-import { basename, extname } from 'path'
-import type { FileKind, FileSummary, MsLevelCount } from '../shared/ipc'
+import { statSync } from 'fs'
+import { basename, dirname, extname, join } from 'path'
+import { hrtime } from 'process'
+import { COMPRESSION_PRESETS } from '../shared/ipc.ts'
+import type {
+  CompressOptions,
+  ConvertResult,
+  DecompressOptions,
+  ExtractOptions,
+  FileKind,
+  FileSummary,
+  LossyAlgo,
+  MsLevelCount
+} from '../shared/ipc.ts'
 
 // The binding ships as ESM; require(ESM) (Node 22.12+/Electron 38) loads its
 // namespace synchronously, which is all we need for these cheap header reads.
@@ -33,12 +45,31 @@ interface MsSpectra {
   get(index: number): MsSpectrum
 }
 
+interface MsRuntimeArguments {
+  threads: number
+  zstdCompressionLevel: number
+  targetMzFormat: number
+  targetIntenFormat: number
+  mzScaleFactor: number
+  intScaleFactor: number
+}
+
+interface MsNativeExtractOptions {
+  msLevel?: number
+  indices?: number[]
+  scanNumbers?: number[]
+}
+
 interface MsFile {
   path: string
   filesize: number | bigint
   format: MsDataFormat
   positions: MsPositions
   spectra: MsSpectra
+  arguments: MsRuntimeArguments
+  compress(outPath: string): MsFile
+  decompress(outPath: string): MsFile
+  extract(outPath: string, options: MsNativeExtractOptions): MsFile
   close(): void
 }
 
@@ -78,6 +109,17 @@ const COMPRESSION: Record<number, string> = {
   1000574: 'zlib',
   1000576: 'none',
   4700001: 'zstd'
+}
+
+// Lossy algorithm → target-format accession code (from src/mscompress.h). "none"
+// keeps the default lossless ZSTD target.
+const LOSSY_FORMAT: Record<LossyAlgo, number> = {
+  none: 4700001, // _ZSTD_compression_ (lossless)
+  cast: 4700002, // _cast_64_to_32_
+  log: 4700003, // _log2_transform_
+  delta16: 4700004, // _delta16_transform_
+  delta32: 4700006, // _delta32_transform_
+  vbr: 4700007 // _vbr_
 }
 
 // Cap the peak-decode integrity probe so huge files stay responsive; corruption
@@ -213,6 +255,148 @@ export function analyze(path: string): FileSummary {
       filesizeBytes,
       error: err instanceof Error ? err.message : String(err)
     }
+  } finally {
+    file?.close()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Convert operations: compress / decompress / extract
+// ---------------------------------------------------------------------------
+
+/** Strip the final extension from a base filename. */
+function stripExt(name: string): string {
+  const ext = extname(name)
+  return ext ? name.slice(0, -ext.length) : name
+}
+
+/** Compute an output path in `outputDir` (or alongside the input). */
+function outPathFor(inputPath: string, outputDir: string | undefined, newExt: string, suffix = ''): string {
+  const dir = outputDir && outputDir.length > 0 ? outputDir : dirname(inputPath)
+  const stem = stripExt(basename(inputPath))
+  return join(dir, `${stem}${suffix}${newExt}`)
+}
+
+/** Build a ConvertResult from the finished output file. */
+function makeResult(
+  op: ConvertResult['op'],
+  inputPath: string,
+  outPath: string,
+  startedAt: bigint
+): ConvertResult {
+  const inputBytes = getFilesize(inputPath)
+  const outputBytes = statSync(outPath).size
+  return {
+    op,
+    outPath,
+    inputBytes,
+    outputBytes,
+    ratio: inputBytes > 0 ? outputBytes / inputBytes : 0,
+    elapsedMs: Number(hrtime.bigint() - startedAt) / 1e6
+  }
+}
+
+function errorResult(op: ConvertResult['op'], err: unknown): ConvertResult {
+  return {
+    op,
+    outPath: '',
+    inputBytes: 0,
+    outputBytes: 0,
+    ratio: 0,
+    elapsedMs: 0,
+    error: err instanceof Error ? err.message : String(err)
+  }
+}
+
+/** Apply preset + advanced overrides onto a file's RuntimeArguments. */
+function applyCompressArgs(file: MsFile, opts: CompressOptions): void {
+  const preset = COMPRESSION_PRESETS[opts.preset] ?? COMPRESSION_PRESETS.default
+  const mz = opts.mzLossy ?? preset.mzLossy
+  const int = opts.intLossy ?? preset.intLossy
+  file.arguments.threads = opts.threads ?? getNumThreads()
+  file.arguments.zstdCompressionLevel = opts.zstdLevel ?? preset.zstdLevel
+  file.arguments.targetMzFormat = LOSSY_FORMAT[mz]
+  file.arguments.targetIntenFormat = LOSSY_FORMAT[int]
+}
+
+/** Compress an mzML → .msz. */
+export function compress(path: string, opts: CompressOptions): ConvertResult {
+  const startedAt = hrtime.bigint()
+  let file: MsFile | null = null
+  try {
+    if (kindFromPath(path) !== 'mzML') {
+      throw new Error('Only mzML files can be compressed.')
+    }
+    file = mod().read(path)
+    applyCompressArgs(file, opts)
+    const outPath = outPathFor(path, opts.outputDir, '.msz')
+    const out = file.compress(outPath)
+    out.close()
+    return makeResult('compress', path, outPath, startedAt)
+  } catch (err) {
+    return errorResult('compress', err)
+  } finally {
+    file?.close()
+  }
+}
+
+/** Decompress an .msz/.mszx → .mzML. */
+export function decompress(path: string, opts: DecompressOptions): ConvertResult {
+  const startedAt = hrtime.bigint()
+  const kind = kindFromPath(path)
+  let file: MsFile | null = null
+  try {
+    if (kind === 'mzML') {
+      throw new Error('mzML files are already decompressed.')
+    }
+    file = openFile(path, kind)
+    file.arguments.threads = opts.threads ?? getNumThreads()
+    const outPath = outPathFor(path, opts.outputDir, '.mzML')
+    const out = file.decompress(outPath)
+    out.close()
+    return makeResult('decompress', path, outPath, startedAt)
+  } catch (err) {
+    return errorResult('decompress', err)
+  } finally {
+    file?.close()
+  }
+}
+
+/** Translate the UI extract options into the native filter object. */
+function nativeExtractOptions(opts: ExtractOptions): MsNativeExtractOptions {
+  if (opts.mode === 'mslevel') {
+    return { msLevel: opts.msLevel ?? 2 }
+  }
+  if (opts.mode === 'scan') {
+    const from = opts.fromScan ?? 0
+    const to = Math.max(from, opts.toScan ?? from)
+    const scanNumbers: number[] = []
+    for (let s = from; s <= to; s++) scanNumbers.push(s)
+    return { scanNumbers }
+  }
+  // index range
+  const from = opts.fromIndex ?? 0
+  const to = Math.max(from, opts.toIndex ?? from)
+  const indices: number[] = []
+  for (let i = from; i <= to; i++) indices.push(i)
+  return { indices }
+}
+
+/** Extract a spectra subset → .mzML or .msz. */
+export function extract(path: string, opts: ExtractOptions): ConvertResult {
+  const startedAt = hrtime.bigint()
+  const kind = kindFromPath(path)
+  let file: MsFile | null = null
+  try {
+    file = openFile(path, kind)
+    file.arguments.threads = opts.threads ?? getNumThreads()
+    const ext = opts.outputFormat === 'msz' ? '.msz' : '.mzML'
+    const outPath = outPathFor(path, opts.outputDir, ext, '.extracted')
+    const out = file.extract(outPath, nativeExtractOptions(opts))
+    out.close()
+    return makeResult('extract', path, outPath, startedAt)
+  } catch (err) {
+    return errorResult('extract', err)
   } finally {
     file?.close()
   }

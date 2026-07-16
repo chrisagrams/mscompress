@@ -4,13 +4,18 @@ import {
   FileDown,
   Scissors,
   FolderOpen,
+  FolderSearch,
   Zap,
   HardDrive,
   Server,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
+import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -35,7 +40,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { compressionProfiles, type LossyAlgo, type FileKind } from "@/mockData"
+import { compressionProfiles, type FileKind } from "@/mockData"
+import { fmtBytes } from "@/mockData"
+import { COMPRESSION_PRESETS } from "@shared/ipc"
+import type {
+  ConvertResult,
+  ExtractMode,
+  LossyAlgo,
+  Preset,
+} from "@shared/ipc"
 
 type Op = "compress" | "decompress" | "extract"
 
@@ -56,25 +69,56 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function ConvertTab({ kind }: { kind: FileKind }) {
+export function ConvertTab({ kind, path }: { kind: FileKind; path: string }) {
   const allowed = opsForKind[kind]
 
   const [op, setOp] = useState<Op>("compress")
-  const [profile, setProfile] = useState("default")
-  const [mzAlgo, setMzAlgo] = useState<LossyAlgo>("log")
-  const [intAlgo, setIntAlgo] = useState<LossyAlgo>("delta32")
-  const [zstd, setZstd] = useState([9])
-  const [extractBy, setExtractBy] = useState("mslevel")
+  const [profile, setProfile] = useState<Preset>("default")
+  const [mzAlgo, setMzAlgo] = useState<LossyAlgo>(COMPRESSION_PRESETS.default.mzLossy)
+  const [intAlgo, setIntAlgo] = useState<LossyAlgo>(COMPRESSION_PRESETS.default.intLossy)
+  const [zstd, setZstd] = useState([COMPRESSION_PRESETS.default.zstdLevel])
+  const [extractBy, setExtractBy] = useState<ExtractMode>("mslevel")
+  const [msLevel, setMsLevel] = useState("2")
+  const [scanFrom, setScanFrom] = useState("1000")
+  const [scanTo, setScanTo] = useState("5000")
+  const [indexFrom, setIndexFrom] = useState("0")
+  const [indexTo, setIndexTo] = useState("10000")
+  const [outFormat, setOutFormat] = useState<"mzML" | "msz">("mzML")
   const [outputDir, setOutputDir] = useState("/data/proteomics/compressed/")
+
+  // Convert run state.
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [phase, setPhase] = useState<string>("")
+  const [result, setResult] = useState<ConvertResult | null>(null)
 
   // Seed the output directory from the OS default (Downloads) on mount.
   useEffect(() => {
     window.api.getDefaultOutputDir().then(setOutputDir).catch(() => {})
   }, [])
 
+  // Subscribe to streamed progress events (proves the main->renderer channel).
+  useEffect(() => {
+    const off = window.api.onConvertProgress((p) => {
+      setPhase(p.phase)
+      console.log("[renderer] convert progress:", p.op, p.phase, p.message ?? p.error ?? "")
+    })
+    return off
+  }, [])
+
   const pickOutputDir = async () => {
     const dir = await window.api.openOutputDir()
     if (dir) setOutputDir(dir)
+  }
+
+  // Choosing a preset resets the advanced controls to that preset's defaults;
+  // the accordion then overrides them per-field.
+  const selectPreset = (p: Preset) => {
+    setProfile(p)
+    const d = COMPRESSION_PRESETS[p]
+    setMzAlgo(d.mzLossy)
+    setIntAlgo(d.intLossy)
+    setZstd([d.zstdLevel])
   }
 
   // Snap to a valid operation whenever the file (and thus allowed ops) changes.
@@ -83,7 +127,47 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
       const next = (["compress", "decompress", "extract"] as Op[]).find((o) => allowed[o])
       if (next) setOp(next)
     }
+    setResult(null)
   }, [kind]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Run the selected operation through the bridge with a live (creeping) bar.
+  const run = async () => {
+    if (running || !allowed[op]) return
+    setResult(null)
+    setRunning(true)
+    setProgress(8)
+    const creep = setInterval(() => setProgress((p) => (p < 90 ? p + 4 : p)), 120)
+    try {
+      let res: ConvertResult
+      if (op === "compress") {
+        res = await window.api.compress(path, {
+          preset: profile,
+          mzLossy: mzAlgo,
+          intLossy: intAlgo,
+          zstdLevel: zstd[0],
+          outputDir,
+        })
+      } else if (op === "decompress") {
+        res = await window.api.decompress(path, { outputDir })
+      } else {
+        res = await window.api.extract(path, {
+          mode: extractBy,
+          msLevel: msLevel === "n" ? 3 : Number(msLevel),
+          fromScan: Number(scanFrom),
+          toScan: Number(scanTo),
+          fromIndex: Number(indexFrom),
+          toIndex: Number(indexTo),
+          outputFormat: outFormat,
+          outputDir,
+        })
+      }
+      setResult(res)
+    } finally {
+      clearInterval(creep)
+      setProgress(100)
+      setRunning(false)
+    }
+  }
 
   const opItems: { value: Op; label: string; icon: typeof FileArchive; hint: string }[] = [
     { value: "compress", label: "Compress → .msz", icon: FileArchive, hint: "Only mzML files can be compressed" },
@@ -144,7 +228,7 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
               {compressionProfiles.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => setProfile(p.id)}
+                  onClick={() => selectPreset(p.id)}
                   className={`rounded-md border p-2 text-left transition-colors ${
                     profile === p.id
                       ? "border-primary bg-primary/10"
@@ -230,7 +314,7 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
               <ToggleGroup
                 type="single"
                 value={extractBy}
-                onValueChange={(v) => v && setExtractBy(v)}
+                onValueChange={(v) => v && setExtractBy(v as ExtractMode)}
                 variant="outline"
                 className="w-full"
               >
@@ -249,7 +333,7 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
             {extractBy === "mslevel" && (
               <div className="space-y-2">
                 <SectionLabel>MS level</SectionLabel>
-                <Select defaultValue="2">
+                <Select value={msLevel} onValueChange={setMsLevel}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -265,11 +349,19 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <SectionLabel>From scan</SectionLabel>
-                  <Input defaultValue="1000" className="mono" />
+                  <Input
+                    value={scanFrom}
+                    onChange={(e) => setScanFrom(e.target.value)}
+                    className="mono"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <SectionLabel>To scan</SectionLabel>
-                  <Input defaultValue="5000" className="mono" />
+                  <Input
+                    value={scanTo}
+                    onChange={(e) => setScanTo(e.target.value)}
+                    className="mono"
+                  />
                 </div>
               </div>
             )}
@@ -277,11 +369,19 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <SectionLabel>From index</SectionLabel>
-                  <Input defaultValue="0" className="mono" />
+                  <Input
+                    value={indexFrom}
+                    onChange={(e) => setIndexFrom(e.target.value)}
+                    className="mono"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <SectionLabel>To index</SectionLabel>
-                  <Input defaultValue="10000" className="mono" />
+                  <Input
+                    value={indexTo}
+                    onChange={(e) => setIndexTo(e.target.value)}
+                    className="mono"
+                  />
                 </div>
               </div>
             )}
@@ -290,7 +390,8 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
               <SectionLabel>Output format</SectionLabel>
               <ToggleGroup
                 type="single"
-                defaultValue="mzML"
+                value={outFormat}
+                onValueChange={(v) => v && setOutFormat(v as "mzML" | "msz")}
                 variant="outline"
                 className="w-full"
               >
@@ -394,12 +495,92 @@ export function ConvertTab({ kind }: { kind: FileKind }) {
         </CardContent>
       </Card>
 
-      <Button size="lg" className="w-full gap-2">
-        <Zap className="size-4" />
-        {op === "compress" && "Compress file"}
-        {op === "decompress" && "Decompress file"}
-        {op === "extract" && "Extract spectra"}
+      <Button
+        size="lg"
+        className="w-full gap-2"
+        disabled={running || !allowed[op]}
+        onClick={run}
+      >
+        {running ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+        {running
+          ? `Running${phase ? ` · ${phase}` : ""}…`
+          : op === "compress"
+            ? "Compress file"
+            : op === "decompress"
+              ? "Decompress file"
+              : "Extract spectra"}
       </Button>
+
+      {/* Live progress while an operation runs */}
+      {running && (
+        <div className="space-y-1.5">
+          <Progress value={progress} className="h-1.5" />
+          <div className="mono text-[11px] text-muted-foreground">
+            {phase || "starting"}…
+          </div>
+        </div>
+      )}
+
+      {/* Completion / error state */}
+      {!running && result && (
+        <Card className="gap-3 py-4">
+          <CardContent className="space-y-3 px-4">
+            {result.error ? (
+              <div className="flex items-start gap-2 text-xs text-destructive">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <div>
+                  <div className="font-medium">{result.op} failed</div>
+                  <p className="mono mt-1 text-[11px] text-muted-foreground">
+                    {result.error}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
+                  <CheckCircle2 className="size-4" /> {result.op} complete
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-md border border-border/60 p-2">
+                    <div className="mono text-sm">{fmtBytes(result.inputBytes)}</div>
+                    <div className="text-[10px] text-muted-foreground">input</div>
+                  </div>
+                  <div className="rounded-md border border-border/60 p-2">
+                    <div className="mono text-sm">{fmtBytes(result.outputBytes)}</div>
+                    <div className="text-[10px] text-muted-foreground">output</div>
+                  </div>
+                  <div className="rounded-md border border-border/60 p-2">
+                    <div className="mono text-sm text-emerald-400">
+                      {result.ratio > 0 ? `${(result.ratio * 100).toFixed(0)}%` : "—"}
+                      {result.ratio > 0 && result.op === "compress" && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ·×{(1 / result.ratio).toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      ratio · {result.elapsedMs.toFixed(0)}ms
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={result.outPath} className="mono text-xs" />
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="shrink-0"
+                    title="Reveal in folder"
+                    onClick={() => window.api.revealInFolder(result.outPath)}
+                  >
+                    <FolderSearch className="size-4" />
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

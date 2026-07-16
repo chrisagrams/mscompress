@@ -1,5 +1,14 @@
 import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
+import type { WebContents } from 'electron'
+import { basename } from 'path'
 import { IPC } from '../shared/ipc'
+import type {
+  CompressOptions,
+  ConvertProgress,
+  ConvertResult,
+  DecompressOptions,
+  ExtractOptions
+} from '../shared/ipc'
 import * as bindings from './bindings'
 
 const FILE_FILTERS = [
@@ -9,6 +18,33 @@ const FILE_FILTERS = [
   { name: 'MSZX', extensions: ['mszx'] },
   { name: 'All files', extensions: ['*'] }
 ]
+
+let progressSeq = 0
+
+/**
+ * Run a convert operation, streaming coarse start/step/done progress to the
+ * renderer over the whitelisted `convert:progress` channel. The native call is
+ * synchronous; we yield once after `start` so that event flushes to the
+ * (separate) renderer process before the blocking work begins, keeping the UI's
+ * progress indicator live.
+ */
+async function runConvert(
+  sender: WebContents,
+  op: ConvertProgress['op'],
+  file: string,
+  work: () => ConvertResult
+): Promise<ConvertResult> {
+  const id = `cv${++progressSeq}`
+  const emit = (p: Omit<ConvertProgress, 'id' | 'op' | 'file'>): void => {
+    if (!sender.isDestroyed()) sender.send(IPC.convertProgress, { id, op, file, ...p })
+  }
+  emit({ phase: 'start', message: `${op} ${file}` })
+  await new Promise((resolve) => setImmediate(resolve))
+  emit({ phase: 'step', message: 'working…' })
+  const result = work()
+  emit(result.error ? { phase: 'error', error: result.error } : { phase: 'done', result })
+  return result
+}
 
 /**
  * Register every whitelisted IPC handler exactly once. All handlers use the
@@ -50,6 +86,10 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle(IPC.revealInFolder, (_event, path: string) => {
+    if (typeof path === 'string' && path.length > 0) shell.showItemInFolder(path)
+  })
+
   ipcMain.handle(IPC.getDefaultOutputDir, () => app.getPath('downloads'))
 
   ipcMain.handle(IPC.getVersion, () => bindings.getVersion())
@@ -59,4 +99,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getFilesize, (_event, path: string) => bindings.getFilesize(path))
 
   ipcMain.handle(IPC.analyze, (_event, path: string) => bindings.analyze(path))
+
+  ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
+    runConvert(event.sender, 'compress', basename(path), () => bindings.compress(path, opts))
+  )
+
+  ipcMain.handle(IPC.decompress, (event, path: string, opts: DecompressOptions) =>
+    runConvert(event.sender, 'decompress', basename(path), () => bindings.decompress(path, opts))
+  )
+
+  ipcMain.handle(IPC.extract, (event, path: string, opts: ExtractOptions) =>
+    runConvert(event.sender, 'extract', basename(path), () => bindings.extract(path, opts))
+  )
 }
