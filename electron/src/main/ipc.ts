@@ -13,6 +13,7 @@ import type {
   QCOptions,
   QueueAddRequest,
   QueueState,
+  TitleBarOverlayColors,
 } from "../shared/ipc"
 import * as bindings from "./bindings"
 import { queue } from "./queue"
@@ -145,6 +146,20 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.settingsGet, () => getSettings())
   ipcMain.handle(IPC.settingsSet, (_event, partial: Partial<AppSettings>) => setSettings(partial))
+
+  // Windows-only: recolor the native title-bar overlay to match the app theme.
+  // Guarded so it's a harmless no-op on macOS/Linux (where no overlay exists)
+  // and never throws if the window wasn't created with `titleBarOverlay`.
+  ipcMain.handle(IPC.setTitleBarOverlay, (event, colors: TitleBarOverlayColors) => {
+    if (process.platform !== "win32") return
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    try {
+      win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor })
+    } catch {
+      // Window wasn't created with a titleBarOverlay — nothing to recolor.
+    }
+  })
 
   // ---- MSTransfer batch queue ----
   // Broadcast every queue-state change to all renderer windows.

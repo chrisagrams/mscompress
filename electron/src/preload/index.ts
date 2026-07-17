@@ -26,6 +26,7 @@ const api: Api = {
   readMszx: (path) => ipcRenderer.invoke(IPC.readMszx, path),
   getSettings: () => ipcRenderer.invoke(IPC.settingsGet),
   setSettings: (partial) => ipcRenderer.invoke(IPC.settingsSet, partial),
+  setTitleBarOverlay: (colors) => ipcRenderer.invoke(IPC.setTitleBarOverlay, colors),
   onSettingsChange: (cb) => {
     const listener = (_e: IpcRendererEvent, s: AppSettings): void => cb(s)
     ipcRenderer.on(IPC.settingsChange, listener)

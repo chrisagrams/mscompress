@@ -237,6 +237,7 @@ export function installApiStub(fx) {
         if (i >= 0) settingsListeners.splice(i, 1)
       }
     },
+    setTitleBarOverlay: () => Promise.resolve(),
     compress: (path) =>
       Promise.resolve({
         op: "compress",

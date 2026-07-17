@@ -25,7 +25,12 @@ import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { SettingsDialog } from "@/components/SettingsDialog"
 import { type FileEntry } from "@/files"
-import type { AppSettings, QueueState, SystemMemory } from "@shared/ipc"
+import {
+  TITLE_BAR_OVERLAY,
+  type AppSettings,
+  type QueueState,
+  type SystemMemory,
+} from "@shared/ipc"
 
 const GB = 1024 ** 3
 
@@ -133,6 +138,9 @@ function App() {
       el.classList.add("dark")
       el.classList.remove("light")
     }
+    // Keep the Windows native window-control overlay in sync with the theme.
+    // Safe no-op on macOS/Linux (guarded in the main process).
+    void window.api.setTitleBarOverlay(TITLE_BAR_OVERLAY[settings.theme]).catch(() => {})
   }, [settings?.theme])
 
   const dark = settings ? settings.theme === "dark" : true
@@ -156,9 +164,10 @@ function App() {
   return (
     <TooltipProvider>
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-        {/* Top toolbar — drag region for the frameless macOS window (app-toolbar
-            gets the traffic-light inset on darwin; interactive controls opt out
-            of dragging via no-drag). */}
+        {/* Top toolbar — drag region for the frameless window (app-toolbar gets
+            the traffic-light inset on darwin and the Window Controls Overlay
+            inset on win32; interactive controls opt out of dragging via
+            no-drag). */}
         <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
           <div className="flex items-center gap-2">
             <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />

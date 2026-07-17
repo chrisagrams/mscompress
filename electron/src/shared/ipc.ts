@@ -25,6 +25,8 @@ export const IPC = {
   extract: "convert:extract",
   // main -> renderer streamed progress (webContents.send)
   convertProgress: "convert:progress",
+  // renderer -> main: update the Windows title-bar overlay colors (theme change)
+  setTitleBarOverlay: "window:setTitleBarOverlay",
   // MSTransfer batch queue
   queueAdd: "queue:add",
   queueStart: "queue:start",
@@ -133,6 +135,28 @@ export interface AppSettings {
   /** Default compression preset. */
   defaultPreset: Preset
   theme: "dark" | "light"
+}
+
+// ---- Window Controls Overlay (Windows) -------------------------------------
+
+/**
+ * Colors for the Windows title-bar overlay (the native min/max/close button
+ * strip shown when `titleBarStyle: "hidden"` + `titleBarOverlay` are set).
+ * `color` is the strip background; `symbolColor` is the glyph color.
+ */
+export interface TitleBarOverlayColors {
+  color: string
+  symbolColor: string
+}
+
+/**
+ * Theme → overlay colors, so the Windows button strip matches the app theme.
+ * Shared by the main process (initial value) and the renderer (live updates on
+ * theme toggle) to keep the two in sync. No-op on macOS/Linux.
+ */
+export const TITLE_BAR_OVERLAY: Record<AppSettings["theme"], TitleBarOverlayColors> = {
+  dark: { color: "#0a0a0a", symbolColor: "#e5e5e5" },
+  light: { color: "#ffffff", symbolColor: "#0a0a0a" },
 }
 
 // ---- MSZX archive ----------------------------------------------------------
@@ -344,6 +368,11 @@ export interface Api {
   getSettings(): Promise<AppSettings>
   /** Merge a partial update into settings, persist, and return the result. */
   setSettings(partial: Partial<AppSettings>): Promise<AppSettings>
+  /**
+   * Update the Windows title-bar overlay (native window-control strip) colors
+   * so they match the app theme. No-op on macOS/Linux (handled in main).
+   */
+  setTitleBarOverlay(colors: TitleBarOverlayColors): Promise<void>
   /** Subscribe to settings-change broadcasts. Returns an unsubscribe fn. */
   onSettingsChange(cb: (settings: AppSettings) => void): () => void
   /** Compress an mzML file to .msz. */

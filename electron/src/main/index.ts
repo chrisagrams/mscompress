@@ -1,12 +1,34 @@
 import { app, shell, BrowserWindow } from "electron"
+import type { BrowserWindowConstructorOptions } from "electron"
 import { join } from "path"
 import { fileURLToPath } from "url"
 import { registerIpcHandlers } from "./ipc"
 import { configureQueue } from "./queue"
 import { configureSettings, loadSettings, onSettingsChange } from "./settings"
 import { getNumThreads } from "./bindings"
+import { TITLE_BAR_OVERLAY } from "../shared/ipc"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
+
+// Height of the app's top toolbar (Tailwind `h-11` = 44px). The Windows title-bar
+// overlay is sized to match so the native window controls line up with that row.
+const TITLE_BAR_HEIGHT = 44
+
+// Per-platform frameless title-bar configuration:
+//  - macOS:   hidden native bar, floating (inset) traffic-light controls.
+//  - Windows: hidden native bar + Window Controls Overlay — the native
+//             min/max/close strip painted with theme-aware colors (recolored
+//             live via the `window:setTitleBarOverlay` IPC on theme change).
+//  - Linux:   default window frame (no override).
+const titleBarOpts: Pick<BrowserWindowConstructorOptions, "titleBarStyle" | "titleBarOverlay"> =
+  process.platform === "darwin"
+    ? { titleBarStyle: "hiddenInset" }
+    : process.platform === "win32"
+      ? {
+          titleBarStyle: "hidden",
+          titleBarOverlay: { ...TITLE_BAR_OVERLAY.dark, height: TITLE_BAR_HEIGHT },
+        }
+      : {}
 
 // App icon (reused from electron/assets). Packaged builds place it under resources.
 const iconPath = app.isPackaged
@@ -24,11 +46,10 @@ function createWindow(): void {
     title: "MScompress",
     icon: iconPath,
     backgroundColor: "#0a0a0a",
-    // macOS: hide the native title bar for a cleaner look while keeping the
-    // traffic-light controls floating (inset) over the content. Other platforms
-    // keep their default window frame. The renderer makes its top toolbar a drag
-    // region and insets it past the traffic lights (see main.tsx / index.css).
-    ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
+    // Frameless title bar on macOS (traffic lights) / Windows (overlay); default
+    // frame on Linux. The renderer makes its top toolbar a drag region and insets
+    // it past the native controls (see main.tsx / index.css / App.tsx).
+    ...titleBarOpts,
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,

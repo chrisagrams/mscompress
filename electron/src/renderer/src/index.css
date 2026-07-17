@@ -181,3 +181,13 @@
 .platform-darwin .app-toolbar {
   padding-left: 78px;
 }
+
+/* Windows only: with the Window Controls Overlay active the native min/max/close
+   strip sits at the top-right. The overlay exposes its geometry to CSS via the
+   `titlebar-area-*` environment variables; reserve exactly the strip's width as
+   right padding so the toolbar's interactive controls sit to its LEFT, never
+   underneath it. Falls back to 0 padding wherever WCO isn't active (env() =
+   100vw), so it's harmless on Linux/macOS. */
+.platform-win32 .app-toolbar {
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+}
