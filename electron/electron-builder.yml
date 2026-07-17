@@ -2,6 +2,11 @@ appId: gy.lab.mscompress
 productName: MScompress
 copyright: Copyright © 2026 Gao Lab
 
+# Ship only the en-US Chromium locale pack. Electron bundles ~55 .pak locale
+# files (~43 MB) by default; the app is English-only, so the rest are dead weight.
+electronLanguages:
+  - en-US
+
 directories:
   output: release
   buildResources: build
