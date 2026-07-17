@@ -155,7 +155,11 @@ export interface TitleBarOverlayColors {
  * theme toggle) to keep the two in sync. No-op on macOS/Linux.
  */
 export const TITLE_BAR_OVERLAY: Record<AppSettings["theme"], TitleBarOverlayColors> = {
-  dark: { color: "#0a0a0a", symbolColor: "#e5e5e5" },
+  // `color` must match the app's top toolbar (Tailwind `bg-card`) so the native
+  // control strip reads as a seamless continuation of that row, not the darker
+  // `--background` (#0a0a0a) side panels. Dark `--card` resolves to #171717;
+  // light `--card` to ~#ffffff.
+  dark: { color: "#171717", symbolColor: "#e5e5e5" },
   light: { color: "#ffffff", symbolColor: "#0a0a0a" },
 }
 
