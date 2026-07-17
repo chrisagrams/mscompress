@@ -1,9 +1,9 @@
 import fs from "node:fs";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { PassThrough } from "node:stream";
+import { Readable } from "node:stream";
 import native from "@/core/bindings.js";
+import type { CompressStreamSession } from "@/core/bindings.js";
 import { BaseFile } from "@/files/base-file.js";
 import { DataFormat } from "@/types/data-format.js";
 import { Division } from "@/types/division.js";
@@ -119,35 +119,41 @@ export class MZMLFile extends BaseFile {
    *
    * The stream yields the exact same bytes that {@link MZMLFile.compress} would
    * write to a file for the same arguments. Compression runs on a background
-   * thread that writes straight into an OS pipe; this Readable drains the read
-   * end, so large files stream incrementally rather than being buffered in
-   * memory. The identical code path runs on every platform (see below).
+   * thread that writes into an OS pipe owned entirely by the native addon; this
+   * Readable pulls compressed chunks from that pipe on demand, so large files
+   * stream incrementally rather than being buffered in memory. One identical
+   * code path runs on every platform.
+   *
+   * ### Why the pipe fd never crosses into JS
+   * Earlier attempts handed the pipe's raw read fd to Node (`fs.createReadStream`
+   * or `net.Socket({ fd })`). That works on POSIX but is fundamentally broken on
+   * Windows: the fd from the CRT `_pipe()` is an anonymous pipe, and libuv's
+   * `uv_guess_handle` returns `UNKNOWN` for it — so `net.Socket` throws
+   * `ERR_INVALID_FD_TYPE` and `fs.createReadStream` faults the worker with an
+   * access violation. There is no way to adopt an anonymous CRT pipe fd into
+   * libuv on Windows. So the fd stays native-only: JS pulls bytes via an async
+   * threadpool read (`compressMzmlStreamRead`), which is portable everywhere.
    *
    * Native compression failures surface as an `'error'` event on the returned
    * stream (never a thrown exception or a hang). End-of-stream is driven by the
-   * native `done` signal.
+   * native EOF signal (a `null` read result), at which point the background
+   * thread is joined and its result checked.
    *
-   * The pipe's read end is wrapped with {@link net.Socket} rather than
-   * `fs.createReadStream`, because a Socket adopts the fd through a libuv pipe
-   * handle (`uv_pipe_open`) on every platform. That matters on Windows: the raw
-   * CRT fd returned by `_pipe()` is not a libuv-pollable handle, so
-   * `fs.createReadStream({ fd })` aborts the worker with an access violation,
-   * whereas `net.Socket` converts it (via `_get_osfhandle`) into a real,
-   * backpressure-aware pipe stream — exactly what POSIX gets from the fd. One
-   * transport, one behavior, no temp file, no Windows special-case.
+   * Backpressure is honored: the next native read is only issued from the
+   * Readable's `_read()`, i.e. after the consumer has drained the previous
+   * chunk, so at most one `chunkSize` buffer is in flight at a time.
    *
-   * @param options - Optional `chunkSize` (the read buffer highWaterMark,
-   *                  default 1 MiB) plus any {@link CompressArgs} overrides.
-   *                  Omitted compression args fall back to this file's current
-   *                  `arguments`.
+   * @param options - Optional `chunkSize` (bytes read per pull, default 1 MiB)
+   *                  plus any {@link CompressArgs} overrides. Omitted compression
+   *                  args fall back to this file's current `arguments`.
    * @returns A Readable stream of MSZ bytes.
    */
   compressStream(options?: { chunkSize?: number } & CompressArgs): NodeJS.ReadableStream {
     const { chunkSize, ...overrides } = options ?? {};
 
-    // `chunkSize` is the read buffer's highWaterMark: the target number of MSZ
-    // bytes buffered before backpressure pauses the producer. Default 1 MiB.
-    const readBufferSize = chunkSize ?? 1024 * 1024;
+    // Bytes requested per native pull. Also used as the Readable highWaterMark
+    // so the stream's buffering target matches the chunk size. Default 1 MiB.
+    const readChunkSize = chunkSize ?? 1024 * 1024;
 
     // Effective native args: this file's current settings with any provided
     // CompressArgs overrides applied on top (same result compress() produces,
@@ -161,11 +167,33 @@ export class MZMLFile extends BaseFile {
       }
     }
 
-    // A pass-through the caller consumes. We route the pipe's read end into it
-    // so that any setup failure (closed handle, prepareDivisions error) or
-    // native compression failure surfaces as a single 'error' event here,
-    // rather than a synchronous throw.
-    const output = new PassThrough({ highWaterMark: readBufferSize });
+    let session: CompressStreamSession | undefined;
+    let reading = false; // guard against overlapping native reads
+
+    const output = new Readable({
+      highWaterMark: readChunkSize,
+      read() {
+        // Pull exactly one chunk per _read() call. Node calls _read() again
+        // when it wants more (i.e. after the consumer drains below the
+        // highWaterMark), so backpressure is honored and at most one native
+        // read is outstanding at a time (guarded by `reading`).
+        if (reading || session === undefined) return;
+        reading = true;
+        native
+          .compressMzmlStreamRead(session, readChunkSize)
+          .then((chunk) => {
+            reading = false;
+            // null signals EOF (compression finished successfully); otherwise
+            // push the chunk and wait for the next _read().
+            this.push(chunk === null ? null : chunk);
+          })
+          .catch((err: unknown) => {
+            reading = false;
+            const error = err instanceof Error ? err : new Error(String(err));
+            this.destroy(error);
+          });
+      },
+    });
 
     try {
       // Mirror compress(): prepare divisions and capture the resolved blocksize.
@@ -173,29 +201,9 @@ export class MZMLFile extends BaseFile {
       args.blocksize = divResult.blocksize;
       this._arguments.blocksize = divResult.blocksize;
 
-      const { readFd, done } = native.compressMzmlStream(this._handle, args);
-
-      // Wrap the pipe's read end as a read-only Socket. The Socket owns the fd
-      // and closes it once destroyed (on 'end'/'error'). Reads are non-blocking
-      // via libuv, so the event loop stays free and backpressure flows through.
-      const source = new net.Socket({ fd: readFd, readable: true, writable: false });
-
-      source.on("error", (err) => {
-        output.destroy(err);
-      });
-      source.pipe(output);
-
-      // The reader hits a clean EOF whether compression succeeded or failed
-      // (the native side always closes the write end). The `done` promise is
-      // the authoritative success/failure signal, so a rejection must tear the
-      // consumer's stream down with an error even if EOF already arrived.
-      done.catch((err: unknown) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        source.destroy();
-        if (!output.destroyed) {
-          output.destroy(error);
-        }
-      });
+      // Open the session (starts the background compression thread). The native
+      // finalizer joins the thread and frees the pipe when `session` is GC'd.
+      session = native.compressMzmlStreamOpen(this._handle, args);
     } catch (err) {
       // Synchronous setup failure (e.g. closed handle). Surface via the stream
       // on the next tick so listeners have a chance to attach.
