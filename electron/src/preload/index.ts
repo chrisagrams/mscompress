@@ -19,6 +19,7 @@ const api: Api = {
   getDefaultOutputDir: () => ipcRenderer.invoke(IPC.getDefaultOutputDir),
   getVersion: () => ipcRenderer.invoke(IPC.getVersion),
   getNumThreads: () => ipcRenderer.invoke(IPC.getNumThreads),
+  getMemory: () => ipcRenderer.invoke(IPC.getMemory),
   getFilesize: (path) => ipcRenderer.invoke(IPC.getFilesize, path),
   analyze: (path) => ipcRenderer.invoke(IPC.analyze, path),
   computeQC: (path, opts) => ipcRenderer.invoke(IPC.computeQC, path, opts),

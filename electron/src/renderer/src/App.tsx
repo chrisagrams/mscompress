@@ -25,7 +25,9 @@ import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { SettingsDialog } from "@/components/SettingsDialog"
 import { type FileEntry } from "@/files"
-import type { AppSettings, QueueState } from "@shared/ipc"
+import type { AppSettings, QueueState, SystemMemory } from "@shared/ipc"
+
+const GB = 1024 ** 3
 
 /** Placeholder shown in the workspace/inspector when no file is open. */
 function NoFile() {
@@ -86,6 +88,33 @@ function App() {
       .catch(() => {})
   }, [])
 
+  // Live memory readout for the status bar — polled from the main process.
+  const [mem, setMem] = useState<SystemMemory | null>(null)
+  useEffect(() => {
+    let alive = true
+    const poll = (): void => {
+      window.api
+        .getMemory()
+        .then((m) => alive && setMem(m))
+        .catch(() => {})
+    }
+    poll()
+    const id = setInterval(poll, 2500)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [])
+
+  // Track the currently running direct convert (compress/decompress/extract) via
+  // the real streamed progress events — set while working, cleared when done.
+  const [activeOp, setActiveOp] = useState<{ op: string; file: string } | null>(null)
+  useEffect(() => {
+    return window.api.onConvertProgress((p) => {
+      setActiveOp(p.phase === "start" || p.phase === "step" ? { op: p.op, file: p.file } : null)
+    })
+  }, [])
+
   // Load + subscribe to persisted settings; apply the theme app-wide.
   useEffect(() => {
     window.api
@@ -111,7 +140,18 @@ function App() {
     if (settings) void window.api.setSettings({ theme: dark ? "light" : "dark" })
   }
 
-  const currentOp = "compress · HEK293_rep2.mzML (63%)"
+  // Real current-operation label: a direct convert takes precedence, else a
+  // running queue job (with its real progress %), else idle.
+  const runningJob = queue.jobs.find((j) => j.status === "running")
+  const currentOp = activeOp
+    ? `${activeOp.op} · ${activeOp.file}`
+    : runningJob
+      ? `${runningJob.op} · ${runningJob.fileName} (${runningJob.progress}%)`
+      : "Ready"
+
+  const memLabel = mem
+    ? `${(mem.rssBytes / GB).toFixed(1)} / ${(mem.totalBytes / GB).toFixed(0)} GB`
+    : "…"
 
   return (
     <TooltipProvider>
@@ -260,12 +300,11 @@ function App() {
               <Cpu className="size-3" /> {settings?.threads ?? "…"} threads
             </span>
             <span className="mono flex items-center gap-1">
-              <MemoryStick className="size-3" /> 3.2 / 32 GB
+              <MemoryStick className="size-3" /> {memLabel}
             </span>
             <span className="mono flex items-center gap-1">
               <Boxes className="size-3" /> mscompress {backendVersion ?? "…"}
             </span>
-            <span className="mono">UTF-8</span>
           </div>
         </footer>
       </div>

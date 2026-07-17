@@ -1,6 +1,7 @@
 import { app, dialog, ipcMain, shell, BrowserWindow } from "electron"
 import type { WebContents } from "electron"
 import { basename } from "path"
+import * as os from "os"
 import { IPC } from "../shared/ipc"
 import type {
   AppSettings,
@@ -99,6 +100,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getVersion, () => bindings.getVersion())
 
   ipcMain.handle(IPC.getNumThreads, () => bindings.getNumThreads())
+
+  // Live memory readout: this process's RSS vs system total/free (real values).
+  ipcMain.handle(IPC.getMemory, () => ({
+    rssBytes: process.memoryUsage().rss,
+    totalBytes: os.totalmem(),
+    freeBytes: os.freemem(),
+  }))
 
   ipcMain.handle(IPC.getFilesize, (_event, path: string) => bindings.getFilesize(path))
 

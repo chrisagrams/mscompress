@@ -213,6 +213,12 @@ export function installApiStub(fx) {
     getDefaultOutputDir: () => Promise.resolve(fx.defaultOutputDir),
     getVersion: () => Promise.resolve(fx.version),
     getNumThreads: () => Promise.resolve(fx.numThreads),
+    getMemory: () =>
+      Promise.resolve({
+        rssBytes: 412_000_000,
+        totalBytes: 34_359_738_368,
+        freeBytes: 12_000_000_000,
+      }),
     getFilesize: (path) => Promise.resolve(summaryFor(path).filesizeBytes),
     analyze: (path) => Promise.resolve(summaryFor(path)),
     computeQC: (path) => Promise.resolve({ ...fx.qc, path }),

@@ -11,6 +11,7 @@ export const IPC = {
   getDefaultOutputDir: "app:getDefaultOutputDir",
   getVersion: "sys:getVersion",
   getNumThreads: "sys:getNumThreads",
+  getMemory: "sys:getMemory",
   getFilesize: "fs:getFilesize",
   analyze: "file:analyze",
   computeQC: "qc:compute",
@@ -109,6 +110,16 @@ export interface ConvertProgress {
   message?: string
   result?: ConvertResult
   error?: string
+}
+
+/** Live memory readout for the status bar (app RSS vs system total/free). */
+export interface SystemMemory {
+  /** This process's resident set size, in bytes (process.memoryUsage().rss). */
+  rssBytes: number
+  /** Total system memory, in bytes (os.totalmem()). */
+  totalBytes: number
+  /** Free system memory, in bytes (os.freemem()). */
+  freeBytes: number
 }
 
 // ---- Global settings -------------------------------------------------------
@@ -319,6 +330,8 @@ export interface Api {
   getVersion(): Promise<string>
   /** Number of worker threads the backend will use. */
   getNumThreads(): Promise<number>
+  /** Live memory readout (app RSS + system total/free) for the status bar. */
+  getMemory(): Promise<SystemMemory>
   /** File size in bytes. */
   getFilesize(path: string): Promise<number>
   /** Analyze a file via the native binding and return a serializable summary. */
