@@ -12,6 +12,10 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
 // Height of the app's top toolbar (Tailwind `h-11` = 44px). The Windows title-bar
 // overlay is sized to match so the native window controls line up with that row.
+// The toolbar's bottom separator is rendered as a *separate* full-width 1px line
+// BELOW the header (see App.tsx), not as the header's own border — otherwise the
+// Window Controls Overlay (which paints over the top-right of the header) would
+// cover the border under the native buttons and break the line in that corner.
 const TITLE_BAR_HEIGHT = 44
 
 // Per-platform frameless title-bar configuration:

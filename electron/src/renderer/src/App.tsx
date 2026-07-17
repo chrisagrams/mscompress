@@ -168,7 +168,7 @@ function App() {
             the traffic-light inset on darwin and the Window Controls Overlay
             inset on win32; interactive controls opt out of dragging via
             no-drag). */}
-        <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
+        <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 bg-card px-3">
           <div className="flex items-center gap-2">
             <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />
             <span className="text-sm font-semibold tracking-tight">MScompress</span>
@@ -198,6 +198,12 @@ function App() {
             </Button>
           </div>
         </header>
+
+        {/* Full-width toolbar separator, rendered BELOW the header so it spans the
+            entire width — including under the Windows native window controls,
+            which the Window Controls Overlay paints over the header's own top-right
+            corner and would otherwise clip a header `border-b`. */}
+        <div className="h-px shrink-0 bg-border" />
 
         {settings && (
           <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} />
