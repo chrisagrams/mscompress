@@ -51,6 +51,22 @@ extraResources:
     to: node-ts/build/Release/mscompress.node
   - from: ../node-ts/package.json
     to: node-ts/package.json
+  # node-ts's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
+  # transitive deps as siblings of dist so Node resolves them from
+  # resources/node-ts/node_modules. (Only the tar closure — not the full 289MB
+  # node_modules, which also carries prebuild-install/dev tooling we don't need.)
+  - from: ../node-ts/node_modules/tar
+    to: node-ts/node_modules/tar
+  - from: ../node-ts/node_modules/@isaacs/fs-minipass
+    to: node-ts/node_modules/@isaacs/fs-minipass
+  - from: ../node-ts/node_modules/chownr
+    to: node-ts/node_modules/chownr
+  - from: ../node-ts/node_modules/minipass
+    to: node-ts/node_modules/minipass
+  - from: ../node-ts/node_modules/minizlib
+    to: node-ts/node_modules/minizlib
+  - from: ../node-ts/node_modules/yallist
+    to: node-ts/node_modules/yallist
 
 linux:
   target:
