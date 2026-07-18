@@ -56,6 +56,7 @@ const api: Api = {
     ipcRenderer.on(IPC.openAssociatedFiles, listener)
     return () => ipcRenderer.removeListener(IPC.openAssociatedFiles, listener)
   },
+  notifyRendererReady: () => ipcRenderer.send(IPC.rendererReady),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   platform: process.platform,
 }

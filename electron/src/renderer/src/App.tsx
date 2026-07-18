@@ -86,9 +86,14 @@ function App() {
   // OS-associated files (double-click / "Open with") pushed from the main
   // process — funnel them through the same analyze→addFiles path as the dialog.
   useEffect(() => {
-    return window.api.onOpenAssociatedFiles((paths) => {
+    const unsub = window.api.onOpenAssociatedFiles((paths) => {
       void ingestPaths(paths).then(addFiles)
     })
+    // Listener is now attached — tell main to flush any cold-start file. (Doing
+    // this here, not on did-finish-load, avoids the race where the file is sent
+    // before React mounts this effect.)
+    window.api.notifyRendererReady()
+    return unsub
   }, [])
 
   const [backendVersion, setBackendVersion] = useState<string | null>(null)

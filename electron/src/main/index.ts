@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from "electron"
+import { app, ipcMain, shell, BrowserWindow } from "electron"
 import type { BrowserWindowConstructorOptions } from "electron"
 import { extname, join } from "path"
 import { fileURLToPath } from "url"
@@ -69,6 +69,17 @@ function openInRenderer(paths: string[]): void {
   }
 }
 
+// The renderer signals readiness from the SAME effect that subscribes to
+// openAssociatedFiles — this is when the listener actually exists. did-finish-load
+// fires earlier (before React runs effects), so flushing there dropped the file.
+ipcMain.on(IPC.rendererReady, () => {
+  rendererReady = true
+  if (pendingFiles.length && mainWindow && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send(IPC.openAssociatedFiles, pendingFiles)
+    pendingFiles = []
+  }
+})
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
@@ -104,12 +115,6 @@ function createWindow(): void {
 
   win.webContents.on("did-finish-load", () => {
     console.log("[main] renderer did-finish-load — window loaded OK")
-    rendererReady = true
-    // Flush any files requested before the renderer was mounted.
-    if (pendingFiles.length) {
-      win.webContents.send(IPC.openAssociatedFiles, pendingFiles)
-      pendingFiles = []
-    }
   })
 
   win.webContents.setWindowOpenHandler((details) => {

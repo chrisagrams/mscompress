@@ -38,6 +38,11 @@ export const IPC = {
   queueUpdate: "queue:update",
   // main -> renderer: OS handed us file paths to open (association/argv)
   openAssociatedFiles: "app:openAssociatedFiles",
+  // renderer -> main: the association listener is mounted; flush buffered files.
+  // Sent from the same effect that subscribes to openAssociatedFiles, so it
+  // races correctly (did-finish-load fires before React effects run, dropping
+  // any file pushed at that point).
+  rendererReady: "app:rendererReady",
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
@@ -410,6 +415,12 @@ export interface Api {
    * Returns an unsubscribe fn.
    */
   onOpenAssociatedFiles(cb: (paths: string[]) => void): () => void
+  /**
+   * Tell the main process the association listener is mounted, so it can flush
+   * any files buffered from a cold-start launch. Call once, from the same effect
+   * that registers onOpenAssociatedFiles.
+   */
+  notifyRendererReady(): void
   /**
    * Resolve the absolute filesystem path of a dropped/selected File. Electron
    * removed `File.path`, so this proxies `webUtils.getPathForFile` from preload.

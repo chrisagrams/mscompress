@@ -267,6 +267,7 @@ export function installApiStub(fx) {
       }),
     onConvertProgress: () => () => {},
     onOpenAssociatedFiles: () => () => {},
+    notifyRendererReady: () => {},
     addQueueJob: () => Promise.resolve("job-stub-1"),
     startQueue: () => Promise.resolve(),
     pauseQueue: () => Promise.resolve(),
