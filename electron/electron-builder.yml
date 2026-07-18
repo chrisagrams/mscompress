@@ -7,6 +7,23 @@ copyright: Copyright © 2026 Gao Lab
 electronLanguages:
   - en-US
 
+# File-type associations. On macOS these populate CFBundleDocumentTypes in the
+# app's Info.plist; double-clicking / "Open with" a .msz/.mszx/.mzML then
+# launches (or focuses, via the single-instance lock) the app and delivers the
+# path through the `open-file` event (wired in src/main/index.ts). `icon` reuses
+# the app icon for now — per-type .icns/.ico are a later polish task.
+fileAssociations:
+  - ext: msz
+    name: MScompress Compressed MS Data
+    description: MScompress compressed mass-spectrometry file
+    role: Editor
+    icon: assets/icons/icon.icns
+  - ext: mszx
+    name: MScompress MS Archive
+    description: MScompress archive (spectra + annotations)
+    role: Editor
+    icon: assets/icons/icon.icns
+
 directories:
   output: release
   buildResources: build
@@ -44,7 +61,7 @@ linux:
 
 mac:
   target:
-    - dir
+    - dmg
   icon: assets/icons/icon.icns
   category: public.app-category.utilities
 
