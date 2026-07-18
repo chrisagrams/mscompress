@@ -170,7 +170,10 @@ function App() {
             no-drag). */}
         <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 bg-card px-3">
           <div className="flex items-center gap-2">
-            <MscLogo className="h-5 w-auto text-foreground" />
+            {/* Nudge down ~1.5px: the SVG box is descender-inclusive, so the
+                letter body (cap-top→baseline) sits high when the box is centered.
+                Offsetting centers the body against the toolbar icons. */}
+            <MscLogo className="h-5 w-auto translate-y-[1.5px] text-foreground" />
           </div>
 
           <div className="no-drag ml-auto flex items-center gap-2">

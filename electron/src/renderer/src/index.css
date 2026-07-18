@@ -177,9 +177,10 @@
 }
 
 /* macOS only: inset the toolbar so its content clears the floating traffic-light
-   buttons (close/minimize/zoom). No effect on Linux/Windows. */
+   buttons (close/minimize/zoom) with comfortable breathing room. The lights end
+   ~78px in; 92px keeps the branding from crowding them. No effect elsewhere. */
 .platform-darwin .app-toolbar {
-  padding-left: 78px;
+  padding-left: 92px;
 }
 
 /* Windows only: with the Window Controls Overlay active the native min/max/close
