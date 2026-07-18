@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fmtBytes } from "@/lib/format"
 import type { FileKind } from "@shared/ipc"
-import type { FileEntry } from "@/files"
+import { ingestPaths, type FileEntry } from "@/files"
 import type { QueueState, QueueStatus } from "@shared/ipc"
 
 function kindIcon(kind: FileKind) {
@@ -79,21 +79,9 @@ export function LeftRail({
 
   const running = queue.running
 
-  // Analyze paths through the binding and turn each into a real FileEntry.
+  // Analyze paths via the shared helper and add the resulting entries.
   const ingest = async (paths: string[]) => {
-    if (paths.length === 0) return
-    const entries = await Promise.all(
-      paths.map(async (p) => {
-        const s = await window.api.analyze(p)
-        console.log("[renderer] analyzed:", s)
-        return {
-          name: s.fileName,
-          path: s.path,
-          kind: s.kind,
-          size: s.filesizeBytes,
-        } satisfies FileEntry
-      }),
-    )
+    const entries = await ingestPaths(paths)
     onAddFiles(entries)
   }
 

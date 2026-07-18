@@ -51,6 +51,11 @@ const api: Api = {
     ipcRenderer.on(IPC.queueUpdate, listener)
     return () => ipcRenderer.removeListener(IPC.queueUpdate, listener)
   },
+  onOpenAssociatedFiles: (cb) => {
+    const listener = (_e: IpcRendererEvent, paths: string[]): void => cb(paths)
+    ipcRenderer.on(IPC.openAssociatedFiles, listener)
+    return () => ipcRenderer.removeListener(IPC.openAssociatedFiles, listener)
+  },
   getPathForFile: (file) => webUtils.getPathForFile(file),
   platform: process.platform,
 }

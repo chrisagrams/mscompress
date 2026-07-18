@@ -24,7 +24,7 @@ import { QCTab } from "@/components/QCTab"
 import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { SettingsDialog } from "@/components/SettingsDialog"
-import { type FileEntry } from "@/files"
+import { ingestPaths, type FileEntry } from "@/files"
 import {
   TITLE_BAR_OVERLAY,
   type AppSettings,
@@ -83,6 +83,14 @@ function App() {
     })
     setSelectedPath(entries[0].path)
   }
+  // OS-associated files (double-click / "Open with") pushed from the main
+  // process — funnel them through the same analyze→addFiles path as the dialog.
+  useEffect(() => {
+    return window.api.onOpenAssociatedFiles((paths) => {
+      void ingestPaths(paths).then(addFiles)
+    })
+  }, [])
+
   const [backendVersion, setBackendVersion] = useState<string | null>(null)
 
   // Backend version for the status bar.

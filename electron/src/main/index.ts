@@ -1,12 +1,12 @@
 import { app, shell, BrowserWindow } from "electron"
 import type { BrowserWindowConstructorOptions } from "electron"
-import { join } from "path"
+import { extname, join } from "path"
 import { fileURLToPath } from "url"
 import { registerIpcHandlers } from "./ipc"
 import { configureQueue } from "./queue"
 import { configureSettings, loadSettings, onSettingsChange } from "./settings"
 import { getNumThreads } from "./bindings"
-import { TITLE_BAR_OVERLAY } from "../shared/ipc"
+import { IPC, TITLE_BAR_OVERLAY } from "../shared/ipc"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
@@ -39,8 +39,38 @@ const iconPath = app.isPackaged
   ? join(process.resourcesPath, "icon.png")
   : join(__dirname, "../../assets/icons/icon.png")
 
+// Hold the window so second-instance / open-file can reach it.
+let mainWindow: BrowserWindow | null = null
+// Files requested before the renderer is ready (macOS open-file, cold start).
+let pendingFiles: string[] = []
+let rendererReady = false
+
+/** Extensions the OS may hand us via file association / "Open with". */
+const OPENABLE = new Set([".msz", ".mszx", ".mzml"])
+
+/** Pull associated file paths out of an argv array (Windows/Linux launch). */
+function filePathsFromArgv(argv: string[]): string[] {
+  return argv
+    .slice(1)
+    .filter((a) => !a.startsWith("-"))
+    .filter((a) => OPENABLE.has(extname(a).toLowerCase()))
+}
+
+/** Send paths to the renderer's open flow, or buffer them until it's ready. */
+function openInRenderer(paths: string[]): void {
+  const wanted = paths.filter(Boolean)
+  if (wanted.length === 0) return
+  if (mainWindow && !mainWindow.webContents.isDestroyed() && rendererReady) {
+    mainWindow.webContents.send(IPC.openAssociatedFiles, wanted)
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  } else {
+    pendingFiles.push(...wanted)
+  }
+}
+
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 960,
@@ -61,17 +91,28 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   })
+  mainWindow = win
 
-  mainWindow.on("ready-to-show", () => {
-    mainWindow.show()
+  win.on("ready-to-show", () => {
+    win.show()
     console.log("[main] window ready-to-show")
   })
 
-  mainWindow.webContents.on("did-finish-load", () => {
-    console.log("[main] renderer did-finish-load — window loaded OK")
+  win.on("closed", () => {
+    mainWindow = null
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  win.webContents.on("did-finish-load", () => {
+    console.log("[main] renderer did-finish-load — window loaded OK")
+    rendererReady = true
+    // Flush any files requested before the renderer was mounted.
+    if (pendingFiles.length) {
+      win.webContents.send(IPC.openAssociatedFiles, pendingFiles)
+      pendingFiles = []
+    }
+  })
+
+  win.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: "deny" }
   })
@@ -79,36 +120,61 @@ function createWindow(): void {
   // Load the renderer: dev server URL in development, built HTML in production.
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (devUrl) {
-    void mainWindow.loadURL(devUrl)
+    void win.loadURL(devUrl)
   } else {
-    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"))
+    void win.loadFile(join(__dirname, "../renderer/index.html"))
   }
 }
 
-app.whenReady().then(() => {
-  // Persisted global settings (userData/settings.json); defaults from the env.
-  configureSettings({
-    dir: app.getPath("userData"),
-    defaultThreads: getNumThreads(),
-    defaultOutputDir: app.getPath("downloads"),
+// Single-instance lock: a second launch (e.g. double-clicking another .msz)
+// hands its argv to the primary instance via `second-instance` and quits.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on("second-instance", (_e, argv) => {
+    openInRenderer(filePathsFromArgv(argv))
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
   })
-  const settings = loadSettings()
 
-  // The `local-archive` remote destination copies finished outputs here.
-  configureQueue({
-    localArchiveDir: join(app.getPath("downloads"), "MScompress-Archive"),
-    threads: settings.threads,
+  // macOS file association — can fire before whenReady, so register up front;
+  // openInRenderer buffers until the renderer is loaded.
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault()
+    openInRenderer([filePath])
   })
-  // Keep the queue's thread count in sync with settings.
-  onSettingsChange((s) => configureQueue({ threads: s.threads }))
 
-  registerIpcHandlers()
-  createWindow()
+  app.whenReady().then(() => {
+    // Persisted global settings (userData/settings.json); defaults from the env.
+    configureSettings({
+      dir: app.getPath("userData"),
+      defaultThreads: getNumThreads(),
+      defaultOutputDir: app.getPath("downloads"),
+    })
+    const settings = loadSettings()
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    // The `local-archive` remote destination copies finished outputs here.
+    configureQueue({
+      localArchiveDir: join(app.getPath("downloads"), "MScompress-Archive"),
+      threads: settings.threads,
+    })
+    // Keep the queue's thread count in sync with settings.
+    onSettingsChange((s) => configureQueue({ threads: s.threads }))
+
+    registerIpcHandlers()
+    createWindow()
+
+    // Cold-start (Windows/Linux): the launch argv may carry an associated file.
+    openInRenderer(filePathsFromArgv(process.argv))
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
-})
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit()

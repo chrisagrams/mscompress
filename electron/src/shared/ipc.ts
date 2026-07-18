@@ -36,6 +36,8 @@ export const IPC = {
   queueGetState: "queue:getState",
   // main -> renderer queue-state broadcast (webContents.send)
   queueUpdate: "queue:update",
+  // main -> renderer: OS handed us file paths to open (association/argv)
+  openAssociatedFiles: "app:openAssociatedFiles",
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
@@ -403,6 +405,11 @@ export interface Api {
   getQueueState(): Promise<QueueState>
   /** Subscribe to queue-state broadcasts. Returns an unsubscribe fn. */
   onQueueUpdate(cb: (state: QueueState) => void): () => void
+  /**
+   * Subscribe to OS "open these files" pushes (double-click / Open with).
+   * Returns an unsubscribe fn.
+   */
+  onOpenAssociatedFiles(cb: (paths: string[]) => void): () => void
   /**
    * Resolve the absolute filesystem path of a dropped/selected File. Electron
    * removed `File.path`, so this proxies `webUtils.getPathForFile` from preload.

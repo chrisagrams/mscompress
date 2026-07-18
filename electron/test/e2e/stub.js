@@ -266,6 +266,7 @@ export function installApiStub(fx) {
         elapsedMs: 260,
       }),
     onConvertProgress: () => () => {},
+    onOpenAssociatedFiles: () => () => {},
     addQueueJob: () => Promise.resolve("job-stub-1"),
     startQueue: () => Promise.resolve(),
     pauseQueue: () => Promise.resolve(),
