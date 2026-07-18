@@ -26,10 +26,12 @@ import type { FileKind } from "@shared/ipc"
 import { ingestPaths, type FileEntry } from "@/files"
 import type { QueueState, QueueStatus } from "@shared/ipc"
 
+// File-kind colours match the OS file-type icons (assets/icons/*): the logo's
+// own brand hues — msz=blue (logo "s"), mzML=magenta (logo "m"), mszx=green.
 function kindIcon(kind: FileKind) {
-  if (kind === "msz") return <FileArchive className="size-3.5 text-chart-4" />
-  if (kind === "mszx") return <Database className="size-3.5 text-chart-2" />
-  return <FileIcon className="size-3.5 text-chart-1" />
+  if (kind === "msz") return <FileArchive className="size-3.5 text-[#24a8df]" />
+  if (kind === "mszx") return <Database className="size-3.5 text-[#10b981]" />
+  return <FileIcon className="size-3.5 text-[#e60f8a]" />
 }
 
 function statusBadge(status: QueueStatus) {
