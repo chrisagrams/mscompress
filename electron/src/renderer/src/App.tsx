@@ -11,13 +11,13 @@ import {
   Scissors,
   Settings as SettingsIcon,
 } from "lucide-react"
-import brandLogo from "@/assets/icon.png"
 import githubMark from "@/assets/github-mark.svg"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { LeftRail } from "@/components/LeftRail"
+import { MscLogo } from "@/components/MscLogo"
 import { Inspector } from "@/components/Inspector"
 import { ConvertTab } from "@/components/ConvertTab"
 import { QCTab } from "@/components/QCTab"
@@ -170,8 +170,7 @@ function App() {
             no-drag). */}
         <header className="app-toolbar drag-region flex h-11 shrink-0 items-center gap-3 bg-card px-3">
           <div className="flex items-center gap-2">
-            <img src={brandLogo} alt="MScompress" className="size-6 object-contain" />
-            <span className="text-sm font-semibold tracking-tight">MScompress</span>
+            <MscLogo className="h-5 w-auto text-foreground" />
           </div>
 
           <div className="no-drag ml-auto flex items-center gap-2">

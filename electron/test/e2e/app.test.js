@@ -92,7 +92,10 @@ describe("MScompress renderer (e2e)", () => {
 
       const text = await bodyText(page)
       assert.match(text, /No file open/)
-      assert.match(text, /MScompress/) // toolbar branding rendered
+
+      // Toolbar branding is the inline MscLogo SVG (aria-label), not text.
+      const brand = await page.$('svg[aria-label="MScompress"]')
+      assert.ok(brand, "toolbar branding (MscLogo) rendered")
 
       assert.deepEqual(page._errors, [], "no uncaught page errors")
     } finally {
