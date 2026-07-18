@@ -89,6 +89,21 @@ mac:
   category: public.app-category.utilities
 
 win:
+  # NSIS installer (not a bare dir): an installer is required to register the
+  # file associations and to write the "Decompress/Extract here" context-menu
+  # verbs (see build/installer.nsh). The standalone CLI is shipped below.
   target:
-    - dir
-  icon: assets/icons/icon.png
+    - nsis
+  icon: assets/icons/icon.ico
+  # Ship the standalone CLI so the context-menu verbs can shell out to it with
+  # no GUI. Lands at resources/cli/mscompress.exe — the absolute path the NSIS
+  # macro registers. Built via: cmake --build cli/build-win --config Release.
+  extraResources:
+    - from: ../cli/build-win/Release/mscompress.exe
+      to: cli/mscompress.exe
+
+nsis:
+  oneClick: false # show the wizard (install dir + per-user/all-users)
+  perMachine: false # per-user install (HKCU), no UAC elevation
+  allowToChangeInstallationDirectory: true
+  include: build/installer.nsh # our context-menu verb macros (customInstall/UnInstall)
