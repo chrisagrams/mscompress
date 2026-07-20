@@ -39,6 +39,15 @@ export interface PrepareDivisionsResult {
   blocksize: number;
 }
 
+/**
+ * Opaque handle to an in-flight compress-stream session (a native
+ * Napi::External). Created by {@link NativeBindings.compressMzmlStreamOpen} and
+ * consumed by {@link NativeBindings.compressMzmlStreamRead}. Not inspectable
+ * from JS; the native finalizer joins the worker thread and frees the pipe when
+ * this handle is garbage-collected.
+ */
+export type CompressStreamSession = { readonly __brand: "CompressStreamSession" };
+
 export interface NativeBindings {
   // FileHandle class
   FileHandle: NativeFileHandleConstructor;
@@ -80,6 +89,24 @@ export interface NativeBindings {
 
   // Compression / decompression
   compressMzml(handle: NativeFileHandle, outputPath: string, args: RuntimeArgumentsNative): boolean;
+  /**
+   * Open a compress-stream session: launches compression on a background thread
+   * writing to an OS pipe kept entirely inside the addon, and returns an opaque
+   * session handle. The raw pipe fd never crosses into JS (an anonymous CRT pipe
+   * fd cannot be adopted by libuv on Windows), so the JS side pulls compressed
+   * bytes via {@link compressMzmlStreamRead}.
+   */
+  compressMzmlStreamOpen(
+    handle: NativeFileHandle,
+    args: RuntimeArgumentsNative
+  ): CompressStreamSession;
+  /**
+   * Perform one async (threadpool) read from a compress-stream session. Resolves
+   * with a Buffer of up to `chunkSize` bytes, or `null` at EOF. Rejects if the
+   * read fails or the background compression reported an error. Call repeatedly
+   * until it resolves `null`.
+   */
+  compressMzmlStreamRead(session: CompressStreamSession, chunkSize: number): Promise<Buffer | null>;
   decompressMsz(
     handle: NativeFileHandle,
     outputPath: string,
