@@ -135,26 +135,13 @@ class JobQueue {
     }
   }
 
-  private execConvert(it: JobInternal, outputDir: string): ConvertResult {
+  private execConvert(it: JobInternal, outputDir: string): Promise<ConvertResult> {
     const { op } = it.job
     // Threads come from global settings, not per-job (0 → binding default).
     const threads = config.threads > 0 ? config.threads : undefined
-    if (op === "compress") {
-      return bindings.compress(it.job.filePath, {
-        ...(it.settings as CompressOptions),
-        outputDir,
-        threads,
-      })
-    }
-    if (op === "decompress") {
-      return bindings.decompress(it.job.filePath, {
-        ...(it.settings as DecompressOptions),
-        outputDir,
-        threads,
-      })
-    }
-    return bindings.extract(it.job.filePath, {
-      ...(it.settings as ExtractOptions),
+    // Run off the main thread so queue jobs don't freeze the UI.
+    return bindings.runConvertInWorker(op, it.job.filePath, {
+      ...(it.settings as CompressOptions & DecompressOptions & ExtractOptions),
       outputDir,
       threads,
     })
@@ -201,7 +188,7 @@ class JobQueue {
       this.emit()
       await new Promise((r) => setImmediate(r))
 
-      const result = this.execConvert(it, outputDir)
+      const result = await this.execConvert(it, outputDir)
       if (result.error) {
         job.status = "error"
         job.error = result.error

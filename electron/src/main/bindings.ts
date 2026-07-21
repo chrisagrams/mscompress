@@ -5,6 +5,7 @@ import { createRequire } from "module"
 import { existsSync, statSync } from "fs"
 import { basename, dirname, extname, join } from "path"
 import { hrtime } from "process"
+import { Worker } from "worker_threads"
 import { COMPRESSION_PRESETS } from "../shared/ipc.ts"
 import type {
   CompressOptions,
@@ -714,4 +715,56 @@ export function extract(path: string, opts: ExtractOptions): ConvertResult {
   } finally {
     file?.close()
   }
+}
+
+// ---------------------------------------------------------------------------
+// Async offload: run the (synchronous) native convert in a worker thread so it
+// never blocks the Electron main JS thread. The sync compress/decompress/extract
+// above stay intact (the smoke test drives them directly); this is an additive
+// path. One-shot worker per job — a pool is overkill at maxConcurrency 1.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the built worker chunk next to this module. When bundled by
+ * electron-vite this file's URL ends in `.js` and `convert-worker.js` sits
+ * beside it in `out/main/`; when run directly under Node's TS type-stripping
+ * (smoke/probe scripts) it ends in `.ts` and `convert-worker.ts` sits beside it.
+ */
+function workerUrl(): URL {
+  const name = import.meta.url.endsWith(".ts") ? "./convert-worker.ts" : "./convert-worker.js"
+  return new URL(name, import.meta.url)
+}
+
+/**
+ * Run a convert off the main thread. Always resolves with a ConvertResult —
+ * worker/spawn failures are mapped to an `errorResult`-shaped value (never
+ * thrown) so callers keep the same contract as the sync path.
+ */
+export function runConvertInWorker(
+  op: "compress" | "decompress" | "extract",
+  path: string,
+  opts: CompressOptions | DecompressOptions | ExtractOptions,
+): Promise<ConvertResult> {
+  return new Promise((resolve) => {
+    let settled = false
+    let worker: Worker
+    const finish = (result: ConvertResult): void => {
+      if (settled) return
+      settled = true
+      void worker.terminate()
+      resolve(result)
+    }
+    try {
+      worker = new Worker(workerUrl())
+    } catch (err) {
+      resolve(errorResult(op, err))
+      return
+    }
+    worker.once("message", (result: ConvertResult) => finish(result))
+    worker.once("error", (err) => finish(errorResult(op, err)))
+    worker.once("exit", (code) => {
+      if (code !== 0) finish(errorResult(op, new Error(`Convert worker exited with code ${code}`)))
+    })
+    worker.postMessage({ op, path, opts })
+  })
 }

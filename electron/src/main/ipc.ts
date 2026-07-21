@@ -31,16 +31,16 @@ let progressSeq = 0
 
 /**
  * Run a convert operation, streaming coarse start/step/done progress to the
- * renderer over the whitelisted `convert:progress` channel. The native call is
- * synchronous; we yield once after `start` so that event flushes to the
- * (separate) renderer process before the blocking work begins, keeping the UI's
- * progress indicator live.
+ * renderer over the whitelisted `convert:progress` channel. The native call runs
+ * in a worker thread (see `runConvertInWorker`), so the main JS thread stays free
+ * and the UI stays responsive; we still yield once after `start` so that event
+ * flushes to the (separate) renderer process before the work begins.
  */
 async function runConvert(
   sender: WebContents,
   op: ConvertProgress["op"],
   file: string,
-  work: () => ConvertResult,
+  work: () => Promise<ConvertResult>,
 ): Promise<ConvertResult> {
   const id = `cv${++progressSeq}`
   const emit = (p: Omit<ConvertProgress, "id" | "op" | "file">): void => {
@@ -49,7 +49,7 @@ async function runConvert(
   emit({ phase: "start", message: `${op} ${file}` })
   await new Promise((resolve) => setImmediate(resolve))
   emit({ phase: "step", message: "working…" })
-  const result = work()
+  const result = await work()
   emit(result.error ? { phase: "error", error: result.error } : { phase: "done", result })
   return result
 }
@@ -119,22 +119,23 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.readMszx, (_event, path: string) => bindings.readMszx(path))
 
-  // Threads come from global settings (not a per-job control).
+  // Threads come from global settings (not a per-job control). The native convert
+  // runs off-thread in a worker so the main process stays responsive.
   ipcMain.handle(IPC.compress, (event, path: string, opts: CompressOptions) =>
     runConvert(event.sender, "compress", basename(path), () =>
-      bindings.compress(path, { ...opts, threads: getSettings().threads }),
+      bindings.runConvertInWorker("compress", path, { ...opts, threads: getSettings().threads }),
     ),
   )
 
   ipcMain.handle(IPC.decompress, (event, path: string, opts: DecompressOptions) =>
     runConvert(event.sender, "decompress", basename(path), () =>
-      bindings.decompress(path, { ...opts, threads: getSettings().threads }),
+      bindings.runConvertInWorker("decompress", path, { ...opts, threads: getSettings().threads }),
     ),
   )
 
   ipcMain.handle(IPC.extract, (event, path: string, opts: ExtractOptions) =>
     runConvert(event.sender, "extract", basename(path), () =>
-      bindings.extract(path, { ...opts, threads: getSettings().threads }),
+      bindings.runConvertInWorker("extract", path, { ...opts, threads: getSettings().threads }),
     ),
   )
 
