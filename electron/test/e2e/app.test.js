@@ -115,6 +115,9 @@ describe("MScompress renderer (e2e)", () => {
       const centerEmpty = await page.$('main [data-testid="empty-state"]')
       assert.equal(centerEmpty, null, "workspace no longer shows empty state")
 
+      // Inspector is hidden by default — reveal it via the toolbar toggle.
+      await page.evaluate(() => document.querySelector('button[title="Show inspector"]')?.click())
+
       // Inspector reflects the stubbed analyze() for the auto-selected mzML.
       await page.waitForFunction(() =>
         document.querySelector('[data-testid="inspector"]')?.textContent.includes("Spectrum count"),
@@ -229,9 +232,9 @@ describe("MScompress renderer (e2e)", () => {
       assert.match(qc, /MS-Level Distribution/)
       assert.match(qc, /Peaks per Spectrum/)
 
-      // Heatmap grid cells (plain divs) from the stubbed cells array.
-      const cells = await page.$$('[data-testid="qc-charts"] [title^="density"]')
-      assert.ok(cells.length > 0, "heatmap cells rendered")
+      // Heatmap now renders as a <canvas> density image (was plain divs).
+      const canvas = await page.$('[data-testid="qc-charts"] canvas')
+      assert.ok(canvas, "heatmap canvas rendered")
     } finally {
       await page.close()
     }

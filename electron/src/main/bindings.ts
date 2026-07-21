@@ -359,8 +359,8 @@ export function readMszx(path: string): MszxManifest {
 
 const QC_DEFAULT_MAX_SPECTRA = 4000
 const QC_DEFAULT_TIC_POINTS = 300
-const QC_RT_BINS = 80
-const QC_MZ_BINS = 40
+const QC_RT_BINS = 300
+const QC_MZ_BINS = 200
 const PEAK_BINS: { label: string; max: number }[] = [
   { label: "0-100", max: 100 },
   { label: "100-250", max: 250 },

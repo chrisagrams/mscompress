@@ -10,6 +10,8 @@ import {
   Database,
   Scissors,
   Settings as SettingsIcon,
+  PanelRight,
+  PanelRightClose,
 } from "lucide-react"
 import githubMark from "@/assets/github-mark.svg"
 import { Button } from "@/components/ui/button"
@@ -54,6 +56,7 @@ function App() {
   const [tab, setTab] = useState("convert")
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
 
   // undefined when no files are open (empty state).
   const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
@@ -211,6 +214,19 @@ function App() {
             <Button variant="ghost" size="icon" className="size-7" onClick={toggleTheme}>
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title={inspectorOpen ? "Hide inspector" : "Show inspector"}
+              onClick={() => setInspectorOpen((o) => !o)}
+            >
+              {inspectorOpen ? (
+                <PanelRightClose className="size-4" />
+              ) : (
+                <PanelRight className="size-4" />
+              )}
+            </Button>
           </div>
         </header>
 
@@ -306,18 +322,20 @@ function App() {
             </Tabs>
           </main>
 
-          {/* Right inspector */}
-          <aside className="w-72 shrink-0 border-l">
-            {selectedEntry ? (
-              <Inspector
-                path={selectedEntry.path}
-                name={selectedEntry.name}
-                kind={selectedEntry.kind}
-              />
-            ) : (
-              <NoFile />
-            )}
-          </aside>
+          {/* Right inspector — collapsible, hidden by default */}
+          {inspectorOpen && (
+            <aside className="w-72 shrink-0 border-l">
+              {selectedEntry ? (
+                <Inspector
+                  path={selectedEntry.path}
+                  name={selectedEntry.name}
+                  kind={selectedEntry.kind}
+                />
+              ) : (
+                <NoFile />
+              )}
+            </aside>
+          )}
         </div>
 
         {/* Bottom status bar */}

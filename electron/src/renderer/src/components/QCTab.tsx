@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Loader2, AlertTriangle } from "lucide-react"
 import {
   Area,
@@ -19,8 +19,8 @@ import type { QCData } from "@shared/ipc"
 
 const donutColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"]
 
-function heatColor(t: number) {
-  // viridis-ish ramp for density 0..1
+// viridis-ish ramp for density 0..1 → [r, g, b]
+function heatRGB(t: number): [number, number, number] {
   const stops = [
     [68, 1, 84],
     [59, 82, 139],
@@ -33,10 +33,83 @@ function heatColor(t: number) {
   const f = x - i
   const a = stops[i]
   const b = stops[Math.min(i + 1, stops.length - 1)]
-  const r = Math.round(a[0] + (b[0] - a[0]) * f)
-  const g = Math.round(a[1] + (b[1] - a[1]) * f)
-  const bl = Math.round(a[2] + (b[2] - a[2]) * f)
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * f),
+    Math.round(a[1] + (b[1] - a[1]) * f),
+    Math.round(a[2] + (b[2] - a[2]) * f),
+  ]
+}
+
+function heatColor(t: number) {
+  const [r, g, bl] = heatRGB(t)
   return `rgb(${r},${g},${bl})`
+}
+
+/**
+ * RT × m/z density map painted to a <canvas> as an ImageData buffer — one pixel
+ * per grid cell (rtBins × mzBins), viridis-ramped and normalized by max density.
+ * CSS scales it to full width, so the fine grid reads as a continuous 2D image.
+ */
+function DensityHeatmap({ heatmap }: { heatmap: QCData["heatmap"] }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const { rtBins, mzBins, cells, rtMax, mzMin, mzMax } = heatmap
+  const maxDensity = cells.reduce((m, c) => Math.max(m, c.density), 0) || 1
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const img = ctx.createImageData(rtBins, mzBins)
+    const data = img.data
+    // Base fill = zero-density colour (also covers the empty/no-cells case).
+    const [br, bg, bb] = heatRGB(0)
+    for (let i = 0; i < rtBins * mzBins; i++) {
+      data[i * 4] = br
+      data[i * 4 + 1] = bg
+      data[i * 4 + 2] = bb
+      data[i * 4 + 3] = 255
+    }
+    // Paint each non-zero cell (rows = m/z, cols = RT), matching the prior grid.
+    for (const c of cells) {
+      const col = Math.min(rtBins - 1, Math.round((c.rt / (rtMax || 1)) * (rtBins - 1)))
+      const row = Math.min(
+        mzBins - 1,
+        Math.round(((c.mz - mzMin) / (mzMax - mzMin || 1)) * (mzBins - 1)),
+      )
+      const [r, g, bl] = heatRGB(c.density / maxDensity)
+      const idx = (row * rtBins + col) * 4
+      data[idx] = r
+      data[idx + 1] = g
+      data[idx + 2] = bl
+      data[idx + 3] = 255
+    }
+    ctx.putImageData(img, 0, 0)
+  }, [rtBins, mzBins, cells, maxDensity, rtMax, mzMin, mzMax])
+
+  return (
+    <div className="flex gap-2">
+      {/* m/z axis labels */}
+      <div className="mono flex flex-col justify-between py-0.5 text-[9px] text-muted-foreground">
+        <span>{mzMax.toFixed(0)}</span>
+        <span>m/z</span>
+        <span>{mzMin.toFixed(0)}</span>
+      </div>
+      <div className="flex-1">
+        <canvas
+          ref={canvasRef}
+          width={rtBins}
+          height={mzBins}
+          className="block h-auto w-full rounded-sm bg-border"
+        />
+        <div className="mono mt-1 flex justify-between text-[9px] text-muted-foreground">
+          <span>RT 0</span>
+          <span>RT {rtMax.toFixed(2)} min</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const chartTooltip = {
@@ -127,25 +200,6 @@ export function QCTab({ path, name }: { path: string; name: string }) {
   }
 
   const { heatmap, tic, bpc, msLevelCounts, peaksPerSpectrum } = qc
-  const maxDensity = heatmap.cells.reduce((m, c) => Math.max(m, c.density), 0) || 1
-
-  // build 2D grid: rows = mz bins (top = high mz), cols = rt bins
-  const grid: number[][] = Array.from({ length: heatmap.mzBins }, () =>
-    Array.from({ length: heatmap.rtBins }, () => 0),
-  )
-  for (const c of heatmap.cells) {
-    const r = Math.min(
-      heatmap.rtBins - 1,
-      Math.round((c.rt / (heatmap.rtMax || 1)) * (heatmap.rtBins - 1)),
-    )
-    const m = Math.min(
-      heatmap.mzBins - 1,
-      Math.round(
-        ((c.mz - heatmap.mzMin) / (heatmap.mzMax - heatmap.mzMin || 1)) * (heatmap.mzBins - 1),
-      ),
-    )
-    grid[m][r] = c.density
-  }
 
   const donutData = msLevelCounts.map((m) => ({ name: m.level, value: m.count }))
   const totalSpectra = donutData.reduce((a, b) => a + b.value, 0) || 1
@@ -255,39 +309,7 @@ export function QCTab({ path, name }: { path: string; name: string }) {
           </div>
         }
       >
-        <div className="flex gap-2">
-          {/* m/z axis labels */}
-          <div className="mono flex flex-col justify-between py-0.5 text-[9px] text-muted-foreground">
-            <span>{heatmap.mzMax.toFixed(0)}</span>
-            <span>m/z</span>
-            <span>{heatmap.mzMin.toFixed(0)}</span>
-          </div>
-          <div className="flex-1">
-            <div
-              className="grid w-full gap-px overflow-hidden rounded-sm bg-border"
-              style={{
-                gridTemplateColumns: `repeat(${heatmap.rtBins}, minmax(0, 1fr))`,
-              }}
-            >
-              {grid.map((row, ri) =>
-                row.map((d, ci) => (
-                  <div
-                    key={`${ri}-${ci}`}
-                    title={`density ${d.toFixed(2)}`}
-                    style={{
-                      background: heatColor(d / maxDensity),
-                      aspectRatio: "1 / 1",
-                    }}
-                  />
-                )),
-              )}
-            </div>
-            <div className="mono mt-1 flex justify-between text-[9px] text-muted-foreground">
-              <span>RT 0</span>
-              <span>RT {heatmap.rtMax.toFixed(2)} min</span>
-            </div>
-          </div>
-        </div>
+        <DensityHeatmap heatmap={heatmap} />
       </Panel>
 
       {/* MS-level donut */}
