@@ -14,6 +14,7 @@ import {
   Check,
   AlertCircle,
   Clock,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,9 +23,9 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fmtBytes } from "@/lib/format"
-import type { FileKind } from "@shared/ipc"
+import { COMPRESSION_PRESETS } from "@shared/ipc"
+import type { AppSettings, FileKind, QueueState, QueueStatus } from "@shared/ipc"
 import { ingestPaths, type FileEntry } from "@/files"
-import type { QueueState, QueueStatus } from "@shared/ipc"
 
 // File-kind colours match the OS file-type icons (assets/icons/*): the logo's
 // own brand hues — msz=blue (logo "s"), mzML=magenta (logo "m"), mszx=green.
@@ -67,20 +68,79 @@ export function LeftRail({
   files,
   selected,
   onSelect,
+  selectedPaths,
+  onMultiSelect,
   onAddFiles,
   queue,
+  settings,
 }: {
   files: FileEntry[]
-  /** Path of the currently selected file. */
+  /** Path of the currently selected file (drives the workspace + Inspector). */
   selected: string
   onSelect: (path: string) => void
+  /** Multi-selection for batch actions (independent of `selected`). */
+  selectedPaths: string[]
+  onMultiSelect: (paths: string[]) => void
   onAddFiles: (entries: FileEntry[]) => void
   queue: QueueState
+  settings: AppSettings | null
 }) {
   const [dragOver, setDragOver] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
+  // Anchor row for shift-range selection (index into `files`).
+  const [anchor, setAnchor] = useState<number | null>(null)
 
   const running = queue.running
+
+  // Click on a file row: plain → single-select (resets multi to just this file);
+  // Ctrl/Cmd → toggle in the multi-selection; Shift → range from the anchor row.
+  const handleRowClick = (e: React.MouseEvent, path: string, idx: number) => {
+    if (e.shiftKey && anchor !== null) {
+      const [a, b] = anchor <= idx ? [anchor, idx] : [idx, anchor]
+      onMultiSelect(files.slice(a, b + 1).map((f) => f.path))
+    } else if (e.ctrlKey || e.metaKey) {
+      onMultiSelect(
+        selectedPaths.includes(path)
+          ? selectedPaths.filter((p) => p !== path)
+          : [...selectedPaths, path],
+      )
+      setAnchor(idx)
+    } else {
+      onSelect(path)
+      onMultiSelect([path])
+      setAnchor(idx)
+    }
+  }
+
+  // Enqueue one LOCAL compress job per selected mzML, then start the queue.
+  const compressSelected = async () => {
+    const s = settings ?? (await window.api.getSettings())
+    const preset = s.defaultPreset ?? "default"
+    const d = COMPRESSION_PRESETS[preset]
+    const targets = files.filter((f) => selectedPaths.includes(f.path) && f.kind === "mzML")
+    if (targets.length === 0) return
+    for (const f of targets) {
+      await window.api.addQueueJob({
+        filePath: f.path,
+        kind: "mzML",
+        op: "compress",
+        settings: {
+          preset,
+          mzLossy: d.mzLossy,
+          intLossy: d.intLossy,
+          zstdLevel: d.zstdLevel,
+          outputDir: s.defaultOutputDir,
+        },
+      })
+    }
+    await window.api.startQueue()
+    setTransferOpen(true)
+    onMultiSelect([])
+  }
+
+  const compressCount = files.filter(
+    (f) => selectedPaths.includes(f.path) && f.kind === "mzML",
+  ).length
 
   // Analyze paths via the shared helper and add the resulting entries.
   const ingest = async (paths: string[]) => {
@@ -151,18 +211,52 @@ export function LeftRail({
       <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Open Files
       </div>
-      <ScrollArea className="min-h-0 flex-[0_0_auto] max-h-[40%]">
+
+      {/* Batch action bar — shown when 2+ files are multi-selected and at least
+          one is an mzML (the only kind that can be compressed). */}
+      {selectedPaths.length >= 2 && compressCount > 0 && (
+        <div
+          data-testid="batch-bar"
+          className="mb-1 flex items-center gap-1 px-2 text-[11px] text-muted-foreground"
+        >
+          <span>{selectedPaths.length} selected</span>
+          <Button
+            size="sm"
+            data-testid="compress-selected"
+            className="ml-auto h-6 gap-1 text-[11px]"
+            onClick={compressSelected}
+          >
+            <FileArchive className="size-3" /> Compress selected
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            title="Clear selection"
+            onClick={() => onMultiSelect([])}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
+
+      <ScrollArea className="min-h-0 flex-1">
         <div className="px-1 pb-2">
-          {files.map((f) => {
+          {files.map((f, idx) => {
             const active = f.path === selected
+            const multi = selectedPaths.includes(f.path)
             return (
               <button
                 key={f.path}
                 data-testid="file-entry"
                 data-path={f.path}
-                onClick={() => onSelect(f.path)}
+                onClick={(e) => handleRowClick(e, f.path, idx)}
                 className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
-                  active ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : multi
+                      ? "bg-accent/60 text-accent-foreground"
+                      : "hover:bg-accent/50"
                 }`}
               >
                 <ChevronRight

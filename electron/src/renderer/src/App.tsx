@@ -53,6 +53,8 @@ function NoFile() {
 function App() {
   const [files, setFiles] = useState<FileEntry[]>([])
   const [selectedPath, setSelectedPath] = useState<string>("")
+  // Multi-selection for batch actions (independent of the single selectedPath).
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([])
   const [tab, setTab] = useState("convert")
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -85,6 +87,7 @@ function App() {
       return [...fresh, ...prev]
     })
     setSelectedPath(entries[0].path)
+    setSelectedPaths([entries[0].path])
   }
   // OS-associated files (double-click / "Open with") pushed from the main
   // process — funnel them through the same analyze→addFiles path as the dialog.
@@ -248,8 +251,11 @@ function App() {
               files={files}
               selected={selectedPath}
               onSelect={setSelectedPath}
+              selectedPaths={selectedPaths}
+              onMultiSelect={setSelectedPaths}
               onAddFiles={addFiles}
               queue={queue}
+              settings={settings}
             />
           </aside>
 
