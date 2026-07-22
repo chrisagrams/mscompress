@@ -104,6 +104,31 @@ if(CODE_COVERAGE)
 endif()
 
 
+# --- experiment tool: mszx_dict (branch feat/mszx-zstd-dictionary) ---
+# Reuses the mscompress core (src/*.c) for real .msz stream extraction and
+# additionally compiles the vendored zstd dictBuilder (ZDICT_*), which the
+# main zstd static lib does not include.
+file(GLOB LIB_SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c)
+file(GLOB ZDICT_SOURCES ${VENDOR_DIR}/zstd/lib/dictBuilder/*.c)
+add_executable(mszx_dict
+    ${LIB_SOURCES}
+    ${ZDICT_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../benchmark/mszx_dict/mszx_dict.c)
+target_compile_definitions(mszx_dict PRIVATE VERSION="${PROJECT_VERSION}")
+target_include_directories(mszx_dict PUBLIC
+    ${VENDOR_DIR}/zstd/lib
+    ${VENDOR_DIR}/zstd/lib/dictBuilder
+    ${VENDOR_DIR}/base64/include
+    ${VENDOR_DIR}/base64/lib
+    ${VENDOR_DIR}/yxml
+    ${VENDOR_DIR}/lz4/include
+    ${SRC_DIR})
+if(WIN32)
+    target_link_libraries(mszx_dict PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
+else()
+    target_link_libraries(mszx_dict PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads)
+endif()
+
 # Enable testing
 enable_testing()
 

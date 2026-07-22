@@ -1,0 +1,10 @@
+>>> perfile
+archive /home/cgrams/mszx_dict_sweep/run48/archives/arch_perfile_L3.mszx mode=perfile level=3 maxdict=0 nfiles=48 bytes=3525628416
+>>> pool
+archive /home/cgrams/mszx_dict_sweep/run48/archives/arch_pool_L3.mszx mode=pool level=3 maxdict=0 nfiles=48 bytes=3526315520
+>>> dictxml
+archive /home/cgrams/mszx_dict_sweep/run48/archives/arch_dictxml_L3.mszx mode=dictxml level=3 maxdict=114688 nfiles=48 bytes=3525749760
+verify /home/cgrams/mszx_dict_sweep/run48/archives/arch_dictxml_L3.mszx: 144 entries checked, 0 failed -> PASS
+>>> dictall
+archive /home/cgrams/mszx_dict_sweep/run48/archives/arch_dictall_L3.mszx mode=dictall level=3 maxdict=114688 nfiles=48 bytes=3468038656
+verify /home/cgrams/mszx_dict_sweep/run48/archives/arch_dictall_L3.mszx: 144 entries checked, 0 failed -> PASS
