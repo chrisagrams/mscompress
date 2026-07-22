@@ -48,6 +48,16 @@ void init_args(Arguments* args) {
    args->zstd_compression_level = 3;  // default
 
    args->json_output = 0;
+
+   // Batch mode defaults.
+   args->batch = 0;
+   args->recursive = 0;
+   args->flatten = 1;  // flatten entry names by default
+   args->continue_on_error = 0;
+   args->list_mode = 0;
+   args->from_file = NULL;
+   args->inputs = NULL;
+   args->n_inputs = 0;
 }
 
 /**

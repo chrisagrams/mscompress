@@ -79,6 +79,8 @@
 #define EXTERNAL 5
 #define DESCRIBE 6
 #define DECOMPRESS_MSZX 7
+#define COMPRESS_BATCH 8
+#define LIST_MSZX 9
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -125,6 +127,16 @@ typedef struct {
    int zstd_compression_level;
 
    int json_output;
+
+   /* Batch mode (folder / glob / list -> one .mszx). See src/batch.c. */
+   int batch;             // explicit --batch opt-in
+   int recursive;         // -r/--recursive directory descent
+   int flatten;           // 1 = flatten entry names (default), 0 = preserve tree
+   int continue_on_error; // skip-and-report instead of fail-fast
+   int list_mode;         // --list: print an .mszx table of contents
+   char* from_file;       // --from-file manifest of input paths (or "-" for stdin)
+   char** inputs;         // collected positional inputs (files/dirs/globs)
+   size_t n_inputs;       // count of collected positional inputs
 } Arguments;
 
 typedef struct {
@@ -387,6 +399,26 @@ int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
 int open_input_file(char* input_path);
 int open_output_file(char* path);
+/* Like open_output_file but WITHOUT O_APPEND, so lseek()+write() can overwrite
+ * earlier bytes. Required by the USTAR writer's seek-back size/checksum patch. */
+int open_output_file_rw(char* path);
+/* Returns 1 if fd refers to a seekable regular file, 0 otherwise (pipe/FIFO). */
+int fd_is_seekable(int fd);
+
+/* ---- USTAR (tar) writer — streaming seek-back-and-patch (Option A) ---- */
+typedef struct {
+   int64_t header_off;  /* byte offset of this entry's 512B header */
+   char header[512];    /* in-memory copy, patched on tar_end_entry */
+} tar_entry_t;
+/* Write a placeholder header (size 0) at the current offset; remember it in w. */
+int tar_begin_entry(int fd, const char* name, tar_entry_t* w);
+/* Patch w's size field + checksum, rewrite the 512B header in place, then write
+ * the payload's zero padding to the next 512B boundary. */
+int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size);
+/* Append a whole, known-size regular-file entry (header + data + padding). */
+int tar_add_file(int fd, const char* name, const void* data, size_t len);
+/* Write the two trailing zero blocks (end-of-archive marker). */
+int tar_finish(int fd);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
 int close_file(int fd);
@@ -402,6 +434,10 @@ typedef struct {
 int mszx_list_entries(int fd, mszx_entry_t** out, size_t* out_count);
 void mszx_free_entries(mszx_entry_t* entries, size_t count);
 int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
+int list_mszx(char* input_path);
+
+/* batch.c */
+int compress_batch(Arguments* arguments);
 
 /* mem.c */
 
