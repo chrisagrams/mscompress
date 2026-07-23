@@ -2414,6 +2414,15 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
              *divisions);  // If we have more threads than divisions, we need to
                            // increase the blocksize to the max division size
       }
+
+      /* create_divisions() deep-copies every position/scan value out of the
+       * full-file `div` into freshly allocated sub-divisions, so `div` is now
+       * an independent, unreferenced structure. Free it here to keep per-file
+       * preprocessor state from accumulating across a long batch run (the
+       * threads == -1 branch above instead transfers ownership of `div` into
+       * *divisions and must NOT free it). */
+      dealloc_division(div);
+      div = NULL;
    }
 
    if (*divisions == NULL)

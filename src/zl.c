@@ -212,22 +212,38 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
       return 0;
    }
 
-   z->avail_in = input_len;
-   z->next_in = input;
-   z->avail_out = output_len;
-   z->next_out = output->buff;
-   z->total_out = 0;
+   /* Use a dedicated, locally-scoped inflate stream rather than the passed-in
+    * `z`. `z` is deflate-initialized by alloc_z_stream() and is reused for
+    * zlib_compress() in the encode pipelines; running inflate on it orphaned
+    * its deflate state and, because the old code called inflateReset() (not
+    * inflateEnd()), leaked a full inflate state on every single call — the
+    * dominant per-file heap growth in batch mode. A local stream that is
+    * inflateInit()'d and inflateEnd()'d here keeps the lifecycle balanced and
+    * leaves `z` untouched (so dealloc_z_stream()'s deflateEnd() still frees it).
+    * The decompressed bytes are identical to before. */
+   z_stream zi;
+   zi.zalloc = Z_NULL;
+   zi.zfree = Z_NULL;
+   zi.opaque = Z_NULL;
+   zi.avail_in = input_len;
+   zi.next_in = input;
+   zi.avail_out = output_len;
+   zi.next_out = output->buff;
+   zi.total_out = 0;
 
-   inflateInit(z);
+   if (inflateInit(&zi) != Z_OK) {
+      error("zlib_decompress: inflateInit error\n");
+      return 0;
+   }
 
    int ret;
    int zlib_realloc_ret;
 
    do {
-      z->avail_out = output_len - z->total_out;
-      z->next_out = output->buff + z->total_out;
+      zi.avail_out = output_len - zi.total_out;
+      zi.next_out = output->buff + zi.total_out;
 
-      ret = inflate(z, Z_NO_FLUSH);
+      ret = inflate(&zi, Z_NO_FLUSH);
 
       if (ret != Z_OK)
          break;
@@ -236,14 +252,15 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
       zlib_realloc_ret = zlib_realloc(output, output_len);
       if (zlib_realloc_ret != 0) {
          error("zlib_decompress: zlib_realloc error\n");
+         inflateEnd(&zi);
          return 0;
       }
 
-   } while (z->avail_out == 0);
+   } while (zi.avail_out == 0);
 
-   r = z->total_out;
+   r = zi.total_out;
 
-   inflateReset(z);
+   inflateEnd(&zi);
 
    zlib_realloc_ret = zlib_realloc(output, r);  // shrink the buffer down to only what is in use
 
