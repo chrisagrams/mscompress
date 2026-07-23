@@ -396,7 +396,6 @@ static char* build_manifest(manifest_rec_t* recs, size_t n, size_t* out_len) {
    APP("{\n");
    APP("  \"version\": \"2.0\",\n");
    APP("  \"container\": \"batch\",\n");
-   APP("  \"created_at\": \"1970-01-01T00:00:00Z\",\n");
    APP("  \"spectra_files\": [\n");
    for (size_t i = 0; i < n; ++i) {
       APP("    {\"entry\": \"");
