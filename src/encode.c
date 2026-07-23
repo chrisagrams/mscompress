@@ -27,8 +27,10 @@
  * @param dest Pre-allocated destination buffer for the base64-encoded output.
  * @param src_len Length of the data in `zblk->buff` to encode.
  * @param out_len Pointer to a variable that receives the length of the base64 output.
- * @warning This function frees the `zlib_block_t*` `zblk` parameter internally.
- *          The caller must not free `zblk` after calling this function.
+ * @warning This function frees the `zlib_block_t*` `zblk` struct internally
+ *          (NOT `zblk->mem` — some callers wrap borrowed buffers). The caller
+ *          must not free `zblk` after calling this function, but the owner of
+ *          `zblk->mem` remains responsible for freeing that buffer.
  */
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len)
@@ -92,9 +94,17 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
 
    zlib_block_t* cmp_output;
 
-   decmp_input = zlib_alloc(0);
+   /* Struct-only wrapper around the borrowed source buffer: allocating it via
+    * zlib_alloc() would malloc a ZLIB_BUFF_FACTOR buffer that the next line
+    * orphans (leaked once per spectrum). */
+   decmp_input = malloc(sizeof(zlib_block_t));
+   if (decmp_input == NULL)
+      error("encode_zlib_fun: malloc failed");
+
+   decmp_input->offset = 0;
    decmp_input->mem = *src;
    decmp_input->buff = decmp_input->mem + decmp_input->offset;
+   decmp_input->len = src_len;
 
    cmp_output = zlib_alloc(0);
 
@@ -106,7 +116,7 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
    if (zlib_len == 0) {
       error("encode_zlib_fun: zlib_compress error\n");
       free(decmp_input);
-      free(cmp_output);
+      zlib_dealloc(cmp_output);
       // Continue to move forward
       *src += src_len;
       return;
@@ -117,7 +127,11 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
    free(decmp_input);
    // free(decmp_header);
 
+   /* encode_base64() frees the cmp_output struct but not its owned buffer
+    * (other callers pass borrowed buffers) — save and free it here. */
+   void* cmp_output_mem = cmp_output->mem;
    encode_base64(cmp_output, dest, zlib_len, out_len);
+   free(cmp_output_mem);
 
    *src += src_len;
 }
@@ -179,7 +193,7 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
       error("encode_zlib_fun: zlib_compress error\n");
       free(decmp_input);
       free(decmp_header);
-      free(cmp_output);
+      zlib_dealloc(cmp_output);
       // Continue to move forward
       *src += org_len + ZLIB_SIZE_OFFSET;
       return;
@@ -188,7 +202,11 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
    free(decmp_input);
    free(decmp_header);
 
+   /* encode_base64() frees the cmp_output struct but not its owned buffer
+    * (other callers pass borrowed buffers) — save and free it here. */
+   void* cmp_output_mem = cmp_output->mem;
    encode_base64(cmp_output, dest, zlib_len, out_len);
+   free(cmp_output_mem);
 
    *src += (ZLIB_SIZE_OFFSET + org_len);
 }

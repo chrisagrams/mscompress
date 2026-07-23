@@ -631,6 +631,19 @@ void* compress_routine(void* args)
       return NULL;
    }
 
+   a_args->z_inflate =
+       alloc_z_stream_inflate();  // Dedicated inflate stream for decoding
+                                  // source zlib data (init once, reset per
+                                  // block).
+
+   if (a_args->z_inflate == NULL) {
+      error("compress_routine: Failed to allocate inflate z_stream.\n");
+      dealloc_z_stream(a_args->z);
+      dealloc_data_block(a_args->tmp);
+      free(a_args);
+      return NULL;
+   }
+
    a_args->ret_code = 0;  // Initialize return code to 0 (success).
 
    if (cb_args == NULL)
@@ -640,6 +653,7 @@ void* compress_routine(void* args)
       dealloc_cctx(czstd);
       dealloc_data_block(a_args->tmp);
       dealloc_z_stream(a_args->z);
+      dealloc_z_stream_inflate(a_args->z_inflate);
       free(a_args);
       return NULL;  // No data to compress.
    }
@@ -709,6 +723,7 @@ void* compress_routine(void* args)
    dealloc_cctx(czstd);
    dealloc_data_block(a_args->tmp);
    dealloc_z_stream(a_args->z);
+   dealloc_z_stream_inflate(a_args->z_inflate);
    free(a_args);
 
    cb_args->ret = cmp_buff;
