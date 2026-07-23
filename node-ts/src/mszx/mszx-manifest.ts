@@ -119,12 +119,34 @@ export class MSZXManifest {
   }
 
   /**
+   * Highest MSZX manifest major version this binding can read. Multi-file
+   * (v2 "batch") archives are written by the C CLI but not yet readable here.
+   */
+  static readonly MAX_SUPPORTED_MAJOR = 1;
+
+  /**
    * Create from plain object.
    *
    * @param data - Manifest data object
    * @returns New MSZXManifest instance
+   * @throws Error if the manifest is a newer major version, or is a
+   *   multi-file/batch archive (v2 `spectra_files`/`container`), which this
+   *   v1-only binding cannot read. Refusing loudly avoids silently
+   *   mis-reading a batch archive as a single-file one.
    */
   static fromJSON(data: MSZXManifestData): MSZXManifest {
+    const raw = data as unknown as Record<string, unknown>;
+    const version = typeof raw.version === "string" ? raw.version : "1.0";
+    const majorParsed = parseInt(version.split(".")[0], 10);
+    const major = Number.isNaN(majorParsed) ? 1 : majorParsed;
+    const isBatch = "spectra_files" in raw || raw.container === "batch";
+    if (major > MSZXManifest.MAX_SUPPORTED_MAJOR || isBatch) {
+      throw new Error(
+        `MSZX manifest version '${version}' is newer than this build supports ` +
+          `(max major ${MSZXManifest.MAX_SUPPORTED_MAJOR}); multi-file/batch ` +
+          `.mszx archives require a newer mscompress Node binding`
+      );
+    }
     return new MSZXManifest(data);
   }
 

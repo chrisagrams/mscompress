@@ -55,9 +55,34 @@ class MSZXManifest:
         """Serialize to JSON string."""
         return json.dumps(self.to_dict(), indent=indent)
 
+    #: Highest MSZX manifest major version this binding can read. Multi-file
+    #: (v2 "batch") archives are written by the C CLI but not yet readable here.
+    MAX_SUPPORTED_MAJOR: int = 1
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> MSZXManifest:
-        """Create from dictionary."""
+        """Create from dictionary.
+
+        Raises:
+            ValueError: if the manifest is a newer major version, or is a
+                multi-file/batch archive (v2 ``spectra_files``/``container``),
+                which this v1-only binding cannot read. Refusing loudly avoids
+                silently mis-reading a batch archive as a single-file one.
+        """
+        version = data.get("version", "1.0")
+        try:
+            major = int(str(version).split(".", 1)[0])
+        except (ValueError, TypeError):
+            major = 1  # unparseable version -> treat as legacy, proceed
+
+        is_batch = "spectra_files" in data or data.get("container") == "batch"
+        if major > cls.MAX_SUPPORTED_MAJOR or is_batch:
+            raise ValueError(
+                f"MSZX manifest version {version!r} is newer than this build "
+                f"supports (max major {cls.MAX_SUPPORTED_MAJOR}); multi-file/"
+                f"batch .mszx archives require a newer mscompress Python binding"
+            )
+
         annotations = [
             AnnotationEntry.from_dict(sr) for sr in data.get("annotations", [])
         ]
