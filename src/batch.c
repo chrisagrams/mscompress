@@ -22,6 +22,7 @@
 #include "mscompress.h"
 
 #ifdef _WIN32
+#include <windows.h>
 #include <io.h>
 #define PATH_SEP '/'
 #else
@@ -116,9 +117,43 @@ static char* join2(const char* dir, const char* name) {
    return out;
 }
 
-/* ---------------- directory walk (POSIX) ---------------- */
+/* ---------------- directory walk ---------------- */
 
-#ifndef _WIN32
+#ifdef _WIN32
+/* Windows directory walk mirroring the POSIX walk_dir: enumerate `dir` via the
+ * Win32 FindFirstFile API, recurse into subdirectories when requested, skip
+ * "." / "..", and keep regular files whose name matches is_mzml_name. */
+static int walk_dir(const char* dir, int recursive, strlist_t* out) {
+   char* pattern = join2(dir, "*"); /* "<dir>/*" (Win32 accepts '/' or '\\') */
+   if (!pattern) return -1;
+
+   WIN32_FIND_DATAA ffd;
+   HANDLE h = FindFirstFileA(pattern, &ffd);
+   free(pattern);
+   if (h == INVALID_HANDLE_VALUE) {
+      warning("batch: cannot open directory '%s'\n", dir);
+      return -1;
+   }
+
+   int rc = 0;
+   do {
+      const char* name = ffd.cFileName;
+      if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
+      char* full = join2(dir, name);
+      if (!full) { rc = -1; break; }
+      if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+         if (recursive) rc = walk_dir(full, recursive, out);
+      } else if (is_mzml_name(full)) {
+         if (strlist_push(out, full) != 0) rc = -1;
+      }
+      free(full);
+      if (rc != 0) break;
+   } while (FindNextFileA(h, &ffd));
+
+   FindClose(h);
+   return rc;
+}
+#else
 static int walk_dir(const char* dir, int recursive, strlist_t* out) {
    DIR* d = opendir(dir);
    if (!d) {
@@ -141,6 +176,54 @@ static int walk_dir(const char* dir, int recursive, strlist_t* out) {
       if (rc != 0) break;
    }
    closedir(d);
+   return rc;
+}
+#endif
+
+#ifdef _WIN32
+/* Windows internal glob. Win32 wildcards (`*`, `?`) are supported in the LAST
+ * path component only; FindFirstFileA matches them natively but returns bare
+ * filenames, so the directory prefix is re-joined to rebuild full paths.
+ * Recursive `**` is not expanded here — use --recursive with a directory input
+ * for that. Mirrors the POSIX glob branch's handling of matched dirs/files. */
+static int glob_win32(const char* pattern, int recursive, strlist_t* out) {
+   const char* slash = NULL;
+   for (const char* p = pattern; *p; ++p)
+      if (*p == '/' || *p == '\\') slash = p;
+
+   char dirbuf[MAX_PATH * 4];
+   const char* dirpart = ".";
+   if (slash) {
+      size_t dl = (size_t)(slash - pattern);
+      if (dl >= sizeof(dirbuf)) {
+         warning("batch: glob pattern too long ('%s')\n", pattern);
+         return -1;
+      }
+      memcpy(dirbuf, pattern, dl);
+      dirbuf[dl] = '\0';
+      dirpart = dirbuf;
+   }
+
+   WIN32_FIND_DATAA ffd;
+   HANDLE h = FindFirstFileA(pattern, &ffd);
+   if (h == INVALID_HANDLE_VALUE) return 0; /* no match, like GLOB_NOMATCH */
+
+   int rc = 0;
+   do {
+      const char* name = ffd.cFileName;
+      if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
+      char* full = slash ? join2(dirpart, name) : strdup(name);
+      if (!full) { rc = -1; break; }
+      if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+         rc = walk_dir(full, recursive, out);
+      } else if (is_mzml_name(full)) {
+         if (strlist_push(out, full) != 0) rc = -1;
+      }
+      free(full);
+      if (rc != 0) break;
+   } while (FindNextFileA(h, &ffd));
+
+   FindClose(h);
    return rc;
 }
 #endif
@@ -169,22 +252,12 @@ static int resolve_token(const char* tok, int recursive, strlist_t* out) {
       globfree(&g);
       return rc;
 #else
-      warning("batch: internal glob patterns are not supported on Windows "
-              "yet ('%s'); pass explicit file paths\n",
-              tok);
-      return -1;
+      return glob_win32(tok, recursive, out);
 #endif
    }
 
    if (is_directory(tok)) {
-#ifndef _WIN32
       return walk_dir(tok, recursive, out);
-#else
-      warning("batch: directory inputs are not supported on Windows yet "
-              "('%s'); pass explicit file paths\n",
-              tok);
-      return -1;
-#endif
    }
 
    if (is_regular_file(tok)) return strlist_push(out, tok);
