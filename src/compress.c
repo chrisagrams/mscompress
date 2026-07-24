@@ -13,6 +13,39 @@
 #include "../vendor/zstd/lib/zstd.h"
 #include "mscompress.h"
 
+/*
+ * Portable mutex/condition-variable/thread wrappers for the compression worker
+ * pool below. Mirrors the mutex wrappers in queue.c; kept file-local so the
+ * platform headers stay out of mscompress.h.
+ */
+#ifdef _WIN32
+typedef CRITICAL_SECTION ms_mutex_t;
+typedef CONDITION_VARIABLE ms_cond_t;
+typedef HANDLE ms_thread_t;
+#define MS_MUTEX_INIT(m) InitializeCriticalSection(m)
+#define MS_MUTEX_DESTROY(m) DeleteCriticalSection(m)
+#define MS_MUTEX_LOCK(m) EnterCriticalSection(m)
+#define MS_MUTEX_UNLOCK(m) LeaveCriticalSection(m)
+#define MS_COND_INIT(c) InitializeConditionVariable(c)
+#define MS_COND_DESTROY(c) ((void)0)
+#define MS_COND_WAIT(c, m) SleepConditionVariableCS((c), (m), INFINITE)
+#define MS_COND_SIGNAL(c) WakeConditionVariable(c)
+#define MS_COND_BROADCAST(c) WakeAllConditionVariable(c)
+#else
+typedef pthread_mutex_t ms_mutex_t;
+typedef pthread_cond_t ms_cond_t;
+typedef pthread_t ms_thread_t;
+#define MS_MUTEX_INIT(m) pthread_mutex_init((m), NULL)
+#define MS_MUTEX_DESTROY(m) pthread_mutex_destroy(m)
+#define MS_MUTEX_LOCK(m) pthread_mutex_lock(m)
+#define MS_MUTEX_UNLOCK(m) pthread_mutex_unlock(m)
+#define MS_COND_INIT(c) pthread_cond_init((c), NULL)
+#define MS_COND_DESTROY(c) pthread_cond_destroy(c)
+#define MS_COND_WAIT(c, m) pthread_cond_wait((c), (m))
+#define MS_COND_SIGNAL(c) pthread_cond_signal(c)
+#define MS_COND_BROADCAST(c) pthread_cond_broadcast(c)
+#endif
+
 /**
  * @brief Creates a ZSTD compression context and handles errors.
  * @return A ZSTD compression context on success. `NULL` on error.
@@ -717,13 +750,643 @@ void* compress_routine(void* args)
 }
 
 /**
- * @brief Compresses data in parallel across multiple divisions using thread pools.
+ * @brief A persistent pool of compression workers feeding an ordered writer.
  *
- * Spawns compression threads (up to the thread limit) for each division, waits
- * for completion, then writes the compressed output to the file descriptor via
- * `cmp_dump`. Returns a `block_len_queue_t` containing the metadata for all
- * compressed blocks.
+ * The pool is allocated once per `compress_mzml()` call and reused across the
+ * XML, m/z and intensity passes, so worker threads are no longer created and
+ * destroyed per wave (or per pass). Within a pass, workers claim divisions
+ * from `next_task` and compress them independently, while the thread that
+ * called `compress_parallel()` acts as the single writer: it drains finished
+ * divisions in strict order (0, 1, 2, ...) and appends them to the output file
+ * descriptor as soon as each becomes available.
  *
+ * Compression of later divisions therefore overlaps the writes of earlier
+ * ones, and since exactly one thread ever writes — always in division order —
+ * the resulting .msz byte layout is identical to the previous fork-join
+ * implementation.
+ *
+ * `max_inflight` caps how far the workers may run ahead of the writer, which
+ * bounds the amount of compressed-but-unwritten data held in memory.
+ */
+typedef struct {
+   ms_mutex_t lock;
+   ms_cond_t work; /* Workers wait here for a claimable unit of work. */
+   ms_cond_t done; /* The writer waits here for its next division. */
+
+   ms_thread_t* tids;
+   int n_workers;
+   int max_inflight;
+   int shutdown;
+
+   /* Per-pass state, all guarded by `lock`. */
+   compress_args_t** args;
+   char* done_flags;
+   int n_divisions;
+   int next_task;  /* Next division a worker may claim. */
+   int next_write; /* Next division the writer expects. */
+
+   /* Speculative pre-compression, active only while the preprocess scan is
+      running. Guarded by `lock`. See spec_start(). */
+   spec_ctx_t* spec;
+} cmp_pool_t;
+
+/* Speculative pre-compression helpers, defined further below. All of the
+   `_locked` variants must be called with the pool lock held. */
+static int spec_ready_locked(spec_ctx_t* spec);
+static int spec_claim_locked(spec_ctx_t* spec);
+static void spec_complete_locked(spec_ctx_t* spec);
+static void spec_run_task(spec_ctx_t* spec, int idx);
+
+/**
+ * @brief Worker loop: claim work from the pool and compress it.
+ *
+ * Prefers speculative tasks while the preprocess scan is still running, then
+ * falls back to divisions of the active ordered pass. Blocks while neither is
+ * claimable — because no pass is active, because the scan has not yet reached
+ * the next speculative task, or because the workers have run `max_inflight`
+ * divisions ahead of the writer. Exits when the pool is shut down by
+ * `dealloc_cmp_pool()`.
+ *
+ * @param pool The pool to pull work from.
+ */
+static void cmp_pool_work(cmp_pool_t* pool) {
+   compress_args_t* args;
+   int i;
+
+   MS_MUTEX_LOCK(&pool->lock);
+
+   for (;;) {
+      while (!pool->shutdown && !spec_ready_locked(pool->spec) &&
+             (pool->next_task >= pool->n_divisions ||
+              pool->next_task - pool->next_write >= pool->max_inflight))
+         MS_COND_WAIT(&pool->work, &pool->lock);
+
+      if (pool->shutdown)
+         break;
+
+      if (spec_ready_locked(pool->spec)) {
+         /* Hold the context across the unlock: spec_scan_finished() cannot
+            clear pool->spec until every claimed task has completed. */
+         spec_ctx_t* spec = pool->spec;
+
+         i = spec_claim_locked(spec);
+         MS_MUTEX_UNLOCK(&pool->lock);
+
+         spec_run_task(spec, i);
+
+         MS_MUTEX_LOCK(&pool->lock);
+         spec_complete_locked(spec);
+         MS_COND_SIGNAL(&pool->done);
+         continue;
+      }
+
+      i = pool->next_task++;
+
+      if (pool->done_flags[i]) /* Already satisfied by speculation. */
+         continue;
+
+      args = pool->args[i];
+
+      MS_MUTEX_UNLOCK(&pool->lock);
+
+      compress_routine((void*)args);
+
+      MS_MUTEX_LOCK(&pool->lock);
+      pool->done_flags[i] = 1;
+      MS_COND_SIGNAL(&pool->done);
+   }
+
+   MS_MUTEX_UNLOCK(&pool->lock);
+}
+
+#ifdef _WIN32
+/**
+ * @brief Windows thread entry point for a compression pool worker.
+ * @param lpParam A pointer to the `cmp_pool_t` to pull work from.
+ * @return 0 on completion.
+ */
+static DWORD WINAPI cmp_pool_worker_win(LPVOID lpParam) {
+   cmp_pool_work((cmp_pool_t*)lpParam);
+   return 0;
+}
+#else
+/**
+ * @brief pthread entry point for a compression pool worker.
+ * @param arg A pointer to the `cmp_pool_t` to pull work from.
+ * @return Always `NULL`.
+ */
+static void* cmp_pool_worker(void* arg) {
+   cmp_pool_work((cmp_pool_t*)arg);
+   return NULL;
+}
+#endif
+
+/**
+ * @brief Allocates a compression worker pool and starts its threads.
+ *
+ * @param n_workers The number of worker threads to start.
+ * @return A running `cmp_pool_t` on success, or `NULL` if fewer than two
+ *         workers were requested (the caller then uses the serial path) or on
+ *         allocation failure.
+ * @note The caller is responsible for freeing the pool via `dealloc_cmp_pool()`.
+ */
+static cmp_pool_t* alloc_cmp_pool(int n_workers) {
+   cmp_pool_t* pool;
+   int i;
+
+   if (n_workers < 2)
+      return NULL; /* Serial fallback, see compress_parallel(). */
+
+   pool = calloc(1, sizeof(cmp_pool_t));
+   if (pool == NULL) {
+      error("alloc_cmp_pool: calloc() error.\n");
+      return NULL;
+   }
+
+   pool->tids = malloc(sizeof(ms_thread_t) * n_workers);
+   if (pool->tids == NULL) {
+      error("alloc_cmp_pool: malloc() error.\n");
+      free(pool);
+      return NULL;
+   }
+
+   MS_MUTEX_INIT(&pool->lock);
+   MS_COND_INIT(&pool->work);
+   MS_COND_INIT(&pool->done);
+
+   pool->n_workers = n_workers;
+   pool->max_inflight = n_workers * 2;
+
+   for (i = 0; i < n_workers; i++) {
+#ifdef _WIN32
+      pool->tids[i] =
+          CreateThread(NULL, 0, cmp_pool_worker_win, (LPVOID)pool, 0, NULL);
+      if (pool->tids[i] == NULL) {
+         perror("CreateThread");
+         exit(-1);
+      }
+#else
+      int ret =
+          pthread_create(&pool->tids[i], NULL, cmp_pool_worker, (void*)pool);
+      if (ret != 0) {
+         perror("pthread_create");
+         exit(-1);
+      }
+#endif
+   }
+
+   return pool;
+}
+
+/**
+ * @brief Shuts down a compression worker pool, joins its threads and frees it.
+ * @param pool The pool to deallocate. `NULL` is a no-op (serial path).
+ * @warning Must not be called while a pass is in flight.
+ */
+static void dealloc_cmp_pool(cmp_pool_t* pool) {
+   int i;
+
+   if (pool == NULL)
+      return;
+
+   MS_MUTEX_LOCK(&pool->lock);
+   pool->shutdown = 1;
+   MS_COND_BROADCAST(&pool->work);
+   MS_MUTEX_UNLOCK(&pool->lock);
+
+   for (i = 0; i < pool->n_workers; i++) {
+#ifdef _WIN32
+      WaitForSingleObject(pool->tids[i], INFINITE);
+      CloseHandle(pool->tids[i]);
+#else
+      pthread_join(pool->tids[i], NULL);
+#endif
+   }
+
+   MS_COND_DESTROY(&pool->done);
+   MS_COND_DESTROY(&pool->work);
+   MS_MUTEX_DESTROY(&pool->lock);
+
+   free(pool->tids);
+   free(pool);
+}
+
+/*
+ * ===========================================================================
+ * Speculative pre-compression
+ * ===========================================================================
+ *
+ * The preprocess scan (scan_mzml) is single-threaded and completes before any
+ * compression starts, leaving every worker idle for its duration. It does not
+ * have to: the division layout that create_divisions() will produce is a pure
+ * function of values that are all known *before* the scan runs —
+ *
+ *   n_divisions   = determine_n_divisions(input_filesize, blocksize), clamped
+ *                   against arguments->threads and the spectrum count
+ *   n_spec_per_div = total_spec / n_divisions
+ *
+ * — because div->size is just the input filesize and div->mz->total_spec is
+ * df->source_total_spec, which pattern_detect() reads from the mzML's
+ * <spectrumList count="..."> attribute. create_divisions() then slices purely
+ * by spectrum index, so division `d` covers spectra [d*n, (d+1)*n) and XML
+ * entries [2*d*n, 2*(d+1)*n). Every one of those positions is final as soon as
+ * the scan has walked past that division's last spectrum.
+ *
+ * So we predict the layout, and as the scan reports progress the pool
+ * compresses each (stream, division) it can already see. The prediction is
+ * *not* trusted: scan_mzml lowers source_total_spec when a file turns out to
+ * hold fewer spectra than it claimed, which shifts every boundary. Rather than
+ * reason about when that can happen, spec_take() compares the positions that
+ * were actually compressed against the real ones create_divisions() produced,
+ * element by element, and only reuses a result on an exact match. A compressed
+ * block is a pure function of its positions, the input map and the data
+ * format, so equal positions guarantee equal bytes; a mispredicted layout
+ * simply falls back to compressing normally.
+ *
+ * Nothing is written to the output fd during speculation — the header is still
+ * the first thing written, at the same point as before — so a mispredict costs
+ * only wasted CPU and can never produce a partial or wrong file.
+ *
+ * Only the uniform divisions [0, n_divisions-1) are speculated on. The last
+ * division (which absorbs the leftover spectra) and the trailing XML-only
+ * division both depend on the end of the scan, so there is nothing to gain and
+ * their edge cases are avoided entirely.
+ */
+
+/* Streams speculated on, in the order compress_mzml writes them. */
+#define SPEC_N_STREAMS 3
+
+typedef struct {
+   data_positions_t dp;     /* Owned copy of the predicted positions. */
+   cmp_blk_queue_t* result; /* Compressed blocks, NULL until done/after take. */
+} spec_task_t;
+
+struct spec_ctx {
+   char* input_map;
+   data_format_t df; /* Private snapshot; the scan mutates the caller's. */
+   long blocksize;   /* Pre-rewrite; affects buffer sizing only, not output. */
+
+   long n_spec_per_div;
+   int n_tasks; /* Division-major: task index = division * 3 + stream. */
+   spec_task_t* tasks;
+
+   cmp_pool_t* pool; /* Borrowed; owned by this context, see spec_start(). */
+
+   /* Guarded by pool->lock. */
+   data_positions_t* xml_dp;
+   data_positions_t* mz_dp;
+   data_positions_t* inten_dp;
+   int scanned;    /* Spectra fully recorded by the scan so far. */
+   int active;     /* Cleared once no further tasks may be claimed. */
+   int next_task;  /* Next task index a worker may claim. */
+   int n_running;  /* Claimed but not yet finished. */
+};
+
+/**
+ * @brief Number of scanned spectra required before task `idx` can be claimed.
+ */
+static long spec_task_requires(spec_ctx_t* spec, int idx) {
+   return ((long)(idx / SPEC_N_STREAMS) + 1) * spec->n_spec_per_div;
+}
+
+/**
+ * @brief Whether a speculative task is claimable right now. Lock held.
+ */
+static int spec_ready_locked(spec_ctx_t* spec) {
+   if (spec == NULL || !spec->active || spec->xml_dp == NULL)
+      return 0;
+   if (spec->next_task >= spec->n_tasks)
+      return 0;
+   return spec->scanned >= spec_task_requires(spec, spec->next_task);
+}
+
+/**
+ * @brief Claims the next speculative task and returns its index. Lock held.
+ */
+static int spec_claim_locked(spec_ctx_t* spec) {
+   spec->n_running++;
+   return spec->next_task++;
+}
+
+/**
+ * @brief Records completion of a claimed speculative task. Lock held.
+ */
+static void spec_complete_locked(spec_ctx_t* spec) { spec->n_running--; }
+
+/**
+ * @brief Compresses one predicted (stream, division) slice.
+ *
+ * Copies the predicted positions out of the scan's arrays (so the result stays
+ * valid and comparable independently of the scan's own bookkeeping) and runs
+ * the ordinary `compress_routine()` over them.
+ *
+ * @param spec The speculative context.
+ * @param idx Task index, division-major.
+ */
+static void spec_run_task(spec_ctx_t* spec, int idx) {
+   spec_task_t* task = &spec->tasks[idx];
+   data_positions_t* src;
+   compress_args_t args;
+   long off, n;
+   int division = idx / SPEC_N_STREAMS;
+
+   switch (idx % SPEC_N_STREAMS) {
+      case 0:
+         src = spec->xml_dp;
+         off = 2 * division * spec->n_spec_per_div;
+         n = 2 * spec->n_spec_per_div;
+         args.mode = _xml_;
+         args.comp_fun = spec->df.xml_compression_fun;
+         break;
+      case 1:
+         src = spec->mz_dp;
+         off = division * spec->n_spec_per_div;
+         n = spec->n_spec_per_div;
+         args.mode = _mass_;
+         args.comp_fun = spec->df.mz_compression_fun;
+         break;
+      default:
+         src = spec->inten_dp;
+         off = division * spec->n_spec_per_div;
+         n = spec->n_spec_per_div;
+         args.mode = _intensity_;
+         args.comp_fun = spec->df.inten_compression_fun;
+         break;
+   }
+
+   task->dp.start_positions = malloc(sizeof(uint64_t) * n);
+   task->dp.end_positions = malloc(sizeof(uint64_t) * n);
+
+   if (task->dp.start_positions == NULL || task->dp.end_positions == NULL) {
+      free(task->dp.start_positions);
+      free(task->dp.end_positions);
+      task->dp.start_positions = NULL;
+      task->dp.end_positions = NULL;
+      return; /* Leaves result NULL; the division is compressed normally. */
+   }
+
+   memcpy(task->dp.start_positions, src->start_positions + off,
+          sizeof(uint64_t) * n);
+   memcpy(task->dp.end_positions, src->end_positions + off,
+          sizeof(uint64_t) * n);
+   task->dp.total_spec = (int)n;
+   task->dp.file_end = 0;
+
+   args.input_map = spec->input_map;
+   args.dp = &task->dp;
+   args.df = &spec->df;
+   args.cmp_blk_size = spec->blocksize;
+   args.blocksize = spec->blocksize / 3;
+   args.ret = NULL;
+
+   compress_routine((void*)&args);
+
+   task->result = args.ret;
+}
+
+/**
+ * @brief Starts speculative pre-compression for an mzML about to be scanned.
+ *
+ * Predicts the division layout create_divisions() will produce, allocates the
+ * worker pool that `compress_mzml_spec()` will go on to reuse for its three
+ * ordered passes, and leaves the workers waiting on scan progress.
+ *
+ * @param arguments The parsed runtime arguments (threads, blocksize, lossy).
+ * @param input_map The memory-mapped input mzML file.
+ * @param input_filesize Size of the input file in bytes.
+ * @param df The format detected by `pattern_detect()`.
+ * @return A speculative context, or `NULL` if speculation does not apply (too
+ *         few threads or divisions, no usable spectrum count, or an invalid
+ *         compression configuration). `NULL` is not an error.
+ * @note The caller owns the result and must free it with `dealloc_spec_ctx()`.
+ */
+spec_ctx_t* spec_start(Arguments* arguments, char* input_map,
+                       long input_filesize, data_format_t* df) {
+   spec_ctx_t* spec;
+   long total_spec, n_divisions;
+   int n_workers, n_spec_divisions;
+
+   if (arguments == NULL || df == NULL || input_map == NULL)
+      return NULL;
+
+   total_spec = df->source_total_spec;
+
+   if (arguments->threads < 2 || total_spec < 2 || input_filesize <= 0)
+      return NULL;
+
+   /* Mirror preprocess_mzml's division-count decision. A wrong guess here is
+      caught by spec_take()'s comparison, so this only has to be right often,
+      not always. */
+   n_divisions = determine_n_divisions(input_filesize, arguments->blocksize);
+   if (n_divisions > total_spec)
+      n_divisions = total_spec;
+   if (n_divisions < arguments->threads) {
+      n_divisions = arguments->threads;
+      if (n_divisions > total_spec)
+         n_divisions = total_spec;
+   }
+
+   n_spec_divisions = (int)n_divisions - 1; /* Skip the leftover division. */
+   if (n_spec_divisions < 1)
+      return NULL;
+
+   spec = calloc(1, sizeof(spec_ctx_t));
+   if (spec == NULL) {
+      error("spec_start: calloc() error.\n");
+      return NULL;
+   }
+
+   spec->df = *df; /* Snapshot: scan_mzml may lower source_total_spec. */
+   if (set_compress_runtime_variables(arguments, &spec->df)) {
+      free(spec);
+      return NULL; /* compress_mzml will report the error for real. */
+   }
+
+   n_workers = arguments->threads < (int)n_divisions ? arguments->threads
+                                                     : (int)n_divisions;
+   spec->pool = alloc_cmp_pool(n_workers);
+   if (spec->pool == NULL) {
+      free(spec);
+      return NULL;
+   }
+
+   spec->input_map = input_map;
+   spec->blocksize = arguments->blocksize;
+   spec->n_spec_per_div = total_spec / n_divisions;
+
+   /* Cap the speculative run at the pool's in-flight budget so the compressed
+      bytes held before the first write stay bounded, as in compress_parallel. */
+   spec->n_tasks = n_spec_divisions * SPEC_N_STREAMS;
+   if (spec->n_tasks > spec->pool->max_inflight)
+      spec->n_tasks = spec->pool->max_inflight;
+
+   spec->tasks = calloc(spec->n_tasks, sizeof(spec_task_t));
+   if (spec->tasks == NULL) {
+      error("spec_start: calloc() error.\n");
+      dealloc_cmp_pool(spec->pool);
+      free(spec);
+      return NULL;
+   }
+
+   MS_MUTEX_LOCK(&spec->pool->lock);
+   spec->active = 1;
+   spec->pool->spec = spec;
+   MS_MUTEX_UNLOCK(&spec->pool->lock);
+
+   return spec;
+}
+
+/**
+ * @brief `scan_progress_cb` that publishes scan progress to the workers.
+ *
+ * Only takes the lock on division boundaries: a worker's readiness changes
+ * only when `n_scanned` reaches a multiple of `n_spec_per_div`, so publishing
+ * every spectrum would be pure lock traffic.
+ */
+void spec_scan_publish(void* ctx, data_positions_t* xml_dp,
+                       data_positions_t* mz_dp, data_positions_t* inten_dp,
+                       int n_scanned) {
+   spec_ctx_t* spec = (spec_ctx_t*)ctx;
+
+   if (spec == NULL)
+      return;
+
+   if (n_scanned % spec->n_spec_per_div != 0)
+      return;
+
+   MS_MUTEX_LOCK(&spec->pool->lock);
+   if (spec->xml_dp == NULL) {
+      /* Published once, on the first call. Workers read these without the lock
+         once they have seen a non-NULL xml_dp, so they must never be rewritten. */
+      spec->xml_dp = xml_dp;
+      spec->mz_dp = mz_dp;
+      spec->inten_dp = inten_dp;
+   }
+   spec->scanned = n_scanned;
+   MS_COND_BROADCAST(&spec->pool->work);
+   MS_MUTEX_UNLOCK(&spec->pool->lock);
+}
+
+/**
+ * @brief Ends speculation and waits for any in-flight task to finish.
+ *
+ * Called once the scan is over — successfully or not — so no worker is left
+ * waiting for progress that will never arrive. Idempotent.
+ *
+ * @param spec The speculative context, or `NULL`.
+ */
+void spec_scan_finished(spec_ctx_t* spec) {
+   if (spec == NULL)
+      return;
+
+   MS_MUTEX_LOCK(&spec->pool->lock);
+   spec->active = 0;
+   MS_COND_BROADCAST(&spec->pool->work);
+   while (spec->n_running > 0) MS_COND_WAIT(&spec->pool->done, &spec->pool->lock);
+   spec->pool->spec = NULL;
+   MS_MUTEX_UNLOCK(&spec->pool->lock);
+}
+
+/**
+ * @brief Claims a speculative result for a division, if it is provably usable.
+ *
+ * Compares the positions that were actually compressed against the real ones
+ * produced by `create_divisions()`. Only an exact match is reused, which makes
+ * the output byte-identical to compressing the division here and now.
+ *
+ * @param spec The speculative context, or `NULL`.
+ * @param mode The stream being compressed (`_xml_`, `_mass_`, `_intensity_`).
+ * @param division The division index within the current pass.
+ * @param real_dp The authoritative data positions for that division.
+ * @return The compressed block queue (ownership transferred), or `NULL` if
+ *         nothing was speculated for it or the prediction did not hold.
+ */
+static cmp_blk_queue_t* spec_take(spec_ctx_t* spec, int mode, int division,
+                                  data_positions_t* real_dp) {
+   spec_task_t* task;
+   cmp_blk_queue_t* result;
+   size_t bytes;
+   int stream, idx;
+
+   if (spec == NULL || real_dp == NULL)
+      return NULL;
+
+   if (mode == _xml_)
+      stream = 0;
+   else if (mode == _mass_)
+      stream = 1;
+   else
+      stream = 2;
+
+   idx = division * SPEC_N_STREAMS + stream;
+   if (idx < 0 || idx >= spec->n_tasks)
+      return NULL;
+
+   task = &spec->tasks[idx];
+
+   if (task->result == NULL || task->dp.total_spec != real_dp->total_spec)
+      return NULL;
+
+   bytes = sizeof(uint64_t) * (size_t)real_dp->total_spec;
+
+   if (memcmp(task->dp.start_positions, real_dp->start_positions, bytes) != 0 ||
+       memcmp(task->dp.end_positions, real_dp->end_positions, bytes) != 0)
+      return NULL;
+
+   result = task->result;
+   task->result = NULL;
+
+   return result;
+}
+
+/**
+ * @brief The worker pool owned by a speculative context, for reuse by the
+ *        ordered compression passes.
+ * @param spec The speculative context, or `NULL`.
+ * @return The pool, or `NULL`.
+ */
+static cmp_pool_t* spec_pool(spec_ctx_t* spec) {
+   return spec ? spec->pool : NULL;
+}
+
+/**
+ * @brief Shuts down speculation and frees the context and its worker pool.
+ * @param spec The speculative context, or `NULL`.
+ */
+void dealloc_spec_ctx(spec_ctx_t* spec) {
+   int i;
+
+   if (spec == NULL)
+      return;
+
+   spec_scan_finished(spec); /* No-op if already ended. */
+
+   for (i = 0; i < spec->n_tasks; i++) {
+      if (spec->tasks[i].result) /* Unclaimed: the prediction did not hold. */
+         dealloc_cmp_buff(spec->tasks[i].result);
+      free(spec->tasks[i].dp.start_positions);
+      free(spec->tasks[i].dp.end_positions);
+   }
+
+   dealloc_cmp_pool(spec->pool);
+   free(spec->tasks);
+   free(spec);
+}
+
+/**
+ * @brief Compresses one stream across all divisions, writing blocks in order.
+ *
+ * Hands the divisions to the persistent worker pool and then acts as the
+ * ordered writer on the calling thread: for each division in turn it waits for
+ * that division to finish compressing, appends its blocks to `blk_len_queue`
+ * and writes them via `cmp_dump`, then releases the next slot to the workers.
+ * Writing division `i` therefore overlaps the compression of divisions
+ * `i+1..`, replacing the previous per-wave join-then-dump barrier.
+ *
+ * If `pool` is `NULL` (threads <= 1) each division is compressed inline on the
+ * calling thread immediately before being written.
+ *
+ * @param pool The persistent worker pool, or `NULL` for the serial path.
  * @param input_map The memory-mapped input mzML file.
  * @param ddp An array of `data_positions_t` pointers, one per division.
  * @param df A pointer to the `data_format_t` struct with compression settings.
@@ -732,7 +1395,6 @@ void* compress_routine(void* args)
  * @param blocksize The size of the data block buffer for accumulating data.
  * @param mode The stream type to compress (`_xml_`, `_mass_`, or `_intensity_`).
  * @param divisions The total number of divisions to process.
- * @param threads The maximum number of concurrent threads.
  * @param fd The output file descriptor to write compressed data to.
  * @param bytes_written Optional out-parameter. If non-NULL, receives the total number
  *        of compressed bytes written to the file descriptor.
@@ -741,91 +1403,120 @@ void* compress_routine(void* args)
  *         this via `dealloc_block_len_queue()`.
  * @note Each `compress_args_t` and its compressed output are freed after writing to disk.
  */
-block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
-                                     data_format_t* df,
-                                     compression_fun comp_fun,
-                                     size_t cmp_blk_size, long blocksize,
-                                     int mode, int divisions, int threads,
-                                     int fd, size_t* bytes_written) {
+static block_len_queue_t* compress_parallel(
+    cmp_pool_t* pool, spec_ctx_t* spec, char* input_map,
+    data_positions_t** ddp, data_format_t* df, compression_fun comp_fun,
+    size_t cmp_blk_size, long blocksize, int mode, int divisions, int fd,
+    size_t* bytes_written) {
    block_len_queue_t* blk_len_queue;
-   compress_args_t** args = malloc(sizeof(compress_args_t*) * divisions);
+   compress_args_t** args;
+   char* done_flags = NULL;
    size_t total_written = 0;
+   int failed = 0;
+   int reused = 0;
+   int i;
 
-#ifdef _WIN32
-   HANDLE* ptid = malloc(sizeof(HANDLE) * divisions);
-#else
-   pthread_t* ptid = malloc(sizeof(pthread_t) * divisions);
-#endif
+   args = malloc(sizeof(compress_args_t*) * divisions);
+   if (args == NULL) {
+      error("compress_parallel: malloc() error.\n");
+      return NULL;
+   }
 
-   int i = 0;
+   if (pool) {
+      done_flags = calloc(divisions, sizeof(char));
+      if (done_flags == NULL) {
+         error("compress_parallel: calloc() error.\n");
+         free(args);
+         return NULL;
+      }
+   }
+
+   for (i = 0; i < divisions; i++) {
+      args[i] = alloc_compress_args(input_map, ddp[i], df, comp_fun,
+                                    cmp_blk_size, blocksize, mode);
+      if (args[i] == NULL) {
+         error("compress_parallel: Failed to allocate compress_args_t.\n");
+         while (--i >= 0) dealloc_compress_args(args[i]);
+         free(done_flags);
+         free(args);
+         return NULL;
+      }
+
+      /* Adopt a speculative result if it was built from the very same
+         positions; otherwise this division is compressed as usual. */
+      args[i]->ret = spec_take(spec, mode, i, ddp[i]);
+      if (args[i]->ret) {
+         reused++;
+         if (done_flags)
+            done_flags[i] = 1;
+      }
+   }
+
+   if (reused)
+      print("\t%d/%d divisions taken from speculative pre-compression.\n",
+            reused, divisions);
+
+   if (pool) {
+      /* Publish the pass; workers start claiming divisions immediately. */
+      MS_MUTEX_LOCK(&pool->lock);
+      pool->args = args;
+      pool->done_flags = done_flags;
+      pool->n_divisions = divisions;
+      pool->next_task = 0;
+      pool->next_write = 0;
+      MS_COND_BROADCAST(&pool->work);
+      MS_MUTEX_UNLOCK(&pool->lock);
+   }
 
    blk_len_queue = alloc_block_len_queue();
 
-   int divisions_used = 0;
-   int divisions_left = divisions;
-
-   for (i = divisions_used; i < divisions; i++) {
-      compress_args_t* i_args = alloc_compress_args(
-          input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
-      if (i_args == NULL) {
-         error("compress_parallel: Failed to allocate compress_args_t.\n");
-         return NULL;
-      }
-      args[i] = i_args;
-   }
-
-   while (divisions_left > 0) {
-      if (divisions_left < threads)
-         threads = divisions_left;
-
-      for (i = divisions_used; i < divisions_used + threads; i++) {
-#ifdef _WIN32
-         ptid[i] =
-             CreateThread(NULL, 0, compress_routine_win, args[i], 0, NULL);
-         if (ptid[i] == NULL) {
-            perror("CreateThread");
-            exit(-1);
-         }
-#else
-         int ret =
-             pthread_create(&ptid[i], NULL, compress_routine, (void*)args[i]);
-         if (ret != 0) {
-            perror("pthread_create");
-            exit(-1);
-         }
-#endif
+   for (i = 0; i < divisions; i++) {
+      if (pool == NULL) {
+         if (args[i]->ret == NULL) /* Serial path (threads <= 1). */
+            compress_routine((void*)args[i]);
+      } else {
+         MS_MUTEX_LOCK(&pool->lock);
+         while (!done_flags[i]) MS_COND_WAIT(&pool->done, &pool->lock);
+         MS_MUTEX_UNLOCK(&pool->lock);
       }
 
-#ifdef _WIN32
-      WaitForMultipleObjects(threads, ptid + divisions_used, TRUE, INFINITE);
-#else
-      for (i = divisions_used; i < divisions_used + threads; i++) {
-         int ret = pthread_join(ptid[i], NULL);
-         if (ret != 0) {
-            perror("pthread_join");
-            exit(-1);
-         }
-      }
-#endif
-
-      for (i = divisions_used; i < divisions_used + threads; i++) {
+      /* On failure keep draining so no worker is left holding a division. */
+      if (!failed) {
          size_t written = cmp_dump(args[i]->ret, blk_len_queue, fd);
-         if (written == (size_t)-1) {
-            /* Clean up remaining args on write failure */
-            for (int j = i; j < divisions; j++)
-               dealloc_compress_args(args[j]);
-            free(args);
-            free(ptid);
-            return NULL;
-         }
-         total_written += written;
-         dealloc_compress_args(args[i]);
+         if (written == (size_t)-1)
+            failed = 1;
+         else
+            total_written += written;
       }
-      divisions_used += threads;
-      divisions_left -= threads;
+
+      dealloc_compress_args(args[i]);
+
+      if (pool) {
+         MS_MUTEX_LOCK(&pool->lock);
+         pool->next_write = i + 1;
+         MS_COND_BROADCAST(&pool->work);
+         MS_MUTEX_UNLOCK(&pool->lock);
+      }
    }
+
+   if (pool) {
+      /* Park the workers until the next pass is published. */
+      MS_MUTEX_LOCK(&pool->lock);
+      pool->args = NULL;
+      pool->done_flags = NULL;
+      pool->n_divisions = 0;
+      pool->next_task = 0;
+      pool->next_write = 0;
+      MS_MUTEX_UNLOCK(&pool->lock);
+      free(done_flags);
+   }
+
    free(args);
-   free(ptid);
+
+   if (failed) {
+      dealloc_block_len_queue(blk_len_queue);
+      return NULL;
+   }
 
    if (bytes_written)
       *bytes_written = total_written;
@@ -853,6 +1544,26 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
  */
 int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
                   data_format_t* df, divisions_t* divisions, int output_fd) {
+   return compress_mzml_spec(input_map, input_filesize, arguments, df,
+                             divisions, output_fd, NULL);
+}
+
+/**
+ * @brief `compress_mzml()` that can adopt speculative pre-compression results.
+ *
+ * Identical to `compress_mzml()`, but reuses the worker pool created by
+ * `spec_start()` and, for every division, adopts the speculatively compressed
+ * blocks when the positions they were built from match the real ones exactly.
+ * Divisions without a usable speculative result are compressed normally, so
+ * the output is byte-identical either way.
+ *
+ * @param spec The speculative context from `preprocess_mzml_spec()`, or `NULL`
+ *             for the plain behaviour. Ownership stays with the caller.
+ */
+int compress_mzml_spec(char* input_map, size_t input_filesize,
+                       Arguments* arguments, data_format_t* df,
+                       divisions_t* divisions, int output_fd,
+                       spec_ctx_t* spec) {
    // Initialize footer to all 0's to not write garbage to file.
    footer_t* footer = calloc(1, sizeof(footer_t));
 
@@ -887,6 +1598,20 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    long blocksize = arguments->blocksize;
    int threads = arguments->threads;
 
+   /* One worker pool, reused across the XML, m/z and intensity passes. NULL
+      when a single worker would be used, which selects the serial path. When
+      speculation ran, its pool is reused here rather than started afresh. */
+   int n_workers =
+       threads < divisions->n_divisions ? threads : divisions->n_divisions;
+   int owns_pool = (spec == NULL);
+   cmp_pool_t* pool;
+
+   if (spec) {
+      spec_scan_finished(spec); /* No-op if preprocess already ended it. */
+      pool = spec_pool(spec);
+   } else
+      pool = alloc_cmp_pool(n_workers);
+
    // Write df header to file.
    output_pos += write_header(output_fd, df, blocksize,
                               "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
@@ -896,13 +1621,15 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    print("\t===XML===\n");
    footer->xml_pos = output_pos;
    xml_block_lens = compress_parallel(
-       (char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize,
-       blocksize / 3, _xml_, divisions->n_divisions, threads, output_fd,
+       pool, spec, (char*)input_map, xml_divisions, df, df->xml_compression_fun,
+       blocksize, blocksize / 3, _xml_, divisions->n_divisions, output_fd,
        &stream_bytes); /* Compress XML */
    output_pos += stream_bytes;
    free(xml_divisions);
    if (xml_block_lens == NULL) {
       error("compress_mzml: Failed to compress XML stream.\n");
+      if (owns_pool)
+         dealloc_cmp_pool(pool);
       free(footer);
       free(mz_divisions);
       free(inten_divisions);
@@ -912,13 +1639,15 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    print("\t===m/z binary===\n");
    footer->mz_binary_pos = output_pos;
    mz_binary_block_lens = compress_parallel(
-       (char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize,
-       blocksize / 3, _mass_, divisions->n_divisions, threads, output_fd,
+       pool, spec, (char*)input_map, mz_divisions, df, df->mz_compression_fun,
+       blocksize, blocksize / 3, _mass_, divisions->n_divisions, output_fd,
        &stream_bytes); /* Compress m/z binary */
    output_pos += stream_bytes;
    free(mz_divisions);
    if (mz_binary_block_lens == NULL) {
       error("compress_mzml: Failed to compress m/z binary stream.\n");
+      if (owns_pool)
+         dealloc_cmp_pool(pool);
       dealloc_block_len_queue(xml_block_lens);
       free(footer);
       free(inten_divisions);
@@ -928,18 +1657,24 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    print("\t===int binary===\n");
    footer->inten_binary_pos = output_pos;
    inten_binary_block_lens = compress_parallel(
-       (char*)input_map, inten_divisions, df, df->inten_compression_fun,
-       blocksize, blocksize / 3, _intensity_, divisions->n_divisions, threads,
-       output_fd, &stream_bytes); /* Compress int binary */
+       pool, spec, (char*)input_map, inten_divisions, df,
+       df->inten_compression_fun,
+       blocksize, blocksize / 3, _intensity_, divisions->n_divisions, output_fd,
+       &stream_bytes); /* Compress int binary */
    output_pos += stream_bytes;
    free(inten_divisions);
    if (inten_binary_block_lens == NULL) {
       error("compress_mzml: Failed to compress intensity binary stream.\n");
+      if (owns_pool)
+         dealloc_cmp_pool(pool);
       dealloc_block_len_queue(xml_block_lens);
       dealloc_block_len_queue(mz_binary_block_lens);
       free(footer);
       return -1;
    }
+
+   if (owns_pool) /* All passes done; workers are no longer needed. */
+      dealloc_cmp_pool(pool);
 
    // Dump block_len_queue to msz file.
    footer->xml_blk_pos = output_pos;

@@ -698,6 +698,23 @@ float get_ret_time(char* spectrum_start, size_t search_len) {
  * @note The caller is responsible for freeing the returned struct with `dealloc_division()`.
  */
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
+   return scan_mzml_progress(input_map, df, end, flags, NULL, NULL);
+}
+
+/**
+ * @brief `scan_mzml()` with incremental progress reporting.
+ *
+ * Identical to `scan_mzml()`, but invokes `cb` once up front (so the consumer
+ * can capture the position arrays) and again after each spectrum is fully
+ * recorded. This lets a consumer begin compressing early spectra while the
+ * scan is still finding later ones; see the speculative pre-compression in
+ * compress.c.
+ *
+ * @param cb Progress callback, or `NULL` for no reporting.
+ * @param cb_ctx Opaque context handed back to `cb`.
+ */
+division_t* scan_mzml_progress(char* input_map, data_format_t* df, long end,
+                               int flags, scan_progress_cb cb, void* cb_ctx) {
    if (input_map == NULL || df == NULL) {
       warning("scan_mzml: NULL pointer passed in.\n");
       return NULL;
@@ -737,6 +754,9 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
    // xml base case
    xml_dp->start_positions[xml_curr] = 0;
+
+   if (cb)
+      cb(cb_ctx, xml_dp, mz_dp, inten_dp, 0);
 
    while (ptr) {
       if (mz_curr + inten_curr == bound)
@@ -819,6 +839,9 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
       spectra_dp->end_positions[spec_curr] = ptr - input_map;
       spec_curr++;
+
+      if (cb)
+         cb(cb_ctx, xml_dp, mz_dp, inten_dp, spec_curr);
    }
 
    if (xml_curr != bound || mz_curr != df->source_total_spec ||
@@ -2310,9 +2333,37 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                     Arguments* arguments, data_format_t** df,
                     divisions_t** divisions) {
+   return preprocess_mzml_spec(input_map, input_filesize, blocksize, arguments,
+                               df, divisions, NULL);
+}
+
+/**
+ * @brief `preprocess_mzml()` that also drives speculative pre-compression.
+ *
+ * Identical to `preprocess_mzml()`, except that on the unfiltered path (no
+ * index/scan/ms-level selection) it starts a speculative pre-compression
+ * context as soon as `pattern_detect()` has produced the data format, and
+ * feeds it scan progress. Divisions whose spectra have already been scanned
+ * are compressed by the worker pool while the scan continues.
+ *
+ * The speculative results are only ever *reused* by `compress_mzml_spec()`
+ * after an exact match of the predicted against the real data positions, so a
+ * mispredicted partition costs wasted CPU and nothing else.
+ *
+ * @param spec Output pointer set to the speculative context (may be set to
+ *             `NULL` if speculation does not apply). Pass `NULL` to disable.
+ *             The caller owns the result and must free it with
+ *             `dealloc_spec_ctx()`.
+ */
+int preprocess_mzml_spec(char* input_map, long input_filesize, long* blocksize,
+                         Arguments* arguments, data_format_t** df,
+                         divisions_t** divisions, spec_ctx_t** spec) {
    double start, end;
 
    start = get_time();
+
+   if (spec)
+      *spec = NULL;
 
    print("\nPreprocessing...\n");
 
@@ -2353,9 +2404,20 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
       div =
           extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
    } else if (arguments->indices_length == 0 && arguments->scans_length == 0) {
-      div = scan_mzml(
-          (char*)input_map, *df, input_filesize,
-          MSLEVEL | SCANNUM);  // A division encapsulating the entire file
+      /* Unfiltered path: the division layout is predictable from the format,
+         so early divisions can be compressed while the scan is still running. */
+      spec_ctx_t* s =
+          spec ? spec_start(arguments, (char*)input_map, input_filesize, *df)
+               : NULL;
+      if (spec)
+         *spec = s;
+
+      div = scan_mzml_progress(
+          (char*)input_map, *df, input_filesize, MSLEVEL | SCANNUM,
+          s ? spec_scan_publish : NULL,
+          s);  // A division encapsulating the entire file
+
+      spec_scan_finished(s); /* Release any worker still awaiting progress. */
    } else
       error("Invalid indicies_size: %ld\n", arguments->indices_length);
 

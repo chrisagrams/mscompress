@@ -134,6 +134,9 @@ typedef struct {
    size_t file_end;  // TODO: remove this
 } data_positions_t;
 
+/* Opaque speculative pre-compression context, defined in compress.c. */
+typedef struct spec_ctx spec_ctx_t;
+
 typedef struct {
    data_positions_t* spectra;
    data_positions_t* xml;
@@ -458,9 +461,27 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
                                         divisions_t* divisions,
                                         long* indicies_length);
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
+
+/**
+ * @brief Callback invoked by `scan_mzml_progress()` as the scan advances.
+ *
+ * Called once before the first spectrum (with `n_scanned == 0`) so the consumer
+ * can capture the position arrays, and again every time a spectrum has been
+ * fully recorded. Entries `[0, n_scanned)` of `mz_dp`/`inten_dp` and
+ * `[0, 2 * n_scanned)` of `xml_dp` are complete and stable once reported.
+ */
+typedef void (*scan_progress_cb)(void* ctx, data_positions_t* xml_dp,
+                                 data_positions_t* mz_dp,
+                                 data_positions_t* inten_dp, int n_scanned);
+
+division_t* scan_mzml_progress(char* input_map, data_format_t* df, long end,
+                               int flags, scan_progress_cb cb, void* cb_ctx);
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                     Arguments* arguments, data_format_t** df,
                     divisions_t** divisions);
+int preprocess_mzml_spec(char* input_map, long input_filesize, long* blocksize,
+                         Arguments* arguments, data_format_t** df,
+                         divisions_t** divisions, spec_ctx_t** spec);
 void parse_footer(footer_t** footer, void* input_map, long input_filesize,
                   block_len_queue_t** xml_block_lens,
                   block_len_queue_t** mz_binary_block_lens,
@@ -571,6 +592,21 @@ void* compress_routine(void* args);
 size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
 int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
                   data_format_t* df, divisions_t* divisions, int output_fd);
+int compress_mzml_spec(char* input_map, size_t input_filesize,
+                       Arguments* arguments, data_format_t* df,
+                       divisions_t* divisions, int output_fd,
+                       spec_ctx_t* spec);
+
+/* Speculative pre-compression (overlaps compression with the preprocess scan).
+   `spec_start()` is called by preprocess once the data format is known;
+   `spec_scan_publish()` is the `scan_progress_cb`. See compress.c. */
+spec_ctx_t* spec_start(Arguments* arguments, char* input_map,
+                       long input_filesize, data_format_t* df);
+void spec_scan_publish(void* ctx, data_positions_t* xml_dp,
+                       data_positions_t* mz_dp, data_positions_t* inten_dp,
+                       int n_scanned);
+void spec_scan_finished(spec_ctx_t* spec);
+void dealloc_spec_ctx(spec_ctx_t* spec);
 int get_compress_type(char* arg);
 compression_fun set_compress_fun(int accession);
 

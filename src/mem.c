@@ -113,6 +113,7 @@ cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size)
    r->size = size;
    r->max_size = size;
    r->original_size = original_size;
+   r->next = NULL;
    return r;
 }
 

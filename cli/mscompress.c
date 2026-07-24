@@ -364,20 +364,28 @@ int main(int argc, char* argv[]) {
          print("\tDetected .mzML file, starting compression...\n");
 
          // Scan mzML for position of all binary data. Divide the m/z,
-         // intensity, and XML data over threads.
-         if (preprocess_mzml(input_map, input_filesize,
-                             &(arguments.blocksize), &arguments, &df,
-                             &divisions)) {
+         // intensity, and XML data over threads. Divisions whose spectra have
+         // already been scanned are compressed while the scan continues; the
+         // results are only reused if they match the final layout exactly.
+         spec_ctx_t* spec = NULL;
+
+         if (preprocess_mzml_spec(input_map, input_filesize,
+                                  &(arguments.blocksize), &arguments, &df,
+                                  &divisions, &spec)) {
+            dealloc_spec_ctx(spec);
             error_status = 1;
             break;
          }
 
          // Start compress routine.
-         if (compress_mzml(input_map, input_filesize, &arguments, df,
-                           divisions, local_fds[1])) {
+         if (compress_mzml_spec(input_map, input_filesize, &arguments, df,
+                                divisions, local_fds[1], spec)) {
+            dealloc_spec_ctx(spec);
             error_status = 1;
             break;
          }
+
+         dealloc_spec_ctx(spec);
 
          break;
       }

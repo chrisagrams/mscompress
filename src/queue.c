@@ -49,22 +49,20 @@ cmp_blk_queue_t* alloc_cmp_buff()
 /**
  * @brief Deallocates a compressed block queue and all of its child nodes.
  *
- * Traverses the linked list from head to tail, freeing each `cmp_block_t` node,
- * then frees the queue struct itself. Safe to call with a NULL queue.
+ * Traverses the linked list from head to tail, freeing each `cmp_block_t` node
+ * and its compressed buffer, then frees the queue struct itself. Safe to call
+ * with a NULL queue.
  *
  * @param queue A pointer to the `cmp_blk_queue_t` to deallocate.
  */
 void dealloc_cmp_buff(cmp_blk_queue_t* queue)
 {
    if (queue) {
-      if (queue->head) {
-         cmp_block_t* curr_head = queue->head;
-         cmp_block_t* new_head = curr_head->next;
-         while (new_head) {
-            free(curr_head);
-            curr_head = new_head;
-            new_head = curr_head->next;
-         }
+      cmp_block_t* curr = queue->head;
+      while (curr) {
+         cmp_block_t* next = curr->next;
+         dealloc_cmp_block(curr);
+         curr = next;
       }
       free(queue);
    }
