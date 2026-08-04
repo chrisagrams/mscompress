@@ -379,6 +379,7 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
 
    char* df_buff = serialize_df(df);
    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df_buff, DATA_FORMAT_T_SIZE);
+   free(df_buff); /* serialize_df returns a malloc'd buffer owned by the caller */
 
    memcpy(header_buff + BLOCKSIZE_OFFSET, &blocksize, sizeof(blocksize));
 

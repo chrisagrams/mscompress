@@ -371,6 +371,15 @@ void* decompress_routine(void* args) {
       return NULL;
    }
 
+   a_args->z_inflate = alloc_z_stream_inflate();
+
+   if (a_args->z_inflate == NULL) {
+      error("decompress_routine: Failed to allocate inflate z_stream.\n");
+      dealloc_z_stream(a_args->z);
+      free(a_args);
+      return NULL;
+   }
+
    a_args->ret_code = 0; // Initialize return code to 0 (success).
 
 
@@ -424,6 +433,8 @@ void* decompress_routine(void* args) {
 
             if (db_args->df->target_mz_fun == NULL) {
                error("decompress_routine: target_mz_fun is NULL, cannot decode mz block.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
                return NULL;
             }
@@ -433,6 +444,8 @@ void* decompress_routine(void* args) {
 
             if (a_args->ret_code != 0) {
                error("decompress_routine: Failed to encode mz block.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
                return NULL;
             }
@@ -484,6 +497,8 @@ void* decompress_routine(void* args) {
 
             if (db_args->df->target_inten_fun == NULL) {
                error("decompress_routine: target_inten_fun is NULL, cannot decode intensity block.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
                return NULL;
             }
@@ -493,6 +508,8 @@ void* decompress_routine(void* args) {
 
             if (a_args->ret_code != 0) {
                error("decompress_routine: Failed to encode intensity block.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
                return NULL;
             }
@@ -514,6 +531,7 @@ void* decompress_routine(void* args) {
    free(orig_decmp_mz_binary);
    free(orig_decmp_inten_binary);
    dealloc_z_stream(a_args->z);
+   dealloc_z_stream_inflate(a_args->z_inflate);
    free(a_args);
 
    return NULL;

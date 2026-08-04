@@ -46,7 +46,7 @@ void algo_decode_log_2_transform_32f(void* args)
    size_t decoded_len = 0;
 
    // Decode using specified encoding format
-   a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded,
+   a_args->dec_fun(a_args->z_inflate, *a_args->src, a_args->src_len, &decoded,
                    &decoded_len, a_args->tmp);
 
    // Deternmine length of data based on data format
@@ -124,7 +124,7 @@ void algo_decode_log_2_transform_64d(void* args) {
    size_t decoded_len = 0;
 
    // Decode using specified encoding format
-   a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded,
+   a_args->dec_fun(a_args->z_inflate, *a_args->src, a_args->src_len, &decoded,
                    &decoded_len, a_args->tmp);
 
    // Deternmine length of data based on data format
@@ -227,8 +227,10 @@ void algo_encode_log_2_transform_32f(void* args) {
       res[i] = (float)exp2((double)arr[i] / a_args->scale_factor) - 1;
 
    // Encode using specified encoding format
+   char* res_start = (char*)res;  /* enc_fun advances res */
    a_args->enc_fun(a_args->z, (char **)(&res), res_len,
                    (char *)a_args->dest, a_args->dest_len);
+   free(res_start);
 
    // Move to next array
    *a_args->src += ((len + 1) * sizeof(uint16_t));
@@ -286,8 +288,10 @@ void algo_encode_log_2_transform_64d(void* args) {
       res[i] = (double)exp2((double)arr[i] / a_args->scale_factor) - 1;
 
    // Encode using specified encoding format
+   char* res_start = (char*)res;  /* enc_fun advances res */
    a_args->enc_fun(a_args->z, (char **)(&res), res_len,
                    (char *)a_args->dest, a_args->dest_len);
+   free(res_start);
 
    // Move to next array
    *a_args->src += ((len + 1) * sizeof(uint16_t));
