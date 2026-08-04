@@ -162,6 +162,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Memory-leak gate: builds the CLI with AddressSanitizer + LeakSanitizer and runs
+  # the full ctest suite under it. Catches leak classes like the unbalanced zlib
+  # inflateInit/inflateEnd leak (test/data/sciex_ttof6600_100.mzML has 201 zlib
+  # blocks; the CompressSciexNoScanAttr test exercises that decode path).
+  # Linux-only: ASan/LSan is a gcc/clang feature. Kept separate from the build-cli
+  # matrix so a sanitizer failure is clearly attributable and doesn't disturb
+  # artifact uploads.
+  asan-leak-cli:
+    name: ASan/LSan CLI (linux x86_64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+          submodules: recursive
+
+      - name: Configure CMake (ASan/LSan)
+        working-directory: ./cli
+        run: >
+          cmake -S . -B build-asan
+          -DENABLE_DEBUG_SYMBOLS=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="-fsanitize=address,leak -fno-omit-frame-pointer -g -O1"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,leak"
+
+      - name: Build CLI (ASan/LSan)
+        working-directory: ./cli
+        run: cmake --build build-asan -j
+
+      - name: Verify sanitizer instrumentation
+        working-directory: ./cli
+        run: |
+          nm build-asan/mscompress | grep -q __asan
+          ldd build-asan/mscompress | grep -qi libasan
+
+      - name: Run CTest under LeakSanitizer
+        working-directory: ./cli/build-asan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:symbolize=1
+        run: ctest --output-on-failure
+
   build-python:
     name: Build Python - ${{ matrix.runner }} ${{ matrix.cibw_arch }}
     runs-on: ${{ matrix.runner }}
