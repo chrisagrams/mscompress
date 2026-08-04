@@ -837,7 +837,7 @@ cdef class MZMLFile(BaseFile):
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
-        self._df.decode_source_compression_mz_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        self._df.decode_source_compression_mz_fun(self._z_inflate, mapping_ptr, end - start, &dest, &out_len, tmp)
         decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
@@ -889,7 +889,7 @@ cdef class MZMLFile(BaseFile):
         mapping_ptr = <char*>self._mapping
         mapping_ptr += start
 
-        self._df.decode_source_compression_inten_fun(self._z, mapping_ptr, end - start, &dest, &out_len, tmp)
+        self._df.decode_source_compression_inten_fun(self._z_inflate, mapping_ptr, end - start, &dest, &out_len, tmp)
         decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
@@ -1115,6 +1115,7 @@ cdef class MSZFile(BaseFile):
         self._block_cache = _coerce_cache(None)   # read() may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
+        self._z_inflate = _alloc_z_stream_inflate()
         self.output_fd = -1
         self._df = NULL
         self._divisions = NULL
@@ -1911,6 +1912,10 @@ cdef class BaseFile:
                                     # pure-Python read() factory can assign it.
     cdef RuntimeArguments _arguments
     cdef z_stream* _z
+    cdef z_stream* _z_inflate  # Dedicated inflate stream: _z is deflate-
+                               # initialized and must never be fed to
+                               # zlib_decompress (init once, inflateReset
+                               # per block inside zlib_decompress).
     cdef int output_fd
 
 
@@ -1928,6 +1933,7 @@ cdef class BaseFile:
         self._cache_spectra = CACHE_SPECTRA_AUTO  # read() may override
         self._arguments = RuntimeArguments()
         self._z = _alloc_z_stream()
+        self._z_inflate = _alloc_z_stream_inflate()
         self.output_fd = -1
         # Initialize pointers to NULL to prevent undefined behavior
         self._df = NULL
@@ -2013,6 +2019,11 @@ cdef class BaseFile:
         if self._z != NULL:
             _dealloc_z_stream(self._z)
             self._z = NULL
+
+        # Free zlib inflate z_stream
+        if self._z_inflate != NULL:
+            _dealloc_z_stream_inflate(self._z_inflate)
+            self._z_inflate = NULL
 
         # Free data_format_t
         if self._df != NULL:

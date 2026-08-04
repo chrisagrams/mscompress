@@ -791,6 +791,18 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       free(res_lens);
       return 1;
    }
+
+   // Dedicated inflate stream for any zlib decode paths (init once, reset per
+   // block).
+   a_args->z_inflate = alloc_z_stream_inflate();
+   if (!a_args->z_inflate) {
+      error("encode_binary_block: Failed to allocate inflate z_stream.\n");
+      dealloc_z_stream(a_args->z);
+      free(a_args);
+      free(buff);
+      free(res_lens);
+      return 1;
+   }
    a_args->dest_len = &algo_output_len;
 
    for (int i = 0; i < total_spec; i++) {
@@ -820,6 +832,8 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
              "encode_binary_block: Failed to encode binary block for spectrum "
              "%d.\n",
              i);
+         dealloc_z_stream(a_args->z);
+         dealloc_z_stream_inflate(a_args->z_inflate);
          free(a_args);
          free(buff);
          free(res_lens);
@@ -831,6 +845,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    }
 
    dealloc_z_stream(a_args->z);
+   dealloc_z_stream_inflate(a_args->z_inflate);
    free(a_args);
 
    // Free previous encoded cache if present (avoid leak on re-encode)

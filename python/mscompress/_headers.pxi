@@ -162,6 +162,8 @@ cdef extern from "../src/mscompress.h":
     void _dealloc_data_block "dealloc_data_block"(data_block_t* db)
     z_stream* _alloc_z_stream "alloc_z_stream"()
     void _dealloc_z_stream "dealloc_z_stream"(z_stream* z)
+    z_stream* _alloc_z_stream_inflate "alloc_z_stream_inflate"()
+    void _dealloc_z_stream_inflate "dealloc_z_stream_inflate"(z_stream* z)
     ZSTD_CCtx* _alloc_cctx "alloc_cctx"()
     ZSTD_DCtx* _alloc_dctx "alloc_dctx"()
     void _dealloc_block_len_queue "dealloc_block_len_queue"(block_len_queue_t* queue)

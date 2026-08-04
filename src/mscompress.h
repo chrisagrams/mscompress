@@ -675,8 +675,12 @@ decompression_fun set_decompress_fun(int accession);
  * @param dec_fun A function pointer to the decoding function to be used.
  * @param tmp A pointer to a `data_block_t` struct used for temporary storage
  * during encoding/decoding.
- * @param z A pointer to a `z_stream` struct used for zlib
- * compression/decompression.
+ * @param z A pointer to a deflate-initialized `z_stream` struct used for zlib
+ * compression (`enc_fun` paths).
+ * @param z_inflate A pointer to an inflate-initialized `z_stream` struct used
+ * for zlib decompression (`dec_fun` paths). Kept separate from `z` so the
+ * compress pipeline can hold both live at once and each stream keeps a
+ * balanced init-once/reset-per-block/end-once lifecycle.
  * @param scale_factor A float representing the scale factor to be applied to
  * the data during encoding/decoding.
  * @param ret_code An integer representing the return code of the algorithm.
@@ -691,6 +695,7 @@ typedef struct {
    decode_fun dec_fun;
    data_block_t* tmp;
    z_stream* z;
+   z_stream* z_inflate;
    float scale_factor;
    int ret_code;
    Algo algo_fun;
@@ -735,6 +740,8 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 zlib_block_t* zlib_alloc(int offset);
 z_stream* alloc_z_stream();
 void dealloc_z_stream(z_stream* z);
+z_stream* alloc_z_stream_inflate();
+void dealloc_z_stream_inflate(z_stream* z);
 int zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);
