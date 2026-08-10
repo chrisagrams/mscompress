@@ -64,12 +64,12 @@ jobs:
       - name: Configure CMake (Unix)
         if: matrix.platform != 'windows'
         working-directory: ./cli
-        run: cmake -DENABLE_DEBUG_SYMBOLS=ON .
+        run: cmake -DCMAKE_BUILD_TYPE=Release .
       
       - name: Configure CMake (Windows)
         if: matrix.platform == 'windows'
         working-directory: ./cli
-        run: cmake -A x64 -DENABLE_DEBUG_SYMBOLS=ON -S . -B build
+        run: cmake -A x64 -S . -B build
       
       - name: Build CLI (Unix)
         if: matrix.platform != 'windows'
