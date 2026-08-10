@@ -416,8 +416,8 @@ long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
-void print_footer_csv(footer_t* footer);
-void print_footer_json(footer_t* footer);
+void print_footer_csv(footer_t* footer, int msz_major, int msz_minor);
+void print_footer_json(footer_t* footer, int msz_major, int msz_minor);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
                 char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
@@ -428,6 +428,7 @@ int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
 const char* msz_version_string(int major, int minor);
 int msz_read_version(void* input_map, long filesize, int* major, int* minor);
+int msz_require_version(void* input_map, long filesize);
 int close_file(int fd);
 
 /* mszx.c */

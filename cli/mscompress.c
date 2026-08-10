@@ -434,10 +434,14 @@ int main(int argc, char* argv[]) {
          footer_t* footer = read_footer(input_map, input_filesize);
          if (!footer)
             exit(1);
+         /* Report the version even when this build cannot decode the file;
+            that is the answer --describe exists to give. */
+         int major = 0, minor = 0;
+         msz_read_version(input_map, input_filesize, &major, &minor);
          if (arguments.json_output)
-            print_footer_json(footer);
+            print_footer_json(footer, major, minor);
          else
-            print_footer_csv(footer);
+            print_footer_csv(footer, major, minor);
          break;
       };
       case DECOMPRESS_MSZX: {

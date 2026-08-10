@@ -2551,7 +2551,7 @@ int parse_footer(footer_t** footer, void* input_map, long input_filesize,
                  divisions_t** divisions, int* n_divisions) {
    *footer = read_footer(input_map, input_filesize);
 
-   /* read_footer() reports the reason (bad magic tag, unsupported version). */
+   /* read_footer() reports the reason (currently a bad magic tag). */
    if (*footer == NULL) {
       *xml_block_lens = NULL;
       *mz_binary_block_lens = NULL;

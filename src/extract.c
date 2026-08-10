@@ -1287,6 +1287,11 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    divisions_t* divisions;
    data_format_t* df;
 
+   /* Gate decoding, not identification: --describe still reports the version
+    * of a file this build cannot decode. */
+   if (msz_require_version(input_map, (long)input_filesize) != 0)
+      return;
+
    ZSTD_DCtx* dctx = alloc_dctx();
 
    if (dctx == NULL)
