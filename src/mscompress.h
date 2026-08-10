@@ -7,7 +7,12 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define STATUS "Dev"
+/* Build status reported by the CLI (`--version`). The CLI's CMakeLists.txt
+   defines this from the build configuration; the fallback covers consumers
+   that compile these sources without it (Python setup.py, Node addon). */
+#ifndef STATUS
+#define STATUS "Release"
+#endif
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
 #define ADDRESS "chrisagrams@gmail.com"
