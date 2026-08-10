@@ -8,7 +8,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { read, MZMLFile, MSZFile } from "../src/index.js";
-import { MZML_PATH, SHUFFLED_MSZ_PATH } from "./fixtures.js";
+import { MZML_PATH, MSZ_PATH, SHUFFLED_MSZ_PATH } from "./fixtures.js";
 
 const tmpDirs = new Set<string>();
 
@@ -95,6 +95,25 @@ describe("byte shuffle", () => {
     const restored = path.join(dir, "restored.mzML");
 
     const msz = read(SHUFFLED_MSZ_PATH) as MSZFile;
+    let out: MZMLFile | undefined;
+    try {
+      out = msz.decompress(restored) as MZMLFile;
+    } finally {
+      out?.close();
+      msz.close();
+    }
+
+    expect(fs.readFileSync(restored).equals(fs.readFileSync(MZML_PATH))).toBe(true);
+  });
+
+  // Paired with the shuffled-fixture test above. Both decode a committed .msz
+  // and compare against test.mzML; if only the shuffled one fails, the shuffle
+  // is implicated, and if both fail the decode path is, independent of it.
+  it("decompresses the checked-in unshuffled fixture", () => {
+    const dir = makeTmpDir("mscompress-plain-fixture-");
+    const restored = path.join(dir, "restored.mzML");
+
+    const msz = read(MSZ_PATH) as MSZFile;
     let out: MZMLFile | undefined;
     try {
       out = msz.decompress(restored) as MZMLFile;
