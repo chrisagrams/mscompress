@@ -182,6 +182,23 @@ def get_cache_usage():
     return _default_block_cache.usage
 
 
+cdef _require_msz_version(void* mapping, long filesize):
+    """Refuse an .msz this build cannot decode.
+
+    Raised at open rather than at decompress() so the caller fails on the file
+    it named, instead of reading nonsense out of a footer it cannot interpret.
+    """
+    cdef int major = 0
+    cdef int minor = 0
+
+    if _msz_read_version(mapping, filesize, &major, &minor) != 0:
+        raise ValueError(
+            "unsupported msz format version %d.%d; this build supports %s-%s"
+            % (major, minor,
+               MIN_SUPPORT.decode('utf-8'), MAX_SUPPORT.decode('utf-8'))
+        )
+
+
 cdef BlockCache _coerce_cache(object cache):
     """Resolve a user-supplied ``cache=`` argument to a BlockCache instance.
 
@@ -984,6 +1001,7 @@ cdef class MSZFile(BaseFile):
         super(MSZFile, self).__init__(path)
         self._block_cache = _coerce_cache(None)  # read() may override
         self._div_spec_offsets = NULL
+        _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -1137,6 +1155,7 @@ cdef class MSZFile(BaseFile):
         self._div_spec_offsets = NULL
 
         # Run the MSZFile-specific init body.
+        _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)

@@ -188,6 +188,23 @@ Napi::Object CreateFooterObject(const Napi::Env& env, footer_t* footer) {
     return obj;
 }
 
+// Refuse an .msz this build cannot decode, at open rather than at decompress,
+// so the caller fails on the file it named instead of reading nonsense out of a
+// footer it cannot interpret. Returns false with a JS exception pending.
+static bool CheckMszVersion(const Napi::Env& env, void* mapping, size_t filesize) {
+    int major = 0;
+    int minor = 0;
+
+    if (msz_read_version(mapping, static_cast<long>(filesize), &major, &minor) == 0)
+        return true;
+
+    Napi::Error::New(env, "unsupported msz format version " + std::to_string(major) +
+                              "." + std::to_string(minor) +
+                              "; this build supports " MIN_SUPPORT "-" MAX_SUPPORT)
+        .ThrowAsJavaScriptException();
+    return false;
+}
+
 // Napi -> C conversions
 Arguments* NapiObjectToArguments(const Napi::Env& env, const Napi::Object& obj) {
     Arguments* args = new Arguments();
@@ -272,6 +289,8 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
         filesize_ = static_cast<size_t>(obj.Get("filesize").As<Napi::Number>().Int64Value());
 
         filetype_ = determine_filetype(mapping_, filesize_);
+        if (filetype_ == DECOMPRESS && !CheckMszVersion(env, mapping_, filesize_))
+            return;
         z_ = alloc_z_stream();
         return;
     }
@@ -309,6 +328,8 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
     map_length_ = filesize_;
 
     filetype_ = determine_filetype(mapping_, filesize_);
+    if (filetype_ == DECOMPRESS && !CheckMszVersion(env, mapping_, filesize_))
+        return;
     z_ = alloc_z_stream();
 }
 

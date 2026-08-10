@@ -1,6 +1,9 @@
 """Tests for the byte-shuffle transform exposed via RuntimeArguments.shuffle."""
 
 import filecmp
+import shutil
+
+import pytest
 
 from mscompress import MSZFile, read
 
@@ -89,3 +92,18 @@ def test_shuffle_skipped_for_lossy_stream(mzml_file_path, tmp_path):
         msz.decompress(restored_path)
 
     assert restored_path.stat().st_size > 0
+
+
+def test_unsupported_version_rejected_at_open(shuffled_msz_file_path, tmp_path):
+    """An .msz claiming a version this build does not support must be refused
+    when it is opened, not after its footer has already been misread."""
+    forged = tmp_path / "future.msz"
+    shutil.copy(shuffled_msz_file_path, forged)
+
+    # Header bytes 4-11 are the (major, minor) stamp; 0.9 is not a real version.
+    data = bytearray(forged.read_bytes())
+    data[4:12] = (0).to_bytes(4, "little") + (9).to_bytes(4, "little")
+    forged.write_bytes(bytes(data))
+
+    with pytest.raises(ValueError, match=r"0\.9"):
+        read(forged)

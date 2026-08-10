@@ -106,6 +106,20 @@ describe("byte shuffle", () => {
     expect(fs.readFileSync(restored).equals(fs.readFileSync(MZML_PATH))).toBe(true);
   });
 
+  it("refuses an .msz claiming an unsupported version", () => {
+    // Rejected at open, not after the footer has already been misread.
+    const dir = makeTmpDir("mscompress-shuffle-version-");
+    const forged = path.join(dir, "future.msz");
+    const bytes = fs.readFileSync(SHUFFLED_MSZ_PATH);
+
+    // Header bytes 4-11 are the (major, minor) stamp; 0.9 is not a real version.
+    bytes.writeInt32LE(0, 4);
+    bytes.writeInt32LE(9, 8);
+    fs.writeFileSync(forged, bytes);
+
+    expect(() => read(forged)).toThrow(/0\.9/);
+  });
+
   it("is accepted as a per-call compressStream override", async () => {
     const file = read(MZML_PATH) as MZMLFile;
     try {
