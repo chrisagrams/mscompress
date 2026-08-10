@@ -50,6 +50,13 @@ file(GLOB SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c mscompress.c)
 add_executable(mscompress ${SOURCES})
 target_compile_definitions(mscompress PRIVATE VERSION="${PROJECT_VERSION}")
 
+# Build status reported by `--version`. $<CONFIG> resolves to CMAKE_BUILD_TYPE
+# for single-config generators and to the --config chosen at build time for
+# multi-config ones (Visual Studio, Ninja Multi-Config). Only Debug is called
+# out; RelWithDebInfo/MinSizeRel/unset all report as Release.
+target_compile_definitions(mscompress PRIVATE
+    STATUS="$<IF:$<CONFIG:Debug>,Debug,Release>")
+
 # Ensure winnt.h sees a target arch and keep headers tidy on MSVC
 if(WIN32)
   target_compile_definitions(mscompress PRIVATE
