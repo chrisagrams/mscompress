@@ -7,7 +7,7 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define STATUS "Dev"
+#define STATUS "Release"
 #define MIN_SUPPORT "0.1"
 #define MAX_SUPPORT "0.1"
 #define ADDRESS "chrisagrams@gmail.com"
