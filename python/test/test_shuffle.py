@@ -75,6 +75,20 @@ def test_checked_in_shuffled_fixture_decompresses(
     assert filecmp.cmp(mzml_file_path, restored_path, shallow=False)
 
 
+def test_checked_in_unshuffled_fixture_decompresses(
+    msz_file_path, mzml_file_path, tmp_path
+):
+    """Paired with the shuffled-fixture test: decodes a committed .msz written
+    before the shuffle existed. If both fail, the decode path is implicated
+    rather than the shuffle."""
+    restored_path = tmp_path / "from_plain_fixture.mzML"
+
+    with read(msz_file_path) as msz:
+        msz.decompress(restored_path)
+
+    assert filecmp.cmp(mzml_file_path, restored_path, shallow=False)
+
+
 def test_shuffle_skipped_for_lossy_stream(mzml_file_path, tmp_path):
     """A lossy stream has no fixed post-transform element width, so the shuffle
     must be skipped for it rather than corrupting the stream."""
