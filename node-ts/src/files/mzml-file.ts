@@ -158,12 +158,17 @@ export class MZMLFile extends BaseFile {
     // Effective native args: this file's current settings with any provided
     // CompressArgs overrides applied on top (same result compress() produces,
     // but per-call and without mutating this._arguments). Only defined
-    // overrides win; the typed key loop keeps this fully type-safe.
+    // overrides win, so an explicit `undefined` does not clobber a default.
+    //
+    // Object.assign rather than `args[key] = value`: CompressArgs mixes number
+    // and boolean fields, so indexing with a union of keys collapses the
+    // assignment target to `never`. Assigning a one-key object keeps each
+    // key/value pair correlated without casting through `any`.
     const args = this._arguments.toNative();
     for (const key of Object.keys(overrides) as (keyof CompressArgs)[]) {
       const value = overrides[key];
       if (value !== undefined) {
-        args[key] = value;
+        Object.assign(args, { [key]: value });
       }
     }
 

@@ -21,6 +21,7 @@ class RuntimeArguments:
     target_mz_format: int
     target_inten_format: int
     zstd_compression_level: int
+    shuffle: bool
 
     def __init__(self) -> None: ...
 

@@ -16,10 +16,17 @@ export class RuntimeArguments {
   targetMzFormat: number;
   targetIntenFormat: number;
   zstdCompressionLevel: number;
+  /**
+   * Byte-shuffle binary arrays before compressing. Lossless and recorded in the
+   * file, so shuffled archives read back without the reader opting in. Applies
+   * only to losslessly stored streams. See {@link CompressArgs.shuffle}.
+   */
+  shuffle: boolean;
 
   /**
    * Create RuntimeArguments with default values.
-   * Defaults: system thread count, 100MB blocks, ZSTD compression level 3.
+   * Defaults: system thread count, 100MB blocks, ZSTD compression level 3,
+   * byte shuffle off.
    */
   constructor() {
     this.threads = native.getNumThreads();
@@ -30,6 +37,7 @@ export class RuntimeArguments {
     this.targetMzFormat = ZSTD_COMPRESSION;
     this.targetIntenFormat = ZSTD_COMPRESSION;
     this.zstdCompressionLevel = 3;
+    this.shuffle = false;
   }
 
   /**
@@ -47,6 +55,7 @@ export class RuntimeArguments {
       targetMzFormat: this.targetMzFormat,
       targetIntenFormat: this.targetIntenFormat,
       zstdCompressionLevel: this.zstdCompressionLevel,
+      shuffle: this.shuffle,
     };
   }
 }

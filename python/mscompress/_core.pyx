@@ -272,6 +272,7 @@ cdef class RuntimeArguments:
         self._arguments.target_mz_format = _ZSTD_compression_
         self._arguments.target_inten_format = _ZSTD_compression_
         self._arguments.zstd_compression_level = 3
+        self._arguments.shuffle = 0
 
     cdef Arguments* get_ptr(self):
         return &self._arguments
@@ -293,6 +294,24 @@ cdef class RuntimeArguments:
             return self._arguments.blocksize
         def __set__(self, value):
             self._arguments.blocksize = value
+
+    property shuffle:
+        """Byte-shuffle binary arrays before compressing them.
+
+        Transposes m/z and intensity samples plane-major so the entropy coder
+        sees long runs of near-constant exponent bytes instead of a noisy
+        element-width period. Lossless and exactly reversible; the flag is
+        recorded in the file, so a shuffled .msz decompresses without the
+        reader needing to know.
+
+        Only applies to streams stored losslessly. A lossy algorithm rewrites
+        samples into its own encoding whose element width is not the source
+        width, so the shuffle is skipped for that stream (with a warning).
+        """
+        def __get__(self):
+            return self._arguments.shuffle != 0
+        def __set__(self, value):
+            self._arguments.shuffle = 1 if value else 0
 
     property mz_scale_factor:
         def __get__(self):

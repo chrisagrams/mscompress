@@ -69,6 +69,13 @@ int64_t getInt64OrDefault(const Napi::Object& obj, const std::string& key, int64
     return defaultValue;
 }
 
+bool getBoolOrDefault(const Napi::Object& obj, const std::string& key, bool defaultValue) {
+    if (obj.Has(key) && obj.Get(key).IsBoolean()) {
+        return obj.Get(key).As<Napi::Boolean>().Value();
+    }
+    return defaultValue;
+}
+
 float getFloatOrDefault(const Napi::Object& obj, const std::string& key, float defaultValue) {
     if (obj.Has(key) && obj.Get(key).IsNumber()) {
         return obj.Get(key).As<Napi::Number>().FloatValue();
@@ -194,6 +201,7 @@ Arguments* NapiObjectToArguments(const Napi::Env& env, const Napi::Object& obj) 
     args->target_mz_format = static_cast<int>(getUint32OrDefault(obj, "targetMzFormat", _ZSTD_compression_));
     args->target_inten_format = static_cast<int>(getUint32OrDefault(obj, "targetIntenFormat", _ZSTD_compression_));
     args->zstd_compression_level = static_cast<int>(getUint32OrDefault(obj, "zstdCompressionLevel", 3));
+    args->shuffle = getBoolOrDefault(obj, "shuffle", false) ? 1 : 0;
     args->ms_level = static_cast<long>(getInt64OrDefault(obj, "msLevel", 0));
 
     // Parse indices array

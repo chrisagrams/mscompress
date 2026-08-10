@@ -3,8 +3,9 @@
 # We want blosc2_shuffle()/blosc2_unshuffle() and their runtime SIMD dispatch;
 # we do not want blosc2's compressors, frames or schunks, and in particular we
 # do not want it building its own copies of zstd/lz4/zlib alongside the ones
-# this project already vendors. These seven translation units are self-contained
-# and pull in nothing from blosc2 beyond its public headers.
+# this project already vendors. These seven translation units pull in nothing
+# from blosc2 beyond its public headers, plus one symbol those headers reference
+# that blosc2.c would otherwise supply - see blosc2-shim.c.
 
 set(BLOSC2_DIR ${VENDOR_DIR}/c-blosc2)
 
@@ -12,6 +13,7 @@ set(BLOSC2_SHUFFLE_SOURCES
     ${BLOSC2_DIR}/blosc/shuffle.c
     ${BLOSC2_DIR}/blosc/shuffle-generic.c
     ${BLOSC2_DIR}/blosc/bitshuffle-generic.c
+    ${VENDOR_DIR}/blosc2-shim.c
 )
 
 # Per-ISA kernels. Each is compiled with its own instruction set enabled, while

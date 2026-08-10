@@ -372,6 +372,46 @@ os.makedirs(os.path.dirname(config_h_path), exist_ok=True)
 with open(config_h_path, 'w') as f:
     f.write(config_h_content)
 
+# c-blosc2 shuffle filters, mirroring vendor/Blosc2Include.cmake. Only the
+# shuffle translation units are built - not the library - so blosc2 does not
+# bring its own zstd/lz4/zlib alongside the ones vendored above. Keep this list
+# and the CMake one in step; a stream written by one build has to be readable
+# by the other. blosc2-shim.c supplies blosc2_error_string(), which blosc2.h
+# references from a static helper and blosc2.c would otherwise define (that
+# file is not built here).
+c_sources += [
+    _abs("../vendor/c-blosc2/blosc/shuffle.c"),
+    _abs("../vendor/c-blosc2/blosc/shuffle-generic.c"),
+    _abs("../vendor/c-blosc2/blosc/bitshuffle-generic.c"),
+    _abs("../vendor/blosc2-shim.c"),
+]
+
+include_dirs += [
+    _abs("../vendor/c-blosc2/include"),
+    _abs("../vendor/c-blosc2/blosc"),
+]
+
+# Per-ISA kernels. shuffle.c dispatches between them at runtime via cpuid, so
+# the wheel still imports on a CPU without AVX2. SSE2 is baseline on x86-64 and
+# NEON is baseline on aarch64, so only AVX2 needs a per-file flag - which
+# build_ext_with_stubs already applies by matching "avx2" in the filename.
+if target_arch == 'x86_64':
+    c_sources += [
+        _abs("../vendor/c-blosc2/blosc/shuffle-sse2.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-sse2.c"),
+        _abs("../vendor/c-blosc2/blosc/shuffle-avx2.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-avx2.c"),
+    ]
+    define_macros += [('SHUFFLE_SSE2_ENABLED', '1'), ('SHUFFLE_AVX2_ENABLED', '1')]
+elif target_arch == 'arm64':
+    c_sources += [
+        _abs("../vendor/c-blosc2/blosc/shuffle-neon.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-neon.c"),
+    ]
+    define_macros += [('SHUFFLE_NEON_ENABLED', '1')]
+# Any other architecture falls back to the generic C paths above: still
+# correct, just not vectorised.
+
 # On Windows, ensure Windows SDK target-architecture macro is defined early
 # so that <Windows.h>/winnt.h doesn't error with "No Target Architecture".
 if sys.platform == 'win32':

@@ -51,6 +51,7 @@ cdef extern from "../src/mscompress.h":
         int target_mz_format
         int target_inten_format
         int zstd_compression_level
+        int shuffle
     
     ctypedef struct data_block_t:
         char* mem
