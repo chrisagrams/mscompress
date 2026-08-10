@@ -162,8 +162,8 @@ add_test(NAME VerboseOutputTest
 )
 # --- byte shuffle -----------------------------------------------------------
 
-# End-to-end: a --shuffle file must decompress byte-identically, must differ
-# from the unshuffled output, and must be smaller.
+# A --shuffle file must decompress byte-identically, differ from the
+# unshuffled output, and be smaller.
 add_test(NAME ShuffleRoundTripTest
     COMMAND ${CMAKE_COMMAND}
     -DEXECUTABLE=$<TARGET_FILE:mscompress>
@@ -172,9 +172,8 @@ add_test(NAME ShuffleRoundTripTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_shuffle.cmake
 )
 
-# Backward compatibility: test.msz was written before the shuffle existed, so it
-# has the marker bit clear and must still decompress to exactly test.mzML.
-# Guards the footer flag-bit scheme against a change to footer_t's layout.
+# test.msz predates the shuffle, so it has the marker bit clear and must still
+# decompress to exactly test.mzML. Guards the footer flag-bit scheme.
 add_test(NAME ShuffleBackwardCompatTest
     COMMAND ${CMAKE_COMMAND}
     -DEXECUTABLE=$<TARGET_FILE:mscompress>
@@ -182,6 +181,18 @@ add_test(NAME ShuffleBackwardCompatTest
     -DINPUT_FILE=${TEST_DATA_DIR}/test.msz
     -DEXPECTED_FILE=${TEST_DATA_DIR}/test.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_comorbid
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
+)
+
+# A checked-in shuffled file (msz 0.2), so the decode path is tested against
+# committed bytes rather than only against whatever this build just wrote.
+add_test(NAME ShuffleFixtureDecompressTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DMODE=decompress
+    -DINPUT_FILE=${TEST_DATA_DIR}/test_shuffled.msz
+    -DEXPECTED_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_fixture
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
 )
 

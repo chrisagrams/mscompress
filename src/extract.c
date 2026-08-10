@@ -1294,9 +1294,12 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
 
    df = get_header_df(input_map);
 
-   parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
-                &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
-                &n_divisions);
+   if (parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
+                    &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
+                    &n_divisions) != 0) {
+      ZSTD_freeDCtx(dctx);
+      return;
+   }
 
    if (ms_level != 0)  // MS level selected
    {

@@ -2,20 +2,12 @@
  * @file shuffle.c
  * @brief HDF5-style byte shuffle transform applied ahead of block compression.
  *
- * Arrays of IEEE754 floats stored in native little-endian order interleave
- * near-constant bytes (sign, exponent, high mantissa) with high-entropy bytes
- * (low mantissa) every `elem_size` bytes. A general-purpose compressor sees a
- * noisy period and can rarely build long matches across it.
+ * Transposes a buffer plane-major: byte j of every element is gathered into
+ * plane j. Near-constant planes (exponent, high mantissa) collapse into long
+ * runs the entropy coder compresses well, instead of being interleaved with
+ * high-entropy low-mantissa bytes every elem_size bytes.
  *
- * The shuffle transposes the buffer plane-major: byte j of every element is
- * gathered into plane j, so byte 0 of all elements is contiguous, then byte 1,
- * and so on. The near-constant planes collapse into long runs the entropy coder
- * compresses very well, and the noisy planes are isolated where they cost only
- * themselves. This is the same transform behind HDF5's shuffle filter and
- * blosc's byte shuffle.
- *
- * The transform is a pure permutation of bytes: entirely lossless and exactly
- * reversible by `unshuffle_bytes()`.
+ * A pure permutation of bytes: lossless and exactly reversible.
  *
  * @version 0.0.1
  */
@@ -27,34 +19,18 @@
 #include "../../vendor/c-blosc2/include/blosc2.h"
 #include "../mscompress.h"
 
-/* blosc2_shuffle()/blosc2_unshuffle() dispatch at runtime to SSE2/AVX2/NEON
- * kernels that transpose a register-sized tile at a time, so both loads and
- * stores stay contiguous instead of striding by the element width. Only their
- * shuffle filters are vendored (see vendor/Blosc2Include.cmake).
- *
- * Their byte layout is identical to the scalar reference below - byte j of
- * element i lands at j * n + i - which matters because a file written by a
- * build that took one path has to be readable by a build that takes the other.
- * cli/test covers that equivalence directly.
- *
- * blosc2 takes an int32_t length, so anything larger falls back to scalar. In
- * practice a block is bounded by --blocksize (100MB by default), well under the
- * limit, but the guard keeps an oversized block correct rather than truncated. */
+/* blosc2's SIMD kernels produce the same layout as the scalar fallback below,
+ * so a file written by either build reads back on the other. blosc2 takes an
+ * int32_t length; anything larger falls back to scalar. */
 #define BLOSC_MAX_LEN ((size_t)0x7fffffff)
 
 /**
  * @brief Byte-shuffles `src` into `dst`.
  *
  * Moves byte `j` of element `i` to position `j * n + i`, where `n` is the
- * element count. Requires `len` to be an exact multiple of `elem_size`; the
- * compression pipeline guarantees this because a data block is only ever cut on
- * a spectrum boundary and every spectrum binary is a whole number of elements.
- *
- * Out-of-place by design: a transpose cannot be done in place without a scratch
- * copy, and taking the destination from the caller lets the surrounding code
- * write the result straight where it is needed instead of bouncing through a
- * temporary. It also matches the (src, dst, size, typesize) shape of the
- * hand-vectorised kernels this can be swapped for.
+ * element count. `len` must be an exact multiple of `elem_size`. Out-of-place:
+ * a transpose needs a scratch copy anyway, so the caller supplies the
+ * destination.
  *
  * @param src Source buffer.
  * @param dst Destination buffer of at least `len` bytes. Must not overlap `src`.
@@ -140,24 +116,15 @@ int unshuffle_bytes(const void* src, void* dst, size_t len, int elem_size) {
 }
 
 /*
- * A compressed data block is not a flat array of samples: it is a sequence of
- * `[ZLIB_TYPE payload_len][payload]` records, one per spectrum, and the decode
- * path walks it by those headers. So the transform is applied to payload bytes
- * only, never to a header, which would otherwise be transposed into the data and
- * destroy the walk.
+ * A block is a sequence of `[ZLIB_TYPE payload_len][payload]` records, one per
+ * spectrum, and the decode path walks it by those headers. Payloads are
+ * gathered into one contiguous run, transposed together, and scattered back;
+ * headers are never touched, and record lengths are unchanged. Transposing
+ * each record alone would only span ~2 KB and capture a fraction of the gain.
  *
- * Shuffling each record's payload on its own would only transpose across a
- * single spectrum - typically a couple of kilobytes - which captures a fraction
- * of the available gain. Instead the payloads of a whole block are gathered into
- * one contiguous run, transposed together, and scattered back into their
- * original byte positions. The block layout and every record length are
- * therefore completely unchanged, while the entropy coder sees byte planes that
- * span the entire block.
- *
- * A block is shuffled only when every payload in it is a whole number of
- * elements. That predicate is computed from the record headers alone, which are
- * never shuffled, so the compress and decompress sides always agree without
- * storing any extra per-block state.
+ * A block is shuffled only when every payload is a whole number of elements.
+ * Both sides derive that from the headers, so they agree without storing any
+ * per-block state.
  */
 
 /**
@@ -224,12 +191,8 @@ static void block_payload_move(void* block, size_t block_len, uint8_t* packed,
    }
 }
 
-/* Shared driver for both directions.
- *
- * Three passes over the payload: gather the records into one contiguous run,
- * transform it, then scatter the result straight back into the block. The
- * transform writes into its own destination rather than copying back over its
- * input, which is what keeps this at three passes instead of four. */
+/* Shared driver for both directions: gather records into one contiguous run,
+ * transform it, scatter the result back into the block. */
 static int block_transform(void* block, size_t block_len, int elem_size,
                            int forward) {
    if (block == NULL || elem_size <= 1 || block_len == 0)

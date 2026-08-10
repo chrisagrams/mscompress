@@ -1,10 +1,6 @@
-# CMake script to verify the --shuffle byte-shuffle transform end to end.
-#
-# Checks three things:
-#   1. a shuffled file decompresses byte-for-byte back to the original mzML
-#   2. shuffling actually changes the output (guards against the flag silently
-#      doing nothing, which a round-trip-only test would happily pass)
-#   3. the shuffled file is smaller, which is the whole point of the transform
+# Verifies the --shuffle transform end to end: a shuffled file decompresses
+# byte-for-byte back to the original mzML, differs from the unshuffled output
+# (so the flag is not silently doing nothing), and is smaller.
 #
 # Expected variables:
 # EXECUTABLE: Path to mscompress executable

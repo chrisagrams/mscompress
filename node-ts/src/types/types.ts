@@ -75,14 +75,9 @@ export interface CompressArgs {
   targetIntenFormat?: number;
   zstdCompressionLevel?: number;
   /**
-   * Byte-shuffle binary arrays before compressing them. Transposes m/z and
-   * intensity samples plane-major so the entropy coder sees long runs of
-   * near-constant exponent bytes rather than a noisy element-width period.
-   *
-   * Lossless and exactly reversible. The flag is recorded in the file, so a
-   * shuffled archive decompresses without the reader needing to know. Applies
-   * only to losslessly stored streams; it is skipped for any stream written
-   * with a lossy algorithm. Defaults to `false`.
+   * Byte-shuffle binary arrays before compressing. Lossless and recorded in the
+   * file, so shuffled archives read back without the reader opting in. Applies
+   * only to losslessly stored streams. Defaults to `false`.
    */
   shuffle?: boolean;
 }

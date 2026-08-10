@@ -16,11 +16,7 @@ export class RuntimeArguments {
   targetMzFormat: number;
   targetIntenFormat: number;
   zstdCompressionLevel: number;
-  /**
-   * Byte-shuffle binary arrays before compressing. Lossless and recorded in the
-   * file, so shuffled archives read back without the reader opting in. Applies
-   * only to losslessly stored streams. See {@link CompressArgs.shuffle}.
-   */
+  /** Byte-shuffle binary arrays before compressing. See {@link CompressArgs.shuffle}. */
   shuffle: boolean;
 
   /**

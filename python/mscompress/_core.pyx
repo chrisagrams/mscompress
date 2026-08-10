@@ -298,15 +298,10 @@ cdef class RuntimeArguments:
     property shuffle:
         """Byte-shuffle binary arrays before compressing them.
 
-        Transposes m/z and intensity samples plane-major so the entropy coder
-        sees long runs of near-constant exponent bytes instead of a noisy
-        element-width period. Lossless and exactly reversible; the flag is
-        recorded in the file, so a shuffled .msz decompresses without the
-        reader needing to know.
-
-        Only applies to streams stored losslessly. A lossy algorithm rewrites
-        samples into its own encoding whose element width is not the source
-        width, so the shuffle is skipped for that stream (with a warning).
+        Lossless and recorded in the file, so a shuffled .msz decompresses
+        without the reader opting in. Applies only to losslessly stored
+        streams; skipped (with a warning) for any stream using a lossy
+        algorithm.
         """
         def __get__(self):
             return self._arguments.shuffle != 0

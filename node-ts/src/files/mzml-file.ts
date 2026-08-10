@@ -155,15 +155,10 @@ export class MZMLFile extends BaseFile {
     // so the stream's buffering target matches the chunk size. Default 1 MiB.
     const readChunkSize = chunkSize ?? 1024 * 1024;
 
-    // Effective native args: this file's current settings with any provided
-    // CompressArgs overrides applied on top (same result compress() produces,
-    // but per-call and without mutating this._arguments). Only defined
-    // overrides win, so an explicit `undefined` does not clobber a default.
-    //
-    // Object.assign rather than `args[key] = value`: CompressArgs mixes number
-    // and boolean fields, so indexing with a union of keys collapses the
-    // assignment target to `never`. Assigning a one-key object keeps each
-    // key/value pair correlated without casting through `any`.
+    // Effective native args: this file's settings with any provided overrides
+    // on top, per-call and without mutating this._arguments. Object.assign
+    // rather than `args[key] = value` because CompressArgs mixes number and
+    // boolean fields, which collapses a union-keyed assignment to `never`.
     const args = this._arguments.toNative();
     for (const key of Object.keys(overrides) as (keyof CompressArgs)[]) {
       const value = overrides[key];

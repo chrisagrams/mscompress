@@ -19,11 +19,8 @@ def test_shuffle_property_roundtrips(mzml_file_path):
 
 
 def test_shuffle_compresses_smaller(mzml_file_path, tmp_path):
-    """The shuffle has to actually change the output and shrink it.
-
-    A round-trip-only check would pass even if the flag silently did nothing,
-    so compare against an unshuffled baseline of the same input.
-    """
+    """Compare against an unshuffled baseline: a round-trip-only check would
+    pass even if the flag silently did nothing."""
     plain_path = tmp_path / "plain.msz"
     shuffled_path = tmp_path / "shuffled.msz"
 
@@ -62,12 +59,22 @@ def test_shuffle_roundtrip_is_byte_identical(mzml_file_path, tmp_path):
     )
 
 
-def test_shuffle_skipped_for_lossy_stream(mzml_file_path, tmp_path):
-    """A lossy stream has no fixed post-transform element width.
+def test_checked_in_shuffled_fixture_decompresses(
+    shuffled_msz_file_path, mzml_file_path, tmp_path
+):
+    """Decode committed bytes, not just what this build round trips against
+    itself. Catches a change that silently alters the on-disk layout."""
+    restored_path = tmp_path / "from_fixture.mzML"
 
-    The shuffle must be skipped for it rather than corrupting the stream, so
-    compression still succeeds and the file still decompresses.
-    """
+    with read(shuffled_msz_file_path) as msz:
+        msz.decompress(restored_path)
+
+    assert filecmp.cmp(mzml_file_path, restored_path, shallow=False)
+
+
+def test_shuffle_skipped_for_lossy_stream(mzml_file_path, tmp_path):
+    """A lossy stream has no fixed post-transform element width, so the shuffle
+    must be skipped for it rather than corrupting the stream."""
     output_path = tmp_path / "lossy_shuffle.msz"
     restored_path = tmp_path / "lossy_shuffle.mzML"
 

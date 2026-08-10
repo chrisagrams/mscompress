@@ -580,9 +580,10 @@ int decompress_msz(char* input_map, size_t input_filesize,
 
    df = get_header_df(input_map);
 
-   parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
-                &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
-                &n_divisions);
+   if (parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
+                    &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
+                    &n_divisions) != 0)
+      return -1;
 
    if (n_divisions == 0) {
       warning("No divisions found in file, aborting...\n");

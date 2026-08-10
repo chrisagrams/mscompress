@@ -14,11 +14,23 @@
 #define STATUS "Release"
 #endif
 #define MIN_SUPPORT "0.1"
-#define MAX_SUPPORT "0.1"
+#define MAX_SUPPORT "0.2"
 #define ADDRESS "chrisagrams@gmail.com"
 
-#define FORMAT_VERSION_MAJOR 1
-#define FORMAT_VERSION_MINOR 0
+/*
+ * On-disk msz format stamps, written to header bytes 4-11.
+ *
+ * 0.1 predates any version check and is stored as (1, 0); 0.2 onward store the
+ * version itself. A file is stamped 0.2 only when it uses a feature 0.1 cannot
+ * express (currently the byte shuffle), so output a 0.1 reader could parse
+ * stays labeled 0.1.
+ */
+#define MSZ_V01_MAJOR 1
+#define MSZ_V01_MINOR 0
+#define MSZ_V02_MAJOR 0
+#define MSZ_V02_MINOR 2
+
+#define FORMAT_VERSION_OFFSET 4
 
 #define BUFSIZE 4096
 #define ZLIB_BUFF_FACTOR 1024000  // initial size of zlib buffer
@@ -78,14 +90,10 @@
 #define _LZ4_compression_ 4700012
 
 /*
- * Byte-shuffle marker.
- *
- * Stored as a flag bit OR'd into the footer's `mz_fmt` / `inten_fmt` fields
- * rather than as a new footer field, so that `sizeof(footer_t)` — which
- * `read_footer()` uses to locate the footer from the end of the file — is
- * unchanged and every previously written .msz keeps parsing byte-for-byte as
- * before. Algorithm accessions occupy 4700000-4700012, comfortably under 2^23,
- * so bit 24 is free. Existing files have it clear, which reads as "no shuffle".
+ * Byte-shuffle marker: a flag bit OR'd into the footer's mz_fmt/inten_fmt
+ * rather than a new footer field, so sizeof(footer_t) - which read_footer()
+ * uses to locate the footer from the end of the file - is unchanged and older
+ * .msz files still parse. Accessions stop at 4700012, so bit 24 is free.
  *
  * Always unwrap a stored format with MSZ_ALGO() before dispatching on it.
  */
@@ -418,6 +426,8 @@ int open_input_file(char* input_path);
 int open_output_file(char* path);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
+const char* msz_version_string(int major, int minor);
+int msz_read_version(void* input_map, long filesize, int* major, int* minor);
 int close_file(int fd);
 
 /* mszx.c */
@@ -490,7 +500,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                     Arguments* arguments, data_format_t** df,
                     divisions_t** divisions);
-void parse_footer(footer_t** footer, void* input_map, long input_filesize,
+int parse_footer(footer_t** footer, void* input_map, long input_filesize,
                   block_len_queue_t** xml_block_lens,
                   block_len_queue_t** mz_binary_block_lens,
                   block_len_queue_t** inten_binary_block_lens,

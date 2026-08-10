@@ -370,8 +370,12 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Interpret #defines
    char message_buff[MESSAGE_SIZE] = MESSAGE;
    int magic_tag = MAGIC_TAG;
-   int format_version_major = FORMAT_VERSION_MAJOR;
-   int format_version_minor = FORMAT_VERSION_MINOR;
+
+   /* Stamp 0.2 only when the file uses something 0.1 cannot express, so plain
+    * output stays readable by a 0.1-only reader. */
+   int shuffled = (df->mz_shuffle_elem > 0 || df->inten_shuffle_elem > 0);
+   int format_version_major = shuffled ? MSZ_V02_MAJOR : MSZ_V01_MAJOR;
+   int format_version_minor = shuffled ? MSZ_V02_MINOR : MSZ_V01_MINOR;
 
    memcpy(header_buff, &magic_tag, sizeof(magic_tag));
    memcpy(header_buff + sizeof(magic_tag), &format_version_major,
@@ -480,7 +484,68 @@ footer_t* read_footer(void* input_map, long filesize) {
       return NULL;
    }
 
+   /* Every reader reaches an .msz through here, so this is the one gate that
+    * covers the CLI and both bindings. */
+   int major, minor;
+
+   if (msz_read_version(input_map, filesize, &major, &minor) != 0)
+      return NULL;
+
    return footer;
+}
+
+/**
+ * @brief Maps an on-disk (major, minor) stamp to its msz version string.
+ *
+ * @return "0.1" / "0.2", or NULL if the stamp is not a supported version.
+ */
+const char* msz_version_string(int major, int minor) {
+   if (major == MSZ_V01_MAJOR && minor == MSZ_V01_MINOR)
+      return "0.1";
+   if (major == MSZ_V02_MAJOR && minor == MSZ_V02_MINOR)
+      return "0.2";
+   return NULL;
+}
+
+/**
+ * @brief Reads and validates the msz format version from a file header.
+ *
+ * @param input_map Pointer to the memory-mapped file.
+ * @param filesize Length of the mapping in bytes.
+ * @param major Receives the stored major version. May be NULL.
+ * @param minor Receives the stored minor version. May be NULL.
+ *
+ * @return 0 if the version is supported, non-zero otherwise.
+ */
+int msz_read_version(void* input_map, long filesize, int* major, int* minor) {
+   int stored_major = 0;
+   int stored_minor = 0;
+
+   if (filesize < FORMAT_VERSION_OFFSET + (long)(2 * sizeof(int))) {
+      error("msz_read_version: file is too small to contain a header.\n");
+      return 1;
+   }
+
+   memcpy(&stored_major, (char*)input_map + FORMAT_VERSION_OFFSET,
+          sizeof(stored_major));
+   memcpy(&stored_minor,
+          (char*)input_map + FORMAT_VERSION_OFFSET + sizeof(stored_major),
+          sizeof(stored_minor));
+
+   if (major)
+      *major = stored_major;
+   if (minor)
+      *minor = stored_minor;
+
+   if (msz_version_string(stored_major, stored_minor) == NULL) {
+      error(
+          "msz_read_version: file is msz version %d.%d; this build supports "
+          "%s-%s.\n",
+          stored_major, stored_minor, MIN_SUPPORT, MAX_SUPPORT);
+      return 1;
+   }
+
+   return 0;
 }
 
 /**

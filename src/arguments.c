@@ -344,11 +344,9 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    df->mz_scale_factor = args->mz_scale_factor;
    df->int_scale_factor = args->int_scale_factor;
 
-   /* Byte shuffle. Only enabled on the lossless path: a lossy transform
-    * rewrites samples into its own encoding whose element width is not the
-    * source width (and for vbr/bitpack is not fixed at all), so transposing on
-    * the source width would corrupt the stream. Warn rather than silently
-    * dropping the request. */
+   /* Lossless path only: a lossy transform rewrites samples into an encoding
+    * whose element width is not the source width (and for vbr/bitpack is not
+    * fixed at all), so transposing on the source width would corrupt it. */
    df->mz_shuffle_elem = 0;
    df->inten_shuffle_elem = 0;
 
@@ -381,9 +379,8 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
  * @note This function modifies the `data_format_t` struct in place.
  */
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
-   /* Strip the shuffle marker before dispatching on the algorithm accession.
-    * Files written before the shuffle existed have the bit clear, so this is a
-    * no-op for them and they decode exactly as they always did. */
+   /* Strip the shuffle marker before dispatching on the accession; older files
+    * have the bit clear, so this is a no-op for them. */
    int mz_fmt = MSZ_ALGO(msz_footer->mz_fmt);
    int inten_fmt = MSZ_ALGO(msz_footer->inten_fmt);
 

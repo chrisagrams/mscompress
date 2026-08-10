@@ -1,24 +1,12 @@
 /**
  * @file blosc2-shim.c
- * @brief Fills the one gap left by vendoring only c-blosc2's shuffle filters.
+ * @brief Supplies the one symbol vendoring only the shuffle filters leaves out.
  *
- * `blosc2.h` defines a *static* `print_error()` that calls
- * `blosc2_error_string()`. Every translation unit including that header - both
- * blosc2's own shuffle sources and our `src/algos/shuffle.c` - therefore
- * carries a copy. `blosc2_error_string()` itself lives in `blosc2.c`, which
- * `Blosc2Include.cmake` deliberately does not build, since that file drags in
- * the frames, schunks and compressors we do not want.
- *
- * At -O2 and above the compiler discards the unreferenced static and no symbol
- * reference survives, so the link succeeds by accident. At -O0 the function
- * body is emitted and the link fails with an undefined reference. That made
- * `cmake -DENABLE_DEBUG_SYMBOLS=ON` and the Python `MSCOMPRESS_DEBUG=1` build
- * unbuildable while release builds were fine.
- *
- * Defining the symbol here makes every optimization level link. The strings
- * match blosc2.c so a trace is identical to the upstream one; the codes we can
- * actually reach are only the shuffle filters' own failure paths, which
- * blosc2's sources describe as "the impossible happened".
+ * blosc2.h defines a static print_error() calling blosc2_error_string(), which
+ * lives in blosc2.c - a file Blosc2Include.cmake deliberately does not build.
+ * At -O2+ the compiler drops the unreferenced static and the link succeeds by
+ * accident; at -O0 it is emitted and the link fails. Defining it here makes
+ * every optimization level link. Strings match blosc2.c.
  */
 
 #include "c-blosc2/include/blosc2.h"
