@@ -90,11 +90,14 @@ include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
 include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
 include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 
+#c-blosc2 (shuffle filters only)
+include (${VENDOR_DIR}/Blosc2Include.cmake) # Add blosc2 byte-shuffle library
+
 # Link libs - only once, after all libraries are defined
 if(WIN32)
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml blosc2_shuffle)
 else()
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads) # need math library and pthreads on Linux/Mac
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml blosc2_shuffle m Threads::Threads) # need math library and pthreads on Linux/Mac
 endif()
 
 if(CODE_COVERAGE)

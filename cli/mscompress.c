@@ -68,6 +68,9 @@ static void print_usage(FILE* stream, int exit_code) {
            " --zstd-compression-level level Set zstd compression level (1-22). "
            "(default: 3)\n");
    fprintf(stream,
+           " --shuffle                      Byte-shuffle binary arrays before "
+           "compression (lossless streams only). (disabled by default)\n");
+   fprintf(stream,
            "  -b, --blocksize size          Set maximum blocksize (xKB, xMB, "
            "xGB). (default: 100MB)\n");
    fprintf(stream,
@@ -231,6 +234,8 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             str++;
          }
          arguments->zstd_compression_level = num;
+      } else if (strcmp(argv[i], "--shuffle") == 0) {
+         arguments->shuffle = 1;
       } else if (strcmp(argv[i], "--list-algorithms") == 0) {
          if (arguments->json_output)
             print_algorithms_json();

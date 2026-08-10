@@ -160,3 +160,38 @@ add_test(NAME VerboseOutputTest
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_verbose
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_verbose.cmake
 )
+# --- byte shuffle -----------------------------------------------------------
+
+# End-to-end: a --shuffle file must decompress byte-identically, must differ
+# from the unshuffled output, and must be smaller.
+add_test(NAME ShuffleRoundTripTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_shuffle.cmake
+)
+
+# Backward compatibility: test.msz was written before the shuffle existed, so it
+# has the marker bit clear and must still decompress to exactly test.mzML.
+# Guards the footer flag-bit scheme against a change to footer_t's layout.
+add_test(NAME ShuffleBackwardCompatTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DMODE=decompress
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.msz
+    -DEXPECTED_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_comorbid
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
+)
+
+# A lossy stream has no fixed post-transform element width, so --shuffle must be
+# skipped for it rather than corrupting the stream.
+add_test(NAME ShuffleWithLossyTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--shuffle;--mz-lossy;delta32"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_lossy
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)

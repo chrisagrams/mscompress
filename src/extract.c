@@ -967,6 +967,15 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
          error("extract_spectrum_mz: Failed to decompress mz block.\n");
          return NULL;
       }
+      /* Undo the byte shuffle before the block enters the cache, so every
+       * consumer of the cache sees plain samples. No-op for unshuffled files. */
+      if (df->mz_shuffle_elem > 1 &&
+          unshuffle_block_records(decmp_mz, mz_blk_len->original_size,
+                                  df->mz_shuffle_elem) != 0) {
+         error("extract_spectrum_mz: Failed to reverse m/z byte shuffle.\n");
+         free(decmp_mz);
+         return NULL;
+      }
       mz_blk_len->cache = decmp_mz;
    } else
       decmp_mz = mz_blk_len->cache;
@@ -1071,6 +1080,17 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       if (decmp_inten == NULL) {
          error(
              "extract_spectrum_inten: Failed to decompress intensity block.\n");
+         return NULL;
+      }
+      /* Undo the byte shuffle before the block enters the cache, so every
+       * consumer of the cache sees plain samples. No-op for unshuffled files. */
+      if (df->inten_shuffle_elem > 1 &&
+          unshuffle_block_records(decmp_inten, inten_blk_len->original_size,
+                                  df->inten_shuffle_elem) != 0) {
+         error(
+             "extract_spectrum_inten: Failed to reverse intensity byte "
+             "shuffle.\n");
+         free(decmp_inten);
          return NULL;
       }
       inten_blk_len->cache = decmp_inten;

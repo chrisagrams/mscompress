@@ -292,9 +292,13 @@ char* serialize_df(data_format_t* df) {
  * @note The returned data_format_t is malloc'd. The caller must free it.
  */
 data_format_t* deserialize_df(char* buff) {
-   data_format_t* r = malloc(sizeof(data_format_t));
+   /* Zeroed, not merely allocated: only the serialized members are filled in
+    * below, so every runtime-only member must start from a defined value. A
+    * caller reading one before set_{compress,decompress}_runtime_variables()
+    * has run would otherwise act on whatever happened to be on the heap. */
+   data_format_t* r = calloc(1, sizeof(data_format_t));
    if (r == NULL)
-      error("deserialize_df: malloc failed.\n");
+      error("deserialize_df: calloc failed.\n");
 
    size_t offset = 0;
 
@@ -496,13 +500,18 @@ void print_footer_csv(footer_t* footer) {
    printf(
        "xml_pos,mz_binary_pos,inten_binary_pos,xml_blk_pos,mz_binary_blk_pos,"
        "inten_binary_blk_pos,divisions_t_pos,num_spectra,original_filesize,n_"
-       "divisions,magic_tag,mz_fmt,inten_fmt\n");
-   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d\n", footer->xml_pos,
-          footer->mz_binary_pos, footer->inten_binary_pos, footer->xml_blk_pos,
-          footer->mz_binary_blk_pos, footer->inten_binary_blk_pos,
-          footer->divisions_t_pos, footer->num_spectra,
-          footer->original_filesize, footer->n_divisions, footer->magic_tag,
-          footer->mz_fmt, footer->inten_fmt);
+       "divisions,magic_tag,mz_fmt,inten_fmt,mz_shuffle,inten_shuffle\n");
+   /* mz_fmt/inten_fmt are reported with the shuffle marker stripped, so the
+    * value keeps mapping straight onto an algorithm accession as it always
+    * has; the marker is surfaced in its own trailing columns instead. */
+   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d,%d,%d\n",
+          footer->xml_pos, footer->mz_binary_pos, footer->inten_binary_pos,
+          footer->xml_blk_pos, footer->mz_binary_blk_pos,
+          footer->inten_binary_blk_pos, footer->divisions_t_pos,
+          footer->num_spectra, footer->original_filesize, footer->n_divisions,
+          footer->magic_tag, MSZ_ALGO(footer->mz_fmt),
+          MSZ_ALGO(footer->inten_fmt), MSZ_HAS_SHUFFLE(footer->mz_fmt) ? 1 : 0,
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? 1 : 0);
 }
 
 void print_footer_json(footer_t* footer) {
@@ -523,8 +532,12 @@ void print_footer_json(footer_t* footer) {
    printf("  \"original_filesize\": %lu,\n", footer->original_filesize);
    printf("  \"n_divisions\": %d,\n", footer->n_divisions);
    printf("  \"magic_tag\": %d,\n", footer->magic_tag);
-   printf("  \"mz_fmt\": %d,\n", footer->mz_fmt);
-   printf("  \"inten_fmt\": %d\n", footer->inten_fmt);
+   printf("  \"mz_fmt\": %d,\n", MSZ_ALGO(footer->mz_fmt));
+   printf("  \"inten_fmt\": %d,\n", MSZ_ALGO(footer->inten_fmt));
+   printf("  \"mz_shuffle\": %s,\n",
+          MSZ_HAS_SHUFFLE(footer->mz_fmt) ? "true" : "false");
+   printf("  \"inten_shuffle\": %s\n",
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? "true" : "false");
    printf("}\n");
 }
 

@@ -72,6 +72,22 @@
 
 #define _LZ4_compression_ 4700012
 
+/*
+ * Byte-shuffle marker.
+ *
+ * Stored as a flag bit OR'd into the footer's `mz_fmt` / `inten_fmt` fields
+ * rather than as a new footer field, so that `sizeof(footer_t)` — which
+ * `read_footer()` uses to locate the footer from the end of the file — is
+ * unchanged and every previously written .msz keeps parsing byte-for-byte as
+ * before. Algorithm accessions occupy 4700000-4700012, comfortably under 2^23,
+ * so bit 24 is free. Existing files have it clear, which reads as "no shuffle".
+ *
+ * Always unwrap a stored format with MSZ_ALGO() before dispatching on it.
+ */
+#define _shuffle_flag_ 0x01000000
+#define MSZ_ALGO(fmt) ((fmt) & ~_shuffle_flag_)
+#define MSZ_HAS_SHUFFLE(fmt) (((fmt) & _shuffle_flag_) != 0)
+
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
@@ -123,6 +139,8 @@ typedef struct {
    int target_inten_format;
 
    int zstd_compression_level;
+
+   int shuffle; /* Apply the byte shuffle to binary streams before compressing. */
 
    int json_output;
 } Arguments;
@@ -340,6 +358,12 @@ typedef struct {
 
    int zstd_compression_level;  // no need to write to file since ZSTD_DCtx
                                 // doesn't need it.
+
+   /* Byte-shuffle element width per binary stream, in bytes. 0 disables it.
+    * Derived from the source data type on compress, and from the footer's
+    * shuffle flag plus the source data type on decompress. */
+   int mz_shuffle_elem;
+   int inten_shuffle_elem;
 
 } data_format_t;
 
@@ -663,6 +687,7 @@ typedef struct {
    float scale_factor;
    int ret_code;
    Algo algo_fun;
+   int shuffle_elem; /* Byte-shuffle element width for this stream; 0 = off. */
 } algo_args;
 
 extern const algo_info_t algo_registry[];
