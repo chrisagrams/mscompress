@@ -304,10 +304,6 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
       } else if (strcmp(argv[i], "-r") == 0 ||
                  strcmp(argv[i], "--recursive") == 0) {
          arguments->recursive = 1;
-      } else if (strcmp(argv[i], "--flatten") == 0) {
-         arguments->flatten = 1;
-      } else if (strcmp(argv[i], "--preserve-tree") == 0) {
-         arguments->flatten = 0;
       } else if (strcmp(argv[i], "--continue-on-error") == 0) {
          arguments->continue_on_error = 1;
       } else if (strcmp(argv[i], "--list") == 0) {
@@ -348,6 +344,20 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
  * `mscompress input output` must NOT be treated as batch. The key disambiguator
  * is that a batch needs 2+ *existing* input files, whereas in `input output`
  * the second positional is an output path that does not exist yet. */
+/* Case-insensitive ".mzML" test, mirroring batch.c's input filter. */
+static int has_mzml_extension(const char* path) {
+   size_t pl = strlen(path);
+   if (pl < 5) return 0;
+   const char* ext = path + pl - 5;
+   const char* want = ".mzml";
+   for (size_t i = 0; i < 5; ++i) {
+      char c = ext[i];
+      if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+      if (c != want[i]) return 0;
+   }
+   return 1;
+}
+
 static int is_batch_request(Arguments* a) {
    if (a->batch || a->from_file) return 1;
 
@@ -365,15 +375,22 @@ static int is_batch_request(Arguments* a) {
          return 1;
    }
 
-   /* 2+ existing regular-file inputs (e.g. shell-expanded *.mzML) => batch. */
+   /* 2+ existing regular-file *mzML* inputs (e.g. shell-expanded *.mzML)
+    * => batch.
+    *
+    * The extension test matters: in the legacy `mscompress input output` form
+    * the second positional is an output path, and it exists whenever the
+    * command is re-run or an existing file is being overwritten. Counting
+    * bare existence here silently flipped those invocations into batch mode. */
    if (a->n_inputs >= 2) {
-      size_t existing = 0;
+      size_t existing_mzml = 0;
       for (size_t i = 0; i < a->n_inputs; ++i) {
          struct stat st;
-         if (stat(a->inputs[i], &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG)
-            existing++;
+         if (stat(a->inputs[i], &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG &&
+             has_mzml_extension(a->inputs[i]))
+            existing_mzml++;
       }
-      if (existing >= 2) return 1;
+      if (existing_mzml >= 2) return 1;
    }
 
    if (a->recursive) return 1;

@@ -167,7 +167,6 @@ typedef struct {
    /* Batch mode (folder / glob / list -> one .mszx). See src/batch.c. */
    int batch;             // explicit --batch opt-in
    int recursive;         // -r/--recursive directory descent
-   int flatten;           // 1 = flatten entry names (default), 0 = preserve tree
    int continue_on_error; // skip-and-report instead of fail-fast
    int list_mode;         // --list: print an .mszx table of contents
    char* from_file;       // --from-file manifest of input paths (or "-" for stdin)
@@ -428,7 +427,7 @@ size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
 size_t write_header(int fd, data_format_t* df, long blocksize, char* md5);
-long get_offset(int fd);
+int64_t get_offset(int fd);
 long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
@@ -482,6 +481,67 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
 int list_mszx(char* input_path);
 
 /* batch.c */
+
+/* Incremental writer for a v2 ("batch") .mszx archive.
+ *
+ * This is the single writer path shared by the CLI (compress_batch) and the
+ * language bindings, so every producer emits byte-identical archives for the
+ * same inputs and settings. Entries stream straight into the archive fd via
+ * the unmodified compress_mzml(); the USTAR header's size + checksum are
+ * patched afterwards, which is why the output must be a seekable regular file.
+ *
+ * The archive is only valid once batch_writer_finish() succeeds — it writes
+ * manifest.json (last) and the end-of-archive marker. Both finish() and
+ * abort() close the fd and free the writer; the handle is dead after either.
+ */
+typedef struct batch_writer batch_writer_t;
+
+/* Open `out_path` for writing. Returns NULL if it cannot be opened or is not
+ * seekable (a pipe/FIFO/stdout is a hard error — see the note above). */
+batch_writer_t* batch_writer_open(const char* out_path);
+
+/* Compress one mmap'd mzML into the archive as a single tar entry.
+ *
+ * entry_name  NULL to derive "<basename minus .mzML>.msz" from src_name, with
+ *             __2/__3 collision suffixes. The writer owns naming so the CLI and
+ *             every binding agree by construction.
+ * src_name    Source path/name, recorded as the manifest's `original`
+ *             (basename only) and used to derive entry_name.
+ * mapping     Caller-owned mmap of the source mzML; not freed here. Bindings
+ *             pass the mapping their file handle already holds.
+ *
+ * Returns the new entry's index (>= 0) for use with the per-entry setters
+ * below, or -1 on failure. A failure mid-entry poisons the writer: the
+ * half-written entry cannot be un-appended, so finish() will refuse and the
+ * caller should abort(). */
+int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
+                          const char* src_name, void* mapping, size_t filesize,
+                          Arguments* args);
+
+/* Attach an auxiliary file (e.g. a PSM annotation) to a spectra entry, written
+ * as its own tar member. `data` is caller-supplied bytes — compression is the
+ * caller's job (both bindings already expose zstd); `compressed` only records
+ * how a reader should treat it. Returns 0 or -1. */
+int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
+                                const char* archive_name, const void* data,
+                                size_t len, const char* format, int compressed,
+                                int64_t num_records);
+
+/* Optional per-entry / archive-level manifest metadata. Return 0 or -1. */
+int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
+                              const char* join_key);
+int batch_writer_set_description(batch_writer_t* w, const char* description);
+/* `extra_json` must be a complete JSON object literal; it is embedded verbatim. */
+int batch_writer_set_extra_json(batch_writer_t* w, const char* extra_json);
+
+/* Write manifest.json + the end-of-archive marker, then close and free the
+ * writer. Returns 0 on success; on failure the partial archive is removed.
+ * The writer is freed either way. */
+int batch_writer_finish(batch_writer_t* w);
+
+/* Close, unlink the partial archive, and free the writer. Safe on NULL. */
+void batch_writer_abort(batch_writer_t* w);
+
 int compress_batch(Arguments* arguments);
 
 /* mem.c */

@@ -74,6 +74,16 @@ add_test(NAME BatchRoundTripTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch.cmake
 )
 
+# Batch paths the round-trip test misses: __N name collisions,
+# --continue-on-error, fail-fast cleanup, and legacy-form batch misdetection.
+add_test(NAME BatchPathsTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_paths
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_paths.cmake
+)
+
 # Batch error paths: empty match set + non-seekable (FIFO) output rejection.
 add_test(NAME BatchRejectTest
     COMMAND ${CMAKE_COMMAND}

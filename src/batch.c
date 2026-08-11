@@ -316,16 +316,9 @@ static void sort_and_dedup(strlist_t* l) {
 
 /* ---------------- entry naming (flatten default) ---------------- */
 
-/* Derive "<basename minus .mzML>.msz"; disambiguate collisions with __N. */
-static char* derive_entry_name(const char* src, strlist_t* used) {
-   const char* base = base_name(src);
-   size_t bl = strlen(base);
-   if (str_iends_with(base, ".mzml")) bl -= 5;
-   char stem[512];
-   size_t copy = bl < sizeof(stem) - 1 ? bl : sizeof(stem) - 1;
-   memcpy(stem, base, copy);
-   stem[copy] = '\0';
-
+/* Make `stem`.msz unique within `used`, disambiguating collisions with __N.
+ * Pushes the chosen name into `used` and returns a malloc'd copy. */
+static char* uniquify_entry_name(const char* stem, strlist_t* used) {
    char cand[600];
    snprintf(cand, sizeof(cand), "%s.msz", stem);
    int n = 2;
@@ -337,21 +330,97 @@ static char* derive_entry_name(const char* src, strlist_t* used) {
       }
       if (clash) snprintf(cand, sizeof(cand), "%s__%d.msz", stem, n++);
    }
-   strlist_push(used, cand);
+   if (strlist_push(used, cand) != 0) return NULL;
    return strdup(cand);
+}
+
+/* Derive "<basename minus .mzML>.msz"; disambiguate collisions with __N. */
+static char* derive_entry_name(const char* src, strlist_t* used) {
+   const char* base = base_name(src);
+   size_t bl = strlen(base);
+   if (str_iends_with(base, ".mzml")) bl -= 5;
+   char stem[512];
+   size_t copy = bl < sizeof(stem) - 1 ? bl : sizeof(stem) - 1;
+   memcpy(stem, base, copy);
+   stem[copy] = '\0';
+
+   return uniquify_entry_name(stem, used);
+}
+
+/* Uniquify an explicitly supplied entry name. A caller-provided ".msz" suffix
+ * is stripped first so the collision suffix lands before the extension. */
+static char* adopt_entry_name(const char* name, strlist_t* used) {
+   size_t nl = strlen(name);
+   if (str_iends_with(name, ".msz")) nl -= 4;
+   char stem[512];
+   size_t copy = nl < sizeof(stem) - 1 ? nl : sizeof(stem) - 1;
+   memcpy(stem, name, copy);
+   stem[copy] = '\0';
+
+   return uniquify_entry_name(stem, used);
 }
 
 /* ---------------- manifest JSON (v2) ---------------- */
 
 typedef struct {
+   char* filename; /* tar member name of the annotation */
+   char* format;   /* reader-supported format tag, e.g. "percolator_tsv" */
+   int compressed; /* payload is zstd-compressed (the caller did it) */
+   int64_t num_records; /* < 0 = omit */
+} manifest_ann_t;
+
+typedef struct {
    char* entry;
    char* original;
    uint64_t size;
+   int64_t num_spectra; /* < 0 = omit */
+   char* join_key;      /* NULL = omit */
+   manifest_ann_t* anns;
+   size_t n_anns;
+   size_t cap_anns;
 } manifest_rec_t;
 
-static void json_append_escaped(char** buf, size_t* len, size_t* cap,
-                                const char* s) {
-   for (const char* p = s; *p; ++p) {
+/* Growable JSON buffer. A single sticky `oom` flag replaces per-append error
+ * checks; build_manifest() returns NULL if it is ever set, so an allocation
+ * failure can never silently truncate a manifest. */
+typedef struct {
+   char* buf;
+   size_t len;
+   size_t cap;
+   int oom;
+} jbuf_t;
+
+static void jb_reserve(jbuf_t* j, size_t extra) {
+   if (j->oom) return;
+   if (j->len + extra + 1 <= j->cap) return;
+   size_t nc = (j->cap + extra + 64) * 2;
+   char* tmp = realloc(j->buf, nc);
+   if (!tmp) {
+      j->oom = 1;
+      return;
+   }
+   j->buf = tmp;
+   j->cap = nc;
+}
+
+static void jb_puts(jbuf_t* j, const char* s) {
+   size_t sl = strlen(s);
+   jb_reserve(j, sl);
+   if (j->oom) return;
+   memcpy(j->buf + j->len, s, sl);
+   j->len += sl;
+   j->buf[j->len] = '\0';
+}
+
+static void jb_i64(jbuf_t* j, int64_t v) {
+   char num[32];
+   snprintf(num, sizeof(num), "%lld", (long long)v);
+   jb_puts(j, num);
+}
+
+/* Append `s` as the body of a JSON string (no surrounding quotes). */
+static void jb_escaped(jbuf_t* j, const char* s) {
+   for (const char* p = s; *p && !j->oom; ++p) {
       char esc[8];
       int el;
       if (*p == '"' || *p == '\\') {
@@ -364,57 +433,107 @@ static void json_append_escaped(char** buf, size_t* len, size_t* cap,
          esc[0] = *p;
          el = 1;
       }
-      if (*len + el + 1 > *cap) {
-         *cap = (*cap + el + 64) * 2;
-         *buf = realloc(*buf, *cap);
-      }
-      memcpy(*buf + *len, esc, el);
-      *len += el;
+      jb_reserve(j, (size_t)el);
+      if (j->oom) return;
+      memcpy(j->buf + j->len, esc, (size_t)el);
+      j->len += (size_t)el;
+      j->buf[j->len] = '\0';
    }
-   (*buf)[*len] = '\0';
 }
 
-static char* build_manifest(manifest_rec_t* recs, size_t n, size_t* out_len) {
-   size_t cap = 1024;
-   size_t len = 0;
-   char* buf = malloc(cap);
-   if (!buf) return NULL;
-   buf[0] = '\0';
+/* Append `"key": "value"` with the value escaped. */
+static void jb_kv_str(jbuf_t* j, const char* key, const char* value) {
+   jb_puts(j, "\"");
+   jb_puts(j, key);
+   jb_puts(j, "\": \"");
+   jb_escaped(j, value);
+   jb_puts(j, "\"");
+}
 
-#define APP(str)                                        \
-   do {                                                 \
-      size_t _sl = strlen(str);                         \
-      if (len + _sl + 1 > cap) {                        \
-         cap = (cap + _sl + 64) * 2;                    \
-         buf = realloc(buf, cap);                       \
-      }                                                 \
-      memcpy(buf + len, str, _sl);                      \
-      len += _sl;                                       \
-      buf[len] = '\0';                                  \
-   } while (0)
+/* Build the v2 manifest. Field order is fixed so identical inputs always
+ * produce byte-identical archives (there are no timestamps by design).
+ * Optional fields are omitted entirely rather than emitted as null, so a
+ * reader written against the original v2 schema still parses the result. */
+static char* build_manifest(manifest_rec_t* recs, size_t n,
+                            const char* description, const char* extra_json,
+                            size_t* out_len) {
+   jbuf_t j = {0};
+   jb_reserve(&j, 1024);
+   if (j.oom) return NULL;
+   j.buf[0] = '\0';
 
-   APP("{\n");
-   APP("  \"version\": \"2.0\",\n");
-   APP("  \"container\": \"batch\",\n");
-   APP("  \"spectra_files\": [\n");
-   for (size_t i = 0; i < n; ++i) {
-      APP("    {\"entry\": \"");
-      json_append_escaped(&buf, &len, &cap, recs[i].entry);
-      APP("\", \"original\": \"");
-      json_append_escaped(&buf, &len, &cap, recs[i].original);
-      APP("\", \"size\": ");
-      char num[32];
-      snprintf(num, sizeof(num), "%llu", (unsigned long long)recs[i].size);
-      APP(num);
-      APP("}");
-      APP(i + 1 < n ? ",\n" : "\n");
+   jb_puts(&j, "{\n");
+   jb_puts(&j, "  \"version\": \"2.0\",\n");
+   jb_puts(&j, "  \"container\": \"batch\",\n");
+   if (description) {
+      jb_puts(&j, "  ");
+      jb_kv_str(&j, "description", description);
+      jb_puts(&j, ",\n");
    }
-   APP("  ]\n");
-   APP("}\n");
-#undef APP
+   if (extra_json) {
+      jb_puts(&j, "  \"extra\": ");
+      jb_puts(&j, extra_json);
+      jb_puts(&j, ",\n");
+   }
+   jb_puts(&j, "  \"spectra_files\": [\n");
+   for (size_t i = 0; i < n; ++i) {
+      manifest_rec_t* r = &recs[i];
+      jb_puts(&j, "    {");
+      jb_kv_str(&j, "entry", r->entry);
+      jb_puts(&j, ", ");
+      jb_kv_str(&j, "original", r->original);
+      jb_puts(&j, ", \"size\": ");
+      jb_i64(&j, (int64_t)r->size);
+      if (r->num_spectra >= 0) {
+         jb_puts(&j, ", \"num_spectra\": ");
+         jb_i64(&j, r->num_spectra);
+      }
+      if (r->join_key) {
+         jb_puts(&j, ", ");
+         jb_kv_str(&j, "join_key", r->join_key);
+      }
+      if (r->n_anns > 0) {
+         jb_puts(&j, ", \"annotations\": [");
+         for (size_t k = 0; k < r->n_anns; ++k) {
+            manifest_ann_t* a = &r->anns[k];
+            jb_puts(&j, "{");
+            jb_kv_str(&j, "filename", a->filename);
+            jb_puts(&j, ", ");
+            jb_kv_str(&j, "format", a->format);
+            jb_puts(&j, ", \"compressed\": ");
+            jb_puts(&j, a->compressed ? "true" : "false");
+            if (a->num_records >= 0) {
+               jb_puts(&j, ", \"num_records\": ");
+               jb_i64(&j, a->num_records);
+            }
+            jb_puts(&j, "}");
+            if (k + 1 < r->n_anns) jb_puts(&j, ", ");
+         }
+         jb_puts(&j, "]");
+      }
+      jb_puts(&j, "}");
+      jb_puts(&j, i + 1 < n ? ",\n" : "\n");
+   }
+   jb_puts(&j, "  ]\n");
+   jb_puts(&j, "}\n");
 
-   *out_len = len;
-   return buf;
+   if (j.oom) {
+      free(j.buf);
+      return NULL;
+   }
+   *out_len = j.len;
+   return j.buf;
+}
+
+static void free_manifest_rec(manifest_rec_t* r) {
+   for (size_t k = 0; k < r->n_anns; ++k) {
+      free(r->anns[k].filename);
+      free(r->anns[k].format);
+   }
+   free(r->anns);
+   free(r->entry);
+   free(r->original);
+   free(r->join_key);
 }
 
 /* ---------------- default output path ---------------- */
@@ -434,7 +553,294 @@ static char* default_output_path(Arguments* a, strlist_t* inputs) {
    return strdup("batch.mszx");
 }
 
-/* ---------------- main entry ---------------- */
+
+/* ---------------- incremental writer ---------------- */
+
+struct batch_writer {
+   int out_fd;
+   char* out_path;
+   manifest_rec_t* recs;
+   size_t n_recs;
+   size_t cap_recs;
+   strlist_t used_names;
+   char* description;
+   char* extra_json;
+   /* Set when an entry failed after its header was written. A half-written
+    * entry cannot be un-appended, so the archive is unrecoverable and
+    * finish() must refuse rather than emit a corrupt manifest. */
+   int poisoned;
+};
+
+static void batch_writer_free(batch_writer_t* w) {
+   if (!w) return;
+   for (size_t i = 0; i < w->n_recs; ++i) free_manifest_rec(&w->recs[i]);
+   free(w->recs);
+   strlist_free(&w->used_names);
+   free(w->description);
+   free(w->extra_json);
+   free(w->out_path);
+   free(w);
+}
+
+batch_writer_t* batch_writer_open(const char* out_path) {
+   if (!out_path) return NULL;
+
+   batch_writer_t* w = calloc(1, sizeof(*w));
+   if (!w) return NULL;
+
+   w->out_path = strdup(out_path);
+   if (!w->out_path) {
+      free(w);
+      return NULL;
+   }
+
+   /* Opened read-write WITHOUT O_APPEND: tar_end_entry seeks back to patch the
+    * header, and under O_APPEND every write would be forced to EOF instead. */
+   w->out_fd = open_output_file_rw(w->out_path);
+   if (w->out_fd < 0) {
+      error("batch: cannot open output archive '%s'\n", out_path);
+      free(w->out_path);
+      free(w);
+      return NULL;
+   }
+   if (!fd_is_seekable(w->out_fd)) {
+      error("batch: .mszx output must be a regular file, not a pipe/stdout "
+            "('%s')\n",
+            out_path);
+      close_file(w->out_fd);
+      free(w->out_path);
+      free(w);
+      return NULL;
+   }
+   return w;
+}
+
+static manifest_rec_t* batch_writer_push_rec(batch_writer_t* w) {
+   if (w->n_recs == w->cap_recs) {
+      size_t nc = w->cap_recs ? w->cap_recs * 2 : 16;
+      manifest_rec_t* tmp = realloc(w->recs, nc * sizeof(*tmp));
+      if (!tmp) return NULL;
+      w->recs = tmp;
+      w->cap_recs = nc;
+   }
+   manifest_rec_t* r = &w->recs[w->n_recs];
+   memset(r, 0, sizeof(*r));
+   r->num_spectra = -1;
+   return r;
+}
+
+int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
+                          const char* src_name, void* mapping, size_t filesize,
+                          Arguments* args) {
+   if (!w || !mapping || !args || filesize == 0) return -1;
+   if (w->poisoned) {
+      error("batch: writer is unusable after a mid-entry failure\n");
+      return -1;
+   }
+
+   const char* label = src_name ? src_name : "(unnamed)";
+
+   if (!is_mzml(mapping, filesize)) {
+      warning("batch: '%s' is not an mzML file (skipped)\n", label);
+      return -1;
+   }
+
+   /* The writer owns entry naming so the CLI and every binding agree. */
+   char* name = entry_name ? adopt_entry_name(entry_name, &w->used_names)
+                           : derive_entry_name(label, &w->used_names);
+   if (!name) return -1;
+
+   tar_entry_t te;
+   if (tar_begin_entry(w->out_fd, name, &te) != 0) {
+      error("batch: tar_begin_entry failed for '%s'\n", name);
+      free(name);
+      return -1;
+   }
+
+   int64_t payload_start = get_offset(w->out_fd);
+
+   data_format_t* df = NULL;
+   divisions_t* divs = NULL;
+   /* Local copy: blocksize auto-tuning inside preprocess_mzml must not leak
+    * from one entry into the next. */
+   long bs = args->blocksize;
+   int fail = 0;
+
+   if (preprocess_mzml((char*)mapping, (long)filesize, &bs, args, &df, &divs)) {
+      error("batch: preprocess failed for '%s'\n", label);
+      fail = 1;
+   } else if (compress_mzml((char*)mapping, filesize, args, df, divs,
+                            w->out_fd)) {
+      error("batch: compress failed for '%s'\n", label);
+      fail = 1;
+   }
+
+   int64_t num_spectra = 0;
+   if (!fail && divs) {
+      for (int i = 0; i < divs->n_divisions; ++i) {
+         if (divs->divisions[i] && divs->divisions[i]->spectra)
+            num_spectra += divs->divisions[i]->spectra->total_spec;
+      }
+   }
+
+   int64_t payload_end = get_offset(w->out_fd);
+   uint64_t payload_bytes = (uint64_t)(payload_end - payload_start);
+
+   if (!fail && tar_end_entry(w->out_fd, &te, payload_bytes) != 0) {
+      error("batch: tar_end_entry failed for '%s'\n", name);
+      fail = 1;
+   }
+
+   if (divs) dealloc_divisions(divs);
+   if (df) dealloc_df(df);
+
+   if (fail) {
+      /* Bytes are already on disk under this entry's header. */
+      w->poisoned = 1;
+      free(name);
+      return -1;
+   }
+
+   manifest_rec_t* r = batch_writer_push_rec(w);
+   if (!r) {
+      w->poisoned = 1;
+      free(name);
+      return -1;
+   }
+   r->entry = name; /* ownership transferred */
+   r->original = strdup(base_name(label));
+   r->size = payload_bytes;
+   r->num_spectra = num_spectra;
+   if (!r->original) {
+      free_manifest_rec(r);
+      w->poisoned = 1;
+      return -1;
+   }
+   w->n_recs++;
+   return (int)(w->n_recs - 1);
+}
+
+int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
+                                const char* archive_name, const void* data,
+                                size_t len, const char* format, int compressed,
+                                int64_t num_records) {
+   if (!w || !archive_name || (!data && len > 0) || !format) return -1;
+   if (w->poisoned) return -1;
+   if (entry_index < 0 || (size_t)entry_index >= w->n_recs) {
+      error("batch: annotation refers to unknown entry index %d\n", entry_index);
+      return -1;
+   }
+
+   manifest_rec_t* r = &w->recs[entry_index];
+
+   if (r->n_anns == r->cap_anns) {
+      size_t nc = r->cap_anns ? r->cap_anns * 2 : 4;
+      manifest_ann_t* tmp = realloc(r->anns, nc * sizeof(*tmp));
+      if (!tmp) return -1;
+      r->anns = tmp;
+      r->cap_anns = nc;
+   }
+
+   /* Known size up front, so this is a plain single-shot tar member. */
+   if (tar_add_file(w->out_fd, archive_name, data, len) != 0) {
+      error("batch: failed to write annotation '%s'\n", archive_name);
+      w->poisoned = 1;
+      return -1;
+   }
+
+   manifest_ann_t* a = &r->anns[r->n_anns];
+   memset(a, 0, sizeof(*a));
+   a->filename = strdup(archive_name);
+   a->format = strdup(format);
+   a->compressed = compressed ? 1 : 0;
+   a->num_records = num_records;
+   if (!a->filename || !a->format) {
+      free(a->filename);
+      free(a->format);
+      return -1;
+   }
+   r->n_anns++;
+   return 0;
+}
+
+int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
+                              const char* join_key) {
+   if (!w || !join_key) return -1;
+   if (entry_index < 0 || (size_t)entry_index >= w->n_recs) return -1;
+   char* dup = strdup(join_key);
+   if (!dup) return -1;
+   free(w->recs[entry_index].join_key);
+   w->recs[entry_index].join_key = dup;
+   return 0;
+}
+
+int batch_writer_set_description(batch_writer_t* w, const char* description) {
+   if (!w || !description) return -1;
+   char* dup = strdup(description);
+   if (!dup) return -1;
+   free(w->description);
+   w->description = dup;
+   return 0;
+}
+
+int batch_writer_set_extra_json(batch_writer_t* w, const char* extra_json) {
+   if (!w || !extra_json) return -1;
+   char* dup = strdup(extra_json);
+   if (!dup) return -1;
+   free(w->extra_json);
+   w->extra_json = dup;
+   return 0;
+}
+
+int batch_writer_finish(batch_writer_t* w) {
+   if (!w) return -1;
+
+   if (w->poisoned) {
+      error("batch: refusing to finalize an archive with a failed entry\n");
+      batch_writer_abort(w);
+      return -1;
+   }
+   if (w->n_recs == 0) {
+      error("batch: no entries were written; nothing to finalize\n");
+      batch_writer_abort(w);
+      return -1;
+   }
+
+   int rc = 0;
+   size_t mlen = 0;
+   char* manifest =
+       build_manifest(w->recs, w->n_recs, w->description, w->extra_json, &mlen);
+
+   /* manifest.json is written LAST: entry sizes are only known once each
+    * payload has streamed out. */
+   if (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen)) {
+      error("batch: failed to write manifest.json\n");
+      rc = -1;
+   }
+   free(manifest);
+
+   if (rc == 0 && tar_finish(w->out_fd) != 0) {
+      error("batch: failed to finalize archive\n");
+      rc = -1;
+   }
+
+   close_file(w->out_fd);
+   w->out_fd = -1;
+
+   if (rc != 0) remove_file(w->out_path);
+
+   batch_writer_free(w);
+   return rc;
+}
+
+void batch_writer_abort(batch_writer_t* w) {
+   if (!w) return;
+   if (w->out_fd >= 0) close_file(w->out_fd);
+   if (w->out_path) remove_file(w->out_path);
+   batch_writer_free(w);
+}
+
+/* ---------------- CLI driver ---------------- */
 
 int compress_batch(Arguments* arguments) {
    if (!arguments) return -1;
@@ -445,7 +851,8 @@ int compress_batch(Arguments* arguments) {
    for (size_t i = 0; i < arguments->n_inputs && rc == 0; ++i)
       rc = resolve_token(arguments->inputs[i], arguments->recursive, &files);
    if (rc == 0 && arguments->from_file)
-      rc = read_paths_from_file(arguments->from_file, arguments->recursive, &files);
+      rc = read_paths_from_file(arguments->from_file, arguments->recursive,
+                                &files);
    if (rc != 0) {
       strlist_free(&files);
       return -1;
@@ -465,22 +872,14 @@ int compress_batch(Arguments* arguments) {
    if (!out_path) {
       out_path = default_output_path(arguments, &files);
       out_path_owned = 1;
-      if (!out_path) { strlist_free(&files); return -1; }
+      if (!out_path) {
+         strlist_free(&files);
+         return -1;
+      }
    }
 
-   /* 3) Open archive WITHOUT O_APPEND (seek-back patch needs real seeks). */
-   int out_fd = open_output_file_rw(out_path);
-   if (out_fd < 0) {
-      error("batch: cannot open output archive '%s'\n", out_path);
-      if (out_path_owned) free(out_path);
-      strlist_free(&files);
-      return -1;
-   }
-   if (!fd_is_seekable(out_fd)) {
-      error("batch: .mszx output must be a regular file, not a pipe/stdout "
-            "('%s')\n",
-            out_path);
-      close_file(out_fd);
+   batch_writer_t* w = batch_writer_open(out_path);
+   if (!w) {
       if (out_path_owned) free(out_path);
       strlist_free(&files);
       return -1;
@@ -489,144 +888,80 @@ int compress_batch(Arguments* arguments) {
    print("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
          out_path);
 
-   manifest_rec_t* recs = calloc(files.count, sizeof(*recs));
-   strlist_t used_names = {0};
-   size_t n_ok = 0;
-   int had_error = 0;
+   /* 3) Stream each file as one tar entry. */
+   size_t n_ok = 0, n_skipped = 0;
+   int fatal = 0;
 
-   /* 4) Stream each file as one tar entry (Option A). */
    for (size_t i = 0; i < files.count; ++i) {
       const char* path = files.items[i];
 
       int in_fd = open_input_file((char*)path);
       if (in_fd < 0) {
          warning("batch: cannot open '%s'\n", path);
-         had_error = 1;
+         n_skipped++;
          if (arguments->continue_on_error) continue;
+         fatal = 1;
          break;
       }
+
       void* map = get_mapping(in_fd);
       long fsize = (long)get_filesize((char*)path);
       if (!map || fsize <= 0) {
          warning("batch: cannot map '%s'\n", path);
          if (map) remove_mapping(map, fsize);
          close_file(in_fd);
-         had_error = 1;
+         n_skipped++;
          if (arguments->continue_on_error) continue;
-         break;
-      }
-      if (!is_mzml(map, (size_t)fsize)) {
-         warning("batch: '%s' is not an mzML file (skipped)\n", path);
-         remove_mapping(map, fsize);
-         close_file(in_fd);
-         had_error = 1;
-         if (arguments->continue_on_error) continue;
+         fatal = 1;
          break;
       }
 
-      char* entry_name = derive_entry_name(path, &used_names);
-      if (!entry_name) {
-         remove_mapping(map, fsize);
-         close_file(in_fd);
-         had_error = 1;
-         break;
-      }
+      print("\t[%zu/%zu] %s\n", i + 1, files.count, base_name(path));
 
-      print("\t[%zu/%zu] %s -> %s\n", i + 1, files.count, base_name(path),
-            entry_name);
+      int idx = batch_writer_add_mzml(w, NULL, path, map, (size_t)fsize,
+                                      arguments);
 
-      tar_entry_t w;
-      if (tar_begin_entry(out_fd, entry_name, &w) != 0) {
-         error("batch: tar_begin_entry failed for '%s'\n", entry_name);
-         free(entry_name);
-         remove_mapping(map, fsize);
-         close_file(in_fd);
-         had_error = 1;
-         break;
-      }
-
-      int64_t payload_start = get_offset(out_fd);
-
-      data_format_t* df = NULL;
-      divisions_t* divs = NULL;
-      long bs = arguments->blocksize;
-      int fail = 0;
-      if (preprocess_mzml(map, fsize, &bs, arguments, &df, &divs)) {
-         error("batch: preprocess failed for '%s'\n", path);
-         fail = 1;
-      } else if (compress_mzml(map, (size_t)fsize, arguments, df, divs,
-                               out_fd)) {
-         error("batch: compress failed for '%s'\n", path);
-         fail = 1;
-      }
-
-      int64_t payload_end = get_offset(out_fd);
-      uint64_t payload_bytes = (uint64_t)(payload_end - payload_start);
-
-      if (!fail) {
-         if (tar_end_entry(out_fd, &w, payload_bytes) != 0) {
-            error("batch: tar_end_entry failed for '%s'\n", entry_name);
-            fail = 1;
-         }
-      }
-
-      if (divs) dealloc_divisions(divs);
-      if (df) dealloc_df(df);
       remove_mapping(map, fsize);
       close_file(in_fd);
 
-      if (fail) {
-         free(entry_name);
-         had_error = 1;
-         if (arguments->continue_on_error) {
-            /* Note: a partially-written entry cannot be cleanly un-appended;
-             * fail-fast is the safe default. continue-on-error past a mid-entry
-             * failure would corrupt the archive, so we still stop here. */
+      if (idx < 0) {
+         /* A mid-entry failure corrupts the archive, so --continue-on-error
+          * cannot rescue it; only pre-entry rejections (a non-mzML input) are
+          * skippable. */
+         if (w->poisoned) {
             error("batch: cannot continue after a mid-entry failure; "
                   "aborting archive.\n");
+            fatal = 1;
+            break;
          }
+         n_skipped++;
+         if (arguments->continue_on_error) continue;
+         fatal = 1;
          break;
       }
-
-      recs[n_ok].entry = entry_name; /* owned */
-      recs[n_ok].original = strdup(base_name(path));
-      recs[n_ok].size = payload_bytes;
       n_ok++;
    }
 
-   /* 5) Manifest (final entry) + end-of-archive, only if no error. */
-   if (!had_error && n_ok > 0) {
-      size_t mlen = 0;
-      char* manifest = build_manifest(recs, n_ok, &mlen);
-      if (!manifest || tar_add_file(out_fd, "manifest.json", manifest, mlen) != 0) {
-         error("batch: failed to write manifest.json\n");
-         had_error = 1;
-      }
-      free(manifest);
-      if (!had_error && tar_finish(out_fd) != 0) {
-         error("batch: failed to finalize archive\n");
-         had_error = 1;
-      }
-   }
-
-   close_file(out_fd);
-
-   /* cleanup manifest records */
-   for (size_t i = 0; i < n_ok; ++i) {
-      free(recs[i].entry);
-      free(recs[i].original);
-   }
-   free(recs);
-   strlist_free(&used_names);
-   strlist_free(&files);
-
-   if (had_error) {
-      remove_file(out_path);
+   if (fatal || n_ok == 0) {
+      if (n_ok == 0 && !fatal)
+         error("batch: no input mzML files could be compressed.\n");
+      batch_writer_abort(w);
       if (out_path_owned) free(out_path);
+      strlist_free(&files);
       return -1;
    }
 
-   print("=== Batch wrote %zu entries to %s ===\n", n_ok, out_path);
+   /* 4) Manifest + end-of-archive. */
+   int frc = batch_writer_finish(w);
+
+   if (frc == 0) {
+      print("=== Batch wrote %zu entries to %s ===\n", n_ok, out_path);
+      if (n_skipped)
+         warning("batch: skipped %zu input(s); see warnings above.\n",
+                 n_skipped);
+   }
+
    if (out_path_owned) free(out_path);
-   return 0;
+   strlist_free(&files);
+   return frc;
 }

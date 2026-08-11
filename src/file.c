@@ -222,9 +222,10 @@ size_t read_from_file(int fd, void* buff, size_t n) {
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
  *
- * @return `long` Current offset of the file descriptor.
+ * @return `int64_t` Current offset of the file descriptor. 64-bit so archive
+ *         offsets past 2 GB stay correct on LLP64 (Windows).
  */
-long get_offset(int fd) {
+int64_t get_offset(int fd) {
 #ifdef _WIN32
    return _lseeki64(fd, 0, SEEK_CUR);
 #else
