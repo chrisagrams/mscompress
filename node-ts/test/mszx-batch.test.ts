@@ -346,6 +346,21 @@ describe("MSZXBatchWriter", () => {
     }
   });
 
+  it("releases the archive so it can be deleted after close", async () => {
+    // Windows only permits unlink once the last handle AND mapping are gone,
+    // so this asserts close() really releases the per-member mmaps rather than
+    // relying on the temp-dir sweep (which is best-effort by design).
+    const out = path.join(writeDir, "deletable.mszx");
+    await compressBatch(inDir, out);
+
+    const archive = MSZXBatchFile.open(out);
+    expect(archive.get(0).spectra.length).toBe(50); // force a member mmap
+    archive.close();
+
+    fs.unlinkSync(out);
+    expect(fs.existsSync(out)).toBe(false);
+  });
+
   it("leaves no archive behind on abort", async () => {
     const out = path.join(writeDir, "aborted.mszx");
     const writer = new MSZXBatchWriter(out);
