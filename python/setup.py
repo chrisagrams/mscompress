@@ -372,6 +372,39 @@ os.makedirs(os.path.dirname(config_h_path), exist_ok=True)
 with open(config_h_path, 'w') as f:
     f.write(config_h_content)
 
+# c-blosc2 shuffle filters only, mirroring vendor/Blosc2Include.cmake. Keep the
+# two lists in step: a stream written by one build has to read on the other.
+c_sources += [
+    _abs("../vendor/c-blosc2/blosc/shuffle.c"),
+    _abs("../vendor/c-blosc2/blosc/shuffle-generic.c"),
+    _abs("../vendor/c-blosc2/blosc/bitshuffle-generic.c"),
+    _abs("../vendor/blosc2-shim.c"),
+]
+
+include_dirs += [
+    _abs("../vendor/c-blosc2/include"),
+    _abs("../vendor/c-blosc2/blosc"),
+]
+
+# Per-ISA kernels, dispatched at runtime via cpuid. SSE2 and NEON are baseline
+# on x86-64/aarch64, so only AVX2 needs a per-file flag, which
+# build_ext_with_stubs already applies by matching "avx2" in the filename.
+if target_arch == 'x86_64':
+    c_sources += [
+        _abs("../vendor/c-blosc2/blosc/shuffle-sse2.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-sse2.c"),
+        _abs("../vendor/c-blosc2/blosc/shuffle-avx2.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-avx2.c"),
+    ]
+    define_macros += [('SHUFFLE_SSE2_ENABLED', '1'), ('SHUFFLE_AVX2_ENABLED', '1')]
+elif target_arch == 'arm64':
+    c_sources += [
+        _abs("../vendor/c-blosc2/blosc/shuffle-neon.c"),
+        _abs("../vendor/c-blosc2/blosc/bitshuffle-neon.c"),
+    ]
+    define_macros += [('SHUFFLE_NEON_ENABLED', '1')]
+# Other architectures fall back to the generic C paths above.
+
 # On Windows, ensure Windows SDK target-architecture macro is defined early
 # so that <Windows.h>/winnt.h doesn't error with "No Target Architecture".
 if sys.platform == 'win32':

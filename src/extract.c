@@ -967,6 +967,15 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
          error("extract_spectrum_mz: Failed to decompress mz block.\n");
          return NULL;
       }
+      /* Undo the byte shuffle before the block enters the cache, so every
+       * consumer of the cache sees plain samples. No-op for unshuffled files. */
+      if (df->mz_shuffle_elem > 1 &&
+          unshuffle_block_records(decmp_mz, mz_blk_len->original_size,
+                                  df->mz_shuffle_elem) != 0) {
+         error("extract_spectrum_mz: Failed to reverse m/z byte shuffle.\n");
+         free(decmp_mz);
+         return NULL;
+      }
       mz_blk_len->cache = decmp_mz;
    } else
       decmp_mz = mz_blk_len->cache;
@@ -1071,6 +1080,17 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       if (decmp_inten == NULL) {
          error(
              "extract_spectrum_inten: Failed to decompress intensity block.\n");
+         return NULL;
+      }
+      /* Undo the byte shuffle before the block enters the cache, so every
+       * consumer of the cache sees plain samples. No-op for unshuffled files. */
+      if (df->inten_shuffle_elem > 1 &&
+          unshuffle_block_records(decmp_inten, inten_blk_len->original_size,
+                                  df->inten_shuffle_elem) != 0) {
+         error(
+             "extract_spectrum_inten: Failed to reverse intensity byte "
+             "shuffle.\n");
+         free(decmp_inten);
          return NULL;
       }
       inten_blk_len->cache = decmp_inten;
@@ -1267,6 +1287,11 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    divisions_t* divisions;
    data_format_t* df;
 
+   /* Gate decoding, not identification: --describe still reports the version
+    * of a file this build cannot decode. */
+   if (msz_require_version(input_map, (long)input_filesize) != 0)
+      return;
+
    ZSTD_DCtx* dctx = alloc_dctx();
 
    if (dctx == NULL)
@@ -1274,9 +1299,12 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
 
    df = get_header_df(input_map);
 
-   parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
-                &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
-                &n_divisions);
+   if (parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
+                    &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
+                    &n_divisions) != 0) {
+      ZSTD_freeDCtx(dctx);
+      return;
+   }
 
    if (ms_level != 0)  // MS level selected
    {

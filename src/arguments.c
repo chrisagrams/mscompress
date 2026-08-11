@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "algos/algos.h"
 #include "mscompress.h"
 
 /**
@@ -46,6 +47,9 @@ void init_args(Arguments* args) {
    args->target_inten_format = _ZSTD_compression_;  // default
 
    args->zstd_compression_level = 3;  // default
+
+   args->shuffle = 1;  // default: on, opt out with --no-shuffle
+   args->shuffle_explicit = 0;
 
    args->json_output = 0;
 
@@ -351,6 +355,34 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    df->mz_scale_factor = args->mz_scale_factor;
    df->int_scale_factor = args->int_scale_factor;
 
+   /* Lossless path only: a lossy transform rewrites samples into an encoding
+    * whose element width is not the source width (and for vbr/bitpack is not
+    * fixed at all), so transposing on the source width would corrupt it. */
+   df->mz_shuffle_elem = 0;
+   df->inten_shuffle_elem = 0;
+
+   if (args->shuffle) {
+      if (mz_fmt == _lossless_)
+         df->mz_shuffle_elem = fmt_elem_size(df->source_mz_fmt);
+      if (inten_fmt == _lossless_)
+         df->inten_shuffle_elem = fmt_elem_size(df->source_inten_fmt);
+
+      /* Only for a caller who asked: on by default, so an unconditional warning
+         would fire on every lossy run for something they never requested. */
+      if (args->shuffle_explicit) {
+         if (mz_fmt != _lossless_ || inten_fmt != _lossless_)
+            warning(
+                "--shuffle only applies to losslessly stored streams; skipped "
+                "for the stream(s) using a lossy transform.\n");
+
+         if ((mz_fmt == _lossless_ && df->mz_shuffle_elem == 0) ||
+             (inten_fmt == _lossless_ && df->inten_shuffle_elem == 0))
+            warning(
+                "--shuffle skipped for a stream whose source data type has no "
+                "fixed element width.\n");
+      }
+   }
+
    return 0;
 }
 
@@ -362,11 +394,32 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
  * @note This function modifies the `data_format_t` struct in place.
  */
 int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
+   /* Strip the shuffle marker before dispatching on the accession; older files
+    * have the bit clear, so this is a no-op for them. */
+   int mz_fmt = MSZ_ALGO(msz_footer->mz_fmt);
+   int inten_fmt = MSZ_ALGO(msz_footer->inten_fmt);
+
+   df->mz_shuffle_elem = MSZ_HAS_SHUFFLE(msz_footer->mz_fmt)
+                             ? fmt_elem_size(df->source_mz_fmt)
+                             : 0;
+   df->inten_shuffle_elem = MSZ_HAS_SHUFFLE(msz_footer->inten_fmt)
+                                ? fmt_elem_size(df->source_inten_fmt)
+                                : 0;
+
+   if ((MSZ_HAS_SHUFFLE(msz_footer->mz_fmt) && df->mz_shuffle_elem == 0) ||
+       (MSZ_HAS_SHUFFLE(msz_footer->inten_fmt) &&
+        df->inten_shuffle_elem == 0)) {
+      error(
+          "set_decompress_runtime_variables: file is byte-shuffled but the "
+          "source data type has no fixed element width; cannot reverse it.\n");
+      return 1;
+   }
+
    // Set target encoding and decompression functions.
-   df->encode_source_compression_mz_fun = set_encode_fun(
-       df->source_compression, msz_footer->mz_fmt, df->source_mz_fmt);
-   df->encode_source_compression_inten_fun = set_encode_fun(
-       df->source_compression, msz_footer->inten_fmt, df->source_inten_fmt);
+   df->encode_source_compression_mz_fun =
+       set_encode_fun(df->source_compression, mz_fmt, df->source_mz_fmt);
+   df->encode_source_compression_inten_fun =
+       set_encode_fun(df->source_compression, inten_fmt, df->source_inten_fmt);
 
    if (df->encode_source_compression_mz_fun == NULL ||
        df->encode_source_compression_inten_fun == NULL) {
@@ -375,10 +428,8 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    }
 
    // Set target decompression functions.
-   df->target_mz_fun =
-       set_decompress_algo(msz_footer->mz_fmt, df->source_mz_fmt);
-   df->target_inten_fun =
-       set_decompress_algo(msz_footer->inten_fmt, df->source_inten_fmt);
+   df->target_mz_fun = set_decompress_algo(mz_fmt, df->source_mz_fmt);
+   df->target_inten_fun = set_decompress_algo(inten_fmt, df->source_inten_fmt);
 
    if (df->target_mz_fun == NULL || df->target_inten_fun == NULL) {
       error("set_decompress_runtime_variables: Failed to set target decompression functions.\n");

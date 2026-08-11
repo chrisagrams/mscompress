@@ -292,9 +292,13 @@ char* serialize_df(data_format_t* df) {
  * @note The returned data_format_t is malloc'd. The caller must free it.
  */
 data_format_t* deserialize_df(char* buff) {
-   data_format_t* r = malloc(sizeof(data_format_t));
+   /* Zeroed, not merely allocated: only the serialized members are filled in
+    * below, so every runtime-only member must start from a defined value. A
+    * caller reading one before set_{compress,decompress}_runtime_variables()
+    * has run would otherwise act on whatever happened to be on the heap. */
+   data_format_t* r = calloc(1, sizeof(data_format_t));
    if (r == NULL)
-      error("deserialize_df: malloc failed.\n");
+      error("deserialize_df: calloc failed.\n");
 
    size_t offset = 0;
 
@@ -366,8 +370,12 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Interpret #defines
    char message_buff[MESSAGE_SIZE] = MESSAGE;
    int magic_tag = MAGIC_TAG;
-   int format_version_major = FORMAT_VERSION_MAJOR;
-   int format_version_minor = FORMAT_VERSION_MINOR;
+
+   /* Stamp 0.2 only when the file uses something 0.1 cannot express, so plain
+    * output stays readable by a 0.1-only reader. */
+   int shuffled = (df->mz_shuffle_elem > 0 || df->inten_shuffle_elem > 0);
+   int format_version_major = shuffled ? MSZ_V02_MAJOR : MSZ_V01_MAJOR;
+   int format_version_minor = shuffled ? MSZ_V02_MINOR : MSZ_V01_MINOR;
 
    memcpy(header_buff, &magic_tag, sizeof(magic_tag));
    memcpy(header_buff + sizeof(magic_tag), &format_version_major,
@@ -480,6 +488,75 @@ footer_t* read_footer(void* input_map, long filesize) {
 }
 
 /**
+ * @brief Maps an on-disk (major, minor) stamp to its msz version string.
+ *
+ * @return "0.1" / "0.2", or NULL if the stamp is not a supported version.
+ */
+const char* msz_version_string(int major, int minor) {
+   if (major == MSZ_V01_MAJOR && minor == MSZ_V01_MINOR)
+      return "0.1";
+   if (major == MSZ_V02_MAJOR && minor == MSZ_V02_MINOR)
+      return "0.2";
+   return NULL;
+}
+
+/**
+ * @brief Reads and validates the msz format version from a file header.
+ *
+ * @param input_map Pointer to the memory-mapped file.
+ * @param filesize Length of the mapping in bytes.
+ * @param major Receives the stored major version. May be NULL.
+ * @param minor Receives the stored minor version. May be NULL.
+ *
+ * @return 0 if the version is supported, non-zero otherwise.
+ */
+int msz_read_version(void* input_map, long filesize, int* major, int* minor) {
+   int stored_major = 0;
+   int stored_minor = 0;
+
+   if (filesize < FORMAT_VERSION_OFFSET + (long)(2 * sizeof(int)))
+      return 1;
+
+   memcpy(&stored_major, (char*)input_map + FORMAT_VERSION_OFFSET,
+          sizeof(stored_major));
+   memcpy(&stored_minor,
+          (char*)input_map + FORMAT_VERSION_OFFSET + sizeof(stored_major),
+          sizeof(stored_minor));
+
+   if (major)
+      *major = stored_major;
+   if (minor)
+      *minor = stored_minor;
+
+   return msz_version_string(stored_major, stored_minor) == NULL ? 1 : 0;
+}
+
+/**
+ * @brief Rejects an .msz this build cannot decode, reporting why.
+ *
+ * Wraps msz_read_version() for the decode paths. Inspection paths
+ * (--describe) call msz_read_version() directly so they can still report the
+ * version of a file that is not supported.
+ *
+ * @param input_map Pointer to the memory-mapped file.
+ * @param filesize Length of the mapping in bytes.
+ *
+ * @return 0 if the file can be decoded, non-zero otherwise.
+ */
+int msz_require_version(void* input_map, long filesize) {
+   int major = 0;
+   int minor = 0;
+
+   if (msz_read_version(input_map, filesize, &major, &minor) == 0)
+      return 0;
+
+   error("file is msz version %d.%d; this build supports %s-%s.\n", major,
+         minor, MIN_SUPPORT, MAX_SUPPORT);
+
+   return 1;
+}
+
+/**
  * @brief Prints the contents of a `footer_t` struct to stdout in CSV format.
  *
  * Outputs a CSV header line followed by a single data line containing all
@@ -487,7 +564,7 @@ footer_t* read_footer(void* input_map, long filesize) {
  *
  * @param footer Pointer to the `footer_t` struct to print.
  */
-void print_footer_csv(footer_t* footer) {
+void print_footer_csv(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
       warning("print_footer_csv: footer is NULL.\n");
       return;
@@ -496,16 +573,31 @@ void print_footer_csv(footer_t* footer) {
    printf(
        "xml_pos,mz_binary_pos,inten_binary_pos,xml_blk_pos,mz_binary_blk_pos,"
        "inten_binary_blk_pos,divisions_t_pos,num_spectra,original_filesize,n_"
-       "divisions,magic_tag,mz_fmt,inten_fmt\n");
-   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d\n", footer->xml_pos,
-          footer->mz_binary_pos, footer->inten_binary_pos, footer->xml_blk_pos,
-          footer->mz_binary_blk_pos, footer->inten_binary_blk_pos,
-          footer->divisions_t_pos, footer->num_spectra,
-          footer->original_filesize, footer->n_divisions, footer->magic_tag,
-          footer->mz_fmt, footer->inten_fmt);
+       "divisions,magic_tag,mz_fmt,inten_fmt,mz_shuffle,inten_shuffle,msz_"
+       "version,msz_version_supported\n");
+   /* mz_fmt/inten_fmt are reported with the shuffle marker stripped, so the
+    * value keeps mapping straight onto an algorithm accession as it always
+    * has; the marker is surfaced in its own trailing columns instead. */
+   /* A version this build does not know is still reported, as its raw
+      stamp: that is the answer --describe exists to give. */
+   const char* known = msz_version_string(msz_major, msz_minor);
+   char raw[32];
+
+   if (known == NULL)
+      snprintf(raw, sizeof(raw), "%d.%d", msz_major, msz_minor);
+
+   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d,%d,%d,%s,%s\n",
+          footer->xml_pos, footer->mz_binary_pos, footer->inten_binary_pos,
+          footer->xml_blk_pos, footer->mz_binary_blk_pos,
+          footer->inten_binary_blk_pos, footer->divisions_t_pos,
+          footer->num_spectra, footer->original_filesize, footer->n_divisions,
+          footer->magic_tag, MSZ_ALGO(footer->mz_fmt),
+          MSZ_ALGO(footer->inten_fmt), MSZ_HAS_SHUFFLE(footer->mz_fmt) ? 1 : 0,
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? 1 : 0, known ? known : raw,
+          known ? "true" : "false");
 }
 
-void print_footer_json(footer_t* footer) {
+void print_footer_json(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
       warning("print_footer_json: footer is NULL.\n");
       return;
@@ -523,8 +615,20 @@ void print_footer_json(footer_t* footer) {
    printf("  \"original_filesize\": %lu,\n", footer->original_filesize);
    printf("  \"n_divisions\": %d,\n", footer->n_divisions);
    printf("  \"magic_tag\": %d,\n", footer->magic_tag);
-   printf("  \"mz_fmt\": %d,\n", footer->mz_fmt);
-   printf("  \"inten_fmt\": %d\n", footer->inten_fmt);
+   printf("  \"mz_fmt\": %d,\n", MSZ_ALGO(footer->mz_fmt));
+   printf("  \"inten_fmt\": %d,\n", MSZ_ALGO(footer->inten_fmt));
+   printf("  \"mz_shuffle\": %s,\n",
+          MSZ_HAS_SHUFFLE(footer->mz_fmt) ? "true" : "false");
+   printf("  \"inten_shuffle\": %s,\n",
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? "true" : "false");
+   const char* known = msz_version_string(msz_major, msz_minor);
+
+   if (known)
+      printf("  \"msz_version\": \"%s\",\n", known);
+   else
+      printf("  \"msz_version\": \"%d.%d\",\n", msz_major, msz_minor);
+
+   printf("  \"msz_version_supported\": %s\n", known ? "true" : "false");
    printf("}\n");
 }
 

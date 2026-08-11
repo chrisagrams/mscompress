@@ -15,6 +15,11 @@ def msz_file_path():
     return str(_TEST_DATA_DIR / "test.msz")
 
 @pytest.fixture
+def shuffled_msz_file_path():
+    """A checked-in byte-shuffled .msz (format 0.2)."""
+    return str(_TEST_DATA_DIR / "test_shuffled.msz")
+
+@pytest.fixture
 def test_data_dir():
     return str(_TEST_DATA_DIR)
 

@@ -7,13 +7,30 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define STATUS "Dev"
+/* Build status reported by the CLI (`--version`). The CLI's CMakeLists.txt
+   defines this from the build configuration; the fallback covers consumers
+   that compile these sources without it (Python setup.py, Node addon). */
+#ifndef STATUS
+#define STATUS "Release"
+#endif
 #define MIN_SUPPORT "0.1"
-#define MAX_SUPPORT "0.1"
+#define MAX_SUPPORT "0.2"
 #define ADDRESS "chrisagrams@gmail.com"
 
-#define FORMAT_VERSION_MAJOR 1
-#define FORMAT_VERSION_MINOR 0
+/*
+ * On-disk msz format stamps, written to header bytes 4-11.
+ *
+ * 0.1 predates any version check and is stored as (1, 0); 0.2 onward store the
+ * version itself. A file is stamped 0.2 only when it uses a feature 0.1 cannot
+ * express (currently the byte shuffle), so output a 0.1 reader could parse
+ * stays labeled 0.1.
+ */
+#define MSZ_V01_MAJOR 1
+#define MSZ_V01_MINOR 0
+#define MSZ_V02_MAJOR 0
+#define MSZ_V02_MINOR 2
+
+#define FORMAT_VERSION_OFFSET 4
 
 #define BUFSIZE 4096
 #define ZLIB_BUFF_FACTOR 1024000  // initial size of zlib buffer
@@ -72,6 +89,18 @@
 
 #define _LZ4_compression_ 4700012
 
+/*
+ * Byte-shuffle marker: a flag bit OR'd into the footer's mz_fmt/inten_fmt
+ * rather than a new footer field, so sizeof(footer_t) - which read_footer()
+ * uses to locate the footer from the end of the file - is unchanged and older
+ * .msz files still parse. Accessions stop at 4700012, so bit 24 is free.
+ *
+ * Always unwrap a stored format with MSZ_ALGO() before dispatching on it.
+ */
+#define _shuffle_flag_ 0x01000000
+#define MSZ_ALGO(fmt) ((fmt) & ~_shuffle_flag_)
+#define MSZ_HAS_SHUFFLE(fmt) (((fmt) & _shuffle_flag_) != 0)
+
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
@@ -125,6 +154,13 @@ typedef struct {
    int target_inten_format;
 
    int zstd_compression_level;
+
+   /* Byte-shuffle binary streams before compressing. On by default; --no-shuffle
+      turns it off. `shuffle_explicit` records whether the caller asked either
+      way, so the "skipped for a lossy stream" warnings only fire for someone who
+      actually requested it. */
+   int shuffle;
+   int shuffle_explicit;
 
    int json_output;
 
@@ -353,6 +389,12 @@ typedef struct {
    int zstd_compression_level;  // no need to write to file since ZSTD_DCtx
                                 // doesn't need it.
 
+   /* Byte-shuffle element width per binary stream, in bytes. 0 disables it.
+    * Derived from the source data type on compress, and from the footer's
+    * shuffle flag plus the source data type on decompress. */
+   int mz_shuffle_elem;
+   int inten_shuffle_elem;
+
 } data_format_t;
 
 /* arguments.c */
@@ -391,8 +433,8 @@ long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
-void print_footer_csv(footer_t* footer);
-void print_footer_json(footer_t* footer);
+void print_footer_csv(footer_t* footer, int msz_major, int msz_minor);
+void print_footer_json(footer_t* footer, int msz_major, int msz_minor);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
                 char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
@@ -421,6 +463,9 @@ int tar_add_file(int fd, const char* name, const void* data, size_t len);
 int tar_finish(int fd);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
+const char* msz_version_string(int major, int minor);
+int msz_read_version(void* input_map, long filesize, int* major, int* minor);
+int msz_require_version(void* input_map, long filesize);
 int close_file(int fd);
 
 /* mszx.c */
@@ -497,7 +542,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                     Arguments* arguments, data_format_t** df,
                     divisions_t** divisions);
-void parse_footer(footer_t** footer, void* input_map, long input_filesize,
+int parse_footer(footer_t** footer, void* input_map, long input_filesize,
                   block_len_queue_t** xml_block_lens,
                   block_len_queue_t** mz_binary_block_lens,
                   block_len_queue_t** inten_binary_block_lens,
@@ -699,6 +744,7 @@ typedef struct {
    float scale_factor;
    int ret_code;
    Algo algo_fun;
+   int shuffle_elem; /* Byte-shuffle element width for this stream; 0 = off. */
 } algo_args;
 
 extern const algo_info_t algo_registry[];

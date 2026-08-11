@@ -69,6 +69,12 @@ static void print_usage(FILE* stream, int exit_code) {
            " --zstd-compression-level level Set zstd compression level (1-22). "
            "(default: 3)\n");
    fprintf(stream,
+           " --no-shuffle                   Disable the byte shuffle of binary "
+           "arrays. (shuffle is enabled by default)\n");
+   fprintf(stream,
+           " --shuffle                      Byte-shuffle binary arrays before "
+           "compression (lossless streams only). (enabled by default)\n");
+   fprintf(stream,
            "  -b, --blocksize size          Set maximum blocksize (xKB, xMB, "
            "xGB). (default: 100MB)\n");
    fprintf(stream,
@@ -264,6 +270,12 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             str++;
          }
          arguments->zstd_compression_level = num;
+      } else if (strcmp(argv[i], "--shuffle") == 0) {
+         arguments->shuffle = 1;
+         arguments->shuffle_explicit = 1;
+      } else if (strcmp(argv[i], "--no-shuffle") == 0) {
+         arguments->shuffle = 0;
+         arguments->shuffle_explicit = 1;
       } else if (strcmp(argv[i], "--list-algorithms") == 0) {
          if (arguments->json_output)
             print_algorithms_json();
@@ -555,10 +567,14 @@ int main(int argc, char* argv[]) {
          footer_t* footer = read_footer(input_map, input_filesize);
          if (!footer)
             exit(1);
+         /* Report the version even when this build cannot decode the file;
+            that is the answer --describe exists to give. */
+         int major = 0, minor = 0;
+         msz_read_version(input_map, input_filesize, &major, &minor);
          if (arguments.json_output)
-            print_footer_json(footer);
+            print_footer_json(footer, major, minor);
          else
-            print_footer_csv(footer);
+            print_footer_csv(footer, major, minor);
          break;
       };
       case DECOMPRESS_MSZX: {
