@@ -64,6 +64,35 @@ add_test(NAME MSZXDecompressTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_mszx.cmake
 )
 
+# Batch mode: N mzML -> one .mszx -> N mzML. Round-trip (byte-identical),
+# dir/glob/list parity, tar validity, and --list.
+add_test(NAME BatchRoundTripTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch.cmake
+)
+
+# Batch paths the round-trip test misses: __N name collisions,
+# --continue-on-error, fail-fast cleanup, and legacy-form batch misdetection.
+add_test(NAME BatchPathsTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_paths
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_paths.cmake
+)
+
+# Batch error paths: empty match set + non-seekable (FIFO) output rejection.
+add_test(NAME BatchRejectTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_reject
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}

@@ -37,6 +37,8 @@ Napi::Value ZstdDecompress(const Napi::CallbackInfo& info);
 
 Napi::Value OpenMszFromArchive(const Napi::CallbackInfo& info);
 
+Napi::Function BatchWriterInit(Napi::Env env);
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Register FileHandle class
     FileHandle::Init(env, exports);
@@ -84,6 +86,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     // MSZX archive helpers
     exports.Set("openMszFromArchive", Napi::Function::New(env, OpenMszFromArchive));
+
+    // Batch (.mszx v2) writer class
+    exports.Set("BatchWriter", BatchWriterInit(env));
 
     return exports;
 }

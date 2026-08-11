@@ -52,6 +52,15 @@ void init_args(Arguments* args) {
    args->shuffle_explicit = 0;
 
    args->json_output = 0;
+
+   // Batch mode defaults.
+   args->batch = 0;
+   args->recursive = 0;
+   args->continue_on_error = 0;
+   args->list_mode = 0;
+   args->from_file = NULL;
+   args->inputs = NULL;
+   args->n_inputs = 0;
 }
 
 /**

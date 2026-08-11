@@ -50,6 +50,7 @@ set(CPP_SOURCE_FILES
   src/native/extract.cpp
   src/native/zstd_utils.cpp
   src/native/mszx.cpp
+  src/native/batch.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})

@@ -2608,3 +2608,249 @@ def get_filesize(path: Union[str, bytes]) -> int:
         raise FileNotFoundError(f"File not found: {path}")
     
     return _get_filesize(path)
+
+
+cdef class MSZXBatchWriter:
+    """
+    Incremental writer for a v2 multi-file ("batch") .mszx archive.
+
+    Wraps the same C writer the CLI drives, so an archive written from Python
+    is byte-identical to one the CLI produces from the same inputs and
+    settings. Each entry streams straight into the archive file — no temp .msz
+    staging — which is why the output must be a seekable regular file.
+
+    The archive only becomes valid once `finish()` succeeds: it writes
+    manifest.json and the end-of-archive marker. Leaving the `with` block via
+    an exception calls `abort()`, removing the partial archive.
+
+    Parameters:
+    path (Union[str, bytes, PathLike]): Output .mszx path.
+    **kwargs: Compression settings forwarded to RuntimeArguments (threads,
+        blocksize, mz_lossy, int_lossy, mz_scale_factor, int_scale_factor,
+        target_xml_format, target_mz_format, target_inten_format,
+        zstd_compression_level).
+
+    Example:
+        with MSZXBatchWriter("cohort.mszx", threads=8) as w:
+            idx = w.add("run1.mzML")
+            w.add_annotation(idx, pin_bytes, "annotations/run1.pin",
+                             format="percolator_tsv")
+    """
+
+    cdef batch_writer_t* _writer
+    cdef RuntimeArguments _arguments
+    cdef object _path
+    cdef list _entries
+    cdef bint _finished
+
+    def __cinit__(self):
+        self._writer = NULL
+        self._finished = False
+
+    def __init__(self, path, **kwargs):
+        self._path = os.fspath(path)
+        if isinstance(self._path, str):
+            path_bytes = self._path.encode("utf-8")
+        else:
+            path_bytes = self._path
+
+        self._arguments = RuntimeArguments()
+        for key, value in kwargs.items():
+            if not hasattr(self._arguments, key):
+                raise TypeError(f"Unknown compression setting: {key!r}")
+            setattr(self._arguments, key, value)
+
+        self._entries = []
+        self._writer = _batch_writer_open(path_bytes)
+        if self._writer == NULL:
+            raise OSError(
+                f"Could not open .mszx archive for writing: {os.fsdecode(path_bytes)} "
+                f"(the output must be a seekable regular file, not a pipe)"
+            )
+
+    def __dealloc__(self):
+        # An un-finished writer left to the GC would otherwise leak the fd and
+        # strand a partial archive on disk.
+        if self._writer != NULL:
+            _batch_writer_abort(self._writer)
+            self._writer = NULL
+
+    cdef _check_open(self):
+        if self._writer == NULL:
+            raise ValueError("Operation on a finished or aborted MSZXBatchWriter")
+
+    def add(self, source, name=None) -> int:
+        """
+        Compress one mzML into the archive as a new entry.
+
+        Parameters:
+        source (Union[str, bytes, PathLike, MZMLFile]): mzML to compress. An
+            already-open MZMLFile reuses its existing mapping.
+        name (Optional[str]): Entry name inside the archive. Defaults to
+            "<source basename minus .mzML>.msz"; collisions get __2, __3, ...
+            suffixes. Naming is handled by the C writer so the CLI and every
+            binding agree.
+
+        Returns:
+        int: Index of the new entry, for use with add_annotation/set_join_key.
+        """
+        self._check_open()
+
+        cdef bytes name_bytes = name.encode("utf-8") if isinstance(name, str) else name
+        cdef const char* name_ptr = <const char*>name_bytes if name_bytes is not None else NULL
+
+        cdef void* mapping
+        cdef size_t filesize
+        cdef int fd = -1
+        cdef bytes src_bytes
+        cdef const char* src_ptr
+        cdef int idx
+        cdef Arguments* args = self._arguments.get_ptr()
+        cdef MZMLFile mzml
+
+        if isinstance(source, MZMLFile):
+            mzml = <MZMLFile>source
+            mapping = mzml._mapping
+            filesize = mzml.filesize
+            src_bytes = mzml._path
+            if mapping == NULL:
+                raise ValueError("MZMLFile is closed; cannot add it to an archive")
+            # Borrow the char* under the GIL; coercing a Python object is not
+            # allowed once it is released.
+            src_ptr = <const char*>src_bytes
+            with nogil:
+                idx = _batch_writer_add_mzml(
+                    self._writer, name_ptr, src_ptr, mapping, filesize, args)
+        else:
+            src = os.fspath(source)
+            src_bytes = src.encode("utf-8") if isinstance(src, str) else src
+            if not os.path.exists(src_bytes):
+                raise FileNotFoundError(f"File not found: {os.fsdecode(src_bytes)}")
+            fd = _open_input_file(src_bytes)
+            if fd < 0:
+                raise OSError(f"Could not open: {os.fsdecode(src_bytes)}")
+            filesize = _get_filesize(src_bytes)
+            mapping = _get_mapping(fd)
+            if mapping == NULL:
+                _close_file(fd)
+                raise OSError(f"Could not map: {os.fsdecode(src_bytes)}")
+            src_ptr = <const char*>src_bytes
+            try:
+                with nogil:
+                    idx = _batch_writer_add_mzml(
+                        self._writer, name_ptr, src_ptr, mapping, filesize, args)
+            finally:
+                _remove_mapping(mapping, filesize)
+                _close_file(fd)
+
+        if idx < 0:
+            raise ValueError(
+                f"Could not add {os.fsdecode(src_bytes)!r} to the archive "
+                f"(not an mzML file, or compression failed)"
+            )
+
+        self._entries.append(os.fsdecode(src_bytes))
+        return idx
+
+    def add_annotation(self, int entry_index, data, filename,
+                       format="tsv", compressed=False, num_records=None) -> None:
+        """
+        Attach an annotation file to a spectra entry, as its own archive member.
+
+        Parameters:
+        entry_index (int): Value returned by `add()`.
+        data (bytes): Annotation payload. Compression is the caller's job —
+            pass already-compressed bytes and set `compressed=True`.
+        filename (str): Member name inside the archive.
+        format (str): Reader-supported format tag (e.g. "percolator_tsv",
+            "pepxml", "tsv").
+        compressed (bool): Records whether `data` is zstd-compressed.
+        num_records (Optional[int]): Record/PSM count, if known.
+        """
+        self._check_open()
+
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise TypeError("Annotation data must be bytes-like")
+        cdef bytes payload = bytes(data)
+        cdef bytes fname = filename.encode("utf-8") if isinstance(filename, str) else filename
+        cdef bytes fmt = format.encode("utf-8") if isinstance(format, str) else format
+        cdef int64_t records = -1 if num_records is None else <int64_t>num_records
+
+        cdef const char* payload_ptr = <const char*>payload if len(payload) else NULL
+        if _batch_writer_add_annotation(
+                self._writer, entry_index, <const char*>fname,
+                <const void*>payload_ptr, <size_t>len(payload),
+                <const char*>fmt, 1 if compressed else 0, records) != 0:
+            raise ValueError(
+                f"Could not add annotation {os.fsdecode(fname)!r} to entry {entry_index}"
+            )
+
+    def set_join_key(self, int entry_index, join_key) -> None:
+        """Set the column used to join annotations to spectra for one entry."""
+        self._check_open()
+        cdef bytes key = join_key.encode("utf-8") if isinstance(join_key, str) else join_key
+        if _batch_writer_set_join_key(self._writer, entry_index, <const char*>key) != 0:
+            raise ValueError(f"Could not set join_key on entry {entry_index}")
+
+    def set_description(self, description) -> None:
+        """Set an archive-level free-text description."""
+        self._check_open()
+        cdef bytes desc = description.encode("utf-8") if isinstance(description, str) else description
+        if _batch_writer_set_description(self._writer, <const char*>desc) != 0:
+            raise ValueError("Could not set archive description")
+
+    def set_extra(self, extra) -> None:
+        """
+        Set the archive-level `extra` metadata object.
+
+        Parameters:
+        extra (dict): Serialized to JSON and embedded in the manifest.
+        """
+        self._check_open()
+        import json
+        cdef bytes blob = json.dumps(extra).encode("utf-8")
+        if _batch_writer_set_extra_json(self._writer, <const char*>blob) != 0:
+            raise ValueError("Could not set archive extra metadata")
+
+    def finish(self) -> None:
+        """
+        Write manifest.json and the end-of-archive marker, then close.
+
+        On failure the partial archive is removed. The writer is unusable
+        afterwards either way.
+        """
+        self._check_open()
+        cdef int rc = _batch_writer_finish(self._writer)
+        self._writer = NULL  # freed by finish(), success or not
+        self._finished = True
+        if rc != 0:
+            raise OSError(f"Could not finalize .mszx archive: {self._path}")
+
+    def abort(self) -> None:
+        """Discard the archive, removing the partial file. Idempotent."""
+        if self._writer != NULL:
+            _batch_writer_abort(self._writer)
+            self._writer = NULL
+
+    @property
+    def path(self):
+        """Output archive path."""
+        return self._path
+
+    @property
+    def entries(self) -> list:
+        """Source paths added so far, in archive order."""
+        return list(self._entries)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            self.abort()
+        elif self._writer != NULL:
+            self.finish()
+        return False

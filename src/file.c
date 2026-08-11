@@ -222,9 +222,10 @@ size_t read_from_file(int fd, void* buff, size_t n) {
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
  *
- * @return `long` Current offset of the file descriptor.
+ * @return `int64_t` Current offset of the file descriptor. 64-bit so archive
+ *         offsets past 2 GB stay correct on LLP64 (Windows).
  */
-long get_offset(int fd) {
+int64_t get_offset(int fd) {
 #ifdef _WIN32
    return _lseeki64(fd, 0, SEEK_CUR);
 #else
@@ -1285,5 +1286,174 @@ void* get_mapping_range(int fd, int64_t offset, size_t length,
                      (off_t)aligned_off);
    if (base == MAP_FAILED) return NULL;
    return base;
+#endif
+}
+
+/* ---------- USTAR archive WRITER (MSZX batch, Option A streaming) ---------- */
+
+/* Writer-only USTAR field offsets (reader offsets are #defined above). */
+#define USTAR_MODE_OFF 100
+#define USTAR_UID_OFF 108
+#define USTAR_GID_OFF 116
+#define USTAR_MTIME_OFF 136
+#define USTAR_CHKSUM_OFF 148
+#define USTAR_VERSION_OFF 263
+
+/* Absolute seek helper (platform-correct 64-bit). */
+static int64_t tar_lseek_set(int fd, int64_t off) {
+#ifdef _WIN32
+   return _lseeki64(fd, off, SEEK_SET);
+#else
+   return (int64_t)lseek(fd, (off_t)off, SEEK_SET);
+#endif
+}
+
+/* Standard USTAR checksum: unsigned sum of all 512 header bytes with the
+ * 8-byte checksum field counted as ASCII spaces. */
+static unsigned tar_checksum(const char* hdr) {
+   unsigned sum = 0;
+   for (int i = 0; i < TAR_BLOCK_SIZE; ++i) {
+      if (i >= USTAR_CHKSUM_OFF && i < USTAR_CHKSUM_OFF + 8)
+         sum += (unsigned)' ';
+      else
+         sum += (unsigned char)hdr[i];
+   }
+   return sum;
+}
+
+/* Write the size (11 octal digits + NUL) and checksum (6 octal digits, NUL,
+ * space) fields into an already-populated 512B header. */
+static void tar_fill_size_and_checksum(char* hdr, uint64_t size) {
+   memset(hdr + USTAR_SIZE_OFF, 0, USTAR_SIZE_LEN);
+   snprintf(hdr + USTAR_SIZE_OFF, USTAR_SIZE_LEN, "%011llo",
+            (unsigned long long)size);
+   memset(hdr + USTAR_CHKSUM_OFF, ' ', 8);
+   unsigned sum = tar_checksum(hdr);
+   snprintf(hdr + USTAR_CHKSUM_OFF, 7, "%06o", sum);
+   hdr[USTAR_CHKSUM_OFF + 6] = '\0';
+   hdr[USTAR_CHKSUM_OFF + 7] = ' ';
+}
+
+/* Populate a full 512B POSIX-ustar header for a regular file. Returns 0, or -1
+ * if `name` cannot be represented in the 100-byte name / 155-byte prefix split. */
+static int tar_build_header(char hdr[TAR_BLOCK_SIZE], const char* name,
+                            uint64_t size) {
+   memset(hdr, 0, TAR_BLOCK_SIZE);
+
+   size_t nlen = strlen(name);
+   if (nlen <= USTAR_NAME_LEN) {
+      memcpy(hdr + USTAR_NAME_OFF, name, nlen);
+   } else {
+      size_t split = 0;
+      for (size_t i = 0; i < nlen; ++i) {
+         if (name[i] == '/') {
+            if (i <= USTAR_PREFIX_LEN && (nlen - i - 1) <= USTAR_NAME_LEN) {
+               split = i;
+               break;
+            }
+         }
+      }
+      if (split == 0) return -1; /* name too long for USTAR */
+      memcpy(hdr + USTAR_PREFIX_OFF, name, split);
+      memcpy(hdr + USTAR_NAME_OFF, name + split + 1, nlen - split - 1);
+   }
+
+   memcpy(hdr + USTAR_MODE_OFF, "0000644", 7);
+   memcpy(hdr + USTAR_UID_OFF, "0000000", 7);
+   memcpy(hdr + USTAR_GID_OFF, "0000000", 7);
+   memcpy(hdr + USTAR_MTIME_OFF, "00000000000", 11); /* mtime 0 = deterministic */
+   hdr[USTAR_TYPEFLAG_OFF] = '0';                     /* regular file */
+   memcpy(hdr + USTAR_MAGIC_OFF, "ustar", 5);
+   hdr[USTAR_MAGIC_OFF + 5] = '\0';
+   memcpy(hdr + USTAR_VERSION_OFF, "00", 2);
+
+   tar_fill_size_and_checksum(hdr, size);
+   return 0;
+}
+
+/* Write `n` zero bytes at the current fd position. */
+static int tar_write_zeros(int fd, size_t n) {
+   char zeros[TAR_BLOCK_SIZE];
+   memset(zeros, 0, sizeof(zeros));
+   while (n > 0) {
+      size_t want = n < sizeof(zeros) ? n : sizeof(zeros);
+      if (write_to_file(fd, zeros, want) != want) return -1;
+      n -= want;
+   }
+   return 0;
+}
+
+int tar_begin_entry(int fd, const char* name, tar_entry_t* w) {
+   if (fd < 0 || !name || !w) return -1;
+   if (tar_build_header(w->header, name, 0) != 0) {
+      error("tar_begin_entry: entry name too long for USTAR: %s\n", name);
+      return -1;
+   }
+   w->header_off = get_offset(fd);
+   if (w->header_off < 0) return -1;
+   if (write_to_file(fd, w->header, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+   return 0;
+}
+
+int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size) {
+   if (fd < 0 || !w) return -1;
+
+   /* Patch size + checksum into the cached header and rewrite it in place. */
+   tar_fill_size_and_checksum(w->header, payload_size);
+   if (tar_lseek_set(fd, w->header_off) < 0) return -1;
+   if (write_to_file(fd, w->header, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+
+   /* Seek to end of payload and pad to the next 512B boundary. */
+   int64_t payload_end =
+       w->header_off + TAR_BLOCK_SIZE + (int64_t)payload_size;
+   if (tar_lseek_set(fd, payload_end) < 0) return -1;
+   size_t pad = (size_t)((TAR_BLOCK_SIZE - (payload_size % TAR_BLOCK_SIZE)) %
+                         TAR_BLOCK_SIZE);
+   return tar_write_zeros(fd, pad);
+}
+
+int tar_add_file(int fd, const char* name, const void* data, size_t len) {
+   if (fd < 0 || !name) return -1;
+   char hdr[TAR_BLOCK_SIZE];
+   if (tar_build_header(hdr, name, (uint64_t)len) != 0) {
+      error("tar_add_file: entry name too long for USTAR: %s\n", name);
+      return -1;
+   }
+   if (write_to_file(fd, hdr, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+   if (len && write_to_file(fd, (char*)data, len) != len) return -1;
+   size_t pad = (TAR_BLOCK_SIZE - (len % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
+   return tar_write_zeros(fd, pad);
+}
+
+int tar_finish(int fd) {
+   if (fd < 0) return -1;
+   return tar_write_zeros(fd, TAR_BLOCK_SIZE * 2);
+}
+
+int open_output_file_rw(char* path) {
+   int fd = -1;
+   if (path) {
+#ifdef _WIN32
+      fd = _open(path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, 0666);
+#else
+      fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+#endif
+      if (fd < 0)
+         warning("Error opening output archive (rw). (%s)\n", strerror(errno));
+   }
+   return fd;
+}
+
+int fd_is_seekable(int fd) {
+   if (fd < 0) return 0;
+#ifdef _WIN32
+   return _lseeki64(fd, 0, SEEK_CUR) >= 0;
+#else
+   off_t r = lseek(fd, 0, SEEK_CUR);
+   if (r == (off_t)-1) return 0;
+   return 1;
 #endif
 }

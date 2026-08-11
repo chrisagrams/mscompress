@@ -37,6 +37,49 @@ Usage: mscompress [OPTION...] input_file [output_file]
 | — | `--list-algorithms` | List available lossy algorithms |
 | — | `--json` | Output JSON for `--describe`, `--list-algorithms`, `--version` |
 
+## Batch options
+
+Compress many mzML into one `.mszx` archive. See the
+[MSZX format spec](../format/mszx.md) for the v2 layout.
+
+| Flag | Long | Argument | Description |
+|------|------|----------|-------------|
+| — | `--batch` | — | Force batch mode (usually inferred — see below) |
+| `-r` | `--recursive` | — | Descend into subdirectories for directory inputs |
+| `-o` | `--output` | path | Output archive path. Required output form for batch |
+| — | `--from-file` | path | Read newline-separated input paths from a manifest (`-` = stdin) |
+| — | `--continue-on-error` | — | Skip an unusable input instead of aborting |
+| — | `--list` | — | Print a `.mszx` table of contents and exit |
+
+### When batch mode is inferred
+
+You rarely need `--batch`. It is inferred when any of these hold:
+
+- `--batch` or `--from-file` is given
+- `-o` names a `.mszx` file
+- any positional is a directory or contains a glob metacharacter (`*?[`)
+- two or more positionals are existing `.mzML` files (e.g. a shell-expanded
+  `*.mzML`)
+- `-r`/`--recursive` is given
+
+The legacy two-positional form `mscompress input output` is never batch: the
+`.mzML` extension test above is what keeps it that way even when the output file
+already exists from a previous run.
+
+### Error handling
+
+Batch mode is fail-fast by default: any unusable input aborts the run and the
+partial archive is removed.
+
+`--continue-on-error` relaxes that for inputs rejected *before* compression
+starts — a file that cannot be opened, mapped, or is not mzML is skipped, and
+the archive is still written with the remaining entries. A failure *during* an
+entry cannot be rescued: its bytes are already in the archive and cannot be
+un-appended, so the run still aborts and removes the output.
+
+The output must be a seekable regular file. A pipe, FIFO, or stdout is a hard
+error — see [why](../format/mszx.md#why-v2-output-must-be-seekable).
+
 ## Generic options
 
 | Flag | Long | Description |
@@ -75,4 +118,25 @@ mscompress --extract-scans 1000-2000 in.msz subset.mzML
 
 ```bash
 mscompress --describe --json in.msz | jq
+```
+
+### Compress a folder of mzML into one archive
+
+```bash
+mscompress --batch runs/ -o cohort.mszx
+mscompress runs/ -r -o cohort.mszx          # recurse into subdirectories
+mscompress runs/*.mzML -o cohort.mszx       # shell-expanded, batch inferred
+```
+
+### Compress an explicit list
+
+```bash
+find runs -name '*.mzML' | mscompress --from-file - -o cohort.mszx
+```
+
+### Inspect and expand an archive
+
+```bash
+mscompress --list cohort.mszx               # table of contents
+mscompress cohort.mszx out/                 # expand every member to out/*.mzML
 ```

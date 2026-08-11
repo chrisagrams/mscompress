@@ -13,9 +13,21 @@ export type { CompressArgs, ExtractOptions } from "@/types/types.js";
 // MSZX support
 export { MSZXFile } from "@/mszx/mszx-file.js";
 export { MSZXBuilder } from "@/mszx/mszx-builder.js";
-export { MSZXManifest } from "@/mszx/mszx-manifest.js";
-export type { AnnotationEntry, MSZXManifestData } from "@/mszx/mszx-manifest.js";
+export { MSZXBatchFile } from "@/mszx/mszx-batch-file.js";
+export { MSZXManifest, MSZXBatchManifest, isBatchManifest } from "@/mszx/mszx-manifest.js";
+export type {
+  AnnotationEntry,
+  MSZXManifestData,
+  MSZXBatchManifestData,
+  SpectraFileEntryData,
+} from "@/mszx/mszx-manifest.js";
 export { createMSZX } from "@/mszx/mszx.js";
+export { MSZXBatchWriter, compressBatch, resolveMzmlInputs } from "@/mszx/mszx-batch-writer.js";
+export type {
+  BatchInput,
+  AddAnnotationOptions,
+  CompressBatchOptions,
+} from "@/mszx/mszx-batch-writer.js";
 
 import native from "@/core/bindings.js";
 
