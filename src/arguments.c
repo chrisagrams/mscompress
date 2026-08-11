@@ -48,7 +48,8 @@ void init_args(Arguments* args) {
 
    args->zstd_compression_level = 3;  // default
 
-   args->shuffle = 0;  // default: off, opt in with --shuffle
+   args->shuffle = 1;  // default: on, opt out with --no-shuffle
+   args->shuffle_explicit = 0;
 
    args->json_output = 0;
 }
@@ -356,16 +357,20 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
       if (inten_fmt == _lossless_)
          df->inten_shuffle_elem = fmt_elem_size(df->source_inten_fmt);
 
-      if (mz_fmt != _lossless_ || inten_fmt != _lossless_)
-         warning(
-             "--shuffle only applies to losslessly stored streams; skipped for "
-             "the stream(s) using a lossy transform.\n");
+      /* Only for a caller who asked: on by default, so an unconditional warning
+         would fire on every lossy run for something they never requested. */
+      if (args->shuffle_explicit) {
+         if (mz_fmt != _lossless_ || inten_fmt != _lossless_)
+            warning(
+                "--shuffle only applies to losslessly stored streams; skipped "
+                "for the stream(s) using a lossy transform.\n");
 
-      if ((mz_fmt == _lossless_ && df->mz_shuffle_elem == 0) ||
-          (inten_fmt == _lossless_ && df->inten_shuffle_elem == 0))
-         warning(
-             "--shuffle skipped for a stream whose source data type has no "
-             "fixed element width.\n");
+         if ((mz_fmt == _lossless_ && df->mz_shuffle_elem == 0) ||
+             (inten_fmt == _lossless_ && df->inten_shuffle_elem == 0))
+            warning(
+                "--shuffle skipped for a stream whose source data type has no "
+                "fixed element width.\n");
+      }
    }
 
    return 0;

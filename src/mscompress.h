@@ -153,7 +153,12 @@ typedef struct {
 
    int zstd_compression_level;
 
-   int shuffle; /* Apply the byte shuffle to binary streams before compressing. */
+   /* Byte-shuffle binary streams before compressing. On by default; --no-shuffle
+      turns it off. `shuffle_explicit` records whether the caller asked either
+      way, so the "skipped for a lossy stream" warnings only fire for someone who
+      actually requested it. */
+   int shuffle;
+   int shuffle_explicit;
 
    int json_output;
 } Arguments;

@@ -289,7 +289,8 @@ cdef class RuntimeArguments:
         self._arguments.target_mz_format = _ZSTD_compression_
         self._arguments.target_inten_format = _ZSTD_compression_
         self._arguments.zstd_compression_level = 3
-        self._arguments.shuffle = 0
+        self._arguments.shuffle = 1
+        self._arguments.shuffle_explicit = 0
 
     cdef Arguments* get_ptr(self):
         return &self._arguments
@@ -313,17 +314,20 @@ cdef class RuntimeArguments:
             self._arguments.blocksize = value
 
     property shuffle:
-        """Byte-shuffle binary arrays before compressing them.
+        """Byte-shuffle binary arrays before compressing them. On by default.
 
         Lossless and recorded in the file, so a shuffled .msz decompresses
         without the reader opting in. Applies only to losslessly stored
-        streams; skipped (with a warning) for any stream using a lossy
-        algorithm.
+        streams; skipped for any stream using a lossy algorithm. Set False to
+        write an archive an 0.1-only reader can still read.
         """
         def __get__(self):
             return self._arguments.shuffle != 0
         def __set__(self, value):
             self._arguments.shuffle = 1 if value else 0
+            # Setting the property counts as asking, which is what decides
+            # whether the lossy-stream warnings fire.
+            self._arguments.shuffle_explicit = 1
 
     property mz_scale_factor:
         def __get__(self):

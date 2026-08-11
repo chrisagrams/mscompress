@@ -218,7 +218,10 @@ Arguments* NapiObjectToArguments(const Napi::Env& env, const Napi::Object& obj) 
     args->target_mz_format = static_cast<int>(getUint32OrDefault(obj, "targetMzFormat", _ZSTD_compression_));
     args->target_inten_format = static_cast<int>(getUint32OrDefault(obj, "targetIntenFormat", _ZSTD_compression_));
     args->zstd_compression_level = static_cast<int>(getUint32OrDefault(obj, "zstdCompressionLevel", 3));
-    args->shuffle = getBoolOrDefault(obj, "shuffle", false) ? 1 : 0;
+    // On by default. `shuffle_explicit` records whether the caller asked either
+    // way, so the lossy-stream warnings only fire for someone who requested it.
+    args->shuffle = getBoolOrDefault(obj, "shuffle", true) ? 1 : 0;
+    args->shuffle_explicit = obj.Has("shuffle") ? 1 : 0;
     args->ms_level = static_cast<long>(getInt64OrDefault(obj, "msLevel", 0));
 
     // Parse indices array

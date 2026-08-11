@@ -196,6 +196,17 @@ add_test(NAME ShuffleFixtureDecompressTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
 )
 
+# --no-shuffle must still produce a working file, and one an 0.1-only reader can
+# read: with the shuffle off there is no 0.2 feature in play, so it stays 0.1.
+add_test(NAME NoShuffleTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--no-shuffle"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_no_shuffle
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
 # A lossy stream has no fixed post-transform element width, so --shuffle must be
 # skipped for it rather than corrupting the stream.
 add_test(NAME ShuffleWithLossyTest

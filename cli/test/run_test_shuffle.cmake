@@ -30,8 +30,9 @@ foreach(F "${PLAIN_MSZ}" "${SHUF_MSZ}" "${ROUNDTRIP}")
 endforeach()
 
 # --- compress without the shuffle, as a size reference ----------------------
+# --no-shuffle is required now that the shuffle is the default.
 execute_process(
-    COMMAND "${EXECUTABLE}" "${INPUT_FILE}" "${PLAIN_MSZ}"
+    COMMAND "${EXECUTABLE}" --no-shuffle "${INPUT_FILE}" "${PLAIN_MSZ}"
     RESULT_VARIABLE PLAIN_RESULT
     OUTPUT_QUIET ERROR_VARIABLE PLAIN_ERR
 )

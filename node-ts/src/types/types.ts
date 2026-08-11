@@ -77,7 +77,8 @@ export interface CompressArgs {
   /**
    * Byte-shuffle binary arrays before compressing. Lossless and recorded in the
    * file, so shuffled archives read back without the reader opting in. Applies
-   * only to losslessly stored streams. Defaults to `false`.
+   * only to losslessly stored streams. Defaults to `true`; set `false` to write
+   * an archive an 0.1-only reader can still read.
    */
   shuffle?: boolean;
 }

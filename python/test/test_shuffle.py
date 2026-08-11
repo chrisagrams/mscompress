@@ -8,9 +8,9 @@ import pytest
 from mscompress import MSZFile, read
 
 
-def test_shuffle_defaults_off(mzml_file_path):
+def test_shuffle_defaults_on(mzml_file_path):
     with read(mzml_file_path) as mzml:
-        assert mzml.arguments.shuffle is False
+        assert mzml.arguments.shuffle is True
 
 
 def test_shuffle_property_roundtrips(mzml_file_path):
@@ -28,6 +28,7 @@ def test_shuffle_compresses_smaller(mzml_file_path, tmp_path):
     shuffled_path = tmp_path / "shuffled.msz"
 
     with read(mzml_file_path) as mzml:
+        mzml.arguments.shuffle = False
         assert isinstance(mzml.compress(plain_path), MSZFile)
 
     with read(mzml_file_path) as mzml:

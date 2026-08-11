@@ -48,10 +48,10 @@ function compressTo(dir: string, name: string, shuffle: boolean): string {
 }
 
 describe("byte shuffle", () => {
-  it("defaults to off", () => {
+  it("defaults to on", () => {
     const file = read(MZML_PATH) as MZMLFile;
     try {
-      expect(file.arguments.shuffle).toBe(false);
+      expect(file.arguments.shuffle).toBe(true);
     } finally {
       file.close();
     }
@@ -59,7 +59,7 @@ describe("byte shuffle", () => {
 
   it("produces a smaller file than the unshuffled baseline", () => {
     const dir = makeTmpDir("mscompress-shuffle-");
-    const plain = compressTo(dir, "plain.msz", false);
+    const plain = compressTo(dir, "plain.msz", false); // explicit opt-out
     const shuffled = compressTo(dir, "shuffled.msz", true);
 
     const plainBytes = fs.readFileSync(plain);
