@@ -131,6 +131,40 @@ void dealloc_z_stream(z_stream* z) {
    }
 }
 
+/**
+ * @brief Allocates and initializes a `z_stream` struct for zlib decompression.
+ * @return A pointer to the allocated `z_stream` on success, `NULL` on error.
+ * @note The caller is responsible for freeing via `dealloc_z_stream_inflate()`.
+ */
+z_stream* alloc_z_stream_inflate() {
+   z_stream* z;
+
+   z = calloc(1, sizeof(z_stream));
+
+   if (z == NULL) {
+      error("alloc_z_stream_inflate: calloc error\n");
+      return NULL;
+   }
+   if (inflateInit(z) != Z_OK) {
+      error("alloc_z_stream_inflate: inflateInit error\n");
+      free(z);
+      return NULL;
+   }
+
+   return z;
+}
+
+/**
+ * @brief Deallocates an inflate `z_stream` allocated by `alloc_z_stream_inflate()`.
+ * @param z A pointer to the `z_stream` struct to be deallocated.
+ */
+void dealloc_z_stream_inflate(z_stream* z) {
+   if (z) {
+      inflateEnd(z);
+      free(z);
+   }
+}
+
 
 /**
  * @brief Compresses input data using zlib deflate into a `zlib_block_t` output buffer.
@@ -195,7 +229,11 @@ uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
 
 /**
  * @brief Decompresses a buffer using zlib and returns the decompressed buffer on success, `NULL` on error.
- * @param z A pointer to the `z_stream` struct for decompression.
+ * @param z A pointer to an inflate-initialized `z_stream` (from
+ *          `alloc_z_stream_inflate()`). The stream is reset with
+ *          `inflateReset()` at the start of each call so it can be reused
+ *          across many blocks; it is NOT `inflateEnd()`'d here — the owner
+ *          frees it once via `dealloc_z_stream_inflate()`.
  * @param input A pointer to the compressed input buffer.
  * @param output A pointer to the `zlib_block_t` struct to store the decompressed output.
  * @param input_len The length of the compressed input buffer.
@@ -212,13 +250,17 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
       return 0;
    }
 
+   /* Reuse the caller's dedicated inflate stream: reset (cheap, keeps the
+    * already-allocated window) instead of inflateInit/inflateEnd per block. */
+   if (inflateReset(z) != Z_OK) {
+      error("zlib_decompress: inflateReset error\n");
+      return 0;
+   }
+
    z->avail_in = input_len;
    z->next_in = input;
    z->avail_out = output_len;
    z->next_out = output->buff;
-   z->total_out = 0;
-
-   inflateInit(z);
 
    int ret;
    int zlib_realloc_ret;
@@ -242,8 +284,6 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
    } while (z->avail_out == 0);
 
    r = z->total_out;
-
-   inflateReset(z);
 
    zlib_realloc_ret = zlib_realloc(output, r);  // shrink the buffer down to only what is in use
 

@@ -30,6 +30,8 @@ export default [
         clearTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
+        queueMicrotask: "readonly",
+        NodeJS: "readonly",
       },
     },
     plugins: {
@@ -79,6 +81,8 @@ export default [
         clearTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
+        queueMicrotask: "readonly",
+        NodeJS: "readonly",
       },
     },
     plugins: {

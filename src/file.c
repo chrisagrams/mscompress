@@ -222,9 +222,10 @@ size_t read_from_file(int fd, void* buff, size_t n) {
  * @brief Gets the current offset of a file descriptor.
  * @param fd File descriptor whose offset is to be retrieved.
  *
- * @return `long` Current offset of the file descriptor.
+ * @return `int64_t` Current offset of the file descriptor. 64-bit so archive
+ *         offsets past 2 GB stay correct on LLP64 (Windows).
  */
-long get_offset(int fd) {
+int64_t get_offset(int fd) {
 #ifdef _WIN32
    return _lseeki64(fd, 0, SEEK_CUR);
 #else
@@ -292,9 +293,13 @@ char* serialize_df(data_format_t* df) {
  * @note The returned data_format_t is malloc'd. The caller must free it.
  */
 data_format_t* deserialize_df(char* buff) {
-   data_format_t* r = malloc(sizeof(data_format_t));
+   /* Zeroed, not merely allocated: only the serialized members are filled in
+    * below, so every runtime-only member must start from a defined value. A
+    * caller reading one before set_{compress,decompress}_runtime_variables()
+    * has run would otherwise act on whatever happened to be on the heap. */
+   data_format_t* r = calloc(1, sizeof(data_format_t));
    if (r == NULL)
-      error("deserialize_df: malloc failed.\n");
+      error("deserialize_df: calloc failed.\n");
 
    size_t offset = 0;
 
@@ -366,8 +371,12 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
    // Interpret #defines
    char message_buff[MESSAGE_SIZE] = MESSAGE;
    int magic_tag = MAGIC_TAG;
-   int format_version_major = FORMAT_VERSION_MAJOR;
-   int format_version_minor = FORMAT_VERSION_MINOR;
+
+   /* Stamp 0.2 only when the file uses something 0.1 cannot express, so plain
+    * output stays readable by a 0.1-only reader. */
+   int shuffled = (df->mz_shuffle_elem > 0 || df->inten_shuffle_elem > 0);
+   int format_version_major = shuffled ? MSZ_V02_MAJOR : MSZ_V01_MAJOR;
+   int format_version_minor = shuffled ? MSZ_V02_MINOR : MSZ_V01_MINOR;
 
    memcpy(header_buff, &magic_tag, sizeof(magic_tag));
    memcpy(header_buff + sizeof(magic_tag), &format_version_major,
@@ -379,6 +388,7 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
 
    char* df_buff = serialize_df(df);
    memcpy(header_buff + DATA_FORMAT_T_OFFSET, df_buff, DATA_FORMAT_T_SIZE);
+   free(df_buff); /* serialize_df returns a malloc'd buffer owned by the caller */
 
    memcpy(header_buff + BLOCKSIZE_OFFSET, &blocksize, sizeof(blocksize));
 
@@ -479,6 +489,75 @@ footer_t* read_footer(void* input_map, long filesize) {
 }
 
 /**
+ * @brief Maps an on-disk (major, minor) stamp to its msz version string.
+ *
+ * @return "0.1" / "0.2", or NULL if the stamp is not a supported version.
+ */
+const char* msz_version_string(int major, int minor) {
+   if (major == MSZ_V01_MAJOR && minor == MSZ_V01_MINOR)
+      return "0.1";
+   if (major == MSZ_V02_MAJOR && minor == MSZ_V02_MINOR)
+      return "0.2";
+   return NULL;
+}
+
+/**
+ * @brief Reads and validates the msz format version from a file header.
+ *
+ * @param input_map Pointer to the memory-mapped file.
+ * @param filesize Length of the mapping in bytes.
+ * @param major Receives the stored major version. May be NULL.
+ * @param minor Receives the stored minor version. May be NULL.
+ *
+ * @return 0 if the version is supported, non-zero otherwise.
+ */
+int msz_read_version(void* input_map, long filesize, int* major, int* minor) {
+   int stored_major = 0;
+   int stored_minor = 0;
+
+   if (filesize < FORMAT_VERSION_OFFSET + (long)(2 * sizeof(int)))
+      return 1;
+
+   memcpy(&stored_major, (char*)input_map + FORMAT_VERSION_OFFSET,
+          sizeof(stored_major));
+   memcpy(&stored_minor,
+          (char*)input_map + FORMAT_VERSION_OFFSET + sizeof(stored_major),
+          sizeof(stored_minor));
+
+   if (major)
+      *major = stored_major;
+   if (minor)
+      *minor = stored_minor;
+
+   return msz_version_string(stored_major, stored_minor) == NULL ? 1 : 0;
+}
+
+/**
+ * @brief Rejects an .msz this build cannot decode, reporting why.
+ *
+ * Wraps msz_read_version() for the decode paths. Inspection paths
+ * (--describe) call msz_read_version() directly so they can still report the
+ * version of a file that is not supported.
+ *
+ * @param input_map Pointer to the memory-mapped file.
+ * @param filesize Length of the mapping in bytes.
+ *
+ * @return 0 if the file can be decoded, non-zero otherwise.
+ */
+int msz_require_version(void* input_map, long filesize) {
+   int major = 0;
+   int minor = 0;
+
+   if (msz_read_version(input_map, filesize, &major, &minor) == 0)
+      return 0;
+
+   error("file is msz version %d.%d; this build supports %s-%s.\n", major,
+         minor, MIN_SUPPORT, MAX_SUPPORT);
+
+   return 1;
+}
+
+/**
  * @brief Prints the contents of a `footer_t` struct to stdout in CSV format.
  *
  * Outputs a CSV header line followed by a single data line containing all
@@ -486,7 +565,7 @@ footer_t* read_footer(void* input_map, long filesize) {
  *
  * @param footer Pointer to the `footer_t` struct to print.
  */
-void print_footer_csv(footer_t* footer) {
+void print_footer_csv(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
       warning("print_footer_csv: footer is NULL.\n");
       return;
@@ -495,16 +574,31 @@ void print_footer_csv(footer_t* footer) {
    printf(
        "xml_pos,mz_binary_pos,inten_binary_pos,xml_blk_pos,mz_binary_blk_pos,"
        "inten_binary_blk_pos,divisions_t_pos,num_spectra,original_filesize,n_"
-       "divisions,magic_tag,mz_fmt,inten_fmt\n");
-   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d\n", footer->xml_pos,
-          footer->mz_binary_pos, footer->inten_binary_pos, footer->xml_blk_pos,
-          footer->mz_binary_blk_pos, footer->inten_binary_blk_pos,
-          footer->divisions_t_pos, footer->num_spectra,
-          footer->original_filesize, footer->n_divisions, footer->magic_tag,
-          footer->mz_fmt, footer->inten_fmt);
+       "divisions,magic_tag,mz_fmt,inten_fmt,mz_shuffle,inten_shuffle,msz_"
+       "version,msz_version_supported\n");
+   /* mz_fmt/inten_fmt are reported with the shuffle marker stripped, so the
+    * value keeps mapping straight onto an algorithm accession as it always
+    * has; the marker is surfaced in its own trailing columns instead. */
+   /* A version this build does not know is still reported, as its raw
+      stamp: that is the answer --describe exists to give. */
+   const char* known = msz_version_string(msz_major, msz_minor);
+   char raw[32];
+
+   if (known == NULL)
+      snprintf(raw, sizeof(raw), "%d.%d", msz_major, msz_minor);
+
+   printf("%lu,%lu,%lu,%lu,%lu,%lu,%lu,%zu,%lu,%d,%d,%d,%d,%d,%d,%s,%s\n",
+          footer->xml_pos, footer->mz_binary_pos, footer->inten_binary_pos,
+          footer->xml_blk_pos, footer->mz_binary_blk_pos,
+          footer->inten_binary_blk_pos, footer->divisions_t_pos,
+          footer->num_spectra, footer->original_filesize, footer->n_divisions,
+          footer->magic_tag, MSZ_ALGO(footer->mz_fmt),
+          MSZ_ALGO(footer->inten_fmt), MSZ_HAS_SHUFFLE(footer->mz_fmt) ? 1 : 0,
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? 1 : 0, known ? known : raw,
+          known ? "true" : "false");
 }
 
-void print_footer_json(footer_t* footer) {
+void print_footer_json(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
       warning("print_footer_json: footer is NULL.\n");
       return;
@@ -522,8 +616,20 @@ void print_footer_json(footer_t* footer) {
    printf("  \"original_filesize\": %lu,\n", footer->original_filesize);
    printf("  \"n_divisions\": %d,\n", footer->n_divisions);
    printf("  \"magic_tag\": %d,\n", footer->magic_tag);
-   printf("  \"mz_fmt\": %d,\n", footer->mz_fmt);
-   printf("  \"inten_fmt\": %d\n", footer->inten_fmt);
+   printf("  \"mz_fmt\": %d,\n", MSZ_ALGO(footer->mz_fmt));
+   printf("  \"inten_fmt\": %d,\n", MSZ_ALGO(footer->inten_fmt));
+   printf("  \"mz_shuffle\": %s,\n",
+          MSZ_HAS_SHUFFLE(footer->mz_fmt) ? "true" : "false");
+   printf("  \"inten_shuffle\": %s,\n",
+          MSZ_HAS_SHUFFLE(footer->inten_fmt) ? "true" : "false");
+   const char* known = msz_version_string(msz_major, msz_minor);
+
+   if (known)
+      printf("  \"msz_version\": \"%s\",\n", known);
+   else
+      printf("  \"msz_version\": \"%d.%d\",\n", msz_major, msz_minor);
+
+   printf("  \"msz_version_supported\": %s\n", known ? "true" : "false");
    printf("}\n");
 }
 
@@ -556,7 +662,10 @@ int is_msz(void* input_map, size_t input_length) {
 
 /**
  * @brief Determines if file mapped in input_map is an mzML file.
- *        Reads first 512 bytes of file and looks for substring "indexedmzML".
+ *        Reads first 512 bytes of file and looks for the "indexedmzML"
+ *        wrapper, the "<mzML" root element, or the mzML namespace URI, so
+ *        that both indexed and non-indexed mzML (e.g. Waters exports) are
+ *        recognized.
  *
  * @param input_map Pointer to the memory-mapped file.
  *
@@ -570,6 +679,12 @@ int is_mzml(void* input_map, size_t input_length) {
    buffer[check_length] = '\0';  // null-terminate
 
    if (strstr(buffer, "indexedmzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "<mzML") != NULL)
+      return 1;
+
+   if (strstr(buffer, "http://psi.hupo.org/ms/mzml") != NULL)
       return 1;
 
    return 0;
@@ -1175,5 +1290,174 @@ void* get_mapping_range(int fd, int64_t offset, size_t length,
                      (off_t)aligned_off);
    if (base == MAP_FAILED) return NULL;
    return base;
+#endif
+}
+
+/* ---------- USTAR archive WRITER (MSZX batch, Option A streaming) ---------- */
+
+/* Writer-only USTAR field offsets (reader offsets are #defined above). */
+#define USTAR_MODE_OFF 100
+#define USTAR_UID_OFF 108
+#define USTAR_GID_OFF 116
+#define USTAR_MTIME_OFF 136
+#define USTAR_CHKSUM_OFF 148
+#define USTAR_VERSION_OFF 263
+
+/* Absolute seek helper (platform-correct 64-bit). */
+static int64_t tar_lseek_set(int fd, int64_t off) {
+#ifdef _WIN32
+   return _lseeki64(fd, off, SEEK_SET);
+#else
+   return (int64_t)lseek(fd, (off_t)off, SEEK_SET);
+#endif
+}
+
+/* Standard USTAR checksum: unsigned sum of all 512 header bytes with the
+ * 8-byte checksum field counted as ASCII spaces. */
+static unsigned tar_checksum(const char* hdr) {
+   unsigned sum = 0;
+   for (int i = 0; i < TAR_BLOCK_SIZE; ++i) {
+      if (i >= USTAR_CHKSUM_OFF && i < USTAR_CHKSUM_OFF + 8)
+         sum += (unsigned)' ';
+      else
+         sum += (unsigned char)hdr[i];
+   }
+   return sum;
+}
+
+/* Write the size (11 octal digits + NUL) and checksum (6 octal digits, NUL,
+ * space) fields into an already-populated 512B header. */
+static void tar_fill_size_and_checksum(char* hdr, uint64_t size) {
+   memset(hdr + USTAR_SIZE_OFF, 0, USTAR_SIZE_LEN);
+   snprintf(hdr + USTAR_SIZE_OFF, USTAR_SIZE_LEN, "%011llo",
+            (unsigned long long)size);
+   memset(hdr + USTAR_CHKSUM_OFF, ' ', 8);
+   unsigned sum = tar_checksum(hdr);
+   snprintf(hdr + USTAR_CHKSUM_OFF, 7, "%06o", sum);
+   hdr[USTAR_CHKSUM_OFF + 6] = '\0';
+   hdr[USTAR_CHKSUM_OFF + 7] = ' ';
+}
+
+/* Populate a full 512B POSIX-ustar header for a regular file. Returns 0, or -1
+ * if `name` cannot be represented in the 100-byte name / 155-byte prefix split. */
+static int tar_build_header(char hdr[TAR_BLOCK_SIZE], const char* name,
+                            uint64_t size) {
+   memset(hdr, 0, TAR_BLOCK_SIZE);
+
+   size_t nlen = strlen(name);
+   if (nlen <= USTAR_NAME_LEN) {
+      memcpy(hdr + USTAR_NAME_OFF, name, nlen);
+   } else {
+      size_t split = 0;
+      for (size_t i = 0; i < nlen; ++i) {
+         if (name[i] == '/') {
+            if (i <= USTAR_PREFIX_LEN && (nlen - i - 1) <= USTAR_NAME_LEN) {
+               split = i;
+               break;
+            }
+         }
+      }
+      if (split == 0) return -1; /* name too long for USTAR */
+      memcpy(hdr + USTAR_PREFIX_OFF, name, split);
+      memcpy(hdr + USTAR_NAME_OFF, name + split + 1, nlen - split - 1);
+   }
+
+   memcpy(hdr + USTAR_MODE_OFF, "0000644", 7);
+   memcpy(hdr + USTAR_UID_OFF, "0000000", 7);
+   memcpy(hdr + USTAR_GID_OFF, "0000000", 7);
+   memcpy(hdr + USTAR_MTIME_OFF, "00000000000", 11); /* mtime 0 = deterministic */
+   hdr[USTAR_TYPEFLAG_OFF] = '0';                     /* regular file */
+   memcpy(hdr + USTAR_MAGIC_OFF, "ustar", 5);
+   hdr[USTAR_MAGIC_OFF + 5] = '\0';
+   memcpy(hdr + USTAR_VERSION_OFF, "00", 2);
+
+   tar_fill_size_and_checksum(hdr, size);
+   return 0;
+}
+
+/* Write `n` zero bytes at the current fd position. */
+static int tar_write_zeros(int fd, size_t n) {
+   char zeros[TAR_BLOCK_SIZE];
+   memset(zeros, 0, sizeof(zeros));
+   while (n > 0) {
+      size_t want = n < sizeof(zeros) ? n : sizeof(zeros);
+      if (write_to_file(fd, zeros, want) != want) return -1;
+      n -= want;
+   }
+   return 0;
+}
+
+int tar_begin_entry(int fd, const char* name, tar_entry_t* w) {
+   if (fd < 0 || !name || !w) return -1;
+   if (tar_build_header(w->header, name, 0) != 0) {
+      error("tar_begin_entry: entry name too long for USTAR: %s\n", name);
+      return -1;
+   }
+   w->header_off = get_offset(fd);
+   if (w->header_off < 0) return -1;
+   if (write_to_file(fd, w->header, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+   return 0;
+}
+
+int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size) {
+   if (fd < 0 || !w) return -1;
+
+   /* Patch size + checksum into the cached header and rewrite it in place. */
+   tar_fill_size_and_checksum(w->header, payload_size);
+   if (tar_lseek_set(fd, w->header_off) < 0) return -1;
+   if (write_to_file(fd, w->header, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+
+   /* Seek to end of payload and pad to the next 512B boundary. */
+   int64_t payload_end =
+       w->header_off + TAR_BLOCK_SIZE + (int64_t)payload_size;
+   if (tar_lseek_set(fd, payload_end) < 0) return -1;
+   size_t pad = (size_t)((TAR_BLOCK_SIZE - (payload_size % TAR_BLOCK_SIZE)) %
+                         TAR_BLOCK_SIZE);
+   return tar_write_zeros(fd, pad);
+}
+
+int tar_add_file(int fd, const char* name, const void* data, size_t len) {
+   if (fd < 0 || !name) return -1;
+   char hdr[TAR_BLOCK_SIZE];
+   if (tar_build_header(hdr, name, (uint64_t)len) != 0) {
+      error("tar_add_file: entry name too long for USTAR: %s\n", name);
+      return -1;
+   }
+   if (write_to_file(fd, hdr, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
+      return -1;
+   if (len && write_to_file(fd, (char*)data, len) != len) return -1;
+   size_t pad = (TAR_BLOCK_SIZE - (len % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
+   return tar_write_zeros(fd, pad);
+}
+
+int tar_finish(int fd) {
+   if (fd < 0) return -1;
+   return tar_write_zeros(fd, TAR_BLOCK_SIZE * 2);
+}
+
+int open_output_file_rw(char* path) {
+   int fd = -1;
+   if (path) {
+#ifdef _WIN32
+      fd = _open(path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY, 0666);
+#else
+      fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+#endif
+      if (fd < 0)
+         warning("Error opening output archive (rw). (%s)\n", strerror(errno));
+   }
+   return fd;
+}
+
+int fd_is_seekable(int fd) {
+   if (fd < 0) return 0;
+#ifdef _WIN32
+   return _lseeki64(fd, 0, SEEK_CUR) >= 0;
+#else
+   off_t r = lseek(fd, 0, SEEK_CUR);
+   if (r == (off_t)-1) return 0;
+   return 1;
 #endif
 }

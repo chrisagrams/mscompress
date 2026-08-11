@@ -11,8 +11,15 @@ from mscompress._core import (
     BaseFile,
     MZMLFile,
     MSZFile,
+    MSZXBatchWriter,
     Spectrum,
     Spectra,
+    CACHE_SPECTRA_AUTO,
+    BlockCache,
+    DEFAULT_CACHE_BYTES,
+    get_default_cache,
+    set_cache_budget,
+    get_cache_usage,
     get_num_threads,
     get_filesize,
     list_algorithms,
@@ -49,11 +56,15 @@ from mscompress.types import (
 from mscompress.mszx import (
     # MSZX classes
     MSZXFile,
+    MSZXBatchFile,
     MSZXBuilder,
     MSZXManifest,
+    MSZXBatchManifest,
+    SpectraFileEntry,
     AnnotationEntry,
     # Convenience functions
     create_mszx,
+    compress_batch,
 )
 
 from mscompress.annotations import (
@@ -83,6 +94,7 @@ __all__ = [
     "BaseFile",
     "MZMLFile",
     "MSZFile",
+    "MSZXBatchWriter",
     "Spectrum",
     "Spectra",
     "SpectrumDict",
@@ -112,11 +124,15 @@ __all__ = [
     "build_composite_metadata",
     # MSZX types
     "MSZXFile",
+    "MSZXBatchFile",
     "MSZXBuilder",
     "MSZXManifest",
+    "MSZXBatchManifest",
+    "SpectraFileEntry",
     "AnnotationEntry",
     # MSZX convenience functions
     "create_mszx",
+    "compress_batch",
     # Search results types
     "PSM",
     "TSVReader",

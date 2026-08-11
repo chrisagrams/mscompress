@@ -25,6 +25,8 @@ Napi::Value GetIntenBinaryMsz(const Napi::CallbackInfo& info);
 Napi::Value GetXmlMsz(const Napi::CallbackInfo& info);
 
 Napi::Value CompressMzml(const Napi::CallbackInfo& info);
+Napi::Value CompressMzmlStreamOpen(const Napi::CallbackInfo& info);
+Napi::Value CompressMzmlStreamRead(const Napi::CallbackInfo& info);
 Napi::Value DecompressMsz(const Napi::CallbackInfo& info);
 
 Napi::Value ExtractMzmlFiltered(const Napi::CallbackInfo& info);
@@ -34,6 +36,8 @@ Napi::Value ZstdCompress(const Napi::CallbackInfo& info);
 Napi::Value ZstdDecompress(const Napi::CallbackInfo& info);
 
 Napi::Value OpenMszFromArchive(const Napi::CallbackInfo& info);
+
+Napi::Function BatchWriterInit(Napi::Env env);
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Register FileHandle class
@@ -68,6 +72,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     // Compression / decompression
     exports.Set("compressMzml", Napi::Function::New(env, CompressMzml));
+    exports.Set("compressMzmlStreamOpen", Napi::Function::New(env, CompressMzmlStreamOpen));
+    exports.Set("compressMzmlStreamRead", Napi::Function::New(env, CompressMzmlStreamRead));
     exports.Set("decompressMsz", Napi::Function::New(env, DecompressMsz));
 
     // Extraction
@@ -80,6 +86,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     // MSZX archive helpers
     exports.Set("openMszFromArchive", Napi::Function::New(env, OpenMszFromArchive));
+
+    // Batch (.mszx v2) writer class
+    exports.Set("BatchWriter", BatchWriterInit(env));
 
     return exports;
 }

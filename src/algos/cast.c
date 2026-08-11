@@ -42,7 +42,7 @@ void algo_decode_cast32_64d(void* args) {
    size_t decoded_len = 0;
 
    // Decode using specified encoding format
-   a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded,
+   a_args->dec_fun(a_args->z_inflate, *a_args->src, a_args->src_len, &decoded,
                    &decoded_len, a_args->tmp);
 
    // Deternmine length of data based on data format
@@ -67,6 +67,8 @@ void algo_decode_cast32_64d(void* args) {
 
    // Store length of array in first 4 bytes
    res[0] = (float)len;
+
+   free(decoded);
 
    // Return result
    *a_args->dest = (char *)res;
@@ -110,7 +112,7 @@ void algo_decode_cast16_32f(void* args) {
    size_t decoded_len = 0;
 
    // Decode using specified encoding format
-   a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded,
+   a_args->dec_fun(a_args->z_inflate, *a_args->src, a_args->src_len, &decoded,
                    &decoded_len, a_args->tmp);
 
    // Deternmine length of data based on data format
@@ -144,6 +146,8 @@ void algo_decode_cast16_32f(void* args) {
       else
          tmp[i] = uint_tmp;
    }
+
+   free(decoded);
 
    // Return result
    *a_args->dest = (char *)res;
@@ -187,7 +191,7 @@ void algo_decode_cast16_64d(void* args) {
    size_t decoded_len = 0;
 
    // Decode using specified encoding format
-   a_args->dec_fun(a_args->z, *a_args->src, a_args->src_len, &decoded,
+   a_args->dec_fun(a_args->z_inflate, *a_args->src, a_args->src_len, &decoded,
                    &decoded_len, a_args->tmp);
 
    // Deternmine length of data based on data format
@@ -221,6 +225,8 @@ void algo_decode_cast16_64d(void* args) {
       else
          tmp[i] = uint_tmp;
    }
+
+   free(decoded);
 
    // Return result
    *a_args->dest = (char *)res;
@@ -288,8 +294,10 @@ void algo_encode_cast32_64d(void* args)
    for (size_t i = 1; i < len + 1; i++) res_arr[i - 1] = (double)arr[i];
 
    // Encode using specified encoding format
+   char* res_start = (char*)res;  /* enc_fun advances res */
    a_args->enc_fun(a_args->z, (char **)&res, len * sizeof(double),
                    (char *)a_args->dest, a_args->dest_len);
+   free(res_start);
 
    // Move src pointer
    *a_args->src += (len + 1) * sizeof(float);
@@ -363,8 +371,10 @@ void algo_encode_cast16_32f(void* args)
       res_arr[i] = (float)(tmp[i] / a_args->scale_factor);
 
    // Encode using specified encoding format
+   char* res_start = (char*)res;  /* enc_fun advances res */
    a_args->enc_fun(a_args->z, (char **)&res, len * sizeof(float),
                    (char *)a_args->dest, a_args->dest_len);
+   free(res_start);
 
    // Move src pointer
    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t);
@@ -434,8 +444,10 @@ void algo_encode_cast16_64d(void* args)
       res_arr[i] = (double)(tmp[i] / a_args->scale_factor);
 
    // Encode using specified encoding format
+   char* res_start = (char*)res;  /* enc_fun advances res */
    a_args->enc_fun(a_args->z, (char **)&res, len * sizeof(double),
                    (char *)a_args->dest, a_args->dest_len);
+   free(res_start);
 
    // Move src pointer
    *a_args->src += (len * sizeof(uint16_t)) + sizeof(uint16_t);

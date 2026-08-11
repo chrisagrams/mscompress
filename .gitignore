@@ -63,3 +63,7 @@ heaptrack*
 .vscode/*
 .DS_Store
 .cache/*
+
+# Documentation build output
+site/
+

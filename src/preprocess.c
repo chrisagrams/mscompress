@@ -2414,6 +2414,15 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
              *divisions);  // If we have more threads than divisions, we need to
                            // increase the blocksize to the max division size
       }
+
+      /* create_divisions() deep-copies every position/scan value out of the
+       * full-file `div` into freshly allocated sub-divisions, so `div` is now
+       * an independent, unreferenced structure. Free it here to keep per-file
+       * preprocessor state from accumulating across a long batch run (the
+       * threads == -1 branch above instead transfers ownership of `div` into
+       * *divisions and must NOT free it). */
+      dealloc_division(div);
+      div = NULL;
    }
 
    if (*divisions == NULL)
@@ -2496,7 +2505,7 @@ data_format_t* create_external_df() {
  * @param arguments Pointer to the Arguments struct (thread count used for division count).
  * @param df Output pointer set to the created data_format_t.
  * @param divisions Output pointer set to the created divisions_t.
- * @return 0 on success.
+ * @return 0 on success, 1 on error.
  */
 int preprocess_external(char* input_map, long input_filesize, long* blocksize,
                         Arguments* arguments, data_format_t** df,
@@ -2511,7 +2520,11 @@ int preprocess_external(char* input_map, long input_filesize, long* blocksize,
 
    divisions_t* div = divide_external(input_filesize, arguments->threads);
 
-   set_compress_runtime_variables(arguments, *df);
+   if (set_compress_runtime_variables(arguments, *df)) {
+      error("preprocess_external: Failed to set compression runtime variables.\n");
+      dealloc_divisions(div);
+      return 1;
+   }
 
    *divisions = div;
 
@@ -2531,12 +2544,22 @@ int preprocess_external(char* input_map, long input_filesize, long* blocksize,
  *
  * @note The block length queues and divisions reference mmap'd data internally.
  */
-void parse_footer(footer_t** footer, void* input_map, long input_filesize,
-                  block_len_queue_t** xml_block_lens,
-                  block_len_queue_t** mz_binary_block_lens,
-                  block_len_queue_t** inten_binary_block_lens,
-                  divisions_t** divisions, int* n_divisions) {
+int parse_footer(footer_t** footer, void* input_map, long input_filesize,
+                 block_len_queue_t** xml_block_lens,
+                 block_len_queue_t** mz_binary_block_lens,
+                 block_len_queue_t** inten_binary_block_lens,
+                 divisions_t** divisions, int* n_divisions) {
    *footer = read_footer(input_map, input_filesize);
+
+   /* read_footer() reports the reason (currently a bad magic tag). */
+   if (*footer == NULL) {
+      *xml_block_lens = NULL;
+      *mz_binary_block_lens = NULL;
+      *inten_binary_block_lens = NULL;
+      *divisions = NULL;
+      *n_divisions = 0;
+      return 1;
+   }
 
    print("\tXML position: %ld\n", (*footer)->xml_pos);
    print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
@@ -2561,4 +2584,6 @@ void parse_footer(footer_t** footer, void* input_map, long input_filesize,
 
    *divisions =
        read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);
+
+   return 0;
 }

@@ -20,10 +20,24 @@ from typing import Any, Dict, List, Optional, Union
 
 from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
 from mscompress.annotations import BasePSMReader, PSMReader, PathAnnotationFile
-from mscompress.mszx.metadata import MSZXManifest
+from mscompress.mszx.batch import MSZXBatchFile, compress_batch
+from mscompress.mszx.metadata import (
+    MSZXBatchManifest,
+    MSZXManifest,
+    SpectraFileEntry,
+)
 from mscompress.types import AnnotationEntry
 
-__all__ = ["MSZXBuilder", "MSZXFile", "MSZXManifest", "create_mszx"]
+__all__ = [
+    "MSZXBatchFile",
+    "compress_batch",
+    "MSZXBatchManifest",
+    "MSZXBuilder",
+    "MSZXFile",
+    "MSZXManifest",
+    "SpectraFileEntry",
+    "create_mszx",
+]
 
 
 class MSZXBuilder:
@@ -31,11 +45,13 @@ class MSZXBuilder:
     Builder for creating MSZX archives from MSZ files and annotations.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> builder = MSZXBuilder(msz)
-        >>> builder.add_annotations(reader, description="Percolator results")
-        >>> builder.set_description("Proteomics dataset with PSM annotations")
-        >>> builder.save("sample.mszx")
+        ```python
+        msz = mscompress.read("sample.msz")
+        builder = MSZXBuilder(msz)
+        builder.add_annotations(reader, description="Percolator results")
+        builder.set_description("Proteomics dataset with PSM annotations")
+        builder.save("sample.mszx")
+        ```
     """
 
     def __init__(
@@ -181,13 +197,15 @@ def create_mszx(
         Path to the created archive.
 
     Example:
-        >>> msz = mscompress.read("sample.msz")
-        >>> create_mszx(
-        ...     msz,
-        ...     "sample.mszx",
-        ...     annotations=["sample.pin", "sample.pepXML"],
-        ...     description="Annotated proteomics dataset"
-        ... )
+        ```python
+        msz = mscompress.read("sample.msz")
+        create_mszx(
+            msz,
+            "sample.mszx",
+            annotations=["sample.pin", "sample.pepXML"],
+            description="Annotated proteomics dataset",
+        )
+        ```
     """
     builder = MSZXBuilder(msz)
 

@@ -50,6 +50,7 @@ set(CPP_SOURCE_FILES
   src/native/extract.cpp
   src/native/zstd_utils.cpp
   src/native/mszx.cpp
+  src/native/batch.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})
@@ -71,6 +72,7 @@ set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
 include(${VENDOR_DIR}/YxmlInclude.cmake)
 include(${VENDOR_DIR}/Base64SetEnvFlags.cmake)
 include(${VENDOR_DIR}/Base64Include.cmake)
+include(${VENDOR_DIR}/Blosc2Include.cmake) # shuffle filters only, not the library
 
 # Node addon settings
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
@@ -85,7 +87,7 @@ if(WIN32 AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
 endif()
 
 # Linking
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY} blosc2_shuffle)
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"

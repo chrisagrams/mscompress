@@ -64,6 +64,35 @@ add_test(NAME MSZXDecompressTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_mszx.cmake
 )
 
+# Batch mode: N mzML -> one .mszx -> N mzML. Round-trip (byte-identical),
+# dir/glob/list parity, tar validity, and --list.
+add_test(NAME BatchRoundTripTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch.cmake
+)
+
+# Batch paths the round-trip test misses: __N name collisions,
+# --continue-on-error, fail-fast cleanup, and legacy-form batch misdetection.
+add_test(NAME BatchPathsTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_paths
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_paths.cmake
+)
+
+# Batch error paths: empty match set + non-seekable (FIFO) output rejection.
+add_test(NAME BatchRejectTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_reject
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}
@@ -139,6 +168,19 @@ add_test(NAME CompressCorruptBase64
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# Non-indexed mzML (no <indexedmzML> wrapper, e.g. Waters exports) with a lossy
+# scheme requested - regression test for GitHub issue #176 (segfault caused by
+# misclassifying non-indexed mzML as an external file, which led to a NULL
+# compression function pointer being invoked).
+add_test(NAME CompressNonIndexedMzMLLossy
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--mz-lossy;delta32"
+    -DINPUT_FILE=${TEST_DATA_DIR}/nonindexed_test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_nonindexed_mzml_lossy
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}
@@ -146,4 +188,61 @@ add_test(NAME VerboseOutputTest
     -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_verbose
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_verbose.cmake
+)
+# --- byte shuffle -----------------------------------------------------------
+
+# A --shuffle file must decompress byte-identically, differ from the
+# unshuffled output, and be smaller.
+add_test(NAME ShuffleRoundTripTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_shuffle.cmake
+)
+
+# test.msz predates the shuffle, so it has the marker bit clear and must still
+# decompress to exactly test.mzML. Guards the footer flag-bit scheme.
+add_test(NAME ShuffleBackwardCompatTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DMODE=decompress
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.msz
+    -DEXPECTED_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_comorbid
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
+)
+
+# A checked-in shuffled file (msz 0.2), so the decode path is tested against
+# committed bytes rather than only against whatever this build just wrote.
+add_test(NAME ShuffleFixtureDecompressTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DMODE=decompress
+    -DINPUT_FILE=${TEST_DATA_DIR}/test_shuffled.msz
+    -DEXPECTED_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_fixture
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
+)
+
+# --no-shuffle must still produce a working file, and one an 0.1-only reader can
+# read: with the shuffle off there is no 0.2 feature in play, so it stays 0.1.
+add_test(NAME NoShuffleTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--no-shuffle"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_no_shuffle
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# A lossy stream has no fixed post-transform element width, so --shuffle must be
+# skipped for it rather than corrupting the stream.
+add_test(NAME ShuffleWithLossyTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS=--shuffle;--mz-lossy;delta32"
+    -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_shuffle_lossy
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
