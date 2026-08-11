@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
+  Boxes,
   FileArchive,
   FileDown,
   Scissors,
@@ -35,6 +36,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { compressionProfiles } from "@/lib/profiles"
 import { fmtBytes } from "@/lib/format"
+import { ingestPaths, type FileEntry } from "@/files"
 import { COMPRESSION_PRESETS, REMOTE_DESTINATIONS } from "@shared/ipc"
 import type {
   AppSettings,
@@ -48,12 +50,15 @@ import type {
   Preset,
 } from "@shared/ipc"
 
-type Op = "compress" | "decompress" | "extract"
+/** Per-file operations, gated by the active file's kind. */
+type SingleOp = "compress" | "decompress" | "extract"
+/** All operations; `batch` works on the checked Explorer files instead. */
+type Op = SingleOp | "batch"
 
 const lossyAlgos: LossyAlgo[] = ["none", "cast", "log", "delta16", "delta32", "vbr"]
 
 // Which operations make sense for each source file kind.
-const opsForKind: Record<FileKind, Record<Op, boolean>> = {
+const opsForKind: Record<FileKind, Record<SingleOp, boolean>> = {
   mzML: { compress: true, decompress: false, extract: true },
   msz: { compress: false, decompress: true, extract: true },
   mszx: { compress: false, decompress: true, extract: true },
@@ -71,14 +76,59 @@ export function ConvertTab({
   kind,
   path,
   settings,
+  checkedFiles,
+  onAddFiles,
+  onClearSelection,
 }: {
   kind: FileKind
   path: string
   settings: AppSettings | null
+  /** Files checked in the Explorer — the inputs for the batch operation. */
+  checkedFiles: FileEntry[]
+  /** Surface newly produced files (e.g. the batch archive) in the Explorer. */
+  onAddFiles: (entries: FileEntry[]) => void
+  /** Clear the Explorer checkbox selection (after a successful batch run). */
+  onClearSelection: () => void
 }) {
-  const allowed = opsForKind[kind]
+  // A batch (v2) .mszx supports decompress (→ directory of .mzML) but not
+  // per-member extract yet; sniff the container to gate the op.
+  const [isBatchArchive, setIsBatchArchive] = useState(false)
+  useEffect(() => {
+    if (kind !== "mszx") {
+      setIsBatchArchive(false)
+      return
+    }
+    let active = true
+    window.api
+      .readMszx(path)
+      .then((m) => {
+        if (active) setIsBatchArchive(!m.error && m.container === "batch")
+      })
+      .catch(() => {
+        if (active) setIsBatchArchive(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [path, kind])
+
+  // Batch inputs: the mzML files checked in the Explorer.
+  const batchTargets = checkedFiles.filter((f) => f.kind === "mzML")
+  const batchReady = batchTargets.length >= 2
+
+  const base = opsForKind[kind]
+  const allowed: Record<Op, boolean> = {
+    compress: base.compress,
+    decompress: base.decompress,
+    extract: base.extract && !isBatchArchive,
+    batch: batchReady,
+  }
 
   const [op, setOp] = useState<Op>("compress")
+  // Batch output: one .mszx v2 archive, or one queued .msz job per file.
+  const [archiveMode, setArchiveMode] = useState<"mszx" | "individual">("mszx")
+  // Archive filename for the .mszx batch mode, written into the output dir.
+  const [archiveName, setArchiveName] = useState("batch.mszx")
   const [profile, setProfile] = useState<Preset>("default")
   const [mzAlgo, setMzAlgo] = useState<LossyAlgo>(COMPRESSION_PRESETS.default.mzLossy)
   const [intAlgo, setIntAlgo] = useState<LossyAlgo>(COMPRESSION_PRESETS.default.intLossy)
@@ -114,10 +164,16 @@ export function ConvertTab({
     selectPreset(settings.defaultPreset)
   }, [settings]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to streamed progress events (proves the main->renderer channel).
+  // Subscribe to streamed progress events. Batch runs stream real per-file
+  // progress (`index`/`total` on step events); single-file ops stay coarse.
   useEffect(() => {
     const off = window.api.onConvertProgress((p) => {
-      setPhase(p.phase)
+      if (p.op === "compressBatch" && p.phase === "step" && p.index != null && p.total) {
+        setProgress(Math.round((p.index / p.total) * 100))
+        setPhase(p.message ?? p.phase)
+      } else {
+        setPhase(p.phase)
+      }
       console.log("[renderer] convert progress:", p.op, p.phase, p.message ?? p.error ?? "")
     })
     return off
@@ -127,6 +183,13 @@ export function ConvertTab({
     const dir = await window.api.openOutputDir()
     if (dir) setOutputDir(dir)
   }
+
+  // The .mszx batch mode writes a local archive — snap Remote back to Local.
+  useEffect(() => {
+    if (op === "batch" && archiveMode === "mszx" && outputTarget === "remote") {
+      setOutputTarget("local")
+    }
+  }, [op, archiveMode, outputTarget])
 
   // Choosing a preset resets the advanced controls to that preset's defaults;
   // the accordion then overrides them per-field.
@@ -141,19 +204,19 @@ export function ConvertTab({
   // Snap to a valid operation whenever the file (and thus allowed ops) changes.
   useEffect(() => {
     if (!allowed[op]) {
-      const next = (["compress", "decompress", "extract"] as Op[]).find((o) => allowed[o])
+      const next = (["compress", "decompress", "extract", "batch"] as Op[]).find((o) => allowed[o])
       if (next) setOp(next)
     }
     setResult(null)
     setEnqueued(null)
-  }, [kind]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kind, isBatchArchive, batchReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build the settings object for the current op (outputDir only for local).
   const buildSettings = (
     includeOutputDir: boolean,
   ): CompressOptions | DecompressOptions | ExtractOptions => {
     const dir = includeOutputDir ? { outputDir } : {}
-    if (op === "compress") {
+    if (op === "compress" || op === "batch") {
       return { preset: profile, mzLossy: mzAlgo, intLossy: intAlgo, zstdLevel: zstd[0], ...dir }
     }
     if (op === "decompress") {
@@ -177,6 +240,59 @@ export function ConvertTab({
     if (running || !allowed[op]) return
     setResult(null)
     setEnqueued(null)
+
+    if (op === "batch") {
+      if (archiveMode === "individual") {
+        // One queued compress job per checked mzML — the queue handles local
+        // output or the remote transfer, matching the single-file remote flow.
+        const remote = outputTarget === "remote"
+        const dest = remote ? REMOTE_DESTINATIONS.find((d) => d.id === destinationId) : undefined
+        for (const f of batchTargets) {
+          await window.api.addQueueJob({
+            filePath: f.path,
+            kind: "mzML",
+            op: "compress",
+            settings: buildSettings(!remote),
+            ...(remote ? { destinationId, remotePath, transferMode } : {}),
+          })
+        }
+        await window.api.startQueue()
+        setEnqueued(
+          `Queued ${batchTargets.length} compress jobs` +
+            (dest ? ` → ${dest.label}` : "") +
+            ". Track them in the Queue tab.",
+        )
+        onClearSelection()
+        return
+      }
+
+      // One .mszx v2 archive into the chosen output directory, with the real
+      // per-file progress streamed from the worker.
+      const name = archiveName.trim() || "batch.mszx"
+      const withExt = name.toLowerCase().endsWith(".mszx") ? name : `${name}.mszx`
+      const sep = outputDir.includes("\\") ? "\\" : "/"
+      const outPath = outputDir.replace(/[/\\]+$/, "") + sep + withExt
+      setRunning(true)
+      setProgress(0)
+      setPhase("")
+      try {
+        const res = await window.api.compressBatch(
+          batchTargets.map((f) => f.path),
+          outPath,
+          { preset: profile, mzLossy: mzAlgo, intLossy: intAlgo, zstdLevel: zstd[0] },
+        )
+        setResult(res)
+        if (!res.error) {
+          // Surface the new archive in the Explorer, selected.
+          onAddFiles(await ingestPaths([res.outPath]))
+          onClearSelection()
+        }
+      } finally {
+        setProgress(100)
+        setRunning(false)
+      }
+      return
+    }
 
     if (outputTarget === "remote") {
       const dest = REMOTE_DESTINATIONS.find((d) => d.id === destinationId)
@@ -232,7 +348,20 @@ export function ConvertTab({
       icon: FileDown,
       hint: "Only compressed files can be decompressed",
     },
-    { value: "extract", label: "Extract", icon: Scissors, hint: "Extract a subset of spectra" },
+    {
+      value: "extract",
+      label: "Extract",
+      icon: Scissors,
+      hint: isBatchArchive
+        ? "Per-member extract from a batch archive isn't supported yet"
+        : "Extract a subset of spectra",
+    },
+    {
+      value: "batch",
+      label: "Batch",
+      icon: Boxes,
+      hint: "Check 2+ mzML files in the Explorer to run a batch",
+    },
   ]
 
   return (
@@ -280,8 +409,8 @@ export function ConvertTab({
         </CardContent>
       </Card>
 
-      {/* Compression settings — compress only */}
-      {op === "compress" && (
+      {/* Compression settings — compress + batch */}
+      {(op === "compress" || op === "batch") && (
         <Card className="gap-3 py-4">
           <CardHeader className="px-4">
             <CardTitle className="text-sm">Compression</CardTitle>
@@ -356,6 +485,58 @@ export function ConvertTab({
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Batch inputs + output mode — batch only */}
+      {op === "batch" && (
+        <Card className="gap-3 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="text-sm">Batch input ({batchTargets.length} mzML)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4">
+            <div data-testid="batch-file-list" className="max-h-40 space-y-1 overflow-y-auto">
+              {batchTargets.map((f) => (
+                <div key={f.path} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="mono truncate">{f.name}</span>
+                  <span className="mono shrink-0 text-[10px] text-muted-foreground">
+                    {fmtBytes(f.size)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <SectionLabel>Output as</SectionLabel>
+              <ToggleGroup
+                type="single"
+                value={archiveMode}
+                onValueChange={(v) => v && setArchiveMode(v as "mszx" | "individual")}
+                variant="outline"
+                className="w-full"
+              >
+                <ToggleGroupItem
+                  value="mszx"
+                  data-testid="batch-mode-mszx"
+                  className="flex-1 text-xs"
+                >
+                  One .mszx archive
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="individual"
+                  data-testid="batch-mode-individual"
+                  className="flex-1 text-xs"
+                >
+                  Individual .msz files
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {archiveMode === "mszx" && (
+                <p className="text-[11px] text-muted-foreground">
+                  All files are compressed into a single batch (v2) archive, written to the
+                  directory and name chosen in Output below.
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -465,7 +646,8 @@ export function ConvertTab({
         </Card>
       )}
 
-      {/* Output — local disk or remote (MSTransfer) */}
+      {/* Output — local disk or remote (MSTransfer). The .mszx batch mode is
+          local-only: the archive is written to this directory + name. */}
       <Card className="gap-3 py-4">
         <CardHeader className="px-4">
           <CardTitle className="text-sm">Output</CardTitle>
@@ -479,7 +661,11 @@ export function ConvertTab({
               <TabsTrigger value="local" className="gap-1.5 text-xs">
                 <HardDrive className="size-3.5" /> Local
               </TabsTrigger>
-              <TabsTrigger value="remote" className="gap-1.5 text-xs">
+              <TabsTrigger
+                value="remote"
+                disabled={op === "batch" && archiveMode === "mszx"}
+                className="gap-1.5 text-xs"
+              >
                 <Server className="size-3.5" /> Remote (MSTransfer)
               </TabsTrigger>
             </TabsList>
@@ -497,6 +683,17 @@ export function ConvertTab({
                   <FolderOpen className="size-4" />
                 </Button>
               </div>
+              {op === "batch" && archiveMode === "mszx" && (
+                <div className="space-y-1.5 pt-2">
+                  <SectionLabel>Archive name</SectionLabel>
+                  <Input
+                    value={archiveName}
+                    onChange={(e) => setArchiveName(e.target.value)}
+                    data-testid="archive-name"
+                    className="mono text-xs"
+                  />
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="remote" className="mt-3 space-y-4">
@@ -565,6 +762,8 @@ export function ConvertTab({
       <Button size="lg" className="w-full gap-2" disabled={running || !allowed[op]} onClick={run}>
         {running ? (
           <Loader2 className="size-4 animate-spin" />
+        ) : op === "batch" && archiveMode === "mszx" ? (
+          <Boxes className="size-4" />
         ) : outputTarget === "remote" ? (
           <Server className="size-4" />
         ) : (
@@ -572,13 +771,17 @@ export function ConvertTab({
         )}
         {running
           ? `Running${phase ? ` · ${phase}` : ""}…`
-          : outputTarget === "remote"
-            ? `Queue ${op} → MSTransfer`
-            : op === "compress"
-              ? "Compress file"
-              : op === "decompress"
-                ? "Decompress file"
-                : "Extract spectra"}
+          : op === "batch"
+            ? archiveMode === "mszx"
+              ? `Create .mszx archive (${batchTargets.length} files)`
+              : `Queue ${batchTargets.length} compress jobs`
+            : outputTarget === "remote"
+              ? `Queue ${op} → MSTransfer`
+              : op === "compress"
+                ? "Compress file"
+                : op === "decompress"
+                  ? "Decompress file"
+                  : "Extract spectra"}
       </Button>
 
       {/* Enqueued confirmation (remote) */}
@@ -637,6 +840,16 @@ export function ConvertTab({
                     </div>
                   </div>
                 </div>
+                {result.outPaths && result.outPaths.length > 0 && (
+                  <div className="text-[11px] text-muted-foreground">
+                    {result.outPaths.length} mzML file(s) written to the directory below.
+                  </div>
+                )}
+                {result.inputCount != null && (
+                  <div className="text-[11px] text-muted-foreground">
+                    {result.inputCount} mzML file(s) archived into the batch .mszx below.
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <Input readOnly value={result.outPath} className="mono text-xs" />
                   <Button

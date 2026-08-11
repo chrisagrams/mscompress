@@ -79,6 +79,8 @@ function App() {
   }, [])
 
   // Add opened/dropped files (deduped by path) and select the first new one.
+  // The checkbox multi-selection is left untouched — adding files must not
+  // silently clear a batch selection in progress.
   const addFiles = (entries: FileEntry[]) => {
     if (entries.length === 0) return
     setFiles((prev) => {
@@ -87,8 +89,10 @@ function App() {
       return [...fresh, ...prev]
     })
     setSelectedPath(entries[0].path)
-    setSelectedPaths([entries[0].path])
   }
+
+  // Files checked in the Explorer — inputs for the Convert tab's batch op.
+  const checkedFiles = files.filter((f) => selectedPaths.includes(f.path))
   // OS-associated files (double-click / "Open with") pushed from the main
   // process — funnel them through the same analyze→addFiles path as the dialog.
   useEffect(() => {
@@ -255,7 +259,6 @@ function App() {
               onMultiSelect={setSelectedPaths}
               onAddFiles={addFiles}
               queue={queue}
-              settings={settings}
             />
           </aside>
 
@@ -298,6 +301,9 @@ function App() {
                       kind={selectedEntry.kind}
                       path={selectedEntry.path}
                       settings={settings}
+                      checkedFiles={checkedFiles}
+                      onAddFiles={addFiles}
+                      onClearSelection={() => setSelectedPaths([])}
                     />
                   ) : (
                     <NoFile />
@@ -305,7 +311,11 @@ function App() {
                 </TabsContent>
                 <TabsContent value="qc" className="m-0">
                   {selectedEntry ? (
-                    <QCTab path={selectedEntry.path} name={selectedEntry.name} />
+                    <QCTab
+                      path={selectedEntry.path}
+                      name={selectedEntry.name}
+                      kind={selectedEntry.kind}
+                    />
                   ) : (
                     <NoFile />
                   )}

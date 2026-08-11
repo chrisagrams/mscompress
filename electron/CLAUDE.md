@@ -18,6 +18,7 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
 - `MZMLFile`: `.format`, `.positions`, `.spectra` (lazy `Spectra`), `.compress(out)`, `.extract(out, opts)`, `getMzBinary/getIntenBinary/getXml(i)`
 - `MSZFile`: `.decompress(out)`, `.extract(out, opts)`, random-access spectrum reads, `MSZFile.fromMszx(archive, entry)`
 - `MSZXFile` / `MSZXManifest` / `MSZXBuilder` / `createMSZX`: archive + annotations (percolator_tsv/pepxml/tsv), manifest (num_spectra, join_key, source_file)
+- `MSZXBatchFile`: collection reader for any `.mszx` (v2 "batch" = N MSZ members; v1 adapts to one) — `manifest.container` discriminates; `MSZXBatchWriter` / `compressBatch(inputs, out, {onProgress})`: async batch writer (wraps the shared C writer)
 - `Spectrum`: `.index .scan .msLevel .retentionTime .size .mz .intensity .peaks .xml`
 - `Spectra`: iterable, `.length`, `.get(i)` (cached)
 - `RuntimeArguments`: threads, zstdCompressionLevel, mzLossy, intLossy (algos: none/cast/log/delta16/delta32/vbr)
@@ -52,6 +53,32 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
   Node smoke test (`npm run smoke:bindings`) can drive them directly; electron
   paths (userData, downloads, local-archive dir) are injected via
   `configureSettings()` / `configureQueue()` from `index.ts`.
+
+## Batch .mszx (v2)
+- `readMszx` returns the `MszxArchive` union (`container: "single" | "batch"`);
+  check `error` first, then discriminate. ArchiveTab renders both shapes.
+- Batch decompress expands to `<outputDir>/<archive stem>/<entry>.mzML`
+  (matching the CLI's mszx→directory semantics); `ConvertResult.outPaths` lists
+  the written files. Per-member extract is not supported yet — ConvertTab sniffs
+  the container and greys extract out for batch archives.
+- **Selection**: Explorer rows carry a checkbox (`file-check`) that toggles the
+  multi-selection (`selectedPaths` in App); row click only changes the active
+  file. The sidebar has NO batch action buttons — batch runs live in the
+  Convert tab's "Batch" operation, enabled when 2+ mzML are checked.
+- The Batch op offers two output modes: "One .mszx archive" →
+  `compressBatch(paths, outPath, opts)` where outPath = the Output card's
+  local directory + an archive-name field (Remote is disabled in this mode);
+  "Individual .msz files" → one queued compress job per file (the old
+  "Compress selected" behavior, with local/remote routing).
+- **QC on a batch archive is per-member**: `computeQC(path, { entry })` opens
+  that member via `MSZXBatchFile` (member is archive-owned — close the archive,
+  not the member). QCTab shows an "Archive member" dropdown for batch archives
+  and always passes `entry`; without it a batch archive errors structurally.
+- `compressBatch` runs in the convert worker. The worker protocol is
+  enveloped: `{type:"progress",index,total,file}` messages stream before the
+  final `{type:"result",result}` — real per-file progress, relayed on
+  `convert:progress` as `step` events with `index`/`total` and rendered as a
+  real progress bar in ConvertTab.
 
 ## Conventions that emerged
 - **Threads are global, not per-job**: they come from `settings.threads`. The

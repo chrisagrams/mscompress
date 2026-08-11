@@ -15,7 +15,14 @@ import {
   CartesianGrid,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { QCData } from "@shared/ipc"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import type { FileKind, QCData } from "@shared/ipc"
 
 const donutColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"]
 
@@ -147,22 +154,57 @@ function Panel({
   )
 }
 
-export function QCTab({ path, name }: { path: string; name: string }) {
+export function QCTab({ path, name, kind }: { path: string; name: string; kind: FileKind }) {
   const [qc, setQc] = useState<QCData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Batch (v2) .mszx: QC runs on ONE archive member, chosen via the dropdown.
+  // null = still resolving the manifest; [] = not a batch archive.
+  const [batchEntries, setBatchEntries] = useState<string[] | null>(null)
+  const [entry, setEntry] = useState<string | null>(null)
+
   useEffect(() => {
+    setBatchEntries(null)
+    setEntry(null)
+    if (kind !== "mszx") return
+    let active = true
+    window.api
+      .readMszx(path)
+      .then((m) => {
+        if (!active) return
+        if (!m.error && m.container === "batch") {
+          const names = m.entries.map((e) => e.entry)
+          setBatchEntries(names)
+          setEntry(names[0] ?? null)
+        } else {
+          setBatchEntries([])
+        }
+      })
+      .catch(() => {
+        if (active) setBatchEntries([])
+      })
+    return () => {
+      active = false
+    }
+  }, [path, kind])
+
+  useEffect(() => {
+    // For .mszx, wait until the manifest resolved; for a batch archive, wait
+    // until a member is picked (batch QC is always per-member).
+    if (kind === "mszx" && batchEntries === null) return
+    if (batchEntries && batchEntries.length > 0 && !entry) return
     let active = true
     setLoading(true)
     setQc(null)
     window.api
-      .computeQC(path)
+      .computeQC(path, entry ? { entry } : undefined)
       .then((data) => {
         if (!active) return
         setQc(data)
         console.log(
           "[renderer] QC:",
           data.path,
+          entry ? `entry=${entry}` : "",
           "tic=",
           data.tic.length,
           "cells=",
@@ -178,23 +220,55 @@ export function QCTab({ path, name }: { path: string; name: string }) {
     return () => {
       active = false
     }
-  }, [path])
+  }, [path, kind, batchEntries, entry])
+
+  // Member picker, shown only for batch archives (above every QC state).
+  const memberSelector =
+    batchEntries && batchEntries.length > 0 && entry ? (
+      <div className="flex items-center gap-2 px-4 pt-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Archive member
+        </span>
+        <Select value={entry} onValueChange={setEntry}>
+          <SelectTrigger data-testid="qc-entry-select" className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {batchEntries.map((e) => (
+              <SelectItem key={e} value={e} className="mono">
+                {e}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    ) : null
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="size-6 animate-spin" />
-        <span className="text-xs">Computing QC for {name}…</span>
+      <div>
+        {memberSelector}
+        <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
+          <Loader2 className="size-6 animate-spin" />
+          <span className="text-xs">
+            Computing QC for {entry ?? name}…
+          </span>
+        </div>
       </div>
     )
   }
 
   if (!qc || qc.error) {
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center text-destructive">
-        <AlertTriangle className="size-6" />
-        <span className="text-sm font-medium">QC failed</span>
-        <p className="mono max-w-md text-[11px] text-muted-foreground">{qc?.error ?? "No data"}</p>
+      <div>
+        {memberSelector}
+        <div className="flex h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center text-destructive">
+          <AlertTriangle className="size-6" />
+          <span className="text-sm font-medium">QC failed</span>
+          <p className="mono max-w-md text-[11px] text-muted-foreground">
+            {qc?.error ?? "No data"}
+          </p>
+        </div>
       </div>
     )
   }
@@ -205,7 +279,9 @@ export function QCTab({ path, name }: { path: string; name: string }) {
   const totalSpectra = donutData.reduce((a, b) => a + b.value, 0) || 1
 
   return (
-    <div data-testid="qc-charts" className="grid grid-cols-2 gap-3 p-4">
+    <div>
+      {memberSelector}
+      <div data-testid="qc-charts" className="grid grid-cols-2 gap-3 p-4">
       {/* TIC */}
       <Panel
         title="TIC Chromatogram"
@@ -382,6 +458,7 @@ export function QCTab({ path, name }: { path: string; name: string }) {
           </BarChart>
         </ResponsiveContainer>
       </Panel>
+      </div>
     </div>
   )
 }

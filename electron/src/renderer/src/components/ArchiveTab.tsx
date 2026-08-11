@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { FileKind, MszxManifest } from "@shared/ipc"
+import { fmtBytes } from "@/lib/format"
+import type { FileKind, MszxArchive, MszxBatchManifest, MszxManifest } from "@shared/ipc"
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -28,7 +29,7 @@ function fmtCreated(iso: string): string {
 }
 
 export function ArchiveTab({ path, kind, name }: { path: string; kind: FileKind; name: string }) {
-  const [manifest, setManifest] = useState<MszxManifest | null>(null)
+  const [manifest, setManifest] = useState<MszxArchive | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export function ArchiveTab({ path, kind, name }: { path: string; kind: FileKind;
       .then((m) => {
         if (!active) return
         setManifest(m)
-        console.log("[renderer] archive:", m.path, "num_spectra=", m.num_spectra)
+        console.log("[renderer] archive:", m.path, "container=", m.container)
       })
       .catch((e) => {
         if (active) setManifest({ error: String(e) } as MszxManifest)
@@ -92,6 +93,10 @@ export function ArchiveTab({ path, kind, name }: { path: string; kind: FileKind;
         </p>
       </div>
     )
+  }
+
+  if (manifest.container === "batch") {
+    return <BatchArchiveView m={manifest} name={name} />
   }
 
   const m = manifest
@@ -197,6 +202,107 @@ export function ArchiveTab({ path, kind, name }: { path: string; kind: FileKind;
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/** v2 multi-file ("batch") archive: summary + one row per bundled MSZ. */
+function BatchArchiveView({ m, name }: { m: MszxBatchManifest; name: string }) {
+  const knownSpectra = m.entries.reduce((sum, e) => sum + (e.num_spectra ?? 0), 0)
+  const totalBytes = m.entries.reduce((sum, e) => sum + e.size, 0)
+  const annotationCount = m.entries.reduce((sum, e) => sum + e.annotations.length, 0)
+
+  return (
+    <div data-testid="archive-batch" className="space-y-3 p-4">
+      <div className="flex items-center gap-2">
+        <Database className="size-4 text-chart-2" />
+        <h2 className="text-sm font-semibold">MSZX Batch Archive</h2>
+        <Badge variant="secondary" className="mono">
+          v{m.version}
+        </Badge>
+        <span className="mono ml-auto text-[11px] text-muted-foreground">{name}</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="gap-2 py-3">
+          <CardHeader className="px-4">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <Field label="Entries" value={m.entries.length.toLocaleString()} />
+            <Separator />
+            <Field
+              label="Total spectra"
+              value={knownSpectra > 0 ? knownSpectra.toLocaleString() : "—"}
+            />
+            <Separator />
+            <Field label="Payload size" value={totalBytes > 0 ? fmtBytes(totalBytes) : "—"} />
+            <Separator />
+            <Field label="Annotations" value={annotationCount.toLocaleString()} />
+          </CardContent>
+        </Card>
+
+        <Card className="gap-2 py-3">
+          <CardHeader className="px-4">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Description
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {m.description ?? "No description in manifest."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="gap-2 py-3">
+        <CardHeader className="px-4">
+          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <FileText className="size-3.5" /> Entries ({m.entries.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-[11px] uppercase tracking-wider">Entry</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Original</TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                  Size
+                </TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                  Spectra
+                </TableHead>
+                <TableHead className="text-right text-[11px] uppercase tracking-wider">
+                  Annotations
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {m.entries.map((e) => (
+                <TableRow key={e.entry}>
+                  <TableCell className="mono text-xs font-medium">{e.entry}</TableCell>
+                  <TableCell className="mono text-xs text-muted-foreground">
+                    {e.original ?? "—"}
+                  </TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    {e.size > 0 ? fmtBytes(e.size) : "—"}
+                  </TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    {e.num_spectra != null ? e.num_spectra.toLocaleString() : "—"}
+                  </TableCell>
+                  <TableCell className="mono text-right text-xs">
+                    {e.annotations.length > 0 ? e.annotations.length : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

@@ -18,13 +18,13 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fmtBytes } from "@/lib/format"
-import { COMPRESSION_PRESETS } from "@shared/ipc"
-import type { AppSettings, FileKind, QueueState, QueueStatus } from "@shared/ipc"
+import type { FileKind, QueueState, QueueStatus } from "@shared/ipc"
 import { ingestPaths, type FileEntry } from "@/files"
 
 // File-kind colours match the OS file-type icons (assets/icons/*): the logo's
@@ -72,75 +72,31 @@ export function LeftRail({
   onMultiSelect,
   onAddFiles,
   queue,
-  settings,
 }: {
   files: FileEntry[]
   /** Path of the currently selected file (drives the workspace + Inspector). */
   selected: string
   onSelect: (path: string) => void
-  /** Multi-selection for batch actions (independent of `selected`). */
+  /** Checked files for batch actions (independent of `selected`). */
   selectedPaths: string[]
   onMultiSelect: (paths: string[]) => void
   onAddFiles: (entries: FileEntry[]) => void
   queue: QueueState
-  settings: AppSettings | null
 }) {
   const [dragOver, setDragOver] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
-  // Anchor row for shift-range selection (index into `files`).
-  const [anchor, setAnchor] = useState<number | null>(null)
 
   const running = queue.running
 
-  // Click on a file row: plain → single-select (resets multi to just this file);
-  // Ctrl/Cmd → toggle in the multi-selection; Shift → range from the anchor row.
-  const handleRowClick = (e: React.MouseEvent, path: string, idx: number) => {
-    if (e.shiftKey && anchor !== null) {
-      const [a, b] = anchor <= idx ? [anchor, idx] : [idx, anchor]
-      onMultiSelect(files.slice(a, b + 1).map((f) => f.path))
-    } else if (e.ctrlKey || e.metaKey) {
-      onMultiSelect(
-        selectedPaths.includes(path)
-          ? selectedPaths.filter((p) => p !== path)
-          : [...selectedPaths, path],
-      )
-      setAnchor(idx)
-    } else {
-      onSelect(path)
-      onMultiSelect([path])
-      setAnchor(idx)
-    }
+  // Toggle a file's checkbox in the multi-selection (batch ops consume it in
+  // the Convert tab). Independent of the active row.
+  const toggleChecked = (path: string) => {
+    onMultiSelect(
+      selectedPaths.includes(path)
+        ? selectedPaths.filter((p) => p !== path)
+        : [...selectedPaths, path],
+    )
   }
-
-  // Enqueue one LOCAL compress job per selected mzML, then start the queue.
-  const compressSelected = async () => {
-    const s = settings ?? (await window.api.getSettings())
-    const preset = s.defaultPreset ?? "default"
-    const d = COMPRESSION_PRESETS[preset]
-    const targets = files.filter((f) => selectedPaths.includes(f.path) && f.kind === "mzML")
-    if (targets.length === 0) return
-    for (const f of targets) {
-      await window.api.addQueueJob({
-        filePath: f.path,
-        kind: "mzML",
-        op: "compress",
-        settings: {
-          preset,
-          mzLossy: d.mzLossy,
-          intLossy: d.intLossy,
-          zstdLevel: d.zstdLevel,
-          outputDir: s.defaultOutputDir,
-        },
-      })
-    }
-    await window.api.startQueue()
-    setTransferOpen(true)
-    onMultiSelect([])
-  }
-
-  const compressCount = files.filter(
-    (f) => selectedPaths.includes(f.path) && f.kind === "mzML",
-  ).length
 
   // Analyze paths via the shared helper and add the resulting entries.
   const ingest = async (paths: string[]) => {
@@ -212,26 +168,17 @@ export function LeftRail({
         Open Files
       </div>
 
-      {/* Batch action bar — shown when 2+ files are multi-selected and at least
-          one is an mzML (the only kind that can be compressed). */}
-      {selectedPaths.length >= 2 && compressCount > 0 && (
+      {/* Selection summary — batch actions themselves live in the Convert tab. */}
+      {selectedPaths.length > 0 && (
         <div
-          data-testid="batch-bar"
-          className="mb-1 flex items-center gap-1 px-2 text-[11px] text-muted-foreground"
+          data-testid="selection-bar"
+          className="mb-1 flex items-center gap-1 px-3 text-[11px] text-muted-foreground"
         >
-          <span>{selectedPaths.length} selected</span>
-          <Button
-            size="sm"
-            data-testid="compress-selected"
-            className="ml-auto h-6 gap-1 text-[11px]"
-            onClick={compressSelected}
-          >
-            <FileArchive className="size-3" /> Compress selected
-          </Button>
+          <span>{selectedPaths.length} checked · batch via Convert</span>
           <Button
             variant="ghost"
             size="icon"
-            className="size-6"
+            className="ml-auto size-6"
             title="Clear selection"
             onClick={() => onMultiSelect([])}
           >
@@ -242,34 +189,38 @@ export function LeftRail({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-1 pb-2">
-          {files.map((f, idx) => {
+          {files.map((f) => {
             const active = f.path === selected
-            const multi = selectedPaths.includes(f.path)
+            const checked = selectedPaths.includes(f.path)
             return (
-              <button
+              <div
                 key={f.path}
                 data-testid="file-entry"
                 data-path={f.path}
-                onClick={(e) => handleRowClick(e, f.path, idx)}
-                className={`group flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
+                onClick={() => onSelect(f.path)}
+                className={`group flex w-full cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : multi
+                    : checked
                       ? "bg-accent/60 text-accent-foreground"
                       : "hover:bg-accent/50"
                 }`}
               >
-                <ChevronRight
-                  className={`size-3 shrink-0 text-muted-foreground transition-transform ${
-                    active ? "rotate-90" : ""
-                  }`}
+                {/* Checkbox = membership in the batch selection; clicking it
+                    must not also change the active row. */}
+                <Checkbox
+                  data-testid="file-check"
+                  className="size-3.5 shrink-0"
+                  checked={checked}
+                  onCheckedChange={() => toggleChecked(f.path)}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 {kindIcon(f.kind)}
                 <span className="truncate">{f.name}</span>
                 <span className="mono ml-auto shrink-0 text-[10px] text-muted-foreground">
                   {fmtBytes(f.size)}
                 </span>
-              </button>
+              </div>
             )
           })}
         </div>

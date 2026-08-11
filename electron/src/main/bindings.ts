@@ -2,12 +2,13 @@
 // This module is the ONLY place the addon is required, and it must never be
 // imported from the renderer (it is externalized from the Vite bundle).
 import { createRequire } from "module"
-import { existsSync, statSync } from "fs"
+import { existsSync, mkdirSync, statSync } from "fs"
 import { basename, dirname, extname, join } from "path"
 import { hrtime } from "process"
 import { Worker } from "worker_threads"
 import { COMPRESSION_PRESETS } from "../shared/ipc.ts"
 import type {
+  CompressBatchOptions,
   CompressOptions,
   ConvertResult,
   DecompressOptions,
@@ -15,6 +16,9 @@ import type {
   FileKind,
   FileSummary,
   MsLevelCount,
+  MszxAnnotation,
+  MszxArchive,
+  MszxBatchManifest,
   MszxManifest,
   LossyAlgo,
   QCData,
@@ -101,12 +105,49 @@ interface MsMszxFile extends MsFile {
   manifest: { toJSON(): MsManifestData }
 }
 
+/** One member record in a batch (.mszx v2) manifest. */
+interface MsBatchEntry {
+  entry: string
+  original?: string
+  size?: number | bigint
+  num_spectra?: number | bigint
+  join_key?: string
+  annotations?: MsManifestData["annotations"]
+}
+
+/** Collection reader for any .mszx (v1 adapts to a one-member collection). */
+interface MsBatchFile {
+  manifest: {
+    version: string
+    /** "batch" for a v2 archive, "single" for an adapted v1. */
+    container: string
+    description?: string
+    spectra_files: MsBatchEntry[]
+  }
+  get(key: number | string): MsFile
+  decompress(outputDir: string): string[]
+  close(): void
+}
+
 interface MscompressModule {
   getVersion(): string
   getNumThreads(): number
   getFilesize(filePath: string): number
   read(filePath: string): MsFile
   MSZXFile: { open(filePath: string): MsMszxFile }
+  MSZXBatchFile: { open(filePath: string): MsBatchFile }
+  compressBatch(
+    inputs: string[],
+    output: string,
+    options?: {
+      threads?: number
+      zstdCompressionLevel?: number
+      targetMzFormat?: number
+      targetIntenFormat?: number
+      description?: string
+      onProgress?: (index: number, total: number, path: string) => void
+    },
+  ): Promise<string>
 }
 
 let cached: MscompressModule | null = null
@@ -309,13 +350,27 @@ export function analyze(path: string): FileSummary {
 // MSZX archive
 // ---------------------------------------------------------------------------
 
+/** Map native annotation records to the plain, IPC-safe shape. */
+function mapAnnotations(list: MsManifestData["annotations"] | undefined): MszxAnnotation[] {
+  return (list ?? []).map((a) => ({
+    filename: a.filename,
+    format: a.format,
+    compressed: Boolean(a.compressed),
+    num_records: a.num_records != null ? toNumber(a.num_records) : null,
+    description: a.description ?? null,
+  }))
+}
+
 /**
  * Read an .mszx archive's manifest + annotations into a plain, serializable
- * object. Always resolves — a bad/missing archive is reported via `error`.
+ * object — the v1 single-file shape or the v2 batch shape, discriminated on
+ * `container`. Always resolves — a bad/missing archive is reported via `error`
+ * (on the "single" shape, since the container is unknown at that point).
  */
-export function readMszx(path: string): MszxManifest {
+export function readMszx(path: string): MszxArchive {
   const base: MszxManifest = {
     path,
+    container: "single",
     version: "",
     created_at: "",
     spectra_file: "",
@@ -326,12 +381,44 @@ export function readMszx(path: string): MszxManifest {
     annotations: [],
   }
 
+  // Sniff the container with the collection reader: it opens any .mszx (a v1
+  // archive adapts to a one-member collection) and only reads manifest.json.
+  let batchManifest: MszxBatchManifest | null = null
+  let bf: MsBatchFile | null = null
+  try {
+    bf = mod().MSZXBatchFile.open(path)
+    if (bf.manifest.container === "batch") {
+      batchManifest = {
+        path,
+        container: "batch",
+        version: bf.manifest.version,
+        description: bf.manifest.description ?? null,
+        entries: bf.manifest.spectra_files.map((e) => ({
+          entry: e.entry,
+          original: e.original ? e.original : null,
+          size: e.size != null ? toNumber(e.size) : 0,
+          num_spectra: e.num_spectra != null ? toNumber(e.num_spectra) : null,
+          join_key: e.join_key ?? "",
+          annotations: mapAnnotations(e.annotations),
+        })),
+      }
+    }
+  } catch (err) {
+    return { ...base, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    bf?.close()
+  }
+  if (batchManifest) return batchManifest
+
+  // v1 → the flat reader, whose manifest carries the full single-file fields
+  // (created_at etc.) that the batch adaptation drops.
   let file: MsMszxFile | null = null
   try {
     file = mod().MSZXFile.open(path)
     const m = file.manifest.toJSON()
     return {
       path,
+      container: "single",
       version: m.version,
       created_at: m.created_at,
       spectra_file: m.spectra_file,
@@ -339,13 +426,7 @@ export function readMszx(path: string): MszxManifest {
       join_key: m.join_key,
       source_file: m.source_file ?? null,
       description: m.description ?? null,
-      annotations: (m.annotations ?? []).map((a) => ({
-        filename: a.filename,
-        format: a.format,
-        compressed: Boolean(a.compressed),
-        num_records: a.num_records != null ? toNumber(a.num_records) : null,
-        description: a.description ?? null,
-      })),
+      annotations: mapAnnotations(m.annotations),
     }
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : String(err) }
@@ -413,8 +494,16 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
   }
 
   let file: MsFile | null = null
+  let archive: MsBatchFile | null = null
   try {
-    file = openFile(path, kind)
+    if (kind === "mszx" && opts.entry) {
+      // Batch (v2) archive member: mmap the embedded MSZ at its offset. The
+      // member is owned by the archive — close the archive, not the member.
+      archive = mod().MSZXBatchFile.open(path)
+      file = archive.get(opts.entry)
+    } else {
+      file = openFile(path, kind)
+    }
     const length = file.spectra.length
     const msLevels = file.positions.msLevels
     const retTimes = file.positions.retTimes
@@ -527,7 +616,8 @@ export function computeQC(path: string, opts: QCOptions = {}): QCData {
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : String(err) }
   } finally {
-    file?.close()
+    if (archive) archive.close()
+    else file?.close()
   }
 }
 
@@ -655,7 +745,51 @@ export function compress(path: string, opts: CompressOptions): ConvertResult {
   }
 }
 
-/** Decompress an .msz/.mszx → .mzML. */
+/**
+ * Expand a batch (v2) .mszx into `<outputDir>/<archive stem>/<entry>.mzML`.
+ * Returns null when the archive is a v1 single-file .mszx, so the caller falls
+ * through to the flat single-output path.
+ */
+function decompressBatchArchive(
+  path: string,
+  opts: DecompressOptions,
+  startedAt: bigint,
+): ConvertResult | null {
+  const bf = mod().MSZXBatchFile.open(path)
+  try {
+    if (bf.manifest.container !== "batch") return null
+    const baseDir = opts.outputDir && opts.outputDir.length > 0 ? opts.outputDir : dirname(path)
+    const outDir = join(baseDir, stripExt(basename(path)))
+    mkdirSync(outDir, { recursive: true })
+    const threads = opts.threads ?? getNumThreads()
+    const written: string[] = []
+    for (const entry of bf.manifest.spectra_files) {
+      // Members are owned by the archive (closed by bf.close()); the returned
+      // output handle is ours to close.
+      const member = bf.get(entry.entry)
+      member.arguments.threads = threads
+      const target = join(outDir, `${stripExt(entry.entry)}.mzML`)
+      const out = member.decompress(target)
+      out.close()
+      written.push(target)
+    }
+    const inputBytes = getFilesize(path)
+    const outputBytes = written.reduce((sum, p) => sum + statSync(p).size, 0)
+    return {
+      op: "decompress",
+      outPath: outDir,
+      outPaths: written,
+      inputBytes,
+      outputBytes,
+      ratio: inputBytes > 0 ? outputBytes / inputBytes : 0,
+      elapsedMs: Number(hrtime.bigint() - startedAt) / 1e6,
+    }
+  } finally {
+    bf.close()
+  }
+}
+
+/** Decompress an .msz/.mszx → .mzML (a batch .mszx → a directory of .mzML). */
 export function decompress(path: string, opts: DecompressOptions): ConvertResult {
   const startedAt = hrtime.bigint()
   const kind = kindFromPath(path)
@@ -663,6 +797,10 @@ export function decompress(path: string, opts: DecompressOptions): ConvertResult
   try {
     if (kind === "mzML") {
       throw new Error("mzML files are already decompressed.")
+    }
+    if (kind === "mszx") {
+      const batchResult = decompressBatchArchive(path, opts, startedAt)
+      if (batchResult) return batchResult
     }
     file = openFile(path, kind)
     file.arguments.threads = opts.threads ?? getNumThreads()
@@ -674,6 +812,54 @@ export function decompress(path: string, opts: DecompressOptions): ConvertResult
     return errorResult("decompress", err)
   } finally {
     file?.close()
+  }
+}
+
+/**
+ * Compress many mzML files into one batch (.mszx v2) archive at `outPath`.
+ * Async because the underlying incremental writer is; always resolves with a
+ * ConvertResult (errors reported structurally — on failure the native writer
+ * removes the partial archive). `onProgress` fires before each entry.
+ */
+export async function compressBatch(
+  paths: string[],
+  outPath: string,
+  opts: CompressBatchOptions,
+  onProgress?: (index: number, total: number, file: string) => void,
+): Promise<ConvertResult> {
+  const startedAt = hrtime.bigint()
+  try {
+    if (paths.length === 0) {
+      throw new Error("No input files to archive.")
+    }
+    const notMzml = paths.find((p) => kindFromPath(p) !== "mzML")
+    if (notMzml) {
+      throw new Error(`Only mzML files can be archived: ${basename(notMzml)}`)
+    }
+    const preset = COMPRESSION_PRESETS[opts.preset] ?? COMPRESSION_PRESETS.default
+    const mz = opts.mzLossy ?? preset.mzLossy
+    const int = opts.intLossy ?? preset.intLossy
+    await mod().compressBatch(paths, outPath, {
+      threads: opts.threads ?? getNumThreads(),
+      zstdCompressionLevel: opts.zstdLevel ?? preset.zstdLevel,
+      targetMzFormat: LOSSY_FORMAT[mz],
+      targetIntenFormat: LOSSY_FORMAT[int],
+      description: opts.description,
+      onProgress,
+    })
+    const inputBytes = paths.reduce((sum, p) => sum + getFilesize(p), 0)
+    const outputBytes = statSync(outPath).size
+    return {
+      op: "compressBatch",
+      outPath,
+      inputCount: paths.length,
+      inputBytes,
+      outputBytes,
+      ratio: inputBytes > 0 ? outputBytes / inputBytes : 0,
+      elapsedMs: Number(hrtime.bigint() - startedAt) / 1e6,
+    }
+  } catch (err) {
+    return errorResult("compressBatch", err)
   }
 }
 
@@ -735,15 +921,21 @@ function workerUrl(): URL {
   return new URL(name, import.meta.url)
 }
 
+/** Messages a convert worker posts back: streamed progress, then one result. */
+export type ConvertWorkerMessage =
+  | { type: "progress"; index: number; total: number; file: string }
+  | { type: "result"; result: ConvertResult }
+
 /**
- * Run a convert off the main thread. Always resolves with a ConvertResult —
+ * Run a request in a one-shot worker. Always resolves with a ConvertResult —
  * worker/spawn failures are mapped to an `errorResult`-shaped value (never
- * thrown) so callers keep the same contract as the sync path.
+ * thrown) so callers keep the same contract as the sync path. `onProgress`
+ * relays the worker's streamed per-file progress (batch ops only).
  */
-export function runConvertInWorker(
-  op: "compress" | "decompress" | "extract",
-  path: string,
-  opts: CompressOptions | DecompressOptions | ExtractOptions,
+function runInWorker(
+  op: ConvertResult["op"],
+  request: unknown,
+  onProgress?: (index: number, total: number, file: string) => void,
 ): Promise<ConvertResult> {
   return new Promise((resolve) => {
     let settled = false
@@ -760,11 +952,36 @@ export function runConvertInWorker(
       resolve(errorResult(op, err))
       return
     }
-    worker.once("message", (result: ConvertResult) => finish(result))
+    worker.on("message", (msg: ConvertWorkerMessage) => {
+      if (msg.type === "progress") {
+        onProgress?.(msg.index, msg.total, msg.file)
+        return
+      }
+      finish(msg.result)
+    })
     worker.once("error", (err) => finish(errorResult(op, err)))
     worker.once("exit", (code) => {
       if (code !== 0) finish(errorResult(op, new Error(`Convert worker exited with code ${code}`)))
     })
-    worker.postMessage({ op, path, opts })
+    worker.postMessage(request)
   })
+}
+
+/** Run a single-file convert off the main thread. */
+export function runConvertInWorker(
+  op: "compress" | "decompress" | "extract",
+  path: string,
+  opts: CompressOptions | DecompressOptions | ExtractOptions,
+): Promise<ConvertResult> {
+  return runInWorker(op, { op, path, opts })
+}
+
+/** Run a batch (.mszx v2) archive build off the main thread. */
+export function runBatchCompressInWorker(
+  paths: string[],
+  outPath: string,
+  opts: CompressBatchOptions,
+  onProgress?: (index: number, total: number, file: string) => void,
+): Promise<ConvertResult> {
+  return runInWorker("compressBatch", { op: "compressBatch", paths, outPath, opts }, onProgress)
 }

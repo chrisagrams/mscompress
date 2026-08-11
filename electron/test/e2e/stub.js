@@ -7,6 +7,8 @@
 const mzML = "/fixtures/test.mzML"
 const msz = "/fixtures/test.msz"
 const mszx = "/fixtures/test.mszx"
+const mzML2 = "/fixtures/run2.mzML"
+const mszxBatch = "/fixtures/cohort.mszx"
 
 export const fixtures = {
   version: "1.2.3-test",
@@ -18,7 +20,7 @@ export const fixtures = {
     defaultPreset: "default",
     theme: "dark",
   },
-  openFilesResult: [mzML, msz, mszx],
+  openFilesResult: [mzML, msz, mszx, mzML2, mszxBatch],
   files: {
     [mzML]: {
       path: mzML,
@@ -64,6 +66,38 @@ export const fixtures = {
       msLevelCounts: [
         { level: "MS1", count: 10 },
         { level: "MS2", count: 40 },
+      ],
+      rtRangeSec: [0.5, 1800.2],
+      accessions: null,
+    },
+    [mzML2]: {
+      path: mzML2,
+      fileName: "run2.mzML",
+      kind: "mzML",
+      filesizeBytes: 909_920,
+      spectrumCount: 100,
+      mzFormat: "float64",
+      intensityFormat: "float32",
+      sourceCompression: "zlib",
+      msLevelCounts: [
+        { level: "MS1", count: 20 },
+        { level: "MS2", count: 80 },
+      ],
+      rtRangeSec: [0.5, 1400.0],
+      accessions: null,
+    },
+    [mszxBatch]: {
+      path: mszxBatch,
+      fileName: "cohort.mszx",
+      kind: "mszx",
+      filesizeBytes: 1_841_731,
+      spectrumCount: 150,
+      mzFormat: "float64",
+      intensityFormat: "float32",
+      sourceCompression: "zstd",
+      msLevelCounts: [
+        { level: "MS1", count: 30 },
+        { level: "MS2", count: 120 },
       ],
       rtRangeSec: [0.5, 1800.2],
       accessions: null,
@@ -118,6 +152,7 @@ export const fixtures = {
     ],
   },
   manifest: {
+    container: "single",
     version: "1.0",
     created_at: "2026-05-12T14:03:22Z",
     spectra_file: "spectra.msz",
@@ -139,6 +174,37 @@ export const fixtures = {
         compressed: false,
         num_records: 96,
         description: "Comet search results",
+      },
+    ],
+  },
+  batchManifest: {
+    container: "batch",
+    version: "2.0",
+    description: "Cohort batch archive (stub)",
+    entries: [
+      {
+        entry: "run1.msz",
+        original: "run1.mzML",
+        size: 931_811,
+        num_spectra: 50,
+        join_key: "scan_number",
+        annotations: [],
+      },
+      {
+        entry: "run2.msz",
+        original: "run2.mzML",
+        size: 909_920,
+        num_spectra: 100,
+        join_key: "scan_number",
+        annotations: [
+          {
+            filename: "run2.pin",
+            format: "percolator_tsv",
+            compressed: true,
+            num_records: 64,
+            description: null,
+          },
+        ],
       },
     ],
   },
@@ -221,8 +287,16 @@ export function installApiStub(fx) {
       }),
     getFilesize: (path) => Promise.resolve(summaryFor(path).filesizeBytes),
     analyze: (path) => Promise.resolve(summaryFor(path)),
-    computeQC: (path) => Promise.resolve({ ...fx.qc, path }),
-    readMszx: (path) => Promise.resolve({ ...fx.manifest, path }),
+    computeQC: (path, opts) => {
+      // Record calls so e2e tests can assert per-member QC wiring.
+      window.__qcCalls = window.__qcCalls || []
+      window.__qcCalls.push({ path, opts: opts || null })
+      return Promise.resolve({ ...fx.qc, path })
+    },
+    readMszx: (path) =>
+      Promise.resolve(
+        path.endsWith("cohort.mszx") ? { ...fx.batchManifest, path } : { ...fx.manifest, path },
+      ),
     getSettings: () => Promise.resolve({ ...settings }),
     setSettings: (partial) => {
       settings = { ...settings, ...partial }
@@ -265,6 +339,20 @@ export function installApiStub(fx) {
         ratio: 0.42,
         elapsedMs: 260,
       }),
+    compressBatch: (paths, outPath) => {
+      // Record calls so e2e tests can assert the renderer wiring.
+      window.__compressBatchCalls = window.__compressBatchCalls || []
+      window.__compressBatchCalls.push({ paths: paths.slice(), outPath })
+      return Promise.resolve({
+        op: "compressBatch",
+        outPath,
+        inputCount: paths.length,
+        inputBytes: 5_856_324,
+        outputBytes: 1_841_731,
+        ratio: 0.31,
+        elapsedMs: 1234,
+      })
+    },
     onConvertProgress: () => () => {},
     onOpenAssociatedFiles: () => () => {},
     notifyRendererReady: () => {},

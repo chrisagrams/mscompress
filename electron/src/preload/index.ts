@@ -35,6 +35,8 @@ const api: Api = {
   compress: (path, opts) => ipcRenderer.invoke(IPC.compress, path, opts),
   decompress: (path, opts) => ipcRenderer.invoke(IPC.decompress, path, opts),
   extract: (path, opts) => ipcRenderer.invoke(IPC.extract, path, opts),
+  compressBatch: (paths, outPath, opts) =>
+    ipcRenderer.invoke(IPC.compressBatch, paths, outPath, opts),
   onConvertProgress: (cb) => {
     const listener = (_e: IpcRendererEvent, p: ConvertProgress): void => cb(p)
     ipcRenderer.on(IPC.convertProgress, listener)

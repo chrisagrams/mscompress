@@ -75,6 +75,18 @@ async function selectFileByExt(page, ext) {
 const isDisabled = (page, selector) =>
   page.$eval(selector, (el) => el.disabled === true || el.hasAttribute("disabled"))
 
+/** Toggle an Explorer file's selection checkbox (batch inputs). */
+async function checkFileByExt(page, suffix) {
+  const handle = await page.evaluateHandle((sfx) => {
+    const els = Array.from(document.querySelectorAll('[data-testid="file-entry"]'))
+    const row = els.find((e) => (e.getAttribute("data-path") || "").endsWith(sfx))
+    return row ? row.querySelector('[data-testid="file-check"]') : null
+  }, suffix)
+  const el = handle.asElement()
+  assert.ok(el, `expected a selection checkbox for file ending in "${suffix}"`)
+  await el.click()
+}
+
 // --- tests -----------------------------------------------------------------
 
 describe("MScompress renderer (e2e)", () => {
@@ -109,7 +121,7 @@ describe("MScompress renderer (e2e)", () => {
       await openFixtureFiles(page)
 
       const entries = await page.$$('[data-testid="file-entry"]')
-      assert.equal(entries.length, 3, "three fixtures added")
+      assert.equal(entries.length, 5, "five fixtures added")
 
       // Empty state replaced by the workspace once a file is selected.
       const centerEmpty = await page.$('main [data-testid="empty-state"]')
@@ -272,6 +284,126 @@ describe("MScompress renderer (e2e)", () => {
       assert.match(archive, /psms\.percolator\.tsv/) // annotation
       assert.match(archive, /peptides\.pep\.xml/)
       assert.match(archive, /Comet search results/)
+    } finally {
+      await page.close()
+    }
+  })
+
+  test("QC on a batch (v2) archive offers a member dropdown and computes per member", async () => {
+    const page = await openApp(browser, server.url)
+    try {
+      await openFixtureFiles(page)
+      await selectFileByExt(page, "cohort.mszx")
+      await clickWithText(page, '[role="tab"]', "QC")
+
+      // Member dropdown appears, defaulting to the first archive entry, and
+      // the charts render for it.
+      await page.waitForSelector('[data-testid="qc-entry-select"]')
+      const trigger = await textOf(page, '[data-testid="qc-entry-select"]')
+      assert.match(trigger, /run1\.msz/)
+      await page.waitForSelector('[data-testid="qc-charts"]')
+      await page.waitForFunction(() => {
+        const calls = window.__qcCalls || []
+        return calls.some((c) => c.opts && c.opts.entry === "run1.msz")
+      })
+
+      // Switch to the second member → QC recomputes with that entry.
+      await page.click('[data-testid="qc-entry-select"]')
+      await page.waitForSelector('[role="option"]')
+      await clickWithText(page, '[role="option"]', "run2.msz")
+      await page.waitForFunction(() => {
+        const calls = window.__qcCalls || []
+        return calls.some((c) => c.opts && c.opts.entry === "run2.msz")
+      })
+      await page.waitForSelector('[data-testid="qc-charts"]')
+      assert.deepEqual(page._errors, [], "no uncaught page errors")
+    } finally {
+      await page.close()
+    }
+  })
+
+  test("Archive tab renders a batch (v2) archive and Convert disables extract for it", async () => {
+    const page = await openApp(browser, server.url)
+    try {
+      await openFixtureFiles(page)
+      await selectFileByExt(page, "cohort.mszx")
+
+      // Convert tab (default): decompress allowed, per-member extract gated off.
+      await page.waitForFunction(
+        () => {
+          const d = document.querySelector('[data-testid="op-decompress"]')
+          const x = document.querySelector('[data-testid="op-extract"]')
+          return d && x && !d.hasAttribute("disabled") && x.hasAttribute("disabled")
+        },
+        { timeout: 10_000 },
+      )
+
+      await clickWithText(page, '[role="tab"]', "Archive")
+      await page.waitForSelector('[data-testid="archive-batch"]')
+      const archive = await textOf(page, '[data-testid="archive-batch"]')
+      assert.match(archive, /MSZX Batch Archive/)
+      assert.match(archive, /Entries \(2\)/)
+      assert.match(archive, /run1\.msz/)
+      assert.match(archive, /run2\.msz/)
+      assert.match(archive, /run2\.mzML/) // original column
+      assert.match(archive, /150/) // total spectra (50 + 100)
+      assert.match(archive, /Cohort batch archive \(stub\)/)
+    } finally {
+      await page.close()
+    }
+  })
+
+  test("checked mzML files can be archived into one .mszx from the Convert tab", async () => {
+    const page = await openApp(browser, server.url)
+    try {
+      await openFixtureFiles(page)
+
+      // No files checked yet → the Batch op is greyed out.
+      await page.waitForSelector('[data-testid="op-batch"]')
+      assert.equal(await isDisabled(page, '[data-testid="op-batch"]'), true)
+
+      // Check both mzML fixtures via the Explorer checkboxes.
+      await checkFileByExt(page, "test.mzML")
+      await checkFileByExt(page, "run2.mzML")
+      await page.waitForSelector('[data-testid="selection-bar"]')
+
+      // Batch op becomes available; switch to it.
+      await page.waitForFunction(
+        () => !document.querySelector('[data-testid="op-batch"]')?.hasAttribute("disabled"),
+        { timeout: 10_000 },
+      )
+      await page.click('[data-testid="op-batch"]')
+
+      // Both inputs are listed; ".mszx archive" is the default output mode.
+      await page.waitForSelector('[data-testid="batch-file-list"]')
+      const list = await textOf(page, '[data-testid="batch-file-list"]')
+      assert.match(list, /test\.mzML/)
+      assert.match(list, /run2\.mzML/)
+      await page.waitForSelector('[data-testid="batch-mode-mszx"]')
+
+      // The Output section stays visible in batch mode: directory picker plus
+      // the archive-name field that appears only for the .mszx mode.
+      assert.match(await bodyText(page), /Output directory/)
+      await page.waitForSelector('[data-testid="archive-name"]')
+
+      await clickWithText(page, "button", "Create .mszx archive")
+
+      // The stubbed compressBatch was called with both paths; the archive path
+      // is the Output card's directory (seeded from settings) + archive name.
+      await page.waitForFunction(() => (window.__compressBatchCalls || []).length === 1)
+      const call = await page.evaluate(() => window.__compressBatchCalls[0])
+      assert.equal(call.paths.length, 2)
+      assert.ok(call.paths.some((p) => p.endsWith("test.mzML")))
+      assert.ok(call.paths.some((p) => p.endsWith("run2.mzML")))
+      assert.equal(call.outPath, "/home/lab/Downloads/batch.mszx")
+
+      // The new archive lands in the Explorer (added via ingestPaths).
+      await page.waitForFunction(() =>
+        Array.from(document.querySelectorAll('[data-testid="file-entry"]')).some((e) =>
+          (e.getAttribute("data-path") || "").endsWith("/home/lab/Downloads/batch.mszx"),
+        ),
+      )
+      assert.deepEqual(page._errors, [], "no uncaught page errors")
     } finally {
       await page.close()
     }

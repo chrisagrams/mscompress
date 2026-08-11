@@ -23,6 +23,7 @@ export const IPC = {
   compress: "convert:compress",
   decompress: "convert:decompress",
   extract: "convert:extract",
+  compressBatch: "convert:compressBatch",
   // main -> renderer streamed progress (webContents.send)
   convertProgress: "convert:progress",
   // renderer -> main: update the Windows title-bar overlay colors (theme change)
@@ -98,10 +99,26 @@ export interface ExtractOptions {
   outputDir?: string
 }
 
+/** Options for archiving many mzML files into one batch (.mszx v2) archive. */
+export interface CompressBatchOptions {
+  preset: Preset
+  /** Advanced overrides (undefined → use the preset default). */
+  mzLossy?: LossyAlgo
+  intLossy?: LossyAlgo
+  zstdLevel?: number
+  threads?: number
+  /** Free-text description stored in the archive manifest. */
+  description?: string
+}
+
 /** Plain result of a convert operation (error reported structurally). */
 export interface ConvertResult {
-  op: "compress" | "decompress" | "extract"
+  op: "compress" | "decompress" | "extract" | "compressBatch"
   outPath: string
+  /** All written files, for multi-output ops (batch-archive decompress). */
+  outPaths?: string[]
+  /** Number of input files, for multi-input ops (compressBatch). */
+  inputCount?: number
   inputBytes: number
   outputBytes: number
   /** outputBytes / inputBytes (0 on error). */
@@ -113,10 +130,13 @@ export interface ConvertResult {
 /** Streamed progress event (main → renderer). */
 export interface ConvertProgress {
   id: string
-  op: "compress" | "decompress" | "extract"
+  op: "compress" | "decompress" | "extract" | "compressBatch"
   phase: "start" | "step" | "done" | "error"
   file: string
   message?: string
+  /** Per-file progress for multi-input ops: 0-based `index` of `total`. */
+  index?: number
+  total?: number
   result?: ConvertResult
   error?: string
 }
@@ -180,9 +200,11 @@ export interface MszxAnnotation {
   description: string | null
 }
 
-/** Plain, serializable MSZX manifest for the Archive tab. */
+/** Plain, serializable MSZX manifest for the Archive tab (v1, single MSZ). */
 export interface MszxManifest {
   path: string
+  /** Discriminator: a v1 archive holds exactly one MSZ file. */
+  container: "single"
   version: string
   created_at: string
   spectra_file: string
@@ -194,6 +216,38 @@ export interface MszxManifest {
   /** Set instead of the manifest fields when the archive couldn't be read. */
   error?: string
 }
+
+/** One MSZ member of a v2 multi-file ("batch") archive. */
+export interface MszxBatchEntry {
+  /** Tar member name of the MSZ payload (e.g. "sample.msz"). */
+  entry: string
+  /** Basename of the source mzML, when recorded. */
+  original: string | null
+  /** Payload size in bytes. */
+  size: number
+  /** Spectrum count, when the writer recorded it. */
+  num_spectra: number | null
+  join_key: string
+  annotations: MszxAnnotation[]
+}
+
+/** Plain, serializable manifest of a v2 multi-file ("batch") archive. */
+export interface MszxBatchManifest {
+  path: string
+  container: "batch"
+  version: string
+  description: string | null
+  entries: MszxBatchEntry[]
+  /** Set instead of the manifest fields when the archive couldn't be read. */
+  error?: string
+}
+
+/**
+ * What `readMszx` returns for any `.mszx`: discriminate on `container` (after
+ * checking `error`, which is reported on the "single" shape when the archive
+ * couldn't be read at all).
+ */
+export type MszxArchive = MszxManifest | MszxBatchManifest
 
 // ---- MSTransfer batch queue ------------------------------------------------
 
@@ -347,6 +401,12 @@ export interface QCOptions {
   maxSpectra?: number
   /** Max TIC/BPC points (RT-binned beyond this). */
   ticPoints?: number
+  /**
+   * For batch (v2) .mszx archives: tar member name of the MSZ to analyze
+   * (from `MszxBatchManifest.entries[].entry`). Required for batch archives —
+   * QC always runs on a single member.
+   */
+  entry?: string
 }
 
 /** The typed surface exposed on `window.api` in the renderer. */
@@ -373,8 +433,11 @@ export interface Api {
   analyze(path: string): Promise<FileSummary>
   /** Compute QC dashboard data (TIC/BPC/heatmap/MS-levels/peaks) from spectra. */
   computeQC(path: string, opts?: QCOptions): Promise<QCData>
-  /** Read an .mszx archive's manifest + annotations. */
-  readMszx(path: string): Promise<MszxManifest>
+  /**
+   * Read an .mszx archive's manifest + annotations. Returns the v1 single-file
+   * shape or the v2 batch shape — discriminate on `container`.
+   */
+  readMszx(path: string): Promise<MszxArchive>
   /** Current persisted settings. */
   getSettings(): Promise<AppSettings>
   /** Merge a partial update into settings, persist, and return the result. */
@@ -388,10 +451,20 @@ export interface Api {
   onSettingsChange(cb: (settings: AppSettings) => void): () => void
   /** Compress an mzML file to .msz. */
   compress(path: string, opts: CompressOptions): Promise<ConvertResult>
-  /** Decompress an .msz/.mszx file to .mzML. */
+  /**
+   * Decompress an .msz/.mszx file to .mzML. A batch (v2) .mszx expands into a
+   * directory of .mzML files instead — `outPath` is the directory and
+   * `outPaths` lists every written file.
+   */
   decompress(path: string, opts: DecompressOptions): Promise<ConvertResult>
   /** Extract a spectra subset to a new .mzML/.msz. */
   extract(path: string, opts: ExtractOptions): Promise<ConvertResult>
+  /** Compress many mzML files into one batch (.mszx v2) archive at `outPath`. */
+  compressBatch(
+    paths: string[],
+    outPath: string,
+    opts: CompressBatchOptions,
+  ): Promise<ConvertResult>
   /**
    * Subscribe to streamed convert progress events. Returns an unsubscribe fn.
    */

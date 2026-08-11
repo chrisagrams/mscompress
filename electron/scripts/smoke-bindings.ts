@@ -13,6 +13,7 @@ import {
   computeQC,
   readMszx,
   compress,
+  compressBatch,
   decompress,
   extract
 } from '../src/main/bindings.ts'
@@ -64,15 +65,16 @@ console.log('')
 // ---- MSZX archive (T7) ----
 {
   const m = readMszx(resolve(dataDir, 'mszx/test.mszx'))
+  if (m.container !== 'single') throw new Error('expected test.mszx to be a v1 single-file archive')
   console.log('readMszx(test.mszx):')
   console.log(
-    `  version=${m.version} num_spectra=${m.num_spectra} join_key=${m.join_key} source_file=${m.source_file} err=${m.error ?? '-'}`
+    `  container=${m.container} version=${m.version} num_spectra=${m.num_spectra} join_key=${m.join_key} source_file=${m.source_file} err=${m.error ?? '-'}`
   )
   console.log(`  description=${JSON.stringify(m.description)}`)
   console.log(`  annotations(${m.annotations.length})=${JSON.stringify(m.annotations)}`)
 
   const bad = readMszx(resolve(dataDir, 'mszx/does-not-exist.mszx'))
-  console.log(`readMszx(bad path): error="${bad.error}" (num_spectra=${bad.num_spectra})`)
+  console.log(`readMszx(bad path): error="${bad.error}" (container=${bad.container})`)
 }
 console.log('')
 
@@ -113,6 +115,64 @@ try {
 } finally {
   rmSync(out, { recursive: true, force: true })
   console.log('\ncleaned temp dir', out)
+}
+
+// ---- Batch mszx (v2): compressBatch -> readMszx -> decompress ----
+console.log('\n=== batch mszx ===')
+{
+  const bdir = mkdtempSync(join(tmpdir(), 'msc-batch-'))
+  try {
+    const inputs = [resolve(dataDir, 'test.mzML'), resolve(dataDir, 'sciex_ttof6600_100.mzML')]
+    const archive = join(bdir, 'cohort.mszx')
+    const progress: string[] = []
+    const b = await compressBatch(inputs, archive, { preset: 'default' }, (i, total, p) =>
+      progress.push(`${i + 1}/${total} ${basename(p)}`)
+    )
+    console.log('COMPRESS-BATCH', JSON.stringify(b))
+    console.log('  progress events:', JSON.stringify(progress))
+    console.log(
+      `  archive exists: ${existsSync(archive)} | inputCount=${b.inputCount} | err=${b.error ?? '-'}`
+    )
+
+    const m = readMszx(archive)
+    if (m.container !== 'batch') throw new Error('expected a batch (v2) manifest')
+    console.log(`  readMszx: container=${m.container} version=${m.version} entries=${m.entries.length}`)
+    for (const e of m.entries) {
+      console.log(`    ${e.entry} original=${e.original} size=${e.size} spectra=${e.num_spectra}`)
+    }
+
+    const d = decompress(archive, { outputDir: bdir })
+    console.log(
+      'DECOMPRESS-BATCH',
+      JSON.stringify({ ...d, outPaths: d.outPaths?.map((p) => basename(p)) })
+    )
+    const allExist = d.outPaths?.every((p) => existsSync(p)) ?? false
+    console.log(`  outDir exists: ${existsSync(d.outPath)} | files=${d.outPaths?.length} | all exist: ${allExist}`)
+    const reread = (d.outPaths ?? []).map((p) => {
+      const f = read(p)
+      const n = f.spectra.length
+      f.close()
+      return n
+    })
+    console.log('  re-read spectra per file:', JSON.stringify(reread))
+
+    // Per-member QC on the batch archive.
+    const q = computeQC(archive, { entry: m.entries[0].entry })
+    console.log(
+      `  computeQC(entry=${m.entries[0].entry}): spectra=${q.spectrumCount} sampled=${q.sampledCount} tic=${q.tic.length} err=${q.error ?? '-'}`
+    )
+    const qNoEntry = computeQC(archive)
+    console.log(`  computeQC without entry rejected: error="${qNoEntry.error}"`)
+
+    // Error path: batch compress must reject a non-mzML input structurally.
+    const badBatch = await compressBatch([resolve(dataDir, 'test.msz')], join(bdir, 'bad.mszx'), {
+      preset: 'default'
+    })
+    console.log(`  non-mzML input rejected: error="${badBatch.error}"`)
+  } finally {
+    rmSync(bdir, { recursive: true, force: true })
+    console.log('  cleaned batch temp dir')
+  }
 }
 
 // ---- MSTransfer queue (T6) ----

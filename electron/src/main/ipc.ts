@@ -5,6 +5,7 @@ import * as os from "os"
 import { IPC } from "../shared/ipc"
 import type {
   AppSettings,
+  CompressBatchOptions,
   CompressOptions,
   ConvertProgress,
   ConvertResult,
@@ -137,6 +138,33 @@ export function registerIpcHandlers(): void {
     runConvert(event.sender, "extract", basename(path), () =>
       bindings.runConvertInWorker("extract", path, { ...opts, threads: getSettings().threads }),
     ),
+  )
+
+  // Batch archive: compress N mzML files into one .mszx (v2). Unlike the coarse
+  // single-file progress, the worker streams real per-file progress, relayed
+  // here as `step` events carrying `index`/`total`.
+  ipcMain.handle(
+    IPC.compressBatch,
+    async (event, paths: string[], outPath: string, opts: CompressBatchOptions) => {
+      const sender = event.sender
+      const id = `cv${++progressSeq}`
+      const file = basename(outPath)
+      const emit = (p: Omit<ConvertProgress, "id" | "op" | "file">): void => {
+        if (!sender.isDestroyed())
+          sender.send(IPC.convertProgress, { id, op: "compressBatch", file, ...p })
+      }
+      emit({ phase: "start", message: `archiving ${paths.length} file(s) → ${file}` })
+      await new Promise((resolve) => setImmediate(resolve))
+      const result = await bindings.runBatchCompressInWorker(
+        paths,
+        outPath,
+        { ...opts, threads: getSettings().threads },
+        (index, total, f) =>
+          emit({ phase: "step", index, total, message: `${index + 1}/${total} · ${basename(f)}` }),
+      )
+      emit(result.error ? { phase: "error", error: result.error } : { phase: "done", result })
+      return result
+    },
   )
 
   // ---- Global settings ----
