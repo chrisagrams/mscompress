@@ -29,6 +29,10 @@ import {
   MSZXFile,
   MSZXBuilder,
   MSZXManifest,
+  MSZXBatchFile,
+  MSZXBatchWriter,
+  MSZXBatchManifest,
+  compressBatch,
   type AnnotationEntry,
   type MSZXManifestData,
   createMSZX,
@@ -119,7 +123,39 @@ Fluent builder. `setSpectra()`, `setDescription()`, `setJoinKey()`,
 
 ### `MSZXManifest`
 
-Manifest record. See the [MSZX format spec](../../format/mszx.md).
+Manifest record for a v1 archive. See the
+[MSZX format spec](../../format/mszx.md).
+
+### `MSZXBatchFile`
+
+Reader for a v2 ("batch") archive, as a lazily-opened collection of `MSZFile`.
+Also opens a v1 archive as a collection of one.
+
+`open()`, `length`, `entries`, `names`, `get(index | name)`, `has()`,
+`decompress()`, `describe()`, `close()`, iterable, `Symbol.dispose`.
+
+### `MSZXBatchWriter`
+
+Incremental writer for a v2 archive. Drives the same C writer as the CLI, so
+output is byte-identical.
+
+`add(source, entryName?)` (async), `addAnnotation()`, `setJoinKey()`,
+`setDescription()`, `setExtra()`, `finish()`, `abort()`, `entries`, `length`.
+
+### `compressBatch(inputs, output, options?)`
+
+Compress many mzML into one `.mszx`. Options: `recursive`, `description`,
+`extra`, `onProgress`, plus any `CompressArgs`.
+
+### `resolveMzmlInputs(inputs, recursive?)`
+
+Expand paths and directories into the sorted, deduplicated mzML list
+`compressBatch` would use.
+
+### `MSZXBatchManifest`
+
+Manifest record for a v2 archive. `spectra_files`, `description`, `extra`,
+`fromSingleFile()`.
 
 ### `createMSZX(options)`
 

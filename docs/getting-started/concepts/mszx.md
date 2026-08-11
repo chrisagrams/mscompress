@@ -19,13 +19,27 @@ Manifest fields:
 | `created_at` | Build timestamp |
 | `spectra_file` | Path to the MSZ inside the archive |
 | `num_spectra` | Spectrum count |
-| `annotations` | List of `{name, file, format}` entries |
+| `annotations` | List of `{filename, format, compressed}` entries |
 | `join_key` | Column to join annotations against spectra (typically `scan_number`) |
 | `description` | Free-text description |
 | `extra` | Open dictionary for custom fields |
 
-You build MSZX archives with `MSZXBuilder` (Python or TypeScript) and read
-them with `MSZXFile`. See:
+## Two layouts
+
+The table above describes a **v1** archive: exactly one spectra file, with
+archive-level annotations. You build it with `MSZXBuilder` and read it with
+`MSZXFile`.
+
+A **v2 ("batch")** archive bundles N spectra files instead — a whole cohort in
+one file — with annotations scoped per entry. You build it with the CLI's
+`--batch`, `compress_batch()` (Python), or `compressBatch()` (Node), and read it
+with `MSZXBatchFile`. Batch archives carry no timestamps, so the same inputs
+always produce byte-identical output.
+
+`read()` picks the right reader from the manifest, so you rarely choose
+explicitly.
+
+See:
 
 - [Python MSZX guide](../../python/guides/mszx.md)
 - [Node.js MSZX guide](../../node/guides/mszx.md)
