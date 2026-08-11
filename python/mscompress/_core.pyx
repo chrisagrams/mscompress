@@ -182,6 +182,23 @@ def get_cache_usage():
     return _default_block_cache.usage
 
 
+cdef _require_msz_version(void* mapping, long filesize):
+    """Refuse an .msz this build cannot decode.
+
+    Raised at open rather than at decompress() so the caller fails on the file
+    it named, instead of reading nonsense out of a footer it cannot interpret.
+    """
+    cdef int major = 0
+    cdef int minor = 0
+
+    if _msz_read_version(mapping, filesize, &major, &minor) != 0:
+        raise ValueError(
+            "unsupported msz format version %d.%d; this build supports %s-%s"
+            % (major, minor,
+               MIN_SUPPORT.decode('utf-8'), MAX_SUPPORT.decode('utf-8'))
+        )
+
+
 cdef BlockCache _coerce_cache(object cache):
     """Resolve a user-supplied ``cache=`` argument to a BlockCache instance.
 
@@ -272,6 +289,8 @@ cdef class RuntimeArguments:
         self._arguments.target_mz_format = _ZSTD_compression_
         self._arguments.target_inten_format = _ZSTD_compression_
         self._arguments.zstd_compression_level = 3
+        self._arguments.shuffle = 1
+        self._arguments.shuffle_explicit = 0
 
     cdef Arguments* get_ptr(self):
         return &self._arguments
@@ -293,6 +312,22 @@ cdef class RuntimeArguments:
             return self._arguments.blocksize
         def __set__(self, value):
             self._arguments.blocksize = value
+
+    property shuffle:
+        """Byte-shuffle binary arrays before compressing them. On by default.
+
+        Lossless and recorded in the file, so a shuffled .msz decompresses
+        without the reader opting in. Applies only to losslessly stored
+        streams; skipped for any stream using a lossy algorithm. Set False to
+        write an archive an 0.1-only reader can still read.
+        """
+        def __get__(self):
+            return self._arguments.shuffle != 0
+        def __set__(self, value):
+            self._arguments.shuffle = 1 if value else 0
+            # Setting the property counts as asking, which is what decides
+            # whether the lossy-stream warnings fire.
+            self._arguments.shuffle_explicit = 1
 
     property mz_scale_factor:
         def __get__(self):
@@ -970,6 +1005,7 @@ cdef class MSZFile(BaseFile):
         super(MSZFile, self).__init__(path)
         self._block_cache = _coerce_cache(None)  # read() may override
         self._div_spec_offsets = NULL
+        _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
@@ -1123,6 +1159,7 @@ cdef class MSZFile(BaseFile):
         self._div_spec_offsets = NULL
 
         # Run the MSZFile-specific init body.
+        _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)

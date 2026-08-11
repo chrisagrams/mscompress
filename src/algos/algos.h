@@ -1,6 +1,15 @@
 #ifndef ALGOS_H
 #define ALGOS_H
 
+#include <stddef.h>
+
+/* shuffle.c */
+int shuffle_bytes(const void* src, void* dst, size_t len, int elem_size);
+int unshuffle_bytes(const void* src, void* dst, size_t len, int elem_size);
+int shuffle_block_records(void* block, size_t block_len, int elem_size);
+int unshuffle_block_records(void* block, size_t block_len, int elem_size);
+int fmt_elem_size(int accession);
+
 /* lossless.c */
 void algo_decode_lossless(void* args);
 void algo_encode_lossless(void* args);

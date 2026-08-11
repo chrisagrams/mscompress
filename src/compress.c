@@ -11,6 +11,7 @@
 #include "../vendor/lz4/lib/lz4.h"
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
+#include "algos/algos.h"
 #include "mscompress.h"
 
 /**
@@ -334,7 +335,7 @@ void dealloc_compress_args(compress_args_t* args) {
 void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
                  int compression_level, cmp_blk_queue_t* cmp_buff,
                  data_block_t** curr_block, char* input, size_t len,
-                 size_t* tot_size, size_t* tot_cmp)
+                 size_t* tot_size, size_t* tot_cmp, int shuffle_elem)
 {
    void* cmp;
    cmp_block_t* cmp_block;
@@ -344,6 +345,14 @@ void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
    data_block_t* tmp_block = *curr_block;
 
    if (!append_mem((*curr_block), input, len)) {
+      /* Transpose the block's samples ahead of the entropy coder. */
+      if (shuffle_elem > 1 &&
+          shuffle_block_records((*curr_block)->mem, (*curr_block)->size,
+                                shuffle_elem) != 0) {
+         error("cmp_routine: byte shuffle failed.\n");
+         return;
+      }
+
       cmp = compression_fun(czstd, (*curr_block)->mem, (*curr_block)->size,
                             &cmp_len, compression_level);
 
@@ -388,13 +397,21 @@ void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
  */
 int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
               int compression_level, cmp_blk_queue_t* cmp_buff,
-              data_block_t** curr_block, size_t* tot_size, size_t* tot_cmp) {
+              data_block_t** curr_block, size_t* tot_size, size_t* tot_cmp,
+              int shuffle_elem) {
    void* cmp;
    cmp_block_t* cmp_block;
    size_t cmp_len = 0;
 
    if (!(*curr_block)) {
       error("cmp_flush: curr_block is NULL. This should not happen.\n");
+      return -1;
+   }
+
+   if (shuffle_elem > 1 &&
+       shuffle_block_records((*curr_block)->mem, (*curr_block)->size,
+                             shuffle_elem) != 0) {
+      error("cmp_flush: byte shuffle failed.\n");
       return -1;
    }
 
@@ -513,7 +530,7 @@ void cmp_xml_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
                      size_t len, size_t* tot_size, size_t* tot_cmp)
 {
    cmp_routine(compression_fun, czstd, df->zstd_compression_level, cmp_buff,
-               curr_block, input, len, tot_size, tot_cmp);
+               curr_block, input, len, tot_size, tot_cmp, 0);
 }
 
 /**
@@ -565,7 +582,8 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
       error("cmp_binary_routine: binary_buff is NULL\n");
 
    cmp_routine(compression_fun, czstd, df->zstd_compression_level, cmp_buff,
-               curr_block, binary_buff, binary_len, tot_size, tot_cmp);
+               curr_block, binary_buff, binary_len, tot_size, tot_cmp,
+               a_args->shuffle_elem);
 
    free(binary_buff);
 }
@@ -675,16 +693,20 @@ void* compress_routine(void* args)
    else
       cmp_fun = cmp_binary_routine;
 
+   a_args->shuffle_elem = 0;
+
    if (cb_args->mode == _mass_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_mz_fun;
       a_args->scale_factor = cb_args->df->mz_scale_factor;
       a_args->src_format = cb_args->df->source_mz_fmt;
       a_args->algo_fun = cb_args->df->target_mz_fun;
+      a_args->shuffle_elem = cb_args->df->mz_shuffle_elem;
    } else if (cb_args->mode == _intensity_) {
       a_args->dec_fun = cb_args->df->decode_source_compression_inten_fun;
       a_args->scale_factor = cb_args->df->int_scale_factor;
       a_args->src_format = cb_args->df->source_inten_fmt;
       a_args->algo_fun = cb_args->df->target_inten_fun;
+      a_args->shuffle_elem = cb_args->df->inten_shuffle_elem;
    } else if (cb_args->mode == _xml_)
       a_args->dec_fun = NULL;
    else
@@ -711,8 +733,8 @@ void* compress_routine(void* args)
    }
 
    cmp_flush(cb_args->comp_fun, czstd, cb_args->df->zstd_compression_level,
-             cmp_buff, &curr_block, &tot_size,
-             &tot_cmp); /* Flush remainder datablocks */
+             cmp_buff, &curr_block, &tot_size, &tot_cmp,
+             a_args->shuffle_elem); /* Flush remainder datablocks */
 
    print(
        "\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. "
@@ -895,9 +917,16 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
       return -1;
    }
 
-   // Store format integer in footer.
+   // Store format integer in footer. The byte shuffle is recorded as a flag bit
+   // on top of the algorithm accession (see _shuffle_flag_), which keeps the
+   // footer layout identical to previously written files.
    footer->mz_fmt = get_algo_type(arguments->mz_lossy);
    footer->inten_fmt = get_algo_type(arguments->int_lossy);
+
+   if (df->mz_shuffle_elem > 1)
+      footer->mz_fmt |= _shuffle_flag_;
+   if (df->inten_shuffle_elem > 1)
+      footer->inten_fmt |= _shuffle_flag_;
 
    long blocksize = arguments->blocksize;
    int threads = arguments->threads;

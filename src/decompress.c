@@ -11,6 +11,7 @@
 #include "../vendor/lz4/lib/lz4.h"
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
+#include "algos/algos.h"
 #include "mscompress.h"
 
 /**
@@ -325,6 +326,24 @@ void* decompress_routine(void* args) {
             db_args->df->inten_decompression_fun, dctx, db_args->input_map,
             db_args->footer_inten_bin_off, db_args->inten_binary_blk);
 
+   /* Reverse the byte shuffle across the whole block, before the per-spectrum
+    * decode loop walks it. No-op when the file was written without shuffling. */
+   if (decmp_mz_binary != NULL && db_args->df->mz_shuffle_elem > 1 &&
+       unshuffle_block_records(decmp_mz_binary,
+                               db_args->mz_binary_blk->original_size,
+                               db_args->df->mz_shuffle_elem) != 0) {
+      error("decompress_routine: failed to reverse m/z byte shuffle.\n");
+      return NULL;
+   }
+
+   if (decmp_inten_binary != NULL && db_args->df->inten_shuffle_elem > 1 &&
+       unshuffle_block_records(decmp_inten_binary,
+                               db_args->inten_binary_blk->original_size,
+                               db_args->df->inten_shuffle_elem) != 0) {
+      error("decompress_routine: failed to reverse intensity byte shuffle.\n");
+      return NULL;
+   }
+
    // Save original pointers for cleanup (encode functions advance mz/inten pointers)
    char *orig_decmp_mz_binary = decmp_mz_binary,
         *orig_decmp_inten_binary = decmp_inten_binary;
@@ -559,11 +578,17 @@ int decompress_msz(char* input_map, size_t input_filesize,
 
    print("\tDetected .msz file, reading header and footer...\n");
 
+   /* Gate decoding, not identification: --describe still reports the version
+    * of a file this build cannot decode. */
+   if (msz_require_version(input_map, input_filesize) != 0)
+      return -1;
+
    df = get_header_df(input_map);
 
-   parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
-                &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
-                &n_divisions);
+   if (parse_footer(&msz_footer, input_map, input_filesize, &xml_block_lens,
+                    &mz_binary_block_lens, &inten_binary_block_lens, &divisions,
+                    &n_divisions) != 0)
+      return -1;
 
    if (n_divisions == 0) {
       warning("No divisions found in file, aborting...\n");

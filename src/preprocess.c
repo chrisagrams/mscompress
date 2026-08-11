@@ -2544,12 +2544,22 @@ int preprocess_external(char* input_map, long input_filesize, long* blocksize,
  *
  * @note The block length queues and divisions reference mmap'd data internally.
  */
-void parse_footer(footer_t** footer, void* input_map, long input_filesize,
-                  block_len_queue_t** xml_block_lens,
-                  block_len_queue_t** mz_binary_block_lens,
-                  block_len_queue_t** inten_binary_block_lens,
-                  divisions_t** divisions, int* n_divisions) {
+int parse_footer(footer_t** footer, void* input_map, long input_filesize,
+                 block_len_queue_t** xml_block_lens,
+                 block_len_queue_t** mz_binary_block_lens,
+                 block_len_queue_t** inten_binary_block_lens,
+                 divisions_t** divisions, int* n_divisions) {
    *footer = read_footer(input_map, input_filesize);
+
+   /* read_footer() reports the reason (currently a bad magic tag). */
+   if (*footer == NULL) {
+      *xml_block_lens = NULL;
+      *mz_binary_block_lens = NULL;
+      *inten_binary_block_lens = NULL;
+      *divisions = NULL;
+      *n_divisions = 0;
+      return 1;
+   }
 
    print("\tXML position: %ld\n", (*footer)->xml_pos);
    print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
@@ -2574,4 +2584,6 @@ void parse_footer(footer_t** footer, void* input_map, long input_filesize,
 
    *divisions =
        read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);
+
+   return 0;
 }
