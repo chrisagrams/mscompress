@@ -17,23 +17,25 @@ def read(
     """
     Read and parse mzML, MSZ, or MSZX files.
 
+    Both ``cache`` and ``cache_spectra`` are exposed only here; the file
+    constructors deliberately don't expose them. ``read()`` is the single
+    entry point for both knobs.
+
     Args:
         path (Union[str, PathLike, bytes]): Path to the file to read.
-        cache: Shared decompressed-block cache for MSZ/MSZX files. ``None``
-            (default) uses the process-wide default ``BlockCache``; pass a
-            ``BlockCache`` to share an explicit pool across files, an int to set
-            a private byte budget, or 0 to disable bounding (legacy unbounded).
-            Ignored for mzML inputs.
+        cache (Optional[Union[BlockCache, int]]): Shared decompressed-block
+            cache for MSZ/MSZX files. ``None`` (default) uses the process-wide
+            default ``BlockCache``; pass a ``BlockCache`` to share an explicit
+            pool across files, an int to set a private byte budget, or 0 to
+            disable bounding (legacy unbounded). Ignored for mzML inputs.
         cache_spectra (int): Per-file LRU cap for cached ``Spectrum`` objects.
             ``CACHE_SPECTRA_AUTO`` (-1, default) uses the bundled default;
             ``0`` disables eviction (legacy unbounded); ``N > 0`` sets an
             explicit cap.
 
-        Both ``cache`` and ``cache_spectra`` are exposed only here; the file
-        constructors deliberately don't expose them. ``read()`` is the single
-        entry point for both knobs.
     Returns:
-        Union[MZMLFile, MSZFile, MSZXFile]: Parsed file object.
+        Union[MZMLFile, MSZFile, MSZXFile]: Parsed file object. A v2 (batch)
+        ``.mszx`` returns an ``MSZXBatchFile`` collection instead.
     """
 
     if not isinstance(path, (str, bytes, PathLike)):
@@ -64,6 +66,15 @@ def read(
     elif filetype == "msz":
         f = MSZFile(path_bytes)
     elif filetype == "mszx":
+        # v1 (single spectra_file) and v2 (multi-file "batch") archives share
+        # the .mszx extension and both carry manifest.json, so the manifest
+        # decides which reader to build. A batch archive holds N payloads and
+        # therefore cannot be an MSZFile the way MSZXFile is.
+        from mscompress.mszx.batch import MSZXBatchFile, read_archive_manifest
+        from mscompress.mszx.metadata import is_batch_manifest
+
+        if is_batch_manifest(_read_mszx_manifest_dict(path_str)):
+            return MSZXBatchFile(path_str, read_archive_manifest(path_str))
         f = MSZXFile.open(path_str)
     else:
         raise OSError(f"Could not determine file type for: {path_str}")
@@ -76,6 +87,24 @@ def read(
     if filetype in ("msz", "mszx"):
         f._set_block_cache(cache)
     return f
+
+
+def _read_mszx_manifest_dict(path):
+    """Load manifest.json out of an .mszx as a plain dict.
+
+    Reads only the manifest member; the MSZ payloads stay on disk.
+    """
+    import json
+
+    with tarfile.open(path, "r") as tar:
+        try:
+            member = tar.getmember("manifest.json")
+        except KeyError:
+            raise ValueError("Invalid MSZX archive: missing manifest.json") from None
+        handle = tar.extractfile(member)
+        if handle is None:
+            raise ValueError("Could not read manifest.json")
+        return json.loads(handle.read().decode("utf-8"))
 
 
 def detect_filetype(path: Union[str, Path]) -> Optional[Literal["mzML", "msz", "mszx"]]:

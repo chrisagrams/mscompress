@@ -20,10 +20,24 @@ from typing import Any, Dict, List, Optional, Union
 
 from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
 from mscompress.annotations import BasePSMReader, PSMReader, PathAnnotationFile
-from mscompress.mszx.metadata import MSZXManifest
+from mscompress.mszx.batch import MSZXBatchFile, compress_batch
+from mscompress.mszx.metadata import (
+    MSZXBatchManifest,
+    MSZXManifest,
+    SpectraFileEntry,
+)
 from mscompress.types import AnnotationEntry
 
-__all__ = ["MSZXBuilder", "MSZXFile", "MSZXManifest", "create_mszx"]
+__all__ = [
+    "MSZXBatchFile",
+    "compress_batch",
+    "MSZXBatchManifest",
+    "MSZXBuilder",
+    "MSZXFile",
+    "MSZXManifest",
+    "SpectraFileEntry",
+    "create_mszx",
+]
 
 
 class MSZXBuilder:

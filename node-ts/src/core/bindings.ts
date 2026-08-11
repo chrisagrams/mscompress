@@ -48,6 +48,39 @@ export interface PrepareDivisionsResult {
  */
 export type CompressStreamSession = { readonly __brand: "CompressStreamSession" };
 
+/**
+ * Native handle to an in-progress .mszx archive.
+ *
+ * Entries are appended sequentially, so `add()` calls must not overlap — the
+ * native side rejects a concurrent call rather than corrupting the archive.
+ * `finish()` and `abort()` both free the handle; it is unusable afterwards.
+ */
+export interface NativeBatchWriter {
+  /** Compress one mzML into the archive; resolves to the new entry index. */
+  add(
+    sourcePath: string,
+    entryName: string | null,
+    args: RuntimeArgumentsNative
+  ): Promise<number>;
+  addAnnotation(
+    entryIndex: number,
+    data: Buffer,
+    name: string,
+    format: string,
+    compressed: boolean,
+    numRecords?: number
+  ): void;
+  setJoinKey(entryIndex: number, joinKey: string): void;
+  setDescription(description: string): void;
+  setExtraJson(json: string): void;
+  finish(): void;
+  abort(): void;
+}
+
+export interface NativeBatchWriterConstructor {
+  new (outputPath: string): NativeBatchWriter;
+}
+
 export interface NativeBindings {
   // FileHandle class
   FileHandle: NativeFileHandleConstructor;
@@ -128,6 +161,9 @@ export interface NativeBindings {
   // MSZX archive helpers — open the embedded MSZ payload at its offset
   // inside a .mszx tar without extracting to a temp file.
   openMszFromArchive(archivePath: string, entryName: string): NativeFileHandle;
+
+  /** Stateful writer for a v2 ("batch") .mszx archive. */
+  BatchWriter: NativeBatchWriterConstructor;
 }
 
 const native: NativeBindings = addon as NativeBindings;

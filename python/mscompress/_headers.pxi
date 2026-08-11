@@ -201,6 +201,21 @@ cdef extern from "../src/mscompress.h":
     void _extract_msz "extract_msz"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, int output_fd) nogil
     int _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd) nogil
     int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd) nogil
+
+    # Batch (.mszx v2) writer — the same incremental API the C CLI drives, so
+    # archives written from Python are byte-identical to the CLI's. `add_mzml`
+    # is `nogil` because it runs the whole multi-threaded compressor for one
+    # entry; holding the GIL across it would serialize callers needlessly.
+    ctypedef struct batch_writer_t:
+        pass
+    batch_writer_t* _batch_writer_open "batch_writer_open"(const char* out_path)
+    int _batch_writer_add_mzml "batch_writer_add_mzml"(batch_writer_t* w, const char* entry_name, const char* src_name, void* mapping, size_t filesize, Arguments* args) nogil
+    int _batch_writer_add_annotation "batch_writer_add_annotation"(batch_writer_t* w, int entry_index, const char* archive_name, const void* data, size_t length, const char* fmt, int compressed, int64_t num_records)
+    int _batch_writer_set_join_key "batch_writer_set_join_key"(batch_writer_t* w, int entry_index, const char* join_key)
+    int _batch_writer_set_description "batch_writer_set_description"(batch_writer_t* w, const char* description)
+    int _batch_writer_set_extra_json "batch_writer_set_extra_json"(batch_writer_t* w, const char* extra_json)
+    int _batch_writer_finish "batch_writer_finish"(batch_writer_t* w)
+    void _batch_writer_abort "batch_writer_abort"(batch_writer_t* w)
     void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd) nogil
 
     int TARGET_MZ
