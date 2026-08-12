@@ -1,0 +1,16 @@
+# Monorepo pre-commit hook.
+#
+# This repo is a monorepo (C library, CLI, Python, docs, and the electron/ app).
+# Git hooks live at the repo root, but linting/formatting is scoped to the
+# electron app only — C/Python/docs are untouched here.
+#
+# When electron files are staged, run lint-staged (Prettier + oxlint on just the
+# staged files, auto-fixing formatting) and a full electron typecheck. Any
+# failure aborts the commit.
+
+if git diff --cached --name-only --diff-filter=ACMR | grep -q '^electron/'; then
+  cd electron || exit 1
+  # lint-staged run from electron/ only touches staged files under this dir.
+  npx --no-install lint-staged || exit 1
+  npm run typecheck || exit 1
+fi

@@ -1,0 +1,109 @@
+appId: gy.lab.mscompress
+productName: MScompress
+copyright: Copyright © 2026 Gao Lab
+
+# Ship only the en-US Chromium locale pack. Electron bundles ~55 .pak locale
+# files (~43 MB) by default; the app is English-only, so the rest are dead weight.
+electronLanguages:
+  - en-US
+
+# File-type associations. On macOS these populate CFBundleDocumentTypes in the
+# app's Info.plist; double-clicking / "Open with" a .msz/.mszx/.mzML then
+# launches (or focuses, via the single-instance lock) the app and delivers the
+# path through the `open-file` event (wired in src/main/index.ts). Per-type
+# icons are colour-coded to match the in-app file kinds: msz=blue, mzML=magenta,
+# mszx=green (see LeftRail kindIcon). electron-builder picks the .icns for mac
+# and the .ico for win from the base path automatically.
+fileAssociations:
+  - ext: msz
+    name: MScompress Compressed MS Data
+    description: MScompress compressed mass-spectrometry file
+    role: Editor
+    icon: assets/icons/msz
+  - ext: mszx
+    name: MScompress MS Archive
+    description: MScompress archive (spectra + annotations)
+    role: Editor
+    icon: assets/icons/mszx
+  - ext: mzML
+    name: mzML Mass-Spectrometry Data
+    description: Open-standard mzML mass-spectrometry file
+    role: Editor
+    icon: assets/icons/mzml
+
+directories:
+  output: release
+  buildResources: build
+
+# electron-vite emits the app to out/; the renderer/main/preload are already
+# bundled there. node_modules is intentionally excluded from the asar because
+# the only runtime native dependency (mscompress / node-ts) is shipped via
+# extraResources below and resolved from resources at runtime.
+files:
+  - out/**
+  - package.json
+  - '!node_modules/**'
+  - '!src/**'
+  - '!scripts/**'
+  - '!electron.vite.config.*'
+  - '!tsconfig*.json'
+  - '!components.json'
+
+# Ship the native mscompress binding (node-ts) outside the asar so its .node
+# addon can be dlopen'd at runtime. bindings.ts resolves resources/node-ts/dist.
+extraResources:
+  - from: ../node-ts/dist
+    to: node-ts/dist
+  - from: ../node-ts/build/Release/mscompress.node
+    to: node-ts/build/Release/mscompress.node
+  - from: ../node-ts/package.json
+    to: node-ts/package.json
+  # node-ts's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
+  # transitive deps as siblings of dist so Node resolves them from
+  # resources/node-ts/node_modules. (Only the tar closure — not the full 289MB
+  # node_modules, which also carries prebuild-install/dev tooling we don't need.)
+  - from: ../node-ts/node_modules/tar
+    to: node-ts/node_modules/tar
+  - from: ../node-ts/node_modules/@isaacs/fs-minipass
+    to: node-ts/node_modules/@isaacs/fs-minipass
+  - from: ../node-ts/node_modules/chownr
+    to: node-ts/node_modules/chownr
+  - from: ../node-ts/node_modules/minipass
+    to: node-ts/node_modules/minipass
+  - from: ../node-ts/node_modules/minizlib
+    to: node-ts/node_modules/minizlib
+  - from: ../node-ts/node_modules/yallist
+    to: node-ts/node_modules/yallist
+
+linux:
+  target:
+    - dir
+    - AppImage
+  icon: assets/icons/icon.png
+  category: Science
+
+mac:
+  target:
+    - dmg
+  icon: assets/icons/icon.icns
+  category: public.app-category.utilities
+
+win:
+  # NSIS installer (not a bare dir): an installer is required to register the
+  # file associations and to write the "Decompress/Extract here" context-menu
+  # verbs (see build/installer.nsh). The standalone CLI is shipped below.
+  target:
+    - nsis
+  icon: assets/icons/icon.ico
+  # Ship the standalone CLI so the context-menu verbs can shell out to it with
+  # no GUI. Lands at resources/cli/mscompress.exe — the absolute path the NSIS
+  # macro registers. Built via: cmake --build cli/build-win --config Release.
+  extraResources:
+    - from: ../cli/build-win/Release/mscompress.exe
+      to: cli/mscompress.exe
+
+nsis:
+  oneClick: false # show the wizard (install dir + per-user/all-users)
+  perMachine: false # per-user install (HKCU), no UAC elevation
+  allowToChangeInstallationDirectory: true
+  include: build/installer.nsh # our context-menu verb macros (customInstall/UnInstall)

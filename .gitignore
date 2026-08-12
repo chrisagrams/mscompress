@@ -6,6 +6,10 @@ mscompress.dSYM/
 *.lib
 *.pdb
 build/
+# ...but electron/build/ is electron-builder's buildResources dir (source config
+# like the NSIS installer script), not build output — keep it tracked.
+!electron/build/
+!electron/build/**
 cli/Debug/
 
 # CMake

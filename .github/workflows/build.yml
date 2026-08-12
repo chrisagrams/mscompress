@@ -507,3 +507,63 @@ jobs:
       - name: Publish to npm
         working-directory: ./node-ts
         run: npm publish --provenance --access public
+
+  build-electron:
+    name: Build Electron GUI - linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate config.h for base64
+        run: python vendor/generate_config.py
+
+      # The Electron app loads the native mscompress binding (node-ts), so build
+      # that first: the .node addon is bundled into the app via extraResources.
+      - name: Install node-ts dependencies
+        working-directory: ./node-ts
+        run: npm install --ignore-scripts
+
+      - name: Build node-ts native addon
+        working-directory: ./node-ts
+        run: npx prebuild -r napi --target 8 --backend cmake-js -- -G "Unix Makefiles"
+
+      - name: Build node-ts TypeScript
+        working-directory: ./node-ts
+        run: npm run build:ts
+
+      # Build + package the Electron app (electron-vite -> electron-builder).
+      - name: Install Electron app dependencies
+        working-directory: ./electron
+        run: npm install --ignore-scripts
+
+      - name: Typecheck + build (electron-vite)
+        working-directory: ./electron
+        run: npm run build
+
+      - name: Package unpacked app (electron-builder)
+        working-directory: ./electron
+        run: npx electron-builder --dir --linux
+
+      - name: Upload unpacked Electron app
+        uses: actions/upload-artifact@v6
+        with:
+          name: electron-linux-x86_64
+          # electron-builder names the x64 output "linux-unpacked" (the arch
+          # suffix only appears for non-x64, e.g. "linux-arm64-unpacked"), so
+          # the glob must match both spellings.
+          path: ./electron/release/linux*unpacked
+          if-no-files-found: error

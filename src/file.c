@@ -784,14 +784,16 @@ char* append_extension(char* input, char* extension) {
 }
 
 /**
- * @brief Strips the ".msz" extension from a path string if present,
- *        otherwise appends ".mzML" to the path string.
+ * @brief Replaces a ".msz" extension with ".mzML" if present, otherwise
+ *        appends ".mzML" to the path string.
  *
- * Used to generate a default output path during decompression.
+ * Used to generate a default output path during decompression (the inverse of
+ * compress, which maps ".mzML" -> ".msz" via change_extension). Decompressing
+ * "foo.msz" therefore yields "foo.mzML", not a bare "foo".
  *
  * @param input Original path string.
  *
- * @return New path string with the ".msz" extension removed or ".mzML" appended.
+ * @return New path string with ".msz" replaced by ".mzML" (or ".mzML" appended).
  *
  * @note The returned string is malloc'd. The caller must free it.
  */
@@ -802,15 +804,17 @@ char* strip_or_append_extension(char* input) {
    char* r;
    char* x;
 
-   r = malloc(sizeof(char) * (strlen(input) + 1));
+   // Worst case the result grows (".msz" -> ".mzML" is +1 char), so size for the
+   // input length plus the longest suffix we may write (".mzML") and the NUL.
+   r = malloc(sizeof(char) * (strlen(input) + sizeof(".mzML")));
    if (r == NULL)
       error("strip_or_append_extension: malloc failed.\n");
 
    strcpy(r, input);
    x = strrchr(r, '.');
-   if (x != NULL && strcmp(x, ".msz") == 0)  // If .msz found, strip it
-      *x = '\0';
-   else  // Otherwise, append .mzML
+   if (x != NULL && strcmp(x, ".msz") == 0)  // .msz -> .mzML (reverse of compress)
+      strcpy(x, ".mzML");
+   else  // no .msz extension: append .mzML
       strcat(r, ".mzML");
 
    return r;

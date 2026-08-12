@@ -193,19 +193,40 @@ npm test
 Pre-built native binaries are available for macOS (x64, ARM64), Linux (x64, ARM64), and Windows (x64). If a pre-built binary is not available for your platform, the native addon will be compiled from source during `npm install` (requires a C++17 compiler and CMake).
 
 ### Electron GUI Application
-To run/build Electron application:
 
-1 . Navigate to `electron/`
+The desktop GUI (in `electron/`) is a **ground-up rewrite** — the legacy
+vanilla-JS GUI has been replaced with a modern stack: **Electron + Vite + React
++ TypeScript + Tailwind v4 + shadcn/ui**, built on top of the `mscompress`
+Node.js/TypeScript bindings (the sibling `node-ts` package). All native work
+runs in the Electron **main process**; the renderer talks to it only through a
+typed, channel-whitelisted `contextBridge` preload (`window.api`), with
+`contextIsolation` on and `nodeIntegration` off.
+
+It provides a split-pane workbench: a file Explorer + MSTransfer batch queue, a
+tabbed workspace (Convert / QC / Queue / Archive), a file Inspector, and
+persisted global settings (threads, default output dir, preset, theme).
+
+**Prerequisites:** build the native binding first (see *Node.js/TypeScript
+Library* above), since the GUI loads `node-ts`:
+
+```
+cd node-ts && npm install && npm run build
+```
+
+**Run + build (from `electron/`):**
+
 ```
 cd electron/
+npm install          # links the local mscompress binding
+npm run dev          # run in development (Vite dev server + Electron)
+npm run build        # typecheck (strict) + electron-vite production build
 ```
 
-2. To run in dev mode:
-```
-npm run start
-```
+**Package** with electron-builder (bundles the native `mscompress.node` addon
+under `resources/node-ts` so the packaged app can load it at runtime):
 
-3. To compile:
 ```
-npm run build
+npm run dist:dir     # unpacked app directory (release/<platform>-unpacked/)
+npm run dist:linux   # linux targets (dir + AppImage)
+npm run dist         # default target for the host platform
 ```

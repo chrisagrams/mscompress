@@ -1,0 +1,509 @@
+// Shared IPC contract between the main process, preload bridge and renderer.
+// Pure types + channel-name constants only — NO electron/node imports here, so
+// it is safe to reference from the renderer (types are erased at build time).
+
+/** Whitelisted IPC channels. The preload bridge only ever invokes these. */
+export const IPC = {
+  openFiles: "dialog:openFiles",
+  openOutputDir: "dialog:openOutputDir",
+  openExternal: "shell:openExternal",
+  revealInFolder: "shell:revealInFolder",
+  getDefaultOutputDir: "app:getDefaultOutputDir",
+  getVersion: "sys:getVersion",
+  getNumThreads: "sys:getNumThreads",
+  getMemory: "sys:getMemory",
+  getFilesize: "fs:getFilesize",
+  analyze: "file:analyze",
+  computeQC: "qc:compute",
+  readMszx: "archive:read",
+  settingsGet: "settings:get",
+  settingsSet: "settings:set",
+  // main -> renderer settings-change broadcast (webContents.send)
+  settingsChange: "settings:change",
+  compress: "convert:compress",
+  decompress: "convert:decompress",
+  extract: "convert:extract",
+  compressBatch: "convert:compressBatch",
+  // main -> renderer streamed progress (webContents.send)
+  convertProgress: "convert:progress",
+  // renderer -> main: update the Windows title-bar overlay colors (theme change)
+  setTitleBarOverlay: "window:setTitleBarOverlay",
+  // MSTransfer batch queue
+  queueAdd: "queue:add",
+  queueStart: "queue:start",
+  queuePause: "queue:pause",
+  queueClear: "queue:clear",
+  queueRemove: "queue:remove",
+  queueGetState: "queue:getState",
+  // main -> renderer queue-state broadcast (webContents.send)
+  queueUpdate: "queue:update",
+  // main -> renderer: OS handed us file paths to open (association/argv)
+  openAssociatedFiles: "app:openAssociatedFiles",
+  // renderer -> main: the association listener is mounted; flush buffered files.
+  // Sent from the same effect that subscribes to openAssociatedFiles, so it
+  // races correctly (did-finish-load fires before React effects run, dropping
+  // any file pushed at that point).
+  rendererReady: "app:rendererReady",
+} as const
+
+export type IpcChannel = (typeof IPC)[keyof typeof IPC]
+
+/** Lossy pre-processing algorithms for m/z and intensity arrays. */
+export type LossyAlgo = "none" | "cast" | "log" | "delta16" | "delta32" | "vbr"
+
+/** Compression presets shown in the Convert UI. */
+export type Preset = "fastest" | "fast" | "default" | "better"
+
+/** How an extract selects its spectra subset. */
+export type ExtractMode = "mslevel" | "scan" | "index"
+
+/**
+ * Preset → concrete settings. The Advanced accordion overrides these per-field.
+ * Pure data so the renderer can seed its form controls from the same source the
+ * main process uses to build RuntimeArguments.
+ */
+export const COMPRESSION_PRESETS: Record<
+  Preset,
+  { zstdLevel: number; mzLossy: LossyAlgo; intLossy: LossyAlgo }
+> = {
+  fastest: { zstdLevel: 1, mzLossy: "none", intLossy: "none" },
+  fast: { zstdLevel: 3, mzLossy: "none", intLossy: "none" },
+  default: { zstdLevel: 9, mzLossy: "none", intLossy: "none" },
+  better: { zstdLevel: 19, mzLossy: "none", intLossy: "none" },
+}
+
+export interface CompressOptions {
+  preset: Preset
+  /** Advanced overrides (undefined → use the preset default). */
+  mzLossy?: LossyAlgo
+  intLossy?: LossyAlgo
+  zstdLevel?: number
+  threads?: number
+  outputDir?: string
+}
+
+export interface DecompressOptions {
+  threads?: number
+  outputDir?: string
+}
+
+export interface ExtractOptions {
+  mode: ExtractMode
+  msLevel?: number
+  fromScan?: number
+  toScan?: number
+  fromIndex?: number
+  toIndex?: number
+  outputFormat: "mzML" | "msz"
+  threads?: number
+  outputDir?: string
+}
+
+/** Options for archiving many mzML files into one batch (.mszx v2) archive. */
+export interface CompressBatchOptions {
+  preset: Preset
+  /** Advanced overrides (undefined → use the preset default). */
+  mzLossy?: LossyAlgo
+  intLossy?: LossyAlgo
+  zstdLevel?: number
+  threads?: number
+  /** Free-text description stored in the archive manifest. */
+  description?: string
+}
+
+/** Plain result of a convert operation (error reported structurally). */
+export interface ConvertResult {
+  op: "compress" | "decompress" | "extract" | "compressBatch"
+  outPath: string
+  /** All written files, for multi-output ops (batch-archive decompress). */
+  outPaths?: string[]
+  /** Number of input files, for multi-input ops (compressBatch). */
+  inputCount?: number
+  inputBytes: number
+  outputBytes: number
+  /** outputBytes / inputBytes (0 on error). */
+  ratio: number
+  elapsedMs: number
+  error?: string
+}
+
+/** Streamed progress event (main → renderer). */
+export interface ConvertProgress {
+  id: string
+  op: "compress" | "decompress" | "extract" | "compressBatch"
+  phase: "start" | "step" | "done" | "error"
+  file: string
+  message?: string
+  /** Per-file progress for multi-input ops: 0-based `index` of `total`. */
+  index?: number
+  total?: number
+  result?: ConvertResult
+  error?: string
+}
+
+/** Live memory readout for the status bar (app RSS vs system total/free). */
+export interface SystemMemory {
+  /** This process's resident set size, in bytes (process.memoryUsage().rss). */
+  rssBytes: number
+  /** Total system memory, in bytes (os.totalmem()). */
+  totalBytes: number
+  /** Free system memory, in bytes (os.freemem()). */
+  freeBytes: number
+}
+
+// ---- Global settings -------------------------------------------------------
+
+/** Persisted, app-wide settings (userData/settings.json). */
+export interface AppSettings {
+  /** Worker threads used for compress/decompress/extract. */
+  threads: number
+  /** Default local output directory for the Convert tab. */
+  defaultOutputDir: string
+  /** Default compression preset. */
+  defaultPreset: Preset
+  theme: "dark" | "light"
+}
+
+// ---- Window Controls Overlay (Windows) -------------------------------------
+
+/**
+ * Colors for the Windows title-bar overlay (the native min/max/close button
+ * strip shown when `titleBarStyle: "hidden"` + `titleBarOverlay` are set).
+ * `color` is the strip background; `symbolColor` is the glyph color.
+ */
+export interface TitleBarOverlayColors {
+  color: string
+  symbolColor: string
+}
+
+/**
+ * Theme → overlay colors, so the Windows button strip matches the app theme.
+ * Shared by the main process (initial value) and the renderer (live updates on
+ * theme toggle) to keep the two in sync. No-op on macOS/Linux.
+ */
+export const TITLE_BAR_OVERLAY: Record<AppSettings["theme"], TitleBarOverlayColors> = {
+  // `color` must match the app's top toolbar (Tailwind `bg-card`) so the native
+  // control strip reads as a seamless continuation of that row, not the darker
+  // `--background` (#0a0a0a) side panels. Dark `--card` resolves to #171717;
+  // light `--card` to ~#ffffff.
+  dark: { color: "#171717", symbolColor: "#e5e5e5" },
+  light: { color: "#ffffff", symbolColor: "#0a0a0a" },
+}
+
+// ---- MSZX archive ----------------------------------------------------------
+
+export interface MszxAnnotation {
+  filename: string
+  format: string
+  compressed: boolean
+  num_records: number | null
+  description: string | null
+}
+
+/** Plain, serializable MSZX manifest for the Archive tab (v1, single MSZ). */
+export interface MszxManifest {
+  path: string
+  /** Discriminator: a v1 archive holds exactly one MSZ file. */
+  container: "single"
+  version: string
+  created_at: string
+  spectra_file: string
+  num_spectra: number
+  join_key: string
+  source_file: string | null
+  description: string | null
+  annotations: MszxAnnotation[]
+  /** Set instead of the manifest fields when the archive couldn't be read. */
+  error?: string
+}
+
+/** One MSZ member of a v2 multi-file ("batch") archive. */
+export interface MszxBatchEntry {
+  /** Tar member name of the MSZ payload (e.g. "sample.msz"). */
+  entry: string
+  /** Basename of the source mzML, when recorded. */
+  original: string | null
+  /** Payload size in bytes. */
+  size: number
+  /** Spectrum count, when the writer recorded it. */
+  num_spectra: number | null
+  join_key: string
+  annotations: MszxAnnotation[]
+}
+
+/** Plain, serializable manifest of a v2 multi-file ("batch") archive. */
+export interface MszxBatchManifest {
+  path: string
+  container: "batch"
+  version: string
+  description: string | null
+  entries: MszxBatchEntry[]
+  /** Set instead of the manifest fields when the archive couldn't be read. */
+  error?: string
+}
+
+/**
+ * What `readMszx` returns for any `.mszx`: discriminate on `container` (after
+ * checking `error`, which is reported on the "single" shape when the archive
+ * couldn't be read at all).
+ */
+export type MszxArchive = MszxManifest | MszxBatchManifest
+
+// ---- MSTransfer batch queue ------------------------------------------------
+
+export type QueueOp = "compress" | "decompress" | "extract"
+export type QueueStatus = "queued" | "running" | "done" | "error"
+
+/** A remote destination for finished outputs. */
+export interface RemoteDestination {
+  id: string
+  label: string
+  type: "local" | "ssh" | "s3"
+  /** local destinations are wired end-to-end; ssh/s3 are input-validating stubs. */
+  configured: boolean
+}
+
+/** Stub destination list (a real settings store arrives in a later task). */
+export const REMOTE_DESTINATIONS: RemoteDestination[] = [
+  {
+    id: "local-archive",
+    label: "local-archive · MScompress-Archive",
+    type: "local",
+    configured: true,
+  },
+  { id: "ssh-hpc", label: "hpc · cgrams@aurora:/flare", type: "ssh", configured: false },
+  { id: "s3-lab", label: "storage-a · s3://lab-archive", type: "s3", configured: false },
+]
+
+/** A single serializable queue job (settings are held privately in main). */
+export interface QueueJob {
+  id: string
+  filePath: string
+  fileName: string
+  kind: FileKind
+  op: QueueOp
+  status: QueueStatus
+  progress: number
+  sizeBytes: number
+  ratio?: number
+  etaSec?: number
+  /** local convert output path. */
+  outPath?: string
+  /** where the output finally landed after a remote transfer. */
+  finalPath?: string
+  destinationId?: string
+  destinationLabel?: string
+  error?: string
+}
+
+export interface QueueState {
+  jobs: QueueJob[]
+  running: number
+  paused: boolean
+  maxConcurrency: number
+}
+
+/** Request to enqueue a convert job (optionally routed to a remote dest). */
+export interface QueueAddRequest {
+  filePath: string
+  fileName?: string
+  kind: FileKind
+  op: QueueOp
+  settings: CompressOptions | DecompressOptions | ExtractOptions
+  destinationId?: string
+  remotePath?: string
+  transferMode?: "copy" | "move"
+}
+
+/** Recognized source file kinds. */
+export type FileKind = "mzML" | "msz" | "mszx"
+
+/**
+ * Plain, JSON-serializable summary of a file produced by the main process via
+ * the native `mscompress` binding. All numeric fields are plain numbers (any
+ * native BigInt is coerced) so it crosses the IPC boundary cleanly.
+ */
+export interface MsLevelCount {
+  /** "MS1" | "MS2" | "MSn" */
+  level: string
+  count: number
+}
+
+export interface FileSummary {
+  path: string
+  fileName: string
+  kind: FileKind
+  filesizeBytes: number
+  /** null when not available (e.g. on parse error). */
+  spectrumCount: number | null
+  mzFormat: string | null
+  intensityFormat: string | null
+  sourceCompression: string | null
+  /** Per-MS-level spectrum counts, ordered MS1, MS2, MSn (empty on error). */
+  msLevelCounts: MsLevelCount[]
+  /** Retention-time span in seconds, [min, max]. [0, 0] when unavailable. */
+  rtRangeSec: [number, number]
+  /** PSI-MS accession dict from DataFormat.toDict(), when available. */
+  accessions: Record<string, string | number> | null
+  /** Populated instead of the format fields when analysis failed. */
+  error?: string
+}
+
+// ---- QC dashboard ----------------------------------------------------------
+
+export interface TicPoint {
+  rt: number
+  tic: number
+}
+export interface BpcPoint {
+  rt: number
+  bpc: number
+}
+export interface HeatCell {
+  rt: number
+  mz: number
+  density: number
+}
+export interface QCHeatmap {
+  rtBins: number
+  mzBins: number
+  mzMin: number
+  mzMax: number
+  rtMax: number
+  cells: HeatCell[]
+}
+export interface PeaksBin {
+  bin: string
+  count: number
+}
+
+/**
+ * QC dashboard data derived from a single pass over (a sample of) the file's
+ * spectra. Same shapes the QCTab charts consume. `rt` values are in minutes
+ * (or spectrum index when the file has no usable retention times).
+ */
+export interface QCData {
+  path: string
+  spectrumCount: number
+  /** How many spectra were actually decoded (≤ spectrumCount when sampled). */
+  sampledCount: number
+  tic: TicPoint[]
+  bpc: BpcPoint[]
+  heatmap: QCHeatmap
+  msLevelCounts: MsLevelCount[]
+  peaksPerSpectrum: PeaksBin[]
+  /** Set instead of the data fields when QC failed. */
+  error?: string
+}
+
+export interface QCOptions {
+  /** Max spectra to decode (stride-sampled beyond this). */
+  maxSpectra?: number
+  /** Max TIC/BPC points (RT-binned beyond this). */
+  ticPoints?: number
+  /**
+   * For batch (v2) .mszx archives: tar member name of the MSZ to analyze
+   * (from `MszxBatchManifest.entries[].entry`). Required for batch archives —
+   * QC always runs on a single member.
+   */
+  entry?: string
+}
+
+/** The typed surface exposed on `window.api` in the renderer. */
+export interface Api {
+  /** Open a multi-select file dialog (mzML/msz/mszx). Returns chosen paths. */
+  openFiles(): Promise<string[]>
+  /** Open a directory picker. Returns the chosen dir, or null if cancelled. */
+  openOutputDir(): Promise<string | null>
+  /** Open a URL in the user's default browser. */
+  openExternal(url: string): Promise<void>
+  /** Reveal a file in the OS file manager (selects it). */
+  revealInFolder(path: string): Promise<void>
+  /** Default output directory (the user's Downloads folder). */
+  getDefaultOutputDir(): Promise<string>
+  /** Native mscompress backend version string. */
+  getVersion(): Promise<string>
+  /** Number of worker threads the backend will use. */
+  getNumThreads(): Promise<number>
+  /** Live memory readout (app RSS + system total/free) for the status bar. */
+  getMemory(): Promise<SystemMemory>
+  /** File size in bytes. */
+  getFilesize(path: string): Promise<number>
+  /** Analyze a file via the native binding and return a serializable summary. */
+  analyze(path: string): Promise<FileSummary>
+  /** Compute QC dashboard data (TIC/BPC/heatmap/MS-levels/peaks) from spectra. */
+  computeQC(path: string, opts?: QCOptions): Promise<QCData>
+  /**
+   * Read an .mszx archive's manifest + annotations. Returns the v1 single-file
+   * shape or the v2 batch shape — discriminate on `container`.
+   */
+  readMszx(path: string): Promise<MszxArchive>
+  /** Current persisted settings. */
+  getSettings(): Promise<AppSettings>
+  /** Merge a partial update into settings, persist, and return the result. */
+  setSettings(partial: Partial<AppSettings>): Promise<AppSettings>
+  /**
+   * Update the Windows title-bar overlay (native window-control strip) colors
+   * so they match the app theme. No-op on macOS/Linux (handled in main).
+   */
+  setTitleBarOverlay(colors: TitleBarOverlayColors): Promise<void>
+  /** Subscribe to settings-change broadcasts. Returns an unsubscribe fn. */
+  onSettingsChange(cb: (settings: AppSettings) => void): () => void
+  /** Compress an mzML file to .msz. */
+  compress(path: string, opts: CompressOptions): Promise<ConvertResult>
+  /**
+   * Decompress an .msz/.mszx file to .mzML. A batch (v2) .mszx expands into a
+   * directory of .mzML files instead — `outPath` is the directory and
+   * `outPaths` lists every written file.
+   */
+  decompress(path: string, opts: DecompressOptions): Promise<ConvertResult>
+  /** Extract a spectra subset to a new .mzML/.msz. */
+  extract(path: string, opts: ExtractOptions): Promise<ConvertResult>
+  /** Compress many mzML files into one batch (.mszx v2) archive at `outPath`. */
+  compressBatch(
+    paths: string[],
+    outPath: string,
+    opts: CompressBatchOptions,
+  ): Promise<ConvertResult>
+  /**
+   * Subscribe to streamed convert progress events. Returns an unsubscribe fn.
+   */
+  onConvertProgress(cb: (p: ConvertProgress) => void): () => void
+  /** Enqueue a convert job on the MSTransfer batch queue. Returns its id. */
+  addQueueJob(req: QueueAddRequest): Promise<string>
+  /** Start (unpause) the queue runner. */
+  startQueue(): Promise<void>
+  /** Pause the queue (running jobs finish; no new ones start). */
+  pauseQueue(): Promise<void>
+  /** Remove all non-running jobs. */
+  clearQueue(): Promise<void>
+  /** Remove a single non-running job by id. */
+  removeJob(id: string): Promise<void>
+  /** Current queue snapshot (for initial render). */
+  getQueueState(): Promise<QueueState>
+  /** Subscribe to queue-state broadcasts. Returns an unsubscribe fn. */
+  onQueueUpdate(cb: (state: QueueState) => void): () => void
+  /**
+   * Subscribe to OS "open these files" pushes (double-click / Open with).
+   * Returns an unsubscribe fn.
+   */
+  onOpenAssociatedFiles(cb: (paths: string[]) => void): () => void
+  /**
+   * Tell the main process the association listener is mounted, so it can flush
+   * any files buffered from a cold-start launch. Call once, from the same effect
+   * that registers onOpenAssociatedFiles.
+   */
+  notifyRendererReady(): void
+  /**
+   * Resolve the absolute filesystem path of a dropped/selected File. Electron
+   * removed `File.path`, so this proxies `webUtils.getPathForFile` from preload.
+   * Synchronous (no IPC round-trip).
+   */
+  getPathForFile(file: File): string
+  /**
+   * Host platform (`process.platform`, e.g. "darwin" | "win32" | "linux").
+   * Used by the renderer for platform-aware chrome (e.g. the macOS toolbar
+   * inset past the traffic-light buttons). Plain value — no IPC round-trip.
+   */
+  platform: string
+}
