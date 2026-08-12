@@ -562,4 +562,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: electron-linux-x86_64
-          path: ./electron/release/linux-*-unpacked
+          # electron-builder names the x64 output "linux-unpacked" (the arch
+          # suffix only appears for non-x64, e.g. "linux-arm64-unpacked"), so
+          # the glob must match both spellings.
+          path: ./electron/release/linux*unpacked
+          if-no-files-found: error
