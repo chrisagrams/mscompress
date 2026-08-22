@@ -23,6 +23,8 @@ MScompress is a multi-threaded lossless and lossy compression tool for Mass Spec
 
 🌟 Random-access to compressed file without full decompression.
 
+🌟 Direct compression of vendor raw files (Thermo, Bruker, SCIEX, Waters) to `.msz`.
+
 🌟 Python library (`pip install mscompress`) and Node.js/TypeScript library (`npm install mscompress`) for programmatic access.
 
 🌟 Full TypeScript type definitions and ESM support.
@@ -72,6 +74,22 @@ or
 ```
 ./mscompress in.mzML out.msz
 ```
+
+### Vendor Raw Files
+
+MScompress can compress vendor raw files directly to `.msz` — Thermo `.raw`, Bruker timsTOF `.d` directories, SCIEX `.wiff`/`.wiff2`/`.t2d`, and Waters `.raw` directories — by converting them to mzML in memory through the compiled [raw2ms](https://github.com/chrisagrams/raw2ms) library and feeding the existing compression pipeline:
+
+```
+./mscompress in.raw
+```
+
+Requirements and behavior:
+
+- The compiled raw2ms C library must be available at runtime. Set `RAW2MS_LIBRARY` to the path of `libraw2ms_capi.so` (`.dylib`/`.dll`), or install it on your library search path. Without it, raw input produces an instructive error; all other functionality is unaffected.
+- The mzML intermediate is built fully in memory when an OOM check says it fits; for large runs it is instead streamed spectrum-by-spectrum into an anonymous in-memory staging file and processed through a memory map, keeping peak memory bounded. (Set `MSCOMPRESS_FORCE_CHUNKED=1` to force the chunked path.)
+- SCIEX `.wiff` files can hold several runs (samples). One invocation converts one run; `--run-index N` selects which (default 0), and the log reports how many runs the file holds.
+- All compression flags (`--mz-lossy`, `--int-lossy`, threads, formats, blocksize) apply as with mzML input. `--extract`/`--describe` require an `.msz` or `.mzML` file — compress the vendor file first.
+- Per-peak ion mobility arrays (Bruker) are not stored; the `.msz` format carries m/z and intensity binary streams only.
 
 ### Decompression
 To decompress, specify `.msz` file as first argument. Will output to `out.mzML`:

@@ -13,9 +13,18 @@
 
 #include "../vendor/zstd/lib/zstd.h"
 #include "libbase64.h"
+#include "raw_input.h"
 #include "yxml.h"
 
 static const char* program_name = NULL;
+
+/* --run-index: which run of a multi-run vendor container (.wiff) to
+ * convert. Lives here rather than in Arguments to keep the shared struct
+ * untouched. */
+static uint64_t run_index_arg = 0;
+
+/* Vendor raw input operation; local to the CLI (src/ operations run 1-7). */
+#define COMPRESS_RAW 8
 
 static void print_usage(FILE* stream, int exit_code) {
    fprintf(stream, "Usage: %s [OPTION...] input_file [output_file]\n",
@@ -54,6 +63,9 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(stream,
            " --extract                      Enables extraction mode for either "
            "mzML or msz files. (disabled by default)\n");
+   fprintf(stream,
+           " --run-index index              Run to convert inside a multi-run "
+           "vendor file (SCIEX .wiff). (default: 0)\n");
    fprintf(stream,
            " --target-xml-format type       Set target xml compression format "
            "(zstd, none). (default: zstd)\n");
@@ -201,6 +213,12 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
          }
       } else if (strcmp(argv[i], "--extract") == 0) {
          arguments->extract_only = 1;
+      } else if (strcmp(argv[i], "--run-index") == 0) {
+         if (i + 1 >= argc) {
+            fprintf(stderr, "%s\n", "Missing run index.");
+            return 1;
+         }
+         run_index_arg = strtoull(argv[++i], NULL, 10);
       } else if (strcmp(argv[i], "--target-xml-format") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing target xml format.");
@@ -313,6 +331,17 @@ int main(int argc, char* argv[]) {
       }
    }
 
+   // Detect vendor raw input (Thermo .raw, Bruker .d, SCIEX .wiff/.wiff2/.t2d,
+   // Waters .raw directory). Bypasses prepare_fds like .mszx does: the raw
+   // file is read through the compiled raw2ms library and converted to an
+   // mzML in memory (see compress_raw).
+   int is_raw = is_raw_vendor_path(arguments.input_file);
+   if (is_raw && (arguments.describe_only || arguments.extract_only)) {
+      error("--describe/--extract need an .msz or .mzML file; compress the "
+            "vendor file to .msz first.\n");
+      exit(1);
+   }
+
    // Open file descriptors and mmap.
    if (is_mszx) {
       operation = DECOMPRESS_MSZX;
@@ -323,6 +352,17 @@ int main(int argc, char* argv[]) {
          if (!arguments.output_file) exit(1);
          memcpy(arguments.output_file, arguments.input_file, ilen - 5);
          arguments.output_file[ilen - 5] = '\0';
+      }
+   } else if (is_raw) {
+      operation = COMPRESS_RAW;
+      if (arguments.output_file == NULL)
+         arguments.output_file =
+             change_extension(arguments.input_file, ".msz\0");
+      local_fds[1] = open_output_file(arguments.output_file);
+      if (local_fds[1] < 0) {
+         error("Error in opening output file descriptor. (%s)\n",
+               strerror(errno));
+         exit(1);
       }
    } else if (arguments.describe_only) {
       local_fds[0] = open_input_file(arguments.input_file);
@@ -354,8 +394,9 @@ int main(int argc, char* argv[]) {
    // Initialize b64 encoder.
    base64_stream_encode_init(&state, 0);
 
-   print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", arguments.input_file,
-         input_filesize);
+   print("\tInput file: %s\n", arguments.input_file);
+   if (operation != COMPRESS_RAW)  // raw input size is reported by compress_raw
+      print("\t\tFilesize: %ld bytes\n", input_filesize);
 
    print("\tOutput file: %s\n", arguments.output_file);
 
@@ -414,9 +455,19 @@ int main(int argc, char* argv[]) {
          preprocess_external(input_map, input_filesize,
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
-         
+
          if (compress_mzml(input_map, input_filesize, &arguments, df,
                            divisions, local_fds[1])) {
+            error_status = 1;
+            break;
+         }
+         break;
+      }
+      case COMPRESS_RAW: {
+         print("\tDetected vendor raw file, converting via raw2ms...\n");
+
+         if (compress_raw(arguments.input_file, run_index_arg, &arguments,
+                          local_fds[1])) {
             error_status = 1;
             break;
          }
