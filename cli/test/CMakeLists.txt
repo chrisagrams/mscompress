@@ -161,6 +161,33 @@ add_test(NAME CompressCorruptBase64
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# Chromatogram-only mzML (zero spectra, e.g. SRM runs from PXD020483).
+# Regression test: total_spec == 0 used to SIGFPE in create_divisions.
+# Mirrors the Python/Node behavior of clamping to a single division so the
+# file roundtrips as XML-only mzML data.
+add_test(NAME CompressChromatogramOnly
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/edge_cases/chromatogram_only.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_chromatogram_only
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# mzML with an empty spectrumList and no binary data arrays (e.g. empty RAW
+# converted by ThermoRawFileParser, or a truncated file).
+# Regression test: pattern_detect returns NULL and the CLI used to exit 1
+# without any error message.
+add_test(NAME CompressNoBinaryArrays
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/edge_cases/no_binary_arrays.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_no_binary_arrays
+    -DEXPECTED_PATTERN=format|spectra
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_fail.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}
