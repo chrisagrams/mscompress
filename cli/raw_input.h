@@ -69,6 +69,9 @@ typedef struct {
    void* ctx;
    const raw_spec_t* (*fetch)(void* ctx, uint64_t index); /* NULL on error */
    void (*release)(void* ctx, const raw_spec_t* spec);    /* NULL if static */
+   /* Detail for the most recent failed fetch (provider-specific), or NULL.
+    * May be NULL itself when a provider has nothing to add. */
+   const char* (*last_error)(void* ctx);
 } raw_provider_t;
 
 /**
@@ -100,10 +103,13 @@ typedef struct {
  * @brief Write `run` as a complete mzML 1.1.0 document into a growable
  *        memory buffer.
  * @param run The run to serialize.
+ * @param salvage When nonzero, spectra whose fetch fails are skipped (with a
+ *                summary warning) instead of aborting; an error is still
+ *                returned when nothing at all is readable.
  * @param out Receives the malloc'd buffer and length on success.
  * @return 0 on success, -1 on allocation/provider failure.
  */
-int raw_write_mzml_mem(const raw_run_t* run, mzml_buf_t* out);
+int raw_write_mzml_mem(const raw_run_t* run, int salvage, mzml_buf_t* out);
 
 /**
  * @brief Write `run` as a complete mzML 1.1.0 document to an open file
@@ -113,10 +119,12 @@ int raw_write_mzml_mem(const raw_run_t* run, mzml_buf_t* out);
  * afterwards and runs the standard pipeline over the mapping.
  *
  * @param run The run to serialize.
+ * @param salvage Skip unreadable spectra instead of failing (see
+ *                raw_write_mzml_mem).
  * @param fd Open, writable file descriptor positioned at the start.
  * @return 0 on success, -1 on failure.
  */
-int raw_write_mzml_fd(const raw_run_t* run, int fd);
+int raw_write_mzml_fd(const raw_run_t* run, int salvage, int fd);
 
 /**
  * @brief Estimate the mzML size a raw input will expand to.
@@ -168,11 +176,13 @@ int is_raw_vendor_path(const char* path);
  *
  * @param input_path Path to the vendor file.
  * @param run_index Run to convert inside multi-run containers (.wiff).
+ * @param salvage Skip unreadable spectra instead of failing (see
+ *                raw_write_mzml_mem).
  * @param arguments Populated CLI arguments.
  * @param output_fd Open output .msz file descriptor.
  * @return 0 on success, -1 on failure (message already printed).
  */
-int compress_raw(const char* input_path, uint64_t run_index,
+int compress_raw(const char* input_path, uint64_t run_index, int salvage,
                  Arguments* arguments, int output_fd);
 
 #endif /* RAW_INPUT_H */

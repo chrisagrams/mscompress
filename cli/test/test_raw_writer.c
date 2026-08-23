@@ -116,6 +116,7 @@ static void build_run(raw_run_t* run) {
    run->provider.ctx = NULL;
    run->provider.fetch = test_fetch;
    run->provider.release = NULL;
+   run->provider.last_error = NULL;
    run->n_spectra = 3;
    run->source_path = "/data/QC & run.raw";
    run->run_id = "20260822_QC"; /* digit-leading: must be NCName-sanitized */
@@ -129,7 +130,7 @@ static int write_doc(mzml_buf_t* doc) {
    raw_run_t run;
    build_run(&run);
    memset(doc, 0, sizeof(*doc));
-   if (raw_write_mzml_mem(&run, doc) != 0) {
+   if (raw_write_mzml_mem(&run, 0, doc) != 0) {
       fprintf(stderr, "FAIL: raw_write_mzml_mem returned error\n");
       failures++;
       return -1;
@@ -392,7 +393,7 @@ static void test_fd_writer_matches_memory_writer(void) {
 
    raw_run_t run;
    build_run(&run);
-   int rc = raw_write_mzml_fd(&run, fd);
+   int rc = raw_write_mzml_fd(&run, 0, fd);
    CHECK(rc == 0, "raw_write_mzml_fd succeeds");
 
    /* Read it back and compare byte-for-byte with the memory writer. */
@@ -477,6 +478,106 @@ static void test_generated_mzml_compresses_via_pipeline(void) {
    free(doc.buf);
 }
 
+/* --- provider with unreadable spectra ------------------------------------- */
+
+/* build_run() fills g_specs; reuse them but fail the middle fetch. */
+static const raw_spec_t* failing_fetch(void* ctx, uint64_t i) {
+   (void)ctx;
+   return i == 1 ? NULL : &g_specs[i];
+}
+
+static const raw_spec_t* all_fail_fetch(void* ctx, uint64_t i) {
+   (void)ctx;
+   (void)i;
+   return NULL;
+}
+
+static const char* failing_last_error(void* ctx) {
+   (void)ctx;
+   return "synthetic provider failure";
+}
+
+static void build_failing_run(raw_run_t* run) {
+   build_run(run);
+   run->provider.fetch = failing_fetch;
+   run->provider.last_error = failing_last_error;
+}
+
+static void test_fetch_failure_is_fatal_without_salvage(void) {
+   raw_run_t run;
+   build_failing_run(&run);
+   mzml_buf_t doc;
+   CHECK(raw_write_mzml_mem(&run, 0, &doc) != 0,
+         "a failed fetch aborts the document without salvage");
+}
+
+static void test_salvage_skips_unreadable_spectra(void) {
+   raw_run_t run;
+   build_failing_run(&run);
+   mzml_buf_t doc;
+   memset(&doc, 0, sizeof(doc));
+   int rc = raw_write_mzml_mem(&run, 1, &doc);
+   CHECK(rc == 0, "salvage completes despite an unreadable spectrum");
+   if (rc != 0)
+      return;
+
+   data_format_t* df = pattern_detect(doc.buf);
+   CHECK(df != NULL, "pattern_detect accepts the salvaged document");
+   CHECK(df && df->source_total_spec == 3,
+         "spectrumList count stays at the declared 3");
+   division_t* div = df ? scan_mzml(doc.buf, df, (long)doc.len, 0) : NULL;
+   CHECK(div != NULL, "scan_mzml scans the salvaged document");
+   if (div) {
+      CHECK(div->mz->total_spec == 2, "two spectra are actually present");
+      CHECK(strstr(doc.buf, "<spectrum id=\"scan=1\" index=\"0\"") != NULL &&
+                strstr(doc.buf, "<spectrum id=\"scan=3\" index=\"1\"") != NULL,
+            "spectrum indices stay sequential after the skip");
+      dealloc_division(div);
+   }
+   if (df)
+      dealloc_df(df);
+   free(doc.buf);
+}
+
+static void test_salvage_errors_when_nothing_is_readable(void) {
+   raw_run_t run;
+   build_failing_run(&run);
+   run.provider.fetch = all_fail_fetch;
+   mzml_buf_t doc;
+   CHECK(raw_write_mzml_mem(&run, 1, &doc) != 0,
+         "salvage with zero readable spectra is an error, not an empty run");
+}
+
+static void test_fetch_failure_reports_provider_detail(void) {
+   raw_run_t run;
+   build_failing_run(&run);
+
+   char tmpl[] = "/tmp/raw_err_capture_XXXXXX";
+   int fd = mkstemp(tmpl);
+   CHECK(fd >= 0, "mkstemp for stderr capture");
+   if (fd < 0)
+      return;
+   fflush(stderr);
+   int saved = dup(STDERR_FILENO);
+   dup2(fd, STDERR_FILENO);
+
+   mzml_buf_t doc;
+   int rc = raw_write_mzml_mem(&run, 0, &doc);
+
+   fflush(stderr);
+   dup2(saved, STDERR_FILENO);
+   close(saved);
+   lseek(fd, 0, SEEK_SET);
+   char buf[4096] = {0};
+   ssize_t got = read(fd, buf, sizeof(buf) - 1);
+   close(fd);
+   unlink(tmpl);
+
+   CHECK(rc != 0, "fetch failure is fatal without salvage");
+   CHECK(got > 0 && strstr(buf, "synthetic provider failure") != NULL,
+         "the error message carries the provider's own detail");
+}
+
 static void test_estimate_formula(void) {
    CHECK(raw_estimate_mzml_bytes(1000, 10) == 3 * 1000 + 1024 * 10,
          "estimate = 3x raw bytes + 1KB per spectrum");
@@ -517,6 +618,10 @@ int main(void) {
    RUN_TEST(test_mzml_is_well_formed_xml);
    RUN_TEST(test_fd_writer_matches_memory_writer);
    RUN_TEST(test_generated_mzml_compresses_via_pipeline);
+   RUN_TEST(test_fetch_failure_is_fatal_without_salvage);
+   RUN_TEST(test_salvage_skips_unreadable_spectra);
+   RUN_TEST(test_salvage_errors_when_nothing_is_readable);
+   RUN_TEST(test_fetch_failure_reports_provider_detail);
    RUN_TEST(test_estimate_formula);
    RUN_TEST(test_should_chunk_boundary);
    RUN_TEST(test_is_raw_vendor_path);

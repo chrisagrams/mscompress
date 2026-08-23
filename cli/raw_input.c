@@ -552,33 +552,68 @@ static int mzml_write_footer(sink_t* s) {
    return sink_printf(s, "</spectrumList></run></mzML>");
 }
 
-static int raw_write_mzml(const raw_run_t* run, sink_t* s) {
+static int raw_write_mzml(const raw_run_t* run, sink_t* s, int salvage) {
    if (run == NULL || run->provider.fetch == NULL)
       return -1;
    if (mzml_write_header(s, run, run->n_spectra))
       return -1;
+   uint64_t written = 0, skipped = 0;
    for (uint64_t i = 0; i < run->n_spectra; i++) {
       const raw_spec_t* spec = run->provider.fetch(run->provider.ctx, i);
       if (spec == NULL) {
-         error("raw_input: provider failed to fetch spectrum %llu.\n",
-               (unsigned long long)i);
+         const char* detail =
+             run->provider.last_error
+                 ? run->provider.last_error(run->provider.ctx)
+                 : NULL;
+         if (detail != NULL && *detail == '\0')
+            detail = NULL;
+         if (salvage) {
+            /* Report the first failure's reason once, then keep going: for a
+             * partially corrupt file the count, not every index, is the news. */
+            if (skipped == 0) {
+               warning("raw_input: salvage: spectrum %llu is unreadable%s%s; "
+                       "skipping it and any further unreadable spectra.\n",
+                       (unsigned long long)i, detail ? ": " : "",
+                       detail ? detail : "");
+            }
+            skipped++;
+            continue;
+         }
+         error("raw_input: provider failed to fetch spectrum %llu%s%s\n",
+               (unsigned long long)i, detail ? ": " : "",
+               detail ? detail : "");
          return -1;
       }
-      int rc = mzml_write_spectrum(s, spec, i);
+      /* Renumber on write, not fetch, so indices stay sequential when salvage
+       * skips spectra; scan_mzml() reconciles the declared count downwards. */
+      int rc = mzml_write_spectrum(s, spec, written);
       if (run->provider.release)
          run->provider.release(run->provider.ctx, spec);
       if (rc)
          return -1;
+      written++;
+   }
+   if (salvage && skipped > 0) {
+      if (written == 0) {
+         error("raw_input: salvage: none of the %llu spectra could be read.\n",
+               (unsigned long long)run->n_spectra);
+         return -1;
+      }
+      warning("raw_input: salvage: wrote %llu of %llu spectra (%llu "
+              "skipped; the mzML count attribute still declares %llu).\n",
+              (unsigned long long)written, (unsigned long long)run->n_spectra,
+              (unsigned long long)skipped,
+              (unsigned long long)run->n_spectra);
    }
    if (mzml_write_footer(s))
       return -1;
    return 0;
 }
 
-int raw_write_mzml_mem(const raw_run_t* run, mzml_buf_t* out) {
+int raw_write_mzml_mem(const raw_run_t* run, int salvage, mzml_buf_t* out) {
    sink_t s;
    sink_init_mem(&s);
-   if (raw_write_mzml(run, &s)) {
+   if (raw_write_mzml(run, &s, salvage)) {
       free(s.buf);
       return -1;
    }
@@ -591,10 +626,10 @@ int raw_write_mzml_mem(const raw_run_t* run, mzml_buf_t* out) {
    return 0;
 }
 
-int raw_write_mzml_fd(const raw_run_t* run, int fd) {
+int raw_write_mzml_fd(const raw_run_t* run, int salvage, int fd) {
    sink_t s;
    sink_init_fd(&s, fd);
-   return raw_write_mzml(run, &s);
+   return raw_write_mzml(run, &s, salvage);
 }
 
 /* === OOM policy =========================================================== */
@@ -796,6 +831,14 @@ static const raw_spec_t* raw2ms_fetch(void* vctx, uint64_t index) {
    return (const raw_spec_t*)g_raw2ms.spectrum(ctx->run, index);
 }
 
+/* raw2ms reports failures through a thread-local message; the fetch loop runs
+ * on one thread, so this is the reason the last fetch returned NULL. */
+static const char* raw2ms_provider_last_error(void* vctx) {
+   (void)vctx;
+   const char* e = g_raw2ms.last_error ? g_raw2ms.last_error() : NULL;
+   return (e != NULL && e[0] != '\0') ? e : NULL;
+}
+
 static void raw2ms_release(void* vctx, const raw_spec_t* spec) {
    (void)vctx;
    g_raw2ms.spectrum_free((void*)spec);
@@ -950,7 +993,7 @@ static int run_compress_pipeline(char* map, size_t len, Arguments* arguments,
    return rc;
 }
 
-int compress_raw(const char* input_path, uint64_t run_index,
+int compress_raw(const char* input_path, uint64_t run_index, int salvage,
                  Arguments* arguments, int output_fd) {
    if (raw2ms_load() != 0)
       return -1;
@@ -1010,6 +1053,7 @@ int compress_raw(const char* input_path, uint64_t run_index,
    rr.provider.ctx = &ctx;
    rr.provider.fetch = raw2ms_fetch;
    rr.provider.release = raw2ms_release;
+   rr.provider.last_error = raw2ms_provider_last_error;
    rr.n_spectra = (uint64_t)n_spectra;
    rr.source_path = g_raw2ms.source_path(run);
    rr.run_id = g_raw2ms.run_id(run);
@@ -1019,7 +1063,7 @@ int compress_raw(const char* input_path, uint64_t run_index,
 
    if (!chunked) {
       mzml_buf_t doc;
-      if (raw_write_mzml_mem(&rr, &doc) != 0) {
+      if (raw_write_mzml_mem(&rr, salvage, &doc) != 0) {
          error("raw_input: failed to generate the mzML document.\n");
          goto out;
       }
@@ -1032,7 +1076,7 @@ int compress_raw(const char* input_path, uint64_t run_index,
                "path.\n");
          goto out;
       }
-      if (raw_write_mzml_fd(&rr, cd.fd) != 0) {
+      if (raw_write_mzml_fd(&rr, salvage, cd.fd) != 0) {
          error("raw_input: failed to generate the mzML document.\n");
          chunked_doc_destroy(&cd);
          goto out;

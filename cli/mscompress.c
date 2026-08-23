@@ -23,6 +23,9 @@ static const char* program_name = NULL;
  * untouched. */
 static uint64_t run_index_arg = 0;
 
+/* --salvage: skip unreadable spectra in vendor input instead of failing. */
+static int salvage_arg = 0;
+
 /* Vendor raw input operation; local to the CLI (src/ operations run 1-7). */
 #define COMPRESS_RAW 8
 
@@ -66,6 +69,9 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(stream,
            " --run-index index              Run to convert inside a multi-run "
            "vendor file (SCIEX .wiff). (default: 0)\n");
+   fprintf(stream,
+           " --salvage                      Skip unreadable spectra in vendor "
+           "files instead of failing. (disabled by default)\n");
    fprintf(stream,
            " --target-xml-format type       Set target xml compression format "
            "(zstd, none). (default: zstd)\n");
@@ -219,6 +225,8 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             return 1;
          }
          run_index_arg = strtoull(argv[++i], NULL, 10);
+      } else if (strcmp(argv[i], "--salvage") == 0) {
+         salvage_arg = 1;
       } else if (strcmp(argv[i], "--target-xml-format") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing target xml format.");
@@ -466,7 +474,8 @@ int main(int argc, char* argv[]) {
       case COMPRESS_RAW: {
          print("\tDetected vendor raw file, converting via raw2ms...\n");
 
-         if (compress_raw(arguments.input_file, run_index_arg, &arguments,
+         if (compress_raw(arguments.input_file, run_index_arg, salvage_arg,
+                          &arguments,
                           local_fds[1])) {
             error_status = 1;
             break;

@@ -89,6 +89,7 @@ Requirements and behavior:
 - The mzML intermediate is built fully in memory when an OOM check says it fits; for large runs it is instead streamed spectrum-by-spectrum into an anonymous in-memory staging file and processed through a memory map, keeping peak memory bounded. (Set `MSCOMPRESS_FORCE_CHUNKED=1` to force the chunked path.)
 - SCIEX `.wiff` files can hold several runs (samples). One invocation converts one run; `--run-index N` selects which (default 0), and the log reports how many runs the file holds.
 - All compression flags (`--mz-lossy`, `--int-lossy`, threads, formats, blocksize) apply as with mzML input. `--extract`/`--describe` require an `.msz` or `.mzML` file — compress the vendor file first.
+- Corrupt input fails with the reader's diagnosis (a truncated Bruker `.d`, for instance, is reported with byte counts before any conversion work starts). `--salvage` instead skips spectra the reader cannot decode, warns with a summary, and converts the rest; a file that is truncated on disk is still rejected outright — re-download it.
 - Per-peak ion mobility arrays (Bruker) are not stored; the `.msz` format carries m/z and intensity binary streams only.
 
 ### Decompression
