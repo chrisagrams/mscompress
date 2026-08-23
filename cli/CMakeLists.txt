@@ -46,7 +46,7 @@ endif()
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
 
-file(GLOB SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c mscompress.c)
+file(GLOB SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c mscompress.c raw_input.c)
 add_executable(mscompress ${SOURCES})
 target_compile_definitions(mscompress PRIVATE VERSION="${PROJECT_VERSION}")
 
@@ -94,7 +94,7 @@ include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
 if(WIN32)
     target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
 else()
-    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads) # need math library and pthreads on Linux/Mac
+    target_link_libraries(mscompress PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads ${CMAKE_DL_LIBS}) # need math library, pthreads and dlopen on Linux/Mac
 endif()
 
 if(CODE_COVERAGE)

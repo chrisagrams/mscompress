@@ -338,11 +338,15 @@ void* decompress_routine(void* args) {
 
    long len = division->size;
 
-   if (len <= 0) {
+   if (len < 0) {
       error(
           "decompress_routine: Error determining decompression buffer size.\n");
       return NULL;
    }
+   if (len == 0)
+      len = 1;  // Nothing to decompress (empty division): keep the malloc
+                // below valid; the copy loop writes nothing and ret_len ends
+                // up 0.
 
    char* buff = malloc(len * 2);
 

@@ -2,6 +2,28 @@
 
 set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/data)
 
+# Unit tests for the vendor raw -> mzML writer. Runs without libraw2ms:
+# spectra are synthesized and checked against mscompress's own detectors.
+file(GLOB RAW_WRITER_CORE_SOURCES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c)
+add_executable(test_raw_writer test_raw_writer.c ${RAW_WRITER_CORE_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../raw_input.c)
+target_include_directories(test_raw_writer PUBLIC
+    ${VENDOR_DIR}/zstd/lib
+    ${VENDOR_DIR}/base64/include
+    ${VENDOR_DIR}/base64/lib
+    ${VENDOR_DIR}/yxml
+    ${VENDOR_DIR}/lz4/include
+    ${SRC_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+if(WIN32)
+    target_link_libraries(test_raw_writer PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml)
+else()
+    target_link_libraries(test_raw_writer PRIVATE base64 lz4 ${ZLIB_LIBRARY} zstd yxml m Threads::Threads ${CMAKE_DL_LIBS})
+endif()
+add_dependencies(test_raw_writer zlib_build)
+add_test(NAME RawWriterTest COMMAND test_raw_writer)
+
 # Simple test to run the executable with --version and --help
 add_test(NAME VersionTest COMMAND mscompress --version)
 
@@ -139,6 +161,33 @@ add_test(NAME CompressCorruptBase64
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# Chromatogram-only mzML (zero spectra, e.g. SRM runs from PXD020483).
+# Regression test: total_spec == 0 used to SIGFPE in create_divisions.
+# Mirrors the Python/Node behavior of clamping to a single division so the
+# file roundtrips as XML-only mzML data.
+add_test(NAME CompressChromatogramOnly
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/edge_cases/chromatogram_only.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_chromatogram_only
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# mzML with an empty spectrumList and no binary data arrays (e.g. empty RAW
+# converted by ThermoRawFileParser, or a truncated file).
+# Regression test: pattern_detect returns NULL and the CLI used to exit 1
+# without any error message.
+add_test(NAME CompressNoBinaryArrays
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/edge_cases/no_binary_arrays.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_no_binary_arrays
+    -DEXPECTED_PATTERN=format|spectra
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_fail.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}
@@ -146,4 +195,14 @@ add_test(NAME VerboseOutputTest
     -DINPUT_FILE=${TEST_DATA_DIR}/test.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_verbose
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_verbose.cmake
+)
+
+# Vendor raw -> msz roundtrip. Vendor files are too large for the repo, so
+# the test self-skips unless MSCOMPRESS_TEST_RAW and RAW2MS_LIBRARY are set
+# in the environment when ctest runs.
+add_test(NAME RawCompressTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_raw
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_raw.cmake
 )

@@ -1775,6 +1775,14 @@ data_positions_t** join_inten(divisions_t* divisions) {
 divisions_t* create_divisions(division_t* div, long n_divisions) {
    divisions_t* r;
 
+   /* A non-positive division count is meaningless (it arises when an mzML
+      contains no spectra, e.g. chromatogram-only SRM runs) and would divide
+      by zero below. Treat it as a request for a single division, which
+      yields one XML-only division. Mirrors the Python/Node bindings, which
+      clamp to 1 before calling this. */
+   if (n_divisions < 1)
+      n_divisions = 1;
+
    r = malloc(sizeof(divisions_t));
    if (r == NULL)
       return NULL;
@@ -1848,6 +1856,33 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
    // TODO: factor this out into a function
    int i = n_divisions - 1;
    n_spec_per_div += n_spec_leftover;
+
+   if (n_spec_per_div == 0) {
+      // mzML with no spectra at all (e.g. chromatogram-only SRM runs): the
+      // spectrum division would be empty, which the block-length bookkeeping
+      // on decompression cannot represent (an empty division consumes no
+      // block, shifting every later division's blocks). Put the remaining
+      // XML straight into this division and drop the extra trailing-XML
+      // division, so the file is a single XML-only division - the same shape
+      // as the leftover-XML division of any normal file.
+      r->n_divisions = n_divisions;
+
+      int remaining = div->xml->total_spec - xml_i;
+      if (remaining > 0) {
+         r->divisions[i] = alloc_division(remaining, 0, 0);
+         for (int j = 0; j < remaining; j++) {
+            r->divisions[i]->xml->start_positions[j] =
+                div->xml->start_positions[xml_i];
+            r->divisions[i]->xml->end_positions[j] =
+                div->xml->end_positions[xml_i];
+            r->divisions[i]->xml->total_spec++;
+            r->divisions[i]->size += div->xml->end_positions[xml_i] -
+                                     div->xml->start_positions[xml_i];
+            xml_i++;
+         }
+      }
+      return r;
+   }
 
    r->divisions[i] =
        alloc_division(n_spec_per_div * 2, n_spec_per_div, n_spec_per_div);
@@ -2318,8 +2353,10 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
 
    *df = pattern_detect((char*)input_map);
 
-   if (*df == NULL)
+   if (*df == NULL) {
+      error("Unable to detect mzML binary data format in input file. The file may be truncated, malformed, or contain no spectra or chromatograms with binary data arrays.\n");
       return 1;
+   }
 
    division_t* div = NULL;
    if (arguments->indices_length > 0) {
@@ -2382,6 +2419,10 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
              "n_divisions to total_spec)\n",
              n_divisions, div->mz->total_spec);
          n_divisions = div->mz->total_spec;
+         if (n_divisions ==
+             0)  // No spectra (e.g. chromatogram-only SRM mzML): use a
+                 // single XML-only division, as the Python/Node bindings do
+            n_divisions = 1;
       }
 
       if (arguments->indices_length != 0 &&
@@ -2408,6 +2449,10 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                 "n_divisions to total_spec)\n",
                 effective_divisions, div->mz->total_spec);
             effective_divisions = div->mz->total_spec;
+            if (effective_divisions ==
+                0)  // No spectra (e.g. chromatogram-only SRM mzML): use a
+                    // single XML-only division, as the Python/Node bindings do
+               effective_divisions = 1;
          }
          *divisions = create_divisions(div, effective_divisions);
          *blocksize = get_division_size_max(
