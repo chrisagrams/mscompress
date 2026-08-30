@@ -172,9 +172,8 @@ size_t write_to_file(int fd, char* buff, size_t n) {
 
    if (rv < 0)
       error(
-          "Error in writing %ld bytes to file descriptor %d. Attempted to "
-          "write %s",
-          n, fd, buff);
+          "Error in writing %zu bytes to file descriptor %d: %s\n",
+          n, fd, strerror(errno));
 
    return (size_t)rv;
 }

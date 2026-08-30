@@ -683,8 +683,14 @@ int decompress_msz(char* input_map, size_t input_filesize,
             return -1;
          }
          start = get_time();
-         write_to_file(fd, args[i]->ret, args[i]->ret_len);
+         size_t written = write_to_file(fd, args[i]->ret, args[i]->ret_len);
          stop = get_time();
+
+         if (written != (size_t)args[i]->ret_len) {
+            error("decompress_msz: Did not write all bytes to disk for division %d.\n", i);
+            dealloc_decompress_args(args[i]);
+            return -1;
+         }
 
          print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len,
                (float)args[i]->ret_len / (stop - start) / 1024 / 1024);
