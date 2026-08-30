@@ -11,7 +11,7 @@ const algo_info_t algo_registry[] = {
    {"cast",     _cast_64_to_32_,       TARGET_MZ,                "Cast 64-bit double to 32-bit float",            0,          0,    0},
    {"cast16",   _cast_64_to_16_,       TARGET_MZ,                "Cast 64-bit double to 16-bit float",            11.801,     0,    0},
    {"delta16",  _delta16_transform_,   TARGET_MZ,                "Delta encoding with 16-bit precision",          127.998,    0,    0},
-   {"delta24",  _delta24_transform_,   TARGET_MZ,                "Delta encoding with 24-bit precision",          65536,      0,    0},
+   {"delta24",  _delta24_transform_,   TARGET_MZ,                "Delta encoding with 24-bit precision",          8192,      0,    0},
    {"delta32",  _delta32_transform_,   TARGET_MZ,                "Delta encoding with 32-bit precision",          262144.0,   0,    0},
    {"bitpack",  _bitpack_,             TARGET_MZ,                "Bit packing transform",                         10000.0,    0,    0},
    {"log",      _log2_transform_,      TARGET_INT,               "Log2 transform",                                0,          72.0, 0},
