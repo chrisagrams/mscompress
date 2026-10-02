@@ -760,10 +760,15 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    size_t algo_output_len = 0;
    char* decmp_binary = blk->cache;
 
-   // Allocate a buffer to hold the encoded data. The size is determined by the
-   // total length of the binary data to be encoded.
-   char* buff = malloc(curr_dp->end_positions[total_spec - 1] -
-                       curr_dp->start_positions[0]);
+   // Allocate a buffer to hold the encoded data, starting from the span the
+   // binary data occupied in the source mzML. Re-encoding can produce more
+   // bytes than the source did (different deflate, or raw output for
+   // _no_encode_), so the loop below grows it whenever an encoder reports it
+   // needs more room.
+   size_t buff_cap = curr_dp->end_positions[total_spec - 1] -
+                     curr_dp->start_positions[0];
+   if (buff_cap == 0) buff_cap = 1;
+   char* buff = malloc(buff_cap);
    if (!buff) {
       error(
           "encode_binary_block: Failed to allocate buffer for encoded data.\n");
@@ -818,26 +823,52 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
 
       a_args->src = (char**)&decmp_binary;
       a_args->src_len = src_len;
-      a_args->dest = (char **)(buff + buff_off);
       a_args->src_format = source_fmt;
       a_args->enc_fun = encode_fun;
       a_args->scale_factor = scale_factor;
 
-      // Call the target function to encode the binary block and write it to the
-      // output buffer
-      target_fun((void*)a_args);
+      char* spec_src = decmp_binary;
+      for (;;) {
+         // Encoders take *dest_len as the room left in dest; if the output
+         // does not fit they write nothing and return the size they need.
+         size_t room = buff_cap - buff_off;
+         decmp_binary = spec_src;
+         algo_output_len = room;
+         a_args->dest = (char **)(buff + buff_off);
 
-      if (a_args->ret_code != 0) {
-         error(
-             "encode_binary_block: Failed to encode binary block for spectrum "
-             "%d.\n",
-             i);
-         dealloc_z_stream(a_args->z);
-         dealloc_z_stream_inflate(a_args->z_inflate);
-         free(a_args);
-         free(buff);
-         free(res_lens);
-         return 1;
+         // Call the target function to encode the binary block and write it
+         // to the output buffer
+         target_fun((void*)a_args);
+
+         if (a_args->ret_code != 0) {
+            error(
+                "encode_binary_block: Failed to encode binary block for "
+                "spectrum %d.\n",
+                i);
+            dealloc_z_stream(a_args->z);
+            dealloc_z_stream_inflate(a_args->z_inflate);
+            free(a_args);
+            free(buff);
+            free(res_lens);
+            return 1;
+         }
+         if (algo_output_len <= room) break;
+
+         size_t new_cap = buff_cap * 2;
+         if (new_cap < buff_off + algo_output_len)
+            new_cap = buff_off + algo_output_len;
+         char* grown = realloc(buff, new_cap);
+         if (!grown) {
+            error("encode_binary_block: Failed to grow encode buffer.\n");
+            dealloc_z_stream(a_args->z);
+            dealloc_z_stream_inflate(a_args->z_inflate);
+            free(a_args);
+            free(buff);
+            free(res_lens);
+            return 1;
+         }
+         buff = grown;
+         buff_cap = new_cap;
       }
 
       res_lens[i] = *a_args->dest_len;

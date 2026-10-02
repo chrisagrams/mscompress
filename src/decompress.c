@@ -279,6 +279,45 @@ DWORD WINAPI decompress_routine_win(LPVOID lpParam) {
 #endif
 
 /**
+ * @brief Grows `*buff` (doubling, or to `need` if larger) so it holds at least
+ *        `need` bytes.
+ * @return 0 on success, 1 if realloc fails (`*buff` is left untouched).
+ */
+static int grow_buff(char** buff, size_t* cap, size_t need) {
+   if (need <= *cap) return 0;
+   size_t new_cap = *cap * 2;
+   if (new_cap < need) new_cap = need;
+   char* grown = realloc(*buff, new_cap);
+   if (grown == NULL) return 1;
+   *buff = grown;
+   *cap = new_cap;
+   return 0;
+}
+
+/**
+ * @brief Runs `target_fun` to encode one spectrum's binary at `*buff + off`,
+ *        growing `*buff` and retrying when the encoder reports the output
+ *        does not fit (encoders take `*dest_len` as the room left in dest).
+ * @param src The binary cursor `a_args->src` points at; rewound on retry.
+ * @return 0 on success (`*a_args->dest_len` holds the bytes written), 1 on
+ *         error.
+ */
+static int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
+                            char** buff, size_t* cap, size_t off) {
+   char* spec_src = *src;
+   for (;;) {
+      size_t room = *cap - off;
+      *src = spec_src;
+      *a_args->dest_len = room;
+      a_args->dest = (char**)(*buff + off);
+      target_fun((void*)a_args);
+      if (a_args->ret_code != 0) return 1;
+      if (*a_args->dest_len <= room) return 0;
+      if (grow_buff(buff, cap, off + *a_args->dest_len)) return 1;
+   }
+}
+
+/**
  * @brief Thread routine for decompression. Calls the `decmp_block` function to decompress the data blocks and writes the decompressed data to the output buffer.
  * @param args A pointer to the `decompress_args_t` struct containing the arguments for decompression.
  * @return Always returns `NULL`. `args->ret` will contain the decompressed data and `args->ret_len` will contain the length of the decompressed data on success.
@@ -354,6 +393,7 @@ void* decompress_routine(void* args) {
    int64_t xml_i = 0, mz_i = 0, inten_i = 0;
 
    int block = 0;
+   int enc_ret;
 
    long len = division->size;
 
@@ -363,7 +403,8 @@ void* decompress_routine(void* args) {
       return NULL;
    }
 
-   char* buff = malloc(len * 2);
+   size_t buff_cap = (size_t)len * 2;
+   char* buff = malloc(buff_cap);
 
    if (buff == NULL) {
       error(
@@ -423,6 +464,14 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len <= len);
+            if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
+               error("decompress_routine: Failed to grow output buffer.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
+               free(a_args);
+               return NULL;
+            }
+            db_args->ret = buff;
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -445,7 +494,6 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
-            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
@@ -458,10 +506,11 @@ void* decompress_routine(void* args) {
                return NULL;
             }
 
-            // Call the target mz function to encode the mz block and write it to the output buffer
-            db_args->df->target_mz_fun((void*)a_args);
-
-            if (a_args->ret_code != 0) {
+            enc_ret = encode_into_buff(db_args->df->target_mz_fun, a_args,
+                                       &decmp_mz_binary, &buff, &buff_cap,
+                                       buff_off);
+            db_args->ret = buff;  // may have moved, even on failure
+            if (enc_ret) {
                error("decompress_routine: Failed to encode mz block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
@@ -487,6 +536,14 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len < len);
+            if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
+               error("decompress_routine: Failed to grow output buffer.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
+               free(a_args);
+               return NULL;
+            }
+            db_args->ret = buff;
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -509,7 +566,6 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
-            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             a_args->scale_factor = db_args->df->int_scale_factor;
@@ -522,10 +578,11 @@ void* decompress_routine(void* args) {
                return NULL;
             }
 
-            // Call the target intensity function to encode the intensity block and write it to the output buffer
-            db_args->df->target_inten_fun((void*)a_args);
-
-            if (a_args->ret_code != 0) {
+            enc_ret = encode_into_buff(db_args->df->target_inten_fun, a_args,
+                                       &decmp_inten_binary, &buff, &buff_cap,
+                                       buff_off);
+            db_args->ret = buff;  // may have moved, even on failure
+            if (enc_ret) {
                error("decompress_routine: Failed to encode intensity block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
