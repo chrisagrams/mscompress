@@ -1,0 +1,41 @@
+name: PR Title
+
+# PRs into dev are squash-merged using the PR title as the commit message,
+# which release-please parses for version bumps and CHANGELOG entries.
+# Enforce Conventional Commits so every PR produces a parseable commit.
+on:
+  pull_request:
+    branches:
+      - dev
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep in sync with changelog-sections in release-please-config.json
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            revert
+            docs
+            test
+            ci
+            build
+            style
+            chore
+          requireScope: false
