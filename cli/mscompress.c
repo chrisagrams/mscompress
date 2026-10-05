@@ -222,22 +222,10 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             fprintf(stderr, "%s\n", "Missing scan array for extraction.");
             return 1;
          }
-         // string_to_array() returns longs; scan numbers are uint32_t, so copy
-         // element-wise rather than reinterpreting the buffer.
-         long* parsed = string_to_array(argv[++i], &arguments->scans_length);
-         arguments->scans = malloc(arguments->scans_length * sizeof(uint32_t));
-         if (!arguments->scans) {
-            fprintf(stderr, "%s\n", "Failed to allocate scan array.");
+         arguments->scans =
+             string_to_scan_array(argv[++i], &arguments->scans_length);
+         if (!arguments->scans)
             return 1;
-         }
-         for (long j = 0; j < arguments->scans_length; j++) {
-            if (parsed[j] < 0 || parsed[j] > UINT32_MAX) {
-               fprintf(stderr, "Scan number out of range: %ld\n", parsed[j]);
-               return 1;
-            }
-            arguments->scans[j] = (uint32_t)parsed[j];
-         }
-         free(parsed);
       } else if (strcmp(argv[i], "--ms-level") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing ms level for extraction.");

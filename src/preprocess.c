@@ -2091,6 +2091,45 @@ long* string_to_array(char* str, long* size) {
 }
 
 /**
+ * @brief Parses a scan-range string into an array of scan numbers.
+ * @param str The input string, in any format `string_to_array()` accepts.
+ * @param size Pointer set to the number of elements in the returned array.
+ * @return Pointer to a malloc'd array of scan numbers, or `NULL` on error.
+ *
+ * Scan numbers are `uint32_t` throughout the library, while `string_to_array()`
+ * returns `long`s, so the values are copied element-wise rather than the
+ * buffer being reinterpreted.
+ *
+ * @warning The caller must free the returned array.
+ */
+uint32_t* string_to_scan_array(char* str, long* size) {
+   long* parsed = string_to_array(str, size);
+   if (parsed == NULL)
+      return NULL;
+
+   // Allocate at least one element: malloc(0) may legitimately return NULL.
+   uint32_t* scans = malloc((*size > 0 ? *size : 1) * sizeof(uint32_t));
+   if (scans == NULL) {
+      error("string_to_scan_array: failed to allocate scan array.\n");
+      free(parsed);
+      return NULL;
+   }
+
+   for (long i = 0; i < *size; i++) {
+      if (parsed[i] < 0 || parsed[i] > UINT32_MAX) {
+         error("Scan number out of range: %ld\n", parsed[i]);
+         free(parsed);
+         free(scans);
+         return NULL;
+      }
+      scans[i] = (uint32_t)parsed[i];
+   }
+
+   free(parsed);
+   return scans;
+}
+
+/**
  * @brief Maps an array of scan numbers to their corresponding spectrum indices within a division.
  * @param scans Array of scan numbers to look up.
  * @param scans_length Number of scans in the array.
