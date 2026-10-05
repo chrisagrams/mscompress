@@ -593,6 +593,7 @@ data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 long* string_to_array(char* str, long* size);
+uint32_t* string_to_scan_array(char* str, long* size);
 long* map_scan_to_index(uint32_t* scans, long scans_length, division_t* div,
                         long index_offset, long* indices_length);
 long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
