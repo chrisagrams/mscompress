@@ -317,16 +317,18 @@ int grow_buff(char** buff, size_t* cap, size_t need) {
 
 /**
  * @brief Runs `target_fun` to encode one spectrum's binary at `*buff + off`,
- *        growing `*buff` and retrying when the encoder reports the output
- *        does not fit (encoders take `*dest_len` as the room left in dest).
+ *        growing `*buff` and retrying once when the encoder reports the
+ *        output does not fit (encoders take `*dest_len` as the room left in
+ *        dest and report the size they need).
  * @param src The binary cursor `a_args->src` points at; rewound on retry.
  * @return 0 on success (`*a_args->dest_len` holds the bytes written), 1 on
- *         error.
+ *         error, including an encoder that still does not fit after the
+ *         buffer was grown to the size it asked for.
  */
 int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
                      char** buff, size_t* cap, size_t off) {
    char* spec_src = *src;
-   for (;;) {
+   for (int attempt = 0; attempt < 2; attempt++) {
       size_t room = *cap - off;
       *src = spec_src;
       *a_args->dest_len = room;
@@ -334,6 +336,9 @@ int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
       target_fun((void*)a_args);
       if (a_args->ret_code != 0) return 1;
       if (*a_args->dest_len <= room) return 0;
+      if (attempt == 1) break;
       if (grow_buff(buff, cap, off + *a_args->dest_len)) return 1;
    }
+   error("encode_into_buff: encoder output did not fit after growing buffer.\n");
+   return 1;
 }
