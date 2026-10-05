@@ -2340,6 +2340,24 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
 }
 
 /**
+ * @brief Extracts spectra from a whole-file division, then frees that division.
+ * @param whole Division covering the entire file, as returned by `scan_mzml()`.
+ * @param indices Indices of the spectra to extract.
+ * @param n Number of indices.
+ * @return The extracted division (see `extract_n_spectra()`).
+ *
+ * @note The extracted division shares `whole->spectra`, so ownership of it is
+ *       handed over rather than freed; everything else in `whole` is freed.
+ */
+static division_t* extract_from_whole_file(division_t* whole, long* indices,
+                                           long n) {
+   division_t* div = extract_n_spectra(whole, indices, n);
+   whole->spectra = NULL;
+   dealloc_division(whole);
+   return div;
+}
+
+/**
  * @brief Preprocesses an mzML file: detects format, scans spectra, and creates divisions.
  *
  * Handles scan/index/ms-level filtering, determines the number of divisions,
@@ -2375,8 +2393,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
           MSLEVEL | SCANNUM);  // A division encapsulating the entire file
       if (tmp == NULL)
          return 1;
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->scans_length > 0) {
       division_t* tmp = scan_mzml(
           (char*)input_map, *df, input_filesize,
@@ -2386,8 +2404,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
       arguments->indices =
           map_scan_to_index(arguments->scans, arguments->scans_length, tmp, 0,
                             &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
 
    } else if (arguments->ms_level > 0 || arguments->ms_level == -1) {
       division_t* tmp = scan_mzml(
@@ -2397,8 +2415,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
          return 1;
       arguments->indices = map_ms_level_to_index(arguments->ms_level, tmp, 0,
                                                  &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->indices_length == 0 && arguments->scans_length == 0) {
       div = scan_mzml(
           (char*)input_map, *df, input_filesize,
