@@ -30,6 +30,7 @@ Arguments* NapiObjectToArguments(const Napi::Env& env, const Napi::Object& obj);
 uint32_t getUint32OrDefault(const Napi::Object& obj, const std::string& key, uint32_t defaultValue);
 int64_t getInt64OrDefault(const Napi::Object& obj, const std::string& key, int64_t defaultValue);
 float getFloatOrDefault(const Napi::Object& obj, const std::string& key, float defaultValue);
+bool getBoolOrDefault(const Napi::Object& obj, const std::string& key, bool defaultValue);
 std::string getStringOrDefault(const Napi::Object& obj, const std::string& key, const std::string& defaultValue);
 
 // RAII FileHandle class

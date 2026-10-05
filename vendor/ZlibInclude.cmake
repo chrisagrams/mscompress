@@ -11,14 +11,14 @@ elseif(APPLE)
     # On macOS, define fdopen to prevent zlib's macro redefinition conflict
     add_custom_target(
         zlib_build
-        COMMAND env "CFLAGS=-Dfdopen=fdopen ${ZLIB_EXTRA_CFLAGS}" ${ZLIB_SOURCE_DIR}/configure
+        COMMAND env "CFLAGS=-O3 -Dfdopen=fdopen ${ZLIB_EXTRA_CFLAGS}" ${ZLIB_SOURCE_DIR}/configure
         COMMAND make -C ${ZLIB_SOURCE_DIR}
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
     )
 else()
     add_custom_target(
         zlib_build
-        COMMAND env "CFLAGS=-fPIC ${ZLIB_EXTRA_CFLAGS}" ${ZLIB_SOURCE_DIR}/configure
+        COMMAND env "CFLAGS=-O3 -fPIC ${ZLIB_EXTRA_CFLAGS}" ${ZLIB_SOURCE_DIR}/configure
         COMMAND make -C ${ZLIB_SOURCE_DIR}
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
     )

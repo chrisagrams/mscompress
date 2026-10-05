@@ -7,13 +7,30 @@
 #include "../vendor/zlib/zlib.h"
 #include "../vendor/zstd/lib/zstd.h"
 
-#define STATUS "Dev"
+/* Build status reported by the CLI (`--version`). The CLI's CMakeLists.txt
+   defines this from the build configuration; the fallback covers consumers
+   that compile these sources without it (Python setup.py, Node addon). */
+#ifndef STATUS
+#define STATUS "Release"
+#endif
 #define MIN_SUPPORT "0.1"
-#define MAX_SUPPORT "0.1"
+#define MAX_SUPPORT "0.2"
 #define ADDRESS "chrisagrams@gmail.com"
 
-#define FORMAT_VERSION_MAJOR 1
-#define FORMAT_VERSION_MINOR 0
+/*
+ * On-disk msz format stamps, written to header bytes 4-11.
+ *
+ * 0.1 predates any version check and is stored as (1, 0); 0.2 onward store the
+ * version itself. A file is stamped 0.2 only when it uses a feature 0.1 cannot
+ * express (currently the byte shuffle), so output a 0.1 reader could parse
+ * stays labeled 0.1.
+ */
+#define MSZ_V01_MAJOR 1
+#define MSZ_V01_MINOR 0
+#define MSZ_V02_MAJOR 0
+#define MSZ_V02_MINOR 2
+
+#define FORMAT_VERSION_OFFSET 4
 
 #define BUFSIZE 4096
 #define ZLIB_BUFF_FACTOR 1024000  // initial size of zlib buffer
@@ -72,6 +89,18 @@
 
 #define _LZ4_compression_ 4700012
 
+/*
+ * Byte-shuffle marker: a flag bit OR'd into the footer's mz_fmt/inten_fmt
+ * rather than a new footer field, so sizeof(footer_t) - which read_footer()
+ * uses to locate the footer from the end of the file - is unchanged and older
+ * .msz files still parse. Accessions stop at 4700012, so bit 24 is free.
+ *
+ * Always unwrap a stored format with MSZ_ALGO() before dispatching on it.
+ */
+#define _shuffle_flag_ 0x01000000
+#define MSZ_ALGO(fmt) ((fmt) & ~_shuffle_flag_)
+#define MSZ_HAS_SHUFFLE(fmt) (((fmt) & _shuffle_flag_) != 0)
+
 #define COMPRESS 1
 #define DECOMPRESS 2
 #define EXTRACT 3
@@ -79,6 +108,8 @@
 #define EXTERNAL 5
 #define DESCRIBE 6
 #define DECOMPRESS_MSZX 7
+#define COMPRESS_BATCH 8
+#define LIST_MSZX 9
 
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
@@ -124,7 +155,23 @@ typedef struct {
 
    int zstd_compression_level;
 
+   /* Byte-shuffle binary streams before compressing. On by default; --no-shuffle
+      turns it off. `shuffle_explicit` records whether the caller asked either
+      way, so the "skipped for a lossy stream" warnings only fire for someone who
+      actually requested it. */
+   int shuffle;
+   int shuffle_explicit;
+
    int json_output;
+
+   /* Batch mode (folder / glob / list -> one .mszx). See src/batch.c. */
+   int batch;             // explicit --batch opt-in
+   int recursive;         // -r/--recursive directory descent
+   int continue_on_error; // skip-and-report instead of fail-fast
+   int list_mode;         // --list: print an .mszx table of contents
+   char* from_file;       // --from-file manifest of input paths (or "-" for stdin)
+   char** inputs;         // collected positional inputs (files/dirs/globs)
+   size_t n_inputs;       // count of collected positional inputs
 } Arguments;
 
 typedef struct {
@@ -189,6 +236,22 @@ typedef struct block_len_t {
    uint64_t encoded_cache_len;
    size_t* encoded_cache_lens;
 
+   // Per-spectrum raw payload lengths within `cache`, as parsed from the
+   // ZLIB_SIZE_OFFSET-byte headers (lens[i]=0 for empty spectra that were
+   // skipped during compression). Populated lazily by the Python no-encode
+   // fast path (extract.c:extract_no_encode_from_cache) so subsequent
+   // accesses skip the cache walk. Distinct from `encoded_cache_lens`, which
+   // holds RE-encoded sizes from the slow path's `encode_binary_block`.
+   size_t* cache_spec_lens;
+
+   // Shared-LRU bookkeeping. Membership and ordering are maintained by
+   // lru_touch_block(); these fields are unused when the block is not in any
+   // LRU. A block belongs to at most one block_lru_t at a time. See
+   // `block_lru_t` below.
+   struct block_len_t* lru_prev;
+   struct block_len_t* lru_next;
+   int lru_pinned;  // 1 if currently in an LRU's list, 0 otherwise.
+
 } block_len_t;
 
 typedef struct {
@@ -197,6 +260,31 @@ typedef struct {
 
    int populated;
 } block_len_queue_t;
+
+/**
+ * @brief Process-wide shared, byte-budgeted LRU of decompressed block caches.
+ *
+ * Caps the cumulative memory held in `block_len_t->cache` (and the associated
+ * encoded_cache / *_lens buffers) across ALL block queues that touch it —
+ * typically every open MSZFile's xml/mz/intensity queues share one instance,
+ * so aggregate decompressed-cache memory obeys a single ceiling regardless of
+ * how many files are open. Eviction frees the cache buffers on the evicted
+ * block but never frees the `block_len_t` node itself (owned by its queue).
+ *
+ * Budget is in BYTES (`blk->original_size` per cached block), not block count,
+ * so it behaves correctly across files with very different block sizes.
+ *
+ * `lock` is an opaque pointer to a platform mutex (allocated in queue.c) so the
+ * heavy platform headers stay out of this widely-included header. All public
+ * operations take the lock; pass NULL for `lru` to disable caching bounds.
+ */
+typedef struct {
+   block_len_t* head;   // Most-recently-touched block.
+   block_len_t* tail;   // Least-recently-touched block (eviction victim).
+   size_t cur_bytes;    // Sum of original_size over currently-cached blocks.
+   size_t cap_bytes;    // Maximum cur_bytes before eviction. 0 = unbounded.
+   void* lock;          // Opaque platform mutex (see queue.c).
+} block_lru_t;
 
 typedef struct {
    uint64_t xml_pos;  // msz file position of start of compressed XML data.
@@ -300,6 +388,12 @@ typedef struct {
    int zstd_compression_level;  // no need to write to file since ZSTD_DCtx
                                 // doesn't need it.
 
+   /* Byte-shuffle element width per binary stream, in bytes. 0 disables it.
+    * Derived from the source data type on compress, and from the footer's
+    * shuffle flag plus the source data type on decompress. */
+   int mz_shuffle_elem;
+   int inten_shuffle_elem;
+
 } data_format_t;
 
 /* arguments.c */
@@ -333,21 +427,44 @@ size_t get_filesize(char* path);
 size_t write_to_file(int fd, char* buff, size_t n);
 size_t read_from_file(int fd, void* buff, size_t n);
 size_t write_header(int fd, data_format_t* df, long blocksize, char* md5);
-long get_offset(int fd);
+int64_t get_offset(int fd);
 long get_header_blocksize(void* input_map);
 data_format_t* get_header_df(void* input_map);
 size_t write_footer(footer_t* footer, int fd);
 footer_t* read_footer(void* input_map, long filesize);
-void print_footer_csv(footer_t* footer);
-void print_footer_json(footer_t* footer);
+void print_footer_csv(footer_t* footer, int msz_major, int msz_minor);
+void print_footer_json(footer_t* footer, int msz_major, int msz_minor);
 int prepare_fds(char* input_path, char** output_path, char* debug_output,
                 char** input_map, long* input_filesize, int* fds);
 int determine_filetype(void* input_map, size_t input_length);
 char* change_extension(char* input, char* extension);
 int open_input_file(char* input_path);
 int open_output_file(char* path);
+/* Like open_output_file but WITHOUT O_APPEND, so lseek()+write() can overwrite
+ * earlier bytes. Required by the USTAR writer's seek-back size/checksum patch. */
+int open_output_file_rw(char* path);
+/* Returns 1 if fd refers to a seekable regular file, 0 otherwise (pipe/FIFO). */
+int fd_is_seekable(int fd);
+
+/* ---- USTAR (tar) writer — streaming seek-back-and-patch (Option A) ---- */
+typedef struct {
+   int64_t header_off;  /* byte offset of this entry's 512B header */
+   char header[512];    /* in-memory copy, patched on tar_end_entry */
+} tar_entry_t;
+/* Write a placeholder header (size 0) at the current offset; remember it in w. */
+int tar_begin_entry(int fd, const char* name, tar_entry_t* w);
+/* Patch w's size field + checksum, rewrite the 512B header in place, then write
+ * the payload's zero padding to the next 512B boundary. */
+int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size);
+/* Append a whole, known-size regular-file entry (header + data + padding). */
+int tar_add_file(int fd, const char* name, const void* data, size_t len);
+/* Write the two trailing zero blocks (end-of-archive marker). */
+int tar_finish(int fd);
 int is_mzml(void* input_map, size_t input_length);
 int is_msz(void* input_map, size_t input_length);
+const char* msz_version_string(int major, int minor);
+int msz_read_version(void* input_map, long filesize, int* major, int* minor);
+int msz_require_version(void* input_map, long filesize);
 int close_file(int fd);
 
 /* mszx.c */
@@ -361,6 +478,71 @@ typedef struct {
 int mszx_list_entries(int fd, mszx_entry_t** out, size_t* out_count);
 void mszx_free_entries(mszx_entry_t* entries, size_t count);
 int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
+int list_mszx(char* input_path);
+
+/* batch.c */
+
+/* Incremental writer for a v2 ("batch") .mszx archive.
+ *
+ * This is the single writer path shared by the CLI (compress_batch) and the
+ * language bindings, so every producer emits byte-identical archives for the
+ * same inputs and settings. Entries stream straight into the archive fd via
+ * the unmodified compress_mzml(); the USTAR header's size + checksum are
+ * patched afterwards, which is why the output must be a seekable regular file.
+ *
+ * The archive is only valid once batch_writer_finish() succeeds — it writes
+ * manifest.json (last) and the end-of-archive marker. Both finish() and
+ * abort() close the fd and free the writer; the handle is dead after either.
+ */
+typedef struct batch_writer batch_writer_t;
+
+/* Open `out_path` for writing. Returns NULL if it cannot be opened or is not
+ * seekable (a pipe/FIFO/stdout is a hard error — see the note above). */
+batch_writer_t* batch_writer_open(const char* out_path);
+
+/* Compress one mmap'd mzML into the archive as a single tar entry.
+ *
+ * entry_name  NULL to derive "<basename minus .mzML>.msz" from src_name, with
+ *             __2/__3 collision suffixes. The writer owns naming so the CLI and
+ *             every binding agree by construction.
+ * src_name    Source path/name, recorded as the manifest's `original`
+ *             (basename only) and used to derive entry_name.
+ * mapping     Caller-owned mmap of the source mzML; not freed here. Bindings
+ *             pass the mapping their file handle already holds.
+ *
+ * Returns the new entry's index (>= 0) for use with the per-entry setters
+ * below, or -1 on failure. A failure mid-entry poisons the writer: the
+ * half-written entry cannot be un-appended, so finish() will refuse and the
+ * caller should abort(). */
+int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
+                          const char* src_name, void* mapping, size_t filesize,
+                          Arguments* args);
+
+/* Attach an auxiliary file (e.g. a PSM annotation) to a spectra entry, written
+ * as its own tar member. `data` is caller-supplied bytes — compression is the
+ * caller's job (both bindings already expose zstd); `compressed` only records
+ * how a reader should treat it. Returns 0 or -1. */
+int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
+                                const char* archive_name, const void* data,
+                                size_t len, const char* format, int compressed,
+                                int64_t num_records);
+
+/* Optional per-entry / archive-level manifest metadata. Return 0 or -1. */
+int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
+                              const char* join_key);
+int batch_writer_set_description(batch_writer_t* w, const char* description);
+/* `extra_json` must be a complete JSON object literal; it is embedded verbatim. */
+int batch_writer_set_extra_json(batch_writer_t* w, const char* extra_json);
+
+/* Write manifest.json + the end-of-archive marker, then close and free the
+ * writer. Returns 0 on success; on failure the partial archive is removed.
+ * The writer is freed either way. */
+int batch_writer_finish(batch_writer_t* w);
+
+/* Close, unlink the partial archive, and free the writer. Safe on NULL. */
+void batch_writer_abort(batch_writer_t* w);
+
+int compress_batch(Arguments* arguments);
 
 /* mem.c */
 
@@ -420,7 +602,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags);
 int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                     Arguments* arguments, data_format_t** df,
                     divisions_t** divisions);
-void parse_footer(footer_t** footer, void* input_map, long input_filesize,
+int parse_footer(footer_t** footer, void* input_map, long input_filesize,
                   block_len_queue_t** xml_block_lens,
                   block_len_queue_t** mz_binary_block_lens,
                   block_len_queue_t** inten_binary_block_lens,
@@ -461,6 +643,8 @@ decode_fun set_decode_fun(int compression_method, int algo, int accession);
 /* encode.c */
 
 encode_fun set_encode_fun(int compression_method, int algo, int accession);
+void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
+                         size_t* out_len);
 void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len);
 
@@ -481,20 +665,23 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
 char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                           block_len_queue_t* mz_binary_block_lens,
                           long mz_binary_blk_pos, divisions_t* divisions,
-                          long index, size_t* out_len, int encode);
+                          long index, size_t* out_len, int encode,
+                          block_lru_t* lru);
 
 char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                              data_format_t* df,
                              block_len_queue_t* inten_binary_block_lens,
                              long inten_binary_blk_pos, divisions_t* divisions,
-                             long index, size_t* out_len, int encode);
+                             long index, size_t* out_len, int encode,
+                             block_lru_t* lru);
 
 char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                       block_len_queue_t* xml_block_lens,
                       block_len_queue_t* mz_binary_block_lens,
                       block_len_queue_t* inten_binary_block_lens, long xml_pos,
                       long mz_pos, long inten_pos, int mz_fmt, int inten_fmt,
-                      divisions_t* divisions, long index, size_t* out_len);
+                      divisions_t* divisions, long index, size_t* out_len,
+                      block_lru_t* lru);
 
 char* extract_mzml_header(char* blk, division_t* first_division,
                           size_t* out_len);
@@ -593,8 +780,12 @@ decompression_fun set_decompress_fun(int accession);
  * @param dec_fun A function pointer to the decoding function to be used.
  * @param tmp A pointer to a `data_block_t` struct used for temporary storage
  * during encoding/decoding.
- * @param z A pointer to a `z_stream` struct used for zlib
- * compression/decompression.
+ * @param z A pointer to a deflate-initialized `z_stream` struct used for zlib
+ * compression (`enc_fun` paths).
+ * @param z_inflate A pointer to an inflate-initialized `z_stream` struct used
+ * for zlib decompression (`dec_fun` paths). Kept separate from `z` so the
+ * compress pipeline can hold both live at once and each stream keeps a
+ * balanced init-once/reset-per-block/end-once lifecycle.
  * @param scale_factor A float representing the scale factor to be applied to
  * the data during encoding/decoding.
  * @param ret_code An integer representing the return code of the algorithm.
@@ -609,9 +800,11 @@ typedef struct {
    decode_fun dec_fun;
    data_block_t* tmp;
    z_stream* z;
+   z_stream* z_inflate;
    float scale_factor;
    int ret_code;
    Algo algo_fun;
+   int shuffle_elem; /* Byte-shuffle element width for this stream; 0 = off. */
 } algo_args;
 
 extern const algo_info_t algo_registry[];
@@ -633,6 +826,17 @@ void append_block_len(block_len_queue_t* queue, size_t original_size,
                       size_t compressed_size);
 block_len_t* get_block_by_index(block_len_queue_t* queue, int index);
 long get_block_offset_by_index(block_len_queue_t* queue, int index);
+
+/* Shared, byte-budgeted LRU over `block_len_t` decompressed-block caches. */
+block_lru_t* alloc_block_lru(size_t cap_bytes);
+void dealloc_block_lru(block_lru_t* lru);
+void lru_touch_block(block_lru_t* lru, block_len_t* blk);
+void lru_remove_queue_blocks(block_lru_t* lru, block_len_queue_t* queue);
+void lru_evict_all(block_lru_t* lru);
+size_t block_cache_usage(block_lru_t* lru);
+size_t block_cache_cap(block_lru_t* lru);
+void block_drop_cache(block_len_t* blk);
+
 block_len_t* pop_block_len(block_len_queue_t* queue);
 size_t dump_block_len_queue(block_len_queue_t* queue, int fd);
 block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
@@ -642,6 +846,8 @@ block_len_queue_t* read_block_len_queue(void* input_map, long offset, long end);
 zlib_block_t* zlib_alloc(int offset);
 z_stream* alloc_z_stream();
 void dealloc_z_stream(z_stream* z);
+z_stream* alloc_z_stream_inflate();
+void dealloc_z_stream_inflate(z_stream* z);
 int zlib_realloc(zlib_block_t* old_block, size_t new_size);
 void zlib_dealloc(zlib_block_t* blk);
 int zlib_append_header(zlib_block_t* blk, void* content, size_t size);

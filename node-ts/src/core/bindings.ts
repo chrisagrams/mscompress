@@ -39,6 +39,48 @@ export interface PrepareDivisionsResult {
   blocksize: number;
 }
 
+/**
+ * Opaque handle to an in-flight compress-stream session (a native
+ * Napi::External). Created by {@link NativeBindings.compressMzmlStreamOpen} and
+ * consumed by {@link NativeBindings.compressMzmlStreamRead}. Not inspectable
+ * from JS; the native finalizer joins the worker thread and frees the pipe when
+ * this handle is garbage-collected.
+ */
+export type CompressStreamSession = { readonly __brand: "CompressStreamSession" };
+
+/**
+ * Native handle to an in-progress .mszx archive.
+ *
+ * Entries are appended sequentially, so `add()` calls must not overlap — the
+ * native side rejects a concurrent call rather than corrupting the archive.
+ * `finish()` and `abort()` both free the handle; it is unusable afterwards.
+ */
+export interface NativeBatchWriter {
+  /** Compress one mzML into the archive; resolves to the new entry index. */
+  add(
+    sourcePath: string,
+    entryName: string | null,
+    args: RuntimeArgumentsNative
+  ): Promise<number>;
+  addAnnotation(
+    entryIndex: number,
+    data: Buffer,
+    name: string,
+    format: string,
+    compressed: boolean,
+    numRecords?: number
+  ): void;
+  setJoinKey(entryIndex: number, joinKey: string): void;
+  setDescription(description: string): void;
+  setExtraJson(json: string): void;
+  finish(): void;
+  abort(): void;
+}
+
+export interface NativeBatchWriterConstructor {
+  new (outputPath: string): NativeBatchWriter;
+}
+
 export interface NativeBindings {
   // FileHandle class
   FileHandle: NativeFileHandleConstructor;
@@ -80,6 +122,24 @@ export interface NativeBindings {
 
   // Compression / decompression
   compressMzml(handle: NativeFileHandle, outputPath: string, args: RuntimeArgumentsNative): boolean;
+  /**
+   * Open a compress-stream session: launches compression on a background thread
+   * writing to an OS pipe kept entirely inside the addon, and returns an opaque
+   * session handle. The raw pipe fd never crosses into JS (an anonymous CRT pipe
+   * fd cannot be adopted by libuv on Windows), so the JS side pulls compressed
+   * bytes via {@link compressMzmlStreamRead}.
+   */
+  compressMzmlStreamOpen(
+    handle: NativeFileHandle,
+    args: RuntimeArgumentsNative
+  ): CompressStreamSession;
+  /**
+   * Perform one async (threadpool) read from a compress-stream session. Resolves
+   * with a Buffer of up to `chunkSize` bytes, or `null` at EOF. Rejects if the
+   * read fails or the background compression reported an error. Call repeatedly
+   * until it resolves `null`.
+   */
+  compressMzmlStreamRead(session: CompressStreamSession, chunkSize: number): Promise<Buffer | null>;
   decompressMsz(
     handle: NativeFileHandle,
     outputPath: string,
@@ -101,6 +161,9 @@ export interface NativeBindings {
   // MSZX archive helpers — open the embedded MSZ payload at its offset
   // inside a .mszx tar without extracting to a temp file.
   openMszFromArchive(archivePath: string, entryName: string): NativeFileHandle;
+
+  /** Stateful writer for a v2 ("batch") .mszx archive. */
+  BatchWriter: NativeBatchWriterConstructor;
 }
 
 const native: NativeBindings = addon as NativeBindings;

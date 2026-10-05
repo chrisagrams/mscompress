@@ -53,13 +53,14 @@ class PSMReader:
     and raw bytes with transparent zstd decompression.
 
     Example:
-        >>> reader = PSMReader("results.tsv")
-        >>> for psm in reader:
-        ...     print(psm.peptide, psm.score)
-        >>>
-        >>> with PSMReader("results.pepXML") as reader:
-        ...     psms = reader.get_by_scan(1234)
-        >>>
+        ```python
+        reader = PSMReader("results.tsv")
+        for psm in reader:
+            print(psm.peptide, psm.score)
+
+        with PSMReader("results.pepXML") as reader:
+            psms = reader.get_by_scan(1234)
+        ```
     """
 
     def __new__(
