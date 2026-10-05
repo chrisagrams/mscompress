@@ -1,0 +1,202 @@
+site_name: mscompress
+site_description: Multi-threaded compression library for Mass Spectrometry data
+site_url: https://chrisagrams.github.io/mscompress/
+repo_url: https://github.com/chrisagrams/mscompress
+repo_name: chrisagrams/mscompress
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path:
+        - .
+        - src
+        - python
+        - node-ts
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - python
+          options:
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            line_length: 60
+            docstring_style: google
+            merge_init_into_class: true
+            filters:
+              - "!^_"
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/chrisagrams/mscompress
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Concepts:
+      - getting-started/concepts/index.md
+      - mzML and MS data: getting-started/concepts/mzml.md
+      - MSZ format: getting-started/concepts/msz.md
+      - MSZX archives: getting-started/concepts/mszx.md
+      - Lossy vs lossless: getting-started/concepts/lossy-vs-lossless.md
+    - Choosing a profile: getting-started/choosing-a-profile.md
+  - Python:
+    - python/index.md
+    - Quick Start: python/quickstart.md
+    - Guides:
+      - python/guides/index.md
+      - Reading files: python/guides/reading-files.md
+      - Working with spectra: python/guides/spectra.md
+      - Compressing files: python/guides/compressing.md
+      - Extracting subsets: python/guides/extracting.md
+      - MSZX archives: python/guides/mszx.md
+      - Annotation readers: python/guides/annotations.md
+      - Croissant metadata: python/guides/metadata.md
+      - Parquet I/O: python/guides/parquet.md
+      - ML dataset adapters: python/guides/ml-datasets.md
+    - API Reference:
+      - python/reference/index.md
+      - mscompress (top-level): python/reference/top-level.md
+      - Core (Cython): python/reference/core.md
+      - mszx: python/reference/mszx.md
+      - metadata: python/reference/metadata.md
+      - annotations: python/reference/annotations.md
+      - parquet: python/reference/parquet.md
+      - datasets: python/reference/datasets.md
+    - Build modes: python/build-modes.md
+    - Troubleshooting: python/troubleshooting.md
+  - Node.js / TypeScript:
+    - node/index.md
+    - Quick Start: node/quickstart.md
+    - Guides:
+      - node/guides/index.md
+      - read() and file handling: node/guides/reading-files.md
+      - Spectra: node/guides/spectra.md
+      - Compression: node/guides/compressing.md
+      - Filtered extraction: node/guides/extracting.md
+      - MSZX archives: node/guides/mszx.md
+      - Async patterns: node/guides/async-patterns.md
+    - API Reference:
+      - node/reference/index.md
+    - Native addon internals: node/native-internals.md
+    - Build from source: node/build-from-source.md
+  - CLI:
+    - cli/index.md
+    - Quick Start: cli/quickstart.md
+    - Command reference: cli/reference.md
+    - Build from source: cli/build-from-source.md
+    - Exit codes and errors: cli/errors.md
+  - Architecture:
+    - architecture/index.md
+    - Compression pipeline: architecture/compression-pipeline.md
+    - Decompression pipeline: architecture/decompression-pipeline.md
+    - Extraction: architecture/extraction.md
+    - Data structures: architecture/data-structures.md
+    - Memory ownership: architecture/memory-ownership.md
+    - Vendor libraries: architecture/vendor-libraries.md
+  - Algorithms:
+    - algorithms/index.md
+    - How it works: algorithms/how-it-works.md
+    - Catalog:
+      - algorithms/catalog/index.md
+      - lossless: algorithms/catalog/lossless.md
+      - cast / cast16: algorithms/catalog/cast.md
+      - delta (16/24/32): algorithms/catalog/delta.md
+      - bitpack: algorithms/catalog/bitpack.md
+      - log: algorithms/catalog/log.md
+      - vbr: algorithms/catalog/vbr.md
+      - vdelta (experimental): algorithms/catalog/vdelta.md
+    - Implementing a new algorithm: algorithms/implementing.md
+    - Testing algorithms: algorithms/testing.md
+  - Format Reference:
+    - format/index.md
+    - MSZ spec: format/msz.md
+    - MSZX spec: format/mszx.md
+    - Compatibility: format/compatibility.md
+  - Contributing:
+    - contributing/index.md
+    - Development setup: contributing/setup.md
+    - Running tests: contributing/testing.md
+    - Memory leak workflow: contributing/memory-leaks.md
+    - Versioning: contributing/versioning.md
+    - CI overview: contributing/ci.md
+  - Reference:
+    - reference/index.md
+    - Glossary: reference/glossary.md
+    - Performance notes: reference/performance.md

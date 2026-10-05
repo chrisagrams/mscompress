@@ -25,17 +25,18 @@ class TSVReader(BasePSMReader):
     tar archive members, or raw bytes via BaseAnnotationFile.
 
     Example:
-        >>> reader = TSVReader("results.pin")
-        >>> for psm in reader:
-        ...     print(psm.peptide, psm.score)
+        ```python
+        reader = TSVReader("results.pin")
+        for psm in reader:
+            print(psm.peptide, psm.score)
 
-        >>>
-        >>> # Read from tar archive
-        >>> import tarfile
-        >>> with tarfile.open("archive.tar") as tar:
-        ...     reader = PINReader.from_tar(tar, "results.pin")
-        ...     for psm in reader:
-        ...         print(psm.peptide)
+        # Read from tar archive
+        import tarfile
+        with tarfile.open("archive.tar") as tar:
+            reader = PINReader.from_tar(tar, "results.pin")
+            for psm in reader:
+                print(psm.peptide)
+        ```
     """
 
     # Regex to parse SpecId format: file.scan.scan.charge

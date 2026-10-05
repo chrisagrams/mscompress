@@ -1,0 +1,8 @@
+# Test fixtures must be byte-identical on every platform.
+#
+# An .msz encodes the exact bytes of the .mzML it was made from, so the two are
+# only comparable if neither is rewritten on checkout. Git detects .mzML as text
+# and, with core.autocrlf=true (the default on Windows runners), converts it to
+# CRLF, while the .msz is detected as binary and left alone. Any byte comparison
+# then fails by one byte per line.
+test/data/** -text

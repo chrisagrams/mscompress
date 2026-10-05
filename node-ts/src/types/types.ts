@@ -60,6 +60,29 @@ export interface FooterNative {
   intenFmt: number;
 }
 
+/**
+ * Optional overrides for the compression runtime arguments. Every field mirrors
+ * a settable property on {@link RuntimeArguments}; anything omitted falls back to
+ * the file's current `arguments` (i.e. the same defaults `compress()` uses).
+ */
+export interface CompressArgs {
+  threads?: number;
+  blocksize?: number;
+  mzScaleFactor?: number;
+  intScaleFactor?: number;
+  targetXmlFormat?: number;
+  targetMzFormat?: number;
+  targetIntenFormat?: number;
+  zstdCompressionLevel?: number;
+  /**
+   * Byte-shuffle binary arrays before compressing. Lossless and recorded in the
+   * file, so shuffled archives read back without the reader opting in. Applies
+   * only to losslessly stored streams. Defaults to `true`; set `false` to write
+   * an archive an 0.1-only reader can still read.
+   */
+  shuffle?: boolean;
+}
+
 /** Arguments passed to native functions */
 export interface RuntimeArgumentsNative {
   threads: number;
@@ -70,6 +93,7 @@ export interface RuntimeArgumentsNative {
   targetMzFormat: number;
   targetIntenFormat: number;
   zstdCompressionLevel: number;
+  shuffle?: boolean;
   msLevel?: number;
   indices?: number[];
   scans?: number[];

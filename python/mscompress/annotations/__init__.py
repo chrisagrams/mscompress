@@ -9,35 +9,44 @@ when reading and writing to archives.
 Example:
     Basic usage with auto-detection:
 
-    >>> from mscompress.annotations import PSMReader
-    >>> reader = PSMReader("results.pin")
-    >>> for psm in reader:
-    ...     print(psm.peptide, psm.score)
+    ```python
+    from mscompress.annotations import PSMReader
+    reader = PSMReader("results.pin")
+    for psm in reader:
+        print(psm.peptide, psm.score)
+    ```
 
     With context manager:
 
-    >>> with PSMReader("results.pepXML") as reader:
-    ...     for psm in reader:
-    ...         print(psm.peptide)
+    ```python
+    with PSMReader("results.pepXML") as reader:
+        for psm in reader:
+            print(psm.peptide)
+    ```
 
     Using annotation files with compression:
 
-    >>> from mscompress.annotations import AnnotationFile
-    >>> # Read a compressed annotation file
-    >>> annotation = AnnotationFile.from_file("results.pin.zst")
-    >>> for psm in annotation:
-    ...     print(psm.peptide, psm.score)
-    >>>
-    >>> # Create from reader and save compressed
-    >>> reader = PINReader("results.pin")
-    >>> annotation = AnnotationFile.from_reader(reader)
-    >>> annotation.save("results.pin.zst", compress=True)
+    ```python
+    from mscompress.annotations import AnnotationFile
+
+    # Read a compressed annotation file
+    annotation = AnnotationFile.from_file("results.pin.zst")
+    for psm in annotation:
+        print(psm.peptide, psm.score)
+
+    # Create from reader and save compressed
+    reader = PINReader("results.pin")
+    annotation = AnnotationFile.from_reader(reader)
+    annotation.save("results.pin.zst", compress=True)
+    ```
 
     Using specific readers:
 
-    >>> from mscompress.annotations import PINReader, PepXMLReader
-    >>> pin_reader = PINReader("results.pin")
-    >>> pepxml_reader = PepXMLReader("results.pepXML")
+    ```python
+    from mscompress.annotations import PINReader, PepXMLReader
+    pin_reader = PINReader("results.pin")
+    pepxml_reader = PepXMLReader("results.pepXML")
+    ```
 """
 
 from __future__ import annotations

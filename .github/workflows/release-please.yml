@@ -1,8 +1,13 @@
 name: Release Please
 
+# Two-phase release flow (dev -> stage -> main):
+#   push to dev:  open/update the release PR (targets dev). Never tags.
+#   push to main: tag + GitHub Release for any merged release PR that has
+#                 been promoted to main, then build and publish.
 on:
   push:
     branches:
+      - dev
       - main
   workflow_dispatch:
 
@@ -25,11 +30,17 @@ jobs:
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Release PRs always live on dev, so both phases look at dev's PRs.
+          target-branch: dev
+          # Only tag/release from main (once the release PR has been promoted).
+          skip-github-release: ${{ github.ref_name != 'main' }}
+          # Only open/update the release PR from dev.
+          skip-github-pull-request: ${{ github.ref_name != 'dev' }}
 
   build-and-publish:
     name: Build and Publish Release
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: ${{ github.ref_name == 'main' && needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/build.yml
     secrets: inherit
     permissions:

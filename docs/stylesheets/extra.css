@@ -1,0 +1,14 @@
+/* Slightly tighter code blocks. */
+.md-typeset code {
+  border-radius: 4px;
+}
+
+/* Make autogen API reference signature blocks easier to scan. */
+.doc-signature {
+  font-size: 0.85em;
+}
+
+/* Center mermaid diagrams. */
+.mermaid {
+  text-align: center;
+}

@@ -51,6 +51,8 @@ cdef extern from "../src/mscompress.h":
         int target_mz_format
         int target_inten_format
         int zstd_compression_level
+        int shuffle
+        int shuffle_explicit
     
     ctypedef struct data_block_t:
         char* mem
@@ -74,7 +76,11 @@ cdef extern from "../src/mscompress.h":
         block_len_t* tail
 
         int populated
-    
+
+    # Opaque to Cython — manipulated only via the C functions below.
+    ctypedef struct block_lru_t:
+        pass
+
     ctypedef struct data_format_t:
         uint32_t source_mz_fmt
         uint32_t source_inten_fmt
@@ -158,6 +164,8 @@ cdef extern from "../src/mscompress.h":
     void _dealloc_data_block "dealloc_data_block"(data_block_t* db)
     z_stream* _alloc_z_stream "alloc_z_stream"()
     void _dealloc_z_stream "dealloc_z_stream"(z_stream* z)
+    z_stream* _alloc_z_stream_inflate "alloc_z_stream_inflate"()
+    void _dealloc_z_stream_inflate "dealloc_z_stream_inflate"(z_stream* z)
     ZSTD_CCtx* _alloc_cctx "alloc_cctx"()
     ZSTD_DCtx* _alloc_dctx "alloc_dctx"()
     void _dealloc_block_len_queue "dealloc_block_len_queue"(block_len_queue_t* queue)
@@ -167,15 +175,25 @@ cdef extern from "../src/mscompress.h":
     void _dealloc_read_divisions "dealloc_read_divisions"(divisions_t* divisions)
 
     footer_t* _read_footer "read_footer"(void* input_map, long filesize)
+    int _msz_read_version "msz_read_version"(void* input_map, long filesize, int* major, int* minor)
+    const char* MIN_SUPPORT
+    const char* MAX_SUPPORT
     divisions_t* _read_divisions "read_divisions"(void* input_map, long position, int n_divisions)
     division_t* _flatten_divisions "flatten_divisions"(divisions_t* divisions)
     block_len_queue_t* _read_block_len_queue "read_block_len_queue"(void* input_map, long offset, long end)
     block_len_t* _get_block_by_index "get_block_by_index"(block_len_queue_t* queue, int index)
     void* _decmp_block "decmp_block"(decompression_fun decompress_fun, ZSTD_DCtx* dctx, void* input_map, long offset, block_len_t* blk)
 
-    char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
-    char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode)
-    char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len)
+    char* _extract_spectrum_mz "extract_spectrum_mz"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _mz_binary_block_lens, long mz_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode, block_lru_t* lru)
+    char* _extract_spectrum_inten "extract_spectrum_inten"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _inten_binary_block_lens, long inten_binary_blk_pos, divisions_t* divisions, long index, size_t* out_len, int encode, block_lru_t* lru)
+    char* _extract_spectra "extract_spectra"(char* input_map, ZSTD_DCtx* dctx, data_format_t* df, block_len_queue_t* _xml_block_lens, block_len_queue_t* _mz_binary_block_lens, block_len_queue_t* _inten_binary_block_lens, long xml_pos, long mz_pos, long inten_pos, int mz_fmt, int inten_fmt, divisions_t* divisions, long index, size_t* out_len, block_lru_t* lru)
+
+    block_lru_t* _alloc_block_lru "alloc_block_lru"(size_t cap_bytes)
+    void _dealloc_block_lru "dealloc_block_lru"(block_lru_t* lru)
+    void _lru_remove_queue_blocks "lru_remove_queue_blocks"(block_lru_t* lru, block_len_queue_t* queue)
+    void _lru_evict_all "lru_evict_all"(block_lru_t* lru)
+    size_t _block_cache_usage "block_cache_usage"(block_lru_t* lru)
+    size_t _block_cache_cap "block_cache_cap"(block_lru_t* lru)
     char* _extract_mzml_header "extract_mzml_header"(char* blk, division_t* first_division, size_t* out_len)
     char* _extract_mzml_footer "extract_mzml_footer"(char* blk, divisions_t* divisions, size_t* out_len)
     # `nogil` allows these to be called from `with nogil:` blocks in the streaming
@@ -183,6 +201,21 @@ cdef extern from "../src/mscompress.h":
     void _extract_msz "extract_msz"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, int output_fd) nogil
     int _compress_mzml "compress_mzml"(char* input_map, size_t input_filesize, Arguments* arguments, data_format_t* df, divisions_t* divisions, int output_fd) nogil
     int _decompress_msz "decompress_msz"(char* input_map, size_t input_filesize, Arguments* arguments, int fd) nogil
+
+    # Batch (.mszx v2) writer — the same incremental API the C CLI drives, so
+    # archives written from Python are byte-identical to the CLI's. `add_mzml`
+    # is `nogil` because it runs the whole multi-threaded compressor for one
+    # entry; holding the GIL across it would serialize callers needlessly.
+    ctypedef struct batch_writer_t:
+        pass
+    batch_writer_t* _batch_writer_open "batch_writer_open"(const char* out_path)
+    int _batch_writer_add_mzml "batch_writer_add_mzml"(batch_writer_t* w, const char* entry_name, const char* src_name, void* mapping, size_t filesize, Arguments* args) nogil
+    int _batch_writer_add_annotation "batch_writer_add_annotation"(batch_writer_t* w, int entry_index, const char* archive_name, const void* data, size_t length, const char* fmt, int compressed, int64_t num_records)
+    int _batch_writer_set_join_key "batch_writer_set_join_key"(batch_writer_t* w, int entry_index, const char* join_key)
+    int _batch_writer_set_description "batch_writer_set_description"(batch_writer_t* w, const char* description)
+    int _batch_writer_set_extra_json "batch_writer_set_extra_json"(batch_writer_t* w, const char* extra_json)
+    int _batch_writer_finish "batch_writer_finish"(batch_writer_t* w)
+    void _batch_writer_abort "batch_writer_abort"(batch_writer_t* w)
     void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd) nogil
 
     int TARGET_MZ
