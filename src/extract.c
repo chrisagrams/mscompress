@@ -827,48 +827,20 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       a_args->enc_fun = encode_fun;
       a_args->scale_factor = scale_factor;
 
-      char* spec_src = decmp_binary;
-      for (;;) {
-         // Encoders take *dest_len as the room left in dest; if the output
-         // does not fit they write nothing and return the size they need.
-         size_t room = buff_cap - buff_off;
-         decmp_binary = spec_src;
-         algo_output_len = room;
-         a_args->dest = (char **)(buff + buff_off);
-
-         // Call the target function to encode the binary block and write it
-         // to the output buffer
-         target_fun((void*)a_args);
-
-         if (a_args->ret_code != 0) {
-            error(
-                "encode_binary_block: Failed to encode binary block for "
-                "spectrum %d.\n",
-                i);
-            dealloc_z_stream(a_args->z);
-            dealloc_z_stream_inflate(a_args->z_inflate);
-            free(a_args);
-            free(buff);
-            free(res_lens);
-            return 1;
-         }
-         if (algo_output_len <= room) break;
-
-         size_t new_cap = buff_cap * 2;
-         if (new_cap < buff_off + algo_output_len)
-            new_cap = buff_off + algo_output_len;
-         char* grown = realloc(buff, new_cap);
-         if (!grown) {
-            error("encode_binary_block: Failed to grow encode buffer.\n");
-            dealloc_z_stream(a_args->z);
-            dealloc_z_stream_inflate(a_args->z_inflate);
-            free(a_args);
-            free(buff);
-            free(res_lens);
-            return 1;
-         }
-         buff = grown;
-         buff_cap = new_cap;
+      // Encoders take *dest_len as the room left in dest; encode_into_buff
+      // grows buff and retries when the output does not fit.
+      if (encode_into_buff(target_fun, a_args, &decmp_binary, &buff, &buff_cap,
+                           buff_off)) {
+         error(
+             "encode_binary_block: Failed to encode binary block for spectrum "
+             "%d.\n",
+             i);
+         dealloc_z_stream(a_args->z);
+         dealloc_z_stream_inflate(a_args->z_inflate);
+         free(a_args);
+         free(buff);
+         free(res_lens);
+         return 1;
       }
 
       res_lens[i] = *a_args->dest_len;

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 
 #include "mscompress.h"
@@ -296,4 +297,43 @@ int get_algo_type(const char* arg) {
    }
    error("get_algo_type: Unknown compression algorithm");
    return -1;
+}
+
+/**
+ * @brief Grows `*buff` (doubling, or to `need` if larger) so it holds at least
+ *        `need` bytes.
+ * @return 0 on success, 1 if realloc fails (`*buff` is left untouched).
+ */
+int grow_buff(char** buff, size_t* cap, size_t need) {
+   if (need <= *cap) return 0;
+   size_t new_cap = *cap * 2;
+   if (new_cap < need) new_cap = need;
+   char* grown = realloc(*buff, new_cap);
+   if (grown == NULL) return 1;
+   *buff = grown;
+   *cap = new_cap;
+   return 0;
+}
+
+/**
+ * @brief Runs `target_fun` to encode one spectrum's binary at `*buff + off`,
+ *        growing `*buff` and retrying when the encoder reports the output
+ *        does not fit (encoders take `*dest_len` as the room left in dest).
+ * @param src The binary cursor `a_args->src` points at; rewound on retry.
+ * @return 0 on success (`*a_args->dest_len` holds the bytes written), 1 on
+ *         error.
+ */
+int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
+                     char** buff, size_t* cap, size_t off) {
+   char* spec_src = *src;
+   for (;;) {
+      size_t room = *cap - off;
+      *src = spec_src;
+      *a_args->dest_len = room;
+      a_args->dest = (char**)(*buff + off);
+      target_fun((void*)a_args);
+      if (a_args->ret_code != 0) return 1;
+      if (*a_args->dest_len <= room) return 0;
+      if (grow_buff(buff, cap, off + *a_args->dest_len)) return 1;
+   }
 }

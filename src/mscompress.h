@@ -812,6 +812,9 @@ extern const int algo_registry_size;
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(const char* arg);
+int grow_buff(char** buff, size_t* cap, size_t need);
+int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
+                     char** buff, size_t* cap, size_t off);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
