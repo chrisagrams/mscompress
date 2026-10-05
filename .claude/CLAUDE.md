@@ -158,7 +158,7 @@ The project version lives in `version.txt` at the repo root — this is the sing
 
 Releases are automated in two phases following the `dev` → `stage` → `main` promotion flow:
 1. On push to `dev`, `.github/workflows/release-please.yml` opens/updates a **release PR targeting `dev`** (bumping `version.txt`, the package files, and `CHANGELOG.md`). Merging it into `dev` does **not** tag anything; the PR is left labeled `autorelease: pending`.
-2. The release commit is promoted `dev` → `stage` → `main` as usual. On push to `main`, release-please finds the pending release PR, creates the `vX.Y.Z` tag + GitHub Release (relabeling the PR `autorelease: tagged`), and chains the build/publish pipeline (`build.yml` called via `workflow_call` with `publish: true`).
+2. The release commit is promoted `dev` → `stage` → `main` as usual. On push to `main`, release-please finds the pending release PR, creates the `vX.Y.Z` tag + GitHub Release (relabeling the PR `autorelease: tagged`), and dispatches the build/publish pipeline (`build.yml` started via `workflow_dispatch` with `publish=true`).
 
 Merge methods are enforced by repository rulesets: PRs into `dev` are **squash-only** (the commit message is the PR title, body blank), and PRs into `stage`/`main` are **merge-commit-only**. Because the PR title becomes the commit release-please parses, `.github/workflows/pr-title.yml` requires PR titles into `dev` to be Conventional Commits (allowed types mirror `changelog-sections`; use `feat!:` for breaking changes).
 
@@ -168,9 +168,9 @@ Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — 
 
 ## CI/CD
 
-`.github/workflows/release-please.yml` maintains the release PR on push to `dev`, and on push to `main` tags any promoted release PR and calls `build.yml` as a reusable workflow with `publish: true` + `release_tag`.
+`.github/workflows/release-please.yml` maintains the release PR on push to `dev`, and on push to `main` tags any promoted release PR and starts `build.yml` as a separate run (`gh workflow run build.yml -f publish=true -f release_tag=<tag>`; `GITHUB_TOKEN` is allowed to trigger `workflow_dispatch`).
 
-`.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_call` from release-please:
+`.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_dispatch` (from release-please, or manually to re-publish a tag with `publish=true` + `release_tag`):
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
 2. **build-python** — cibuildwheel for CPython 3.10–3.14 + pytest
 3. **build-node** — prebuild + cmake-js compile + vitest on Linux/macOS/Windows (x64, arm64)
@@ -178,4 +178,4 @@ Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — 
 5. **publish-node** — npm publish (gated on `inputs.publish`; uploads prebuilds to GitHub Release)
 6. **build-docker** — Multi-arch Docker image (pushes on `inputs.publish`)
 
-> Operational note: PyPI trusted publishing matches the OIDC `job_workflow_ref` claim — the workflow file that *defines the publish job* — not the entry/caller workflow. The `publish-python` job stays in `build.yml`, so `job_workflow_ref` remains `build.yml` even when called from `release-please.yml`. The existing PyPI trusted-publisher config (workflow `build.yml`, environment `pypi`) therefore needs no change. It would only need updating if the publish step itself were moved into `release-please.yml`.
+> Operational note: `build.yml` must be the **top-level** workflow of the publish run — do not call it via `workflow_call`. PyPI trusted publishing matches the OIDC `job_workflow_ref` claim at login but verifies the upload's attestation against the Build Config URI (the top-level workflow), so a reusable-workflow call fails with "Build Config URI ... does not match expected Trusted Publisher". npm trusted publishing matches the top-level workflow too and fails with a bare `ENEEDAUTH` on mismatch. With `build.yml` dispatched on its own, the PyPI (workflow `build.yml`, environment `pypi`) and npm (workflow `build.yml`, environment `npm`) trusted-publisher configs both match.

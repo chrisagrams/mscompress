@@ -8,10 +8,10 @@ on:
   pull_request:
     branches:
       - 'dev'
+  # Dispatched by release-please.yml once a release is cut (not workflow_call:
+  # PyPI/npm trusted publishing need build.yml to be the top-level workflow).
+  # Releases flow exclusively through release-please, so there is no tag-push trigger.
   workflow_dispatch:
-  # Called by release-please.yml once a release is cut. Releases flow exclusively
-  # through release-please now, so there is no tag-push trigger here.
-  workflow_call:
     inputs:
       publish:
         description: 'Publish artifacts (PyPI, npm, Docker, GitHub Release)'
