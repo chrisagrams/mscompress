@@ -156,13 +156,17 @@ The project version lives in `version.txt` at the repo root — this is the sing
 - **Python** — `python/pyproject.toml` (`$.project.version`) and `python/mscompress/__init__.py` (`__version__`, carries an `# x-release-please-version` annotation) are updated by release-please via `release-please-config.json` `extra-files`
 - **npm** — all `package.json` files are updated by release-please `extra-files`
 
-Releases are automated. On push to `main`, `.github/workflows/release-please.yml` opens/updates a **release PR** (bumping `version.txt`, the package files, and `CHANGELOG.md`). Merging it creates the `vX.Y.Z` tag + GitHub Release and chains the build/publish pipeline (`build.yml` called via `workflow_call` with `publish: true`). Bump sizing: `feat:` → minor; `fix:`/`perf:`/`refactor:` → patch; `feat!:`/`BREAKING CHANGE` → major (the patch-triggering set is configured in `release-please-config.json` `changelog-sections`).
+Releases are automated in two phases following the `dev` → `stage` → `main` promotion flow:
+1. On push to `dev`, `.github/workflows/release-please.yml` opens/updates a **release PR targeting `dev`** (bumping `version.txt`, the package files, and `CHANGELOG.md`). Merging it into `dev` does **not** tag anything; the PR is left labeled `autorelease: pending`.
+2. The release commit is promoted `dev` → `stage` → `main` as usual. On push to `main`, release-please finds the pending release PR, creates the `vX.Y.Z` tag + GitHub Release (relabeling the PR `autorelease: tagged`), and chains the build/publish pipeline (`build.yml` called via `workflow_call` with `publish: true`).
+
+Only one release can be in flight: while a merged release PR is still pending (not yet on `main`), release-please will not open a new release PR on `dev`. The tag points at the release commit on `dev`, which is in `main`'s history as long as promotions use merge commits (not squash). Hotfixes made directly on `stage`/`main` must be merged back into `dev` to be picked up. Bump sizing: `feat:` → minor; `fix:`/`perf:`/`refactor:` → patch; `feat!:`/`BREAKING CHANGE` → major (the patch-triggering set is configured in `release-please-config.json` `changelog-sections`).
 
 Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — it comes from `version.txt`.
 
 ## CI/CD
 
-`.github/workflows/release-please.yml` (push to `main`) maintains the release PR and, when a release is cut, calls `build.yml` as a reusable workflow with `publish: true` + `release_tag`.
+`.github/workflows/release-please.yml` maintains the release PR on push to `dev`, and on push to `main` tags any promoted release PR and calls `build.yml` as a reusable workflow with `publish: true` + `release_tag`.
 
 `.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_call` from release-please:
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
