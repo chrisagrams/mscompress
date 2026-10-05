@@ -895,7 +895,8 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 division_t* extract_one_spectra(division_t* div, long index) {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -938,9 +939,12 @@ division_t* extract_one_spectra(division_t* div, long index) {
    inten_dp->end_positions[1] = div->inten->end_positions[index];
    new_div->size += inten_dp->end_positions[1] - inten_dp->start_positions[1];
 
-   // Copy over xml from inden end till next spectra
+   // Copy over xml from inten end till next spectra (or, for the file's last
+   // spectrum, till its own end; the end case copies the rest)
    xml_dp->start_positions[4] = div->inten->end_positions[index];
-   xml_dp->end_positions[4] = div->spectra->start_positions[index + 1];
+   xml_dp->end_positions[4] = index + 1 < div->spectra->total_spec
+                                  ? div->spectra->start_positions[index + 1]
+                                  : div->spectra->end_positions[index];
    new_div->size += xml_dp->end_positions[4] - xml_dp->start_positions[4];
 
    // Copy over xml from last spectra till end
@@ -972,7 +976,8 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -1036,10 +1041,13 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 
       inten_curr++;
 
-      // Copy over xml from inden end till next spectra
+      // Copy over xml from inten end till next spectra (or, for the file's
+      // last spectrum, till its own end; the end case copies the rest)
       xml_dp->start_positions[xml_curr] = div->inten->end_positions[index];
       xml_dp->end_positions[xml_curr] =
-          div->spectra->start_positions[index + 1];
+          index + 1 < div->spectra->total_spec
+              ? div->spectra->start_positions[index + 1]
+              : div->spectra->end_positions[index];
       new_div->size +=
           xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
 
