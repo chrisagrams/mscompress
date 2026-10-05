@@ -357,13 +357,16 @@ void no_encode_w_header(z_stream* z, char** src, size_t src_len, char* dest,
  * @param src Pointer to the source buffer pointer (the reconstructed samples).
  * @param src_len Number of bytes to copy.
  * @param dest Pre-allocated destination buffer.
- * @param out_len Receives the number of bytes copied (`src_len`).
+ * @param out_len In: capacity of `dest` in bytes. Out: number of bytes copied
+ *                (`src_len`). If the data would not fit, nothing is copied and
+ *                `*out_len` is set to the required size (> the capacity passed).
  */
 void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
                          size_t* out_len)
 {
    (void)z;
-   memcpy(dest, *src, src_len);
+   if (src_len <= *out_len)
+      memcpy(dest, *src, src_len);
    *out_len = src_len;
 }
 
