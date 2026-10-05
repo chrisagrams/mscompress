@@ -223,7 +223,9 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             return 1;
          }
          arguments->scans =
-             (uint32_t *)string_to_array(argv[++i], &arguments->scans_length);
+             string_to_scan_array(argv[++i], &arguments->scans_length);
+         if (!arguments->scans)
+            return 1;
       } else if (strcmp(argv[i], "--ms-level") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing ms level for extraction.");
