@@ -181,6 +181,18 @@ add_test(NAME CompressNonIndexedMzMLLossy
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# --extract with --extract-scans / --extract-indices on mzML and msz input -
+# regression test for GitHub issue #195 (only the first ceil(N/2) scans were
+# extracted; extracting an mzML's final spectrum crashed).
+add_test(NAME ExtractTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEST_MSZ=${TEST_DATA_DIR}/test.msz
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_extract
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_extract.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}

@@ -129,7 +129,20 @@ class build_ext_with_stubs(_build_ext):
                     if flags and simd_type in source_lower:
                         ext.extra_compile_args_per_file[source] = flags
                         break
-        
+
+                # The cloudflare zlib fork only slides its deflate hash tables
+                # under __aarch64__ or HAS_SSE2; with neither, every deflate
+                # input larger than ~64 KB emits corrupt output or segfaults.
+                # Its own configure/CMake set HAS_SSE2, so we must too.
+                # emmintrin.h is force-included because deflate.c only pulls
+                # in intrinsics headers under HAS_SSE42.
+                if (target_arch == 'x86_64' and
+                        os.path.normpath(source).endswith(os.path.join('zlib', 'deflate.c'))):
+                    if sys.platform == 'win32':
+                        ext.extra_compile_args_per_file[source] = ['/DHAS_SSE2', '/FIemmintrin.h']
+                    else:
+                        ext.extra_compile_args_per_file[source] = ['-DHAS_SSE2', '-include', 'emmintrin.h']
+
         # Call parent build_extensions
         _build_ext.build_extensions(self)
     
