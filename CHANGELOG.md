@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/chrisagrams/mscompress/compare/v1.1.0...v1.1.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* don't treat --extract onto an existing .mzML output as a batch request ([#206](https://github.com/chrisagrams/mscompress/issues/206)) ([b3cbd91](https://github.com/chrisagrams/mscompress/commit/b3cbd9133d2466cf58a1d9538f03174c86bad6e7))
+* extract the full scan list and the final mzML spectrum ([#205](https://github.com/chrisagrams/mscompress/issues/205)) ([bea9c84](https://github.com/chrisagrams/mscompress/commit/bea9c848a0d2e91d3db9112d5e9ddc8f10653a8b))
+* zlib re-encode of &gt;64 KB arrays corrupts output or segfaults ([#196](https://github.com/chrisagrams/mscompress/issues/196)) ([df6f5a0](https://github.com/chrisagrams/mscompress/commit/df6f5a04920953a8ac6b0631260510b44ea630d1))
+
 ## [1.1.0](https://github.com/chrisagrams/mscompress/compare/v1.0.16...v1.1.0) (2026-10-05)
 
 
