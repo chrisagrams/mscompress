@@ -593,6 +593,7 @@ data_positions_t** join_xml(divisions_t* divisions);
 data_positions_t** join_mz(divisions_t* divisions);
 data_positions_t** join_inten(divisions_t* divisions);
 long* string_to_array(char* str, long* size);
+uint32_t* string_to_scan_array(char* str, long* size);
 long* map_scan_to_index(uint32_t* scans, long scans_length, division_t* div,
                         long index_offset, long* indices_length);
 long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
@@ -812,6 +813,9 @@ extern const int algo_registry_size;
 Algo set_compress_algo(int algo, int accession);
 Algo set_decompress_algo(int algo, int accession);
 int get_algo_type(const char* arg);
+int grow_buff(char** buff, size_t* cap, size_t need);
+int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
+                     char** buff, size_t* cap, size_t off);
 
 /* queue.c */
 cmp_blk_queue_t* alloc_cmp_buff();
