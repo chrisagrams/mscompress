@@ -895,7 +895,8 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 division_t* extract_one_spectra(division_t* div, long index) {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -938,9 +939,12 @@ division_t* extract_one_spectra(division_t* div, long index) {
    inten_dp->end_positions[1] = div->inten->end_positions[index];
    new_div->size += inten_dp->end_positions[1] - inten_dp->start_positions[1];
 
-   // Copy over xml from inden end till next spectra
+   // Copy over xml from inten end till next spectra (or, for the file's last
+   // spectrum, till its own end; the end case copies the rest)
    xml_dp->start_positions[4] = div->inten->end_positions[index];
-   xml_dp->end_positions[4] = div->spectra->start_positions[index + 1];
+   xml_dp->end_positions[4] = index + 1 < div->spectra->total_spec
+                                  ? div->spectra->start_positions[index + 1]
+                                  : div->spectra->end_positions[index];
    new_div->size += xml_dp->end_positions[4] - xml_dp->start_positions[4];
 
    // Copy over xml from last spectra till end
@@ -972,7 +976,8 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -1036,10 +1041,13 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 
       inten_curr++;
 
-      // Copy over xml from inden end till next spectra
+      // Copy over xml from inten end till next spectra (or, for the file's
+      // last spectrum, till its own end; the end case copies the rest)
       xml_dp->start_positions[xml_curr] = div->inten->end_positions[index];
       xml_dp->end_positions[xml_curr] =
-          div->spectra->start_positions[index + 1];
+          index + 1 < div->spectra->total_spec
+              ? div->spectra->start_positions[index + 1]
+              : div->spectra->end_positions[index];
       new_div->size +=
           xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
 
@@ -2083,6 +2091,45 @@ long* string_to_array(char* str, long* size) {
 }
 
 /**
+ * @brief Parses a scan-range string into an array of scan numbers.
+ * @param str The input string, in any format `string_to_array()` accepts.
+ * @param size Pointer set to the number of elements in the returned array.
+ * @return Pointer to a malloc'd array of scan numbers, or `NULL` on error.
+ *
+ * Scan numbers are `uint32_t` throughout the library, while `string_to_array()`
+ * returns `long`s, so the values are copied element-wise rather than the
+ * buffer being reinterpreted.
+ *
+ * @warning The caller must free the returned array.
+ */
+uint32_t* string_to_scan_array(char* str, long* size) {
+   long* parsed = string_to_array(str, size);
+   if (parsed == NULL)
+      return NULL;
+
+   // Allocate at least one element: malloc(0) may legitimately return NULL.
+   uint32_t* scans = malloc((*size > 0 ? *size : 1) * sizeof(uint32_t));
+   if (scans == NULL) {
+      error("string_to_scan_array: failed to allocate scan array.\n");
+      free(parsed);
+      return NULL;
+   }
+
+   for (long i = 0; i < *size; i++) {
+      if (parsed[i] < 0 || parsed[i] > UINT32_MAX) {
+         error("Scan number out of range: %ld\n", parsed[i]);
+         free(parsed);
+         free(scans);
+         return NULL;
+      }
+      scans[i] = (uint32_t)parsed[i];
+   }
+
+   free(parsed);
+   return scans;
+}
+
+/**
  * @brief Maps an array of scan numbers to their corresponding spectrum indices within a division.
  * @param scans Array of scan numbers to look up.
  * @param scans_length Number of scans in the array.
@@ -2293,6 +2340,24 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
 }
 
 /**
+ * @brief Extracts spectra from a whole-file division, then frees that division.
+ * @param whole Division covering the entire file, as returned by `scan_mzml()`.
+ * @param indices Indices of the spectra to extract.
+ * @param n Number of indices.
+ * @return The extracted division (see `extract_n_spectra()`).
+ *
+ * @note The extracted division shares `whole->spectra`, so ownership of it is
+ *       handed over rather than freed; everything else in `whole` is freed.
+ */
+static division_t* extract_from_whole_file(division_t* whole, long* indices,
+                                           long n) {
+   division_t* div = extract_n_spectra(whole, indices, n);
+   whole->spectra = NULL;
+   dealloc_division(whole);
+   return div;
+}
+
+/**
  * @brief Preprocesses an mzML file: detects format, scans spectra, and creates divisions.
  *
  * Handles scan/index/ms-level filtering, determines the number of divisions,
@@ -2328,8 +2393,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
           MSLEVEL | SCANNUM);  // A division encapsulating the entire file
       if (tmp == NULL)
          return 1;
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->scans_length > 0) {
       division_t* tmp = scan_mzml(
           (char*)input_map, *df, input_filesize,
@@ -2339,8 +2404,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
       arguments->indices =
           map_scan_to_index(arguments->scans, arguments->scans_length, tmp, 0,
                             &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
 
    } else if (arguments->ms_level > 0 || arguments->ms_level == -1) {
       division_t* tmp = scan_mzml(
@@ -2350,8 +2415,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
          return 1;
       arguments->indices = map_ms_level_to_index(arguments->ms_level, tmp, 0,
                                                  &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->indices_length == 0 && arguments->scans_length == 0) {
       div = scan_mzml(
           (char*)input_map, *df, input_filesize,
