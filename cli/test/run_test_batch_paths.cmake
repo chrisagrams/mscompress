@@ -8,6 +8,10 @@
 #      leave no archive behind.
 #   4. Legacy two-positional form must not be inferred as batch just because the
 #      output file already exists (re-run / overwrite).
+#   5. Same for --extract, whose output is itself an .mzML: re-running onto an
+#      existing output must stay single-file (it used to segfault).
+#   6. --extract with a batch-style input (a directory) must be rejected with
+#      an error, not crash.
 #
 # Expected variables: EXECUTABLE, TEST_MZML, TEMP_DIR
 
@@ -130,6 +134,34 @@ foreach(PASS 1 2)
             "output must not flip the invocation into batch mode")
     endif()
 endforeach()
+
+# --- 5: --extract onto an existing .mzML output must stay non-batch ---
+set(EXT_MZML "${TEMP_DIR}/extract.mzML")
+foreach(PASS 1 2)
+    execute_process(
+        COMMAND "${EXECUTABLE}" --extract --extract-indices "[0]"
+                "${TEST_MZML}" "${EXT_MZML}"
+        RESULT_VARIABLE ER OUTPUT_VARIABLE EO ERROR_VARIABLE EE)
+    if(NOT ER EQUAL 0)
+        message(STATUS "out: ${EO}\nerr: ${EE}")
+        message(FATAL_ERROR
+            "extract pass ${PASS} failed (${ER}) — an existing .mzML output "
+            "must not flip --extract into batch mode")
+    endif()
+endforeach()
+
+# --- 6: --extract with a directory input is rejected cleanly ---
+execute_process(
+    COMMAND "${EXECUTABLE}" --extract --extract-indices "[0]"
+            "${TEMP_DIR}/tree" "${TEMP_DIR}/extract_dir.mzML"
+    RESULT_VARIABLE DR OUTPUT_VARIABLE DO ERROR_VARIABLE DE)
+if(NOT DR EQUAL 1)
+    message(FATAL_ERROR
+        "--extract with a directory input should exit 1, got ${DR}: ${DE}")
+endif()
+if(NOT DE MATCHES "single input file")
+    message(FATAL_ERROR "expected a 'single input file' rejection, got: ${DE}")
+endif()
 
 file(REMOVE_RECURSE "${TEMP_DIR}")
 message(STATUS "Batch path tests passed.")
