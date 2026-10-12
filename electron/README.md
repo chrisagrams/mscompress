@@ -4,7 +4,7 @@ A cross-platform desktop app for the [MScompress](../README.md) mass-spectrometr
 compression toolkit. This is a ground-up rewrite of the previous vanilla-JS GUI.
 
 **Stack:** Electron · Vite · React · TypeScript · Tailwind v4 · shadcn/ui
-(new-york), built on the [`mscompress`](../node-ts) Node.js/TypeScript bindings.
+(new-york), built on the [`mscompress`](../node) Node.js/TypeScript bindings.
 
 ## Architecture
 
@@ -26,16 +26,16 @@ batch queue, MSZX archive manifest + annotations viewer, and persisted settings.
 
 ## Prerequisites
 
-Build the native binding first (the GUI loads `node-ts`):
+Build the native binding first (the GUI loads `node`):
 
 ```sh
-cd ../node-ts && npm install && npm run build
+cd ../node && npm install && npm run build
 ```
 
 ## Develop
 
 ```sh
-npm install        # links the local mscompress binding (file:../node-ts)
+npm install        # links the local mscompress binding (file:../node)
 npm run dev        # Vite dev server + Electron
 ```
 
@@ -49,7 +49,7 @@ npm run smoke:bindings # exercise the native binding wrappers against test data
 ## Package
 
 electron-builder bundles the native `mscompress.node` addon under
-`resources/node-ts` (outside the asar) so the packaged app can load it. Output
+`resources/node` (outside the asar) so the packaged app can load it. Output
 goes to `release/`.
 
 ```sh

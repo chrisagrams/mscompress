@@ -13,8 +13,8 @@
 **Electron app** (`electron/`, electron-vite + React + TS; electron-builder `^25.1.8`):
 - `electron-builder.yml`: `appId: gy.lab.mscompress`, `productName: MScompress`.
   Win target is currently only `dir` (no installer) and there is **no
-  `fileAssociations`** key yet. Native `node-ts` binding shipped via
-  `extraResources` to `resources/node-ts`.
+  `fileAssociations`** key yet. Native `node` binding shipped via
+  `extraResources` to `resources/node`.
 - `src/main/index.ts`: creates the window in `app.whenReady()`. **No
   single-instance lock**, **no `open-file` handler**, **no argv parsing.**
 - `src/main/ipc.ts`: `IPC.openFiles` opens a native dialog and returns paths;
@@ -432,19 +432,19 @@ Key points:
 
 ### 2.5 Getting the CLI onto the machine
 
-Bundle it via electron-builder `extraResources`, mirroring how `node-ts` is
+Bundle it via electron-builder `extraResources`, mirroring how `node` is
 already shipped. Build `cli/` for win-x64 in CI, drop the exe where the config
 expects it, then:
 
 ```yaml
-# electron-builder.yml — add alongside the existing node-ts extraResources
+# electron-builder.yml — add alongside the existing node extraResources
 extraResources:
-  - from: ../node-ts/dist
-    to: node-ts/dist
-  - from: ../node-ts/build/Release/mscompress.node
-    to: node-ts/build/Release/mscompress.node
-  - from: ../node-ts/package.json
-    to: node-ts/package.json
+  - from: ../node/dist
+    to: node/dist
+  - from: ../node/build/Release/mscompress.node
+    to: node/build/Release/mscompress.node
+  - from: ../node/package.json
+    to: node/package.json
   # NEW: standalone CLI for the context-menu action
   - from: ../cli/build/Release/mscompress.exe   # adjust to real CI output path
     to: cli/mscompress.exe

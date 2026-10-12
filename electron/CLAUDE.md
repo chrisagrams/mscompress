@@ -4,7 +4,7 @@ This directory (`electron/`) is a **full rewrite** of the MScompress desktop app
 The legacy vanilla-JS GUI was removed. The new app is:
 
 **Vite + Electron + React + TypeScript + Tailwind v4 + shadcn/ui**, built on the
-**`mscompress` node-ts bindings** (the sibling `../node-ts` package, published as `mscompress` on npm).
+**`mscompress` node bindings** (the sibling `../node` package, published as `mscompress` on npm).
 
 ## Design source of truth
 The chosen design ("Split-Pane Workbench / IDE") already exists as a verified web mockup at:
@@ -13,7 +13,7 @@ Port that UI faithfully. Its layout: 3 panes — left rail (file Explorer + MSTr
 center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — plus a top toolbar
 (logo + theme toggle) and a bottom status bar (threads, mem, backend version).
 
-## node-ts binding API (../node-ts/dist/index.d.ts)
+## node binding API (../node/dist/index.d.ts)
 - `read(path)` → auto-detects, returns MZMLFile | MSZFile | MSZXFile
 - `MZMLFile`: `.format`, `.positions`, `.spectra` (lazy `Spectra`), `.compress(out)`, `.extract(out, opts)`, `getMzBinary/getIntenBinary/getXml(i)`
 - `MSZFile`: `.decompress(out)`, `.extract(out, opts)`, random-access spectrum reads, `MSZFile.fromMszx(archive, entry)`
@@ -94,11 +94,11 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
 - Config in `electron-builder.yml`; appId `gy.lab.mscompress`, productName
   `MScompress`, icons from `assets/icons`.
 - **Native addon**: `node_modules` is excluded from the asar; instead the
-  `node-ts` binding (`dist` + `build/Release/mscompress.node` + `package.json`)
-  is shipped via `extraResources` to `resources/node-ts`, and `bindings.ts`
-  resolves it from `process.resourcesPath/node-ts/dist/index.js` when packaged
+  `node` binding (`dist` + `build/Release/mscompress.node` + `package.json`)
+  is shipped via `extraResources` to `resources/node`, and `bindings.ts`
+  resolves it from `process.resourcesPath/node/dist/index.js` when packaged
   (falling back to the `mscompress` node_modules symlink in dev / smoke test).
-- Build the native binding (`node-ts`) BEFORE packaging.
+- Build the native binding (`node`) BEFORE packaging.
   `npm run build` = typecheck + electron-vite build; `npm run dist:dir` =
   build + `electron-builder --dir` (unpacked); `npm run dist` / `dist:linux` =
   installers. Output goes to `release/` (git-ignored).

@@ -17,7 +17,7 @@ debugging, or when contributing.
 ## Build
 
 ```bash
-cd node-ts
+cd node
 npm install
 npm run build
 ```
