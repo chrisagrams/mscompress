@@ -676,6 +676,21 @@ class MSZXBatchWriter:
         """
         ...
 
+    def add_psms(
+        self,
+        entry_index: int,
+        source: Any,
+        filename: Optional[str] = None,
+        compressed: bool = True,
+        description: Optional[str] = None,
+    ) -> str:
+        """Attach search results to a spectra entry, stored as mzTab.
+
+        `source` is a results file path or a `BasePSMReader`. Engine output is
+        converted to mzTab; returns the archive member name written.
+        """
+        ...
+
     def set_join_key(self, entry_index: int, join_key: str) -> None:
         """Set the column used to join annotations to spectra for one entry."""
         ...

@@ -9,6 +9,7 @@ from mscompress.annotations.psms._base import BasePSMReader, BaseAnnotationFile,
 from mscompress.types import AnnotationFormat
 from mscompress.annotations.psms.percolator import TSVReader
 from mscompress.annotations.psms.pepxml import PepXMLReader
+from mscompress.annotations.psms.mztab import MzTabReader
 
 
 def _detect_format_from_name(name: str) -> Optional[AnnotationFormat]:
@@ -19,7 +20,9 @@ def _detect_format_from_name(name: str) -> Optional[AnnotationFormat]:
     if name_lower.endswith(".zst"):
         name_lower = name_lower[:-4]
     
-    if name_lower.endswith(".pin"):
+    if name_lower.endswith(".mztab"):
+        return AnnotationFormat.MZTAB
+    elif name_lower.endswith(".pin"):
         return AnnotationFormat.PERCOLATOR_TSV
     elif name_lower.endswith(".tsv"):
         return AnnotationFormat.PERCOLATOR_TSV
@@ -36,7 +39,9 @@ def _detect_format_from_content(data: bytes) -> Optional[AnnotationFormat]:
     # Check first KB for format hints
     header = data[:1024].decode("utf-8", errors="ignore")
     
-    if "pepXML" in header or "spectrum_query" in header:
+    if header.startswith("MTD\t") or "\nPSH\t" in data[:65536].decode("utf-8", errors="ignore"):
+        return AnnotationFormat.MZTAB
+    elif "pepXML" in header or "spectrum_query" in header:
         return AnnotationFormat.PEPXML
     elif "SpecId" in header or "PSMId" in header or "ScanNr" in header:
         return AnnotationFormat.PERCOLATOR_TSV
@@ -74,7 +79,7 @@ class PSMReader:
 
         Args:
             source: Source for reading - file path or BaseAnnotationFile.
-            format: Format hint ('pin', 'pepxml'). Auto-detected if None.
+            format: Format hint. Auto-detected if None.
             **kwargs: Additional arguments passed to the reader constructor.
 
         Returns:
@@ -105,7 +110,9 @@ class PSMReader:
                 data = ann_source.read()
                 format = _detect_format_from_content(data)
 
-        if format == AnnotationFormat.PERCOLATOR_TSV:
+        if format == AnnotationFormat.MZTAB:
+            return MzTabReader(ann_source, **kwargs)
+        elif format == AnnotationFormat.PERCOLATOR_TSV:
             return TSVReader(ann_source, **kwargs)
         elif format == AnnotationFormat.PEPXML:
             return PepXMLReader(ann_source, **kwargs)
@@ -113,5 +120,5 @@ class PSMReader:
             name = ann_source.name or "unknown"
             raise ValueError(
                 f"Cannot determine format for {name}. "
-                "Please specify format='percolator_tsv' or 'pepxml'."
+                "Please specify format='mztab', 'percolator_tsv' or 'pepxml'."
             )

@@ -1658,6 +1658,7 @@ cdef class MSZXFile(MSZFile):
         import warnings
         from mscompress.annotations import PSMReader, MSZXAnnotationFile
         from mscompress.mszx.metadata import MSZXManifest
+        from mscompress.types import AnnotationFormat
 
         archive_path = Path(path)
         if not archive_path.exists():
@@ -1684,7 +1685,10 @@ cdef class MSZXFile(MSZFile):
                         member=member,
                         name=entry.filename,
                     )
-                    reader = PSMReader(mszx_source)
+                    reader = PSMReader(
+                        mszx_source,
+                        format=entry.format if entry.format == AnnotationFormat.MZTAB else None,
+                    )
                     annotation_readers[entry.filename] = reader
                 except KeyError:
                     warnings.warn(
@@ -1708,8 +1712,16 @@ cdef class MSZXFile(MSZFile):
         self._manifest = manifest
         self._annotations = annotation_readers
         self._archive_path = archive_path
+        # Prefer an mzTab entry; archives written before annotations were
+        # unified on mzTab only carry engine-specific (legacy) files.
+        mztab_readers = [
+            annotation_readers[e.filename]
+            for e in manifest.annotations
+            if e.format == AnnotationFormat.MZTAB and e.filename in annotation_readers
+        ]
         self._primary_annotation_reader = (
-            next(iter(annotation_readers.values())) if annotation_readers else None
+            mztab_readers[0] if mztab_readers
+            else next(iter(annotation_readers.values()), None)
         )
         self._closed = False
         return self
@@ -2633,8 +2645,7 @@ cdef class MSZXBatchWriter:
     Example:
         with MSZXBatchWriter("cohort.mszx", threads=8) as w:
             idx = w.add("run1.mzML")
-            w.add_annotation(idx, pin_bytes, "annotations/run1.pin",
-                             format="percolator_tsv")
+            w.add_psms(idx, "run1.pin")   # stored as run1.pin.mztab.zst
     """
 
     cdef batch_writer_t* _writer
@@ -2784,6 +2795,50 @@ cdef class MSZXBatchWriter:
             raise ValueError(
                 f"Could not add annotation {os.fsdecode(fname)!r} to entry {entry_index}"
             )
+
+    def add_psms(self, int entry_index, source, filename=None,
+                 compressed=True, description=None) -> str:
+        """
+        Attach search results to a spectra entry, stored as mzTab.
+
+        Engine output (pepXML, Percolator TSV, ...) is converted to mzTab and
+        zstd-compressed; the original file is not stored. mzTab input is
+        stored unchanged.
+
+        Parameters:
+        entry_index (int): Value returned by `add()`.
+        source: Path to a results file, or a `BasePSMReader`.
+        filename (Optional[str]): Base member name; `.mztab` (and `.zst`) is
+            appended. Defaults to the source file name.
+        compressed (bool): zstd-compress the member (default True).
+        description (Optional[str]): Accepted for parity with
+            `MSZXBuilder.add_annotations`; the batch manifest does not
+            record per-annotation descriptions.
+
+        Returns:
+        str: The archive member name written.
+        """
+        # Local imports avoid the _core <-> annotations circular at load.
+        import zstandard as zstd
+        from mscompress.annotations import (
+            BasePSMReader, PSMReader, mztab_member_name, reader_to_mztab,
+        )
+        from mscompress.annotations._base import DEFAULT_ZSTD_COMPRESSION_LEVEL
+
+        self._check_open()
+        if not 0 <= entry_index < len(self._entries):
+            raise ValueError(f"Unknown entry index {entry_index}")
+
+        reader = source if isinstance(source, BasePSMReader) else PSMReader(source)
+        location = Path(self._entries[entry_index]).name
+        data = reader_to_mztab(reader, ms_run_location=location).encode("utf-8")
+        if compressed:
+            data = zstd.ZstdCompressor(level=DEFAULT_ZSTD_COMPRESSION_LEVEL).compress(data)
+
+        member = mztab_member_name(filename or reader.name or "annotations", compressed)
+        self.add_annotation(entry_index, data, member, format="mztab",
+                            compressed=compressed, num_records=len(reader))
+        return member
 
     def set_join_key(self, int entry_index, join_key) -> None:
         """Set the column used to join annotations to spectra for one entry."""

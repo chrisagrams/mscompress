@@ -13,6 +13,8 @@ import native, { type NativeBatchWriter } from "@/core/bindings.js";
 import { MZMLFile } from "@/files/mzml-file.js";
 import { RuntimeArguments } from "@/types/runtime-arguments.js";
 import type { CompressArgs } from "@/types/types.js";
+import type { AnnotationFormat } from "@/annotations/psm.js";
+import { convertToMzTab, mzTabMemberName } from "@/annotations/reader.js";
 
 /** An mzML to add: a path, or an already-open MZMLFile. */
 export type BatchInput = string | MZMLFile;
@@ -24,6 +26,25 @@ export interface AddAnnotationOptions {
   compressed?: boolean;
   /** Record/PSM count, if known. */
   numRecords?: number;
+}
+
+export interface AddPSMsOptions {
+  /**
+   * Exact archive member name. Defaults to `<input basename>.mztab` (an mzTab
+   * input keeps its name) plus `.zst` when compressed.
+   */
+  filename?: string;
+  /** Name used for format detection / the default member name when `input` is a Buffer. */
+  nameHint?: string;
+  /** Input format; auto-detected when omitted. */
+  format?: AnnotationFormat;
+  /** zstd-compress the stored mzTab (default true). */
+  compressed?: boolean;
+  /**
+   * Spectra file name recorded as the mzTab `ms_run[1]-location`. Defaults to
+   * the entry's archive name when known.
+   */
+  msRunLocation?: string;
 }
 
 /**
@@ -54,6 +75,8 @@ export class MSZXBatchWriter {
   private writer: NativeBatchWriter | null;
   private readonly args: RuntimeArguments;
   private readonly added: string[] = [];
+  /** Entry names passed to add(), or the C writer's default for that source. */
+  private readonly entryNames: string[] = [];
   /** Entries append sequentially; overlapping adds would corrupt the archive. */
   private pending = false;
 
@@ -102,6 +125,9 @@ export class MSZXBatchWriter {
       .add(sourcePath, entryName ?? null, this.args.toNative())
       .then((index) => {
         this.added.push(sourcePath);
+        // Best effort: the C writer may suffix colliding default names.
+        this.entryNames[index] =
+          entryName ?? `${path.basename(sourcePath).replace(/\.mzml$/i, "")}.msz`;
         return index;
       })
       .finally(() => {
@@ -129,6 +155,42 @@ export class MSZXBatchWriter {
       options?.compressed ?? false,
       options?.numRecords
     );
+  }
+
+  /**
+   * Attach search results to a spectra entry, stored as mzTab.
+   *
+   * `input` (mzTab, pepXML or Percolator TSV/PIN) is converted to mzTab — the
+   * original is not stored — then zstd-compressed unless `compressed` is false.
+   *
+   * @param entryIndex - Index returned by {@link add}.
+   * @param input - Path to the annotation file, or its contents.
+   * @param options - Naming, format and compression options.
+   * @returns The archive member name used.
+   * @throws Error if the input format cannot be determined, or a Buffer input
+   *   has neither `filename` nor `nameHint` and is not recognizable by content.
+   */
+  addPSMs(entryIndex: number, input: string | Buffer, options?: AddPSMsOptions): string {
+    this.ensureOpen();
+    const data = typeof input === "string" ? fs.readFileSync(input) : input;
+    const nameHint = typeof input === "string" ? input : options?.nameHint;
+    const compressed = options?.compressed ?? true;
+    const conversion = convertToMzTab(data, nameHint, {
+      format: options?.format,
+      msRunLocation:
+        options?.msRunLocation ??
+        (this.added[entryIndex] ? path.basename(this.added[entryIndex]) : null),
+    });
+    const name =
+      options?.filename ??
+      mzTabMemberName(nameHint ?? "psms.mztab", compressed, conversion.inputFormat === "mztab");
+    const raw = Buffer.from(conversion.text, "utf-8");
+    this.addAnnotation(entryIndex, compressed ? native.zstdCompress(raw) : raw, name, {
+      format: "mztab",
+      compressed,
+      numRecords: conversion.numRecords,
+    });
+    return name;
   }
 
   /** Set the column used to join annotations to spectra for one entry. */
@@ -199,10 +261,7 @@ export interface CompressBatchOptions extends CompressArgs {
  * built from the same set are deterministic. Directories contribute only
  * `*.mzML` (case-insensitive); explicitly named files are taken as-is.
  */
-export function resolveMzmlInputs(
-  inputs: string | string[],
-  recursive = false
-): string[] {
+export function resolveMzmlInputs(inputs: string | string[], recursive = false): string[] {
   const tokens = typeof inputs === "string" ? [inputs] : inputs;
   const found: string[] = [];
 

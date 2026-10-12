@@ -13,8 +13,12 @@
 export interface AnnotationEntry {
   /** Filename of the annotation file within the archive */
   filename: string;
-  /** Format of the annotation file */
-  format: "percolator_tsv" | "pepxml" | "tsv";
+  /**
+   * Format of the annotation file. New archives only ever store `"mztab"`;
+   * the engine formats appear in archives written before that and are still
+   * readable.
+   */
+  format: "mztab" | "percolator_tsv" | "pepxml" | "tsv";
   /** Whether the file is compressed with zstd */
   compressed: boolean;
   /** Optional human-readable description */
@@ -275,8 +279,7 @@ export class MSZXBatchManifest {
     rejectUnsupportedMajor(raw, MSZXBatchManifest.MAX_SUPPORTED_MAJOR);
     if (!isBatchManifest(raw)) {
       throw new Error(
-        "not a multi-file (batch) MSZX manifest; use MSZXManifest for " +
-          "single-file archives"
+        "not a multi-file (batch) MSZX manifest; use MSZXManifest for " + "single-file archives"
       );
     }
     return new MSZXBatchManifest(data);

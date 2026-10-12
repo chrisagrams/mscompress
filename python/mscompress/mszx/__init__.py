@@ -2,7 +2,7 @@
 
 MSZX is a bundled archive format that combines:
 - Compressed mass spectrometry data (MSZ)
-- Search results (e.g., Percolator .pin, pepXML)
+- Search results, stored as mzTab (converted from pepXML, Percolator, ...)
 - Internal manifest for self-description (`MSZXManifest`)
 
 This package provides the writer-side machinery (`MSZXBuilder`,
@@ -18,15 +18,26 @@ import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import zstandard as zstd
+
 from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
-from mscompress.annotations import BasePSMReader, PSMReader, PathAnnotationFile
+from mscompress.annotations import (
+    PSM,
+    BasePSMReader,
+    PSMReader,
+    SearchInfo,
+    mztab_member_name,
+    reader_to_mztab,
+    write_mztab,
+)
+from mscompress.annotations._base import DEFAULT_ZSTD_COMPRESSION_LEVEL
 from mscompress.mszx.batch import MSZXBatchFile, compress_batch
 from mscompress.mszx.metadata import (
     MSZXBatchManifest,
     MSZXManifest,
     SpectraFileEntry,
 )
-from mscompress.types import AnnotationEntry
+from mscompress.types import AnnotationEntry, AnnotationFormat
 
 __all__ = [
     "MSZXBatchFile",
@@ -37,6 +48,7 @@ __all__ = [
     "MSZXManifest",
     "SpectraFileEntry",
     "create_mszx",
+    "upgrade_mszx",
 ]
 
 
@@ -71,10 +83,10 @@ class MSZXBuilder:
         path_str = msz.path.decode("utf-8")
         self.compression = compression
         self._msz_path = Path(path_str)
-        self._annotations: List[tuple[Path, AnnotationEntry]] = []
+        self._annotations: List[tuple[bytes, AnnotationEntry]] = []
         self._description: Optional[str] = None
         self._source_name = source_name or self._msz_path.name
-        self._join_key = "scan_number"
+        self._join_key = "spectra_ref"
         self._extra: Dict[str, Any] = {}
 
     def add_annotations(
@@ -83,33 +95,73 @@ class MSZXBuilder:
         description: Optional[str] = None,
     ) -> MSZXBuilder:
         """
-        Add annotations to the archive.
+        Add search results to the archive, stored as mzTab.
+
+        Engine output (pepXML, Percolator TSV, ...) is converted to mzTab;
+        the original file is not stored. mzTab input is stored unchanged.
 
         Args:
-            reader: BasePSMReader instance containing the annotations.
+            reader: BasePSMReader instance containing the PSMs.
             description: Optional description of the annotations.
         Returns:
             Self for method chaining.
         """
-        if reader.file_path is None:
-            raise ValueError("Annotation reader must have a file path for archiving")
-        path = Path(reader.file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"Annotation file not found: {path}")
+        mztab = reader_to_mztab(reader, ms_run_location=self._msz_path.name)
+        source_name = reader.name or f"annotations{len(self._annotations) + 1}"
+        return self._add_mztab(
+            mztab.encode("utf-8"),
+            mztab_member_name(source_name, self.compression),
+            len(reader),
+            description,
+        )
 
-        fmt = reader.format
-        num_records = len(reader)
+    def add_psms(
+        self,
+        psms: List[PSM],
+        filename: str,
+        search_info: Optional[SearchInfo] = None,
+        description: Optional[str] = None,
+    ) -> MSZXBuilder:
+        """
+        Add in-memory PSMs to the archive, stored as mzTab.
 
-        filename = path.name if not self.compression else path.name + ".zst"
+        Args:
+            psms: PSMs to store.
+            filename: Base name for the archive member (``.mztab`` is appended).
+            search_info: Optional search metadata for the mzTab header.
+            description: Optional description of the annotations.
+        Returns:
+            Self for method chaining.
+        """
+        mztab = write_mztab(
+            psms, search_info=search_info, ms_run_location=self._msz_path.name
+        )
+        return self._add_mztab(
+            mztab.encode("utf-8"),
+            mztab_member_name(filename, self.compression),
+            len(psms),
+            description,
+        )
 
+    def _add_mztab(
+        self,
+        data: bytes,
+        filename: str,
+        num_records: int,
+        description: Optional[str],
+    ) -> MSZXBuilder:
+        if any(entry.filename == filename for _, entry in self._annotations):
+            raise ValueError(f"Duplicate annotation member name: {filename}")
         entry = AnnotationEntry(
             filename=filename,
-            format=fmt,
+            format=AnnotationFormat.MZTAB,
             compressed=self.compression,
             description=description,
             num_records=num_records,
         )
-        self._annotations.append((path, entry))
+        if self.compression:
+            data = zstd.ZstdCompressor(level=DEFAULT_ZSTD_COMPRESSION_LEVEL).compress(data)
+        self._annotations.append((data, entry))
         return self
 
     def set_description(self, description: str) -> MSZXBuilder:
@@ -163,15 +215,10 @@ class MSZXBuilder:
 
             tar.add(str(self._msz_path), arcname=manifest.spectra_file)
 
-            for path, entry in self._annotations:
-                if self.compression:
-                    annotation_source = PathAnnotationFile(path)
-                    compressed_data = annotation_source.get_compressed()
-                    annotation_info = tarfile.TarInfo(name=entry.filename)
-                    annotation_info.size = len(compressed_data)
-                    tar.addfile(annotation_info, io.BytesIO(compressed_data))
-                else:
-                    tar.add(str(path), arcname=entry.filename)
+            for data, entry in self._annotations:
+                annotation_info = tarfile.TarInfo(name=entry.filename)
+                annotation_info.size = len(data)
+                tar.addfile(annotation_info, io.BytesIO(data))
 
         return output
 
@@ -221,3 +268,13 @@ def create_mszx(
                 builder.add_annotations(annotation)
 
     return builder.save(output_path)
+
+
+def __getattr__(name: str) -> Any:
+    # Imported lazily so `python -m mscompress.mszx.upgrade` does not find the
+    # module already loaded by this package (runpy warns about that).
+    if name == "upgrade_mszx":
+        from mscompress.mszx.upgrade import upgrade_mszx
+
+        return upgrade_mszx
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

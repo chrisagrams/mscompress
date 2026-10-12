@@ -63,7 +63,8 @@ multiple PSMs are reduced according to the `multi_psm` argument
 ## Importing from Parquet
 
 `from_parquet` converts a Parquet table into an MSZ file, an MSZX archive,
-or a Percolator-style annotations TSV. The output format is chosen from the
+or a Percolator-style annotations TSV. In an MSZX archive the PSM columns are
+stored as mzTab, like every other annotation source (`<name>.tsv.mztab.zst`). The output format is chosen from the
 destination extension (override with `output_type=`):
 
 ```python

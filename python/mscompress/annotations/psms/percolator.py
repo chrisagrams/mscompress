@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 from mscompress.annotations._base import BaseAnnotationFile
 from mscompress.annotations.psms._base import BasePSMReader
-from mscompress.annotations.psms._types import PSM
+from mscompress.annotations.psms._types import PSM, SearchInfo
 from mscompress.types import AnnotationFormat
 
 
@@ -95,6 +95,15 @@ class TSVReader(BasePSMReader):
                 headers = header_line.split("\t")
                 delimiter = "\t"
 
+        # Percolator's own output starts with PSMId; a .pin (SpecId) is the
+        # search engine's feature file, so its producer is unknown here.
+        self._search_info = SearchInfo(
+            software="Percolator" if headers[0] == "PSMId" else None,
+            primary_score_name=(
+                "score" if any(h.lower() == "score" for h in headers) else None
+            ),
+        )
+
         # Create reader for remaining lines
         reader = csv.DictReader(lines[1:], fieldnames=headers, delimiter=delimiter)
 
@@ -136,13 +145,11 @@ class TSVReader(BasePSMReader):
             peptide = row.get("Peptide", row.get("peptide", ""))
             
             # Clean up peptide format (remove flanking residues like K.PEPTIDE.R)
-            if "." in peptide and len(peptide.split(".")) >= 3:
-                parts = peptide.split(".")
-                # Check if flanking residues are single letters (standard format)
-                if len(parts[0]) <= 1 and len(parts[-1]) <= 1:
-                     peptide = parts[1]
-                # If it matches X.PEPTIDE.X format, take middle. 
-                # Note: Some formats might be deeper, but this is standard.
+            # Only the outer dots delimit flanks, so a mass shift such as
+            # M[15.9949] inside the peptide is kept intact.
+            flanked = re.match(r"^[^.]?\.(.+)\.[^.]?$", peptide)
+            if flanked:
+                peptide = flanked.group(1)
 
             # Get label (1 = target, -1 = decoy)
             # Standard PIN: Label
@@ -195,12 +202,17 @@ class TSVReader(BasePSMReader):
                 except ValueError:
                     extra[h] = val
 
+            q_value = extra.get("q-value")
+            pep = extra.get("posterior_error_prob")
+
             return PSM(
                 scan_number=scan_number,
                 peptide=peptide,
                 charge=charge,
                 score=score,
                 proteins=proteins,
+                q_value=q_value if isinstance(q_value, float) else None,
+                pep=pep if isinstance(pep, float) else None,
                 is_decoy=is_decoy,
                 extra=extra,
             )

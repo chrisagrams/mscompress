@@ -18,6 +18,9 @@ import { MSZFile } from "@/files/msz-file.js";
 import { MSZXBuilder } from "@/mszx/mszx-builder.js";
 import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
 import type { ExtractOptions } from "@/types/types.js";
+import { MzTabReader, writeMzTab } from "@/annotations/mztab.js";
+import type { PSM, PSMCollection } from "@/annotations/psm.js";
+import { mzTabMemberName, readPSMs } from "@/annotations/reader.js";
 
 interface CapturedTarEntries {
   manifest: MSZXManifest;
@@ -94,7 +97,11 @@ function readManifestAndAnnotations(filePath: string): CapturedTarEntries {
 export class MSZXFile extends MSZFile {
   readonly archivePath: string;
   readonly manifest: MSZXManifest;
+  /** Decompressed annotation member contents, keyed by member name. */
   readonly annotations: Map<string, Buffer>;
+
+  /** Parsed annotation readers, filled lazily by {@link getPSMReader}. */
+  private readonly readerCache = new Map<string, PSMCollection>();
 
   private constructor(
     archivePath: string,
@@ -166,6 +173,64 @@ export class MSZXFile extends MSZFile {
   }
 
   /**
+   * Parsed PSMs of one annotation member. Parsed on first use and cached.
+   *
+   * mzTab members (everything written by current versions) come back as an
+   * {@link MzTabReader}; members of older archives (pepXML, Percolator) are
+   * parsed with their engine reader and expose the same query API.
+   *
+   * @param filename - Member name from the manifest.
+   * @returns The PSM collection.
+   * @throws Error if the member is missing or cannot be parsed.
+   */
+  getPSMReader(filename: string): PSMCollection {
+    const cached = this.readerCache.get(filename);
+    if (cached) return cached;
+    const content = this.getAnnotationFile(filename);
+    const entry = this.manifest.annotations.find((a) => a.filename === filename);
+    const reader = readPSMs(content, filename, entry?.format);
+    this.readerCache.set(filename, reader);
+    return reader;
+  }
+
+  /**
+   * Parsed PSM readers for every annotation member, keyed by member name, in
+   * manifest order. Members that fail to parse are skipped with a warning.
+   */
+  get psmReaders(): Map<string, PSMCollection> {
+    const readers = new Map<string, PSMCollection>();
+    for (const entry of this.manifest.annotations) {
+      if (!this.annotations.has(entry.filename)) continue;
+      try {
+        readers.set(entry.filename, this.getPSMReader(entry.filename));
+      } catch (err) {
+        console.warn(
+          `Warning: could not parse annotation '${entry.filename}': ${(err as Error).message}`
+        );
+      }
+    }
+    return readers;
+  }
+
+  /**
+   * The primary annotation reader: the first mzTab member, else the first
+   * parsable legacy member, else null.
+   */
+  get annotationReader(): PSMCollection | null {
+    const readers = this.psmReaders;
+    for (const reader of readers.values()) {
+      if (reader instanceof MzTabReader) return reader;
+    }
+    const first = readers.values().next();
+    return first.done ? null : first.value;
+  }
+
+  /** PSMs of the primary annotation (empty if the archive has none). */
+  get psms(): PSM[] {
+    return this.annotationReader?.psms ?? [];
+  }
+
+  /**
    * Decompress to mzML.
    *
    * If `output` has no extension (treated as a directory), writes
@@ -199,8 +264,8 @@ export class MSZXFile extends MSZFile {
    * Extract a subset of spectra to a new file. For .mzML / .msz output,
    * inherits the standard MSZFile.extract behavior. For .mszx output,
    * builds a filtered MSZX archive containing the selected spectra plus
-   * all annotation files (annotations are not currently filtered to the
-   * scan subset — TODO if a use case appears).
+   * every annotation, filtered to the PSMs of the extracted scans and stored
+   * as mzTab (legacy pepXML/Percolator members are converted).
    *
    * @param output - Output file path. Extension determines format.
    * @param options - Optional filters (indices, scanNumbers, msLevel).
@@ -237,7 +302,7 @@ export class MSZXFile extends MSZFile {
       for (const [key, value] of Object.entries(this.manifest.extra)) {
         builder.setExtra(key, value);
       }
-      // TODO: filter annotation buffers to the extracted scan subset.
+      this.addFilteredAnnotations(builder, this.targetScans(options), path.basename(tmpMszPath));
       const outputPath = builder.saveSync(output);
 
       return MSZXFile.open(outputPath);
@@ -247,6 +312,88 @@ export class MSZXFile extends MSZFile {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       } catch {
         /* ignore */
+      }
+    }
+  }
+
+  /**
+   * Scan numbers selected by extract options, matching the Python binding's
+   * `MSZXFile.extract`: the union of `scanNumbers` and the scans of
+   * `indices`, restricted to `msLevel` when given; every scan when no
+   * filter is set.
+   */
+  private targetScans(options?: ExtractOptions): Set<number> {
+    const scans = this.positions.scans;
+    const levels = this.positions.msLevels;
+    const indices = options?.indices?.length ? options.indices : null;
+    const scanNumbers = options?.scanNumbers?.length ? options.scanNumbers : null;
+    const msLevel = options?.msLevel;
+    const target = new Set<number>(scanNumbers ?? []);
+
+    if (indices) {
+      for (const idx of indices) {
+        if (idx >= 0 && idx < scans.length) target.add(scans[idx]);
+      }
+    }
+    if (msLevel !== undefined && msLevel !== null) {
+      const atLevel = new Set<number>();
+      for (let i = 0; i < scans.length; i++) {
+        if (levels[i] === msLevel) atLevel.add(scans[i]);
+      }
+      if (indices || scanNumbers) {
+        for (const scan of [...target]) {
+          if (!atLevel.has(scan)) target.delete(scan);
+        }
+      } else {
+        for (const scan of atLevel) target.add(scan);
+      }
+    }
+    if (!indices && !scanNumbers && (msLevel === undefined || msLevel === null)) {
+      for (const scan of scans) target.add(scan);
+    }
+    return target;
+  }
+
+  /**
+   * Add every annotation of this archive to `builder`, filtered to `scans`
+   * and stored as compressed mzTab. Members that fail are skipped with a
+   * warning, as in the Python binding.
+   */
+  private addFilteredAnnotations(
+    builder: MSZXBuilder,
+    scans: Set<number>,
+    spectraFile: string
+  ): void {
+    for (const entry of this.manifest.annotations) {
+      if (!this.annotations.has(entry.filename)) continue;
+      try {
+        const reader = this.getPSMReader(entry.filename);
+        let text: string;
+        let isMzTab: boolean;
+        if (reader instanceof MzTabReader) {
+          text = reader.filter(scans);
+          isMzTab = true;
+        } else {
+          text = writeMzTab(
+            reader.psms.filter((psm) => scans.has(psm.scan_number)),
+            {
+              searchInfo: reader.searchInfo,
+              msRunLocation: spectraFile,
+              sourceFormat: reader.format,
+              sourceName: entry.filename.replace(/\.zst$/i, ""),
+            }
+          );
+          isMzTab = false;
+        }
+        builder.addMzTab(text, {
+          filename: mzTabMemberName(entry.filename, true, isMzTab),
+          description: entry.description,
+          compressed: true,
+        });
+      } catch (err) {
+        console.warn(
+          `Warning: failed to filter annotation '${entry.filename}': ${(err as Error).message}`
+        );
       }
     }
   }

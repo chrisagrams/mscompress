@@ -9,6 +9,9 @@ import * as tar from "tar";
 import native from "@/core/bindings.js";
 import { MSZFile } from "@/files/msz-file.js";
 import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
+import { MzTabReader, writeMzTab } from "@/annotations/mztab.js";
+import type { AnnotationFormat, PSM, SearchInfo } from "@/annotations/psm.js";
+import { convertToMzTab, mzTabMemberName } from "@/annotations/reader.js";
 
 /**
  * Builder for creating MSZX archives from MSZ files and annotations.
@@ -26,10 +29,10 @@ import { MSZXManifest, AnnotationEntry } from "@/mszx/mszx-manifest.js";
 export class MSZXBuilder {
   private msz: MSZFile;
   private mszPath: string;
-  private annotations: Array<{ path: string; entry: AnnotationEntry }> = [];
+  private annotations: Array<{ data: Buffer; entry: AnnotationEntry }> = [];
   private description?: string;
   private sourceName: string;
-  private joinKey: string = "scan_number";
+  private joinKey: string = "spectra_ref";
   private extra: Record<string, unknown> = {};
 
   /**
@@ -49,54 +52,107 @@ export class MSZXBuilder {
   }
 
   /**
-   * Add annotations to the archive.
+   * Add search results to the archive.
    *
-   * @param filePath - Path to the annotation file
-   * @param options - Annotation options
+   * The file is converted to mzTab (the only format archives store) and the
+   * original is not kept. The member is named `<basename>.mztab` (an mzTab
+   * input keeps its name), plus `.zst` when `compressed` (default `true`,
+   * matching the Python builder).
+   *
+   * @param filePath - Path to an mzTab, pepXML or Percolator TSV/PIN file
+   *   (optionally zstd-compressed with a `.zst` suffix).
+   * @param options - Annotation options. `format` is a hint for the *input*
+   *   format, used instead of auto-detection; the stored format is always mzTab.
    * @returns This builder for method chaining
+   * @throws Error if the file is missing or its format cannot be determined.
    */
   addAnnotations(
     filePath: string,
     options?: {
       description?: string;
-      format?: "percolator_tsv" | "pepxml" | "tsv";
+      format?: AnnotationFormat;
       compressed?: boolean;
     }
   ): this {
     if (!fs.existsSync(filePath)) {
       throw new Error(`Annotation file not found: ${filePath}`);
     }
+    const conversion = convertToMzTab(fs.readFileSync(filePath), filePath, {
+      format: options?.format,
+      msRunLocation: path.basename(this.mszPath),
+    });
+    const compressed = options?.compressed ?? true;
+    return this.addMzTab(conversion.text, {
+      filename: mzTabMemberName(filePath, compressed, conversion.inputFormat === "mztab"),
+      description: options?.description,
+      compressed,
+      numRecords: conversion.numRecords,
+    });
+  }
 
-    const compressed = options?.compressed ?? false;
-    const filename = path.basename(filePath) + (compressed ? ".zst" : "");
-
-    // Auto-detect format from extension if not provided
-    let format = options?.format;
-    if (!format) {
-      const ext = path.extname(filePath).toLowerCase();
-      if (ext === ".pin" || ext === ".tsv") {
-        format = "percolator_tsv";
-      } else if (ext === ".pepxml" || ext === ".xml") {
-        format = "pepxml";
-      } else {
-        format = "tsv";
-      }
+  /**
+   * Add in-memory PSMs to the archive, written as mzTab.
+   *
+   * @param psms - PSMs to store.
+   * @param options - `filename` defaults to `"psms.mztab"` (`.mztab` is appended
+   *   if missing, `.zst` when `compressed`, which defaults to `true`).
+   * @returns This builder for method chaining
+   */
+  addPSMs(
+    psms: Iterable<PSM>,
+    options?: {
+      filename?: string;
+      searchInfo?: SearchInfo;
+      description?: string;
+      compressed?: boolean;
     }
+  ): this {
+    const list = [...psms];
+    const text = writeMzTab(list, {
+      searchInfo: options?.searchInfo,
+      msRunLocation: path.basename(this.mszPath),
+    });
+    const compressed = options?.compressed ?? true;
+    return this.addMzTab(text, {
+      filename: mzTabMemberName(options?.filename ?? "psms.mztab", compressed),
+      description: options?.description,
+      compressed,
+      numRecords: list.length,
+    });
+  }
 
-    // Count lines for num_records (simple implementation)
-    const content = fs.readFileSync(filePath, "utf-8");
-    const lines = content.split("\n").filter((line) => line.trim().length > 0);
-    const num_records = Math.max(0, lines.length - 1); // Subtract header
-
+  /**
+   * Add an mzTab document verbatim, under an explicit member name.
+   *
+   * @param content - mzTab text or bytes.
+   * @param options - `filename` is the exact member name; `numRecords` is
+   *   counted by parsing `content` when omitted.
+   * @returns This builder for method chaining
+   * @throws Error if a member with the same name was already added.
+   */
+  addMzTab(
+    content: string | Buffer,
+    options: {
+      filename: string;
+      description?: string;
+      compressed?: boolean;
+      numRecords?: number;
+    }
+  ): this {
+    const filename = options.filename;
+    if (this.annotations.some((a) => a.entry.filename === filename)) {
+      throw new Error(`Duplicate annotation member name: ${filename}`);
+    }
+    const raw = typeof content === "string" ? Buffer.from(content, "utf-8") : content;
+    const compressed = options.compressed ?? true;
     const entry: AnnotationEntry = {
       filename,
-      format,
+      format: "mztab",
       compressed,
-      description: options?.description,
-      num_records,
+      description: options.description,
+      num_records: options.numRecords ?? new MzTabReader(raw).length,
     };
-
-    this.annotations.push({ path: filePath, entry });
+    this.annotations.push({ data: compressed ? native.zstdCompress(raw) : raw, entry });
     return this;
   }
 
@@ -114,7 +170,8 @@ export class MSZXBuilder {
   /**
    * Set the key used to join spectra with annotations.
    *
-   * @param joinKey - Join key (e.g., 'scan_number', 'index')
+   * @param joinKey - Join key (default 'spectra_ref', matching the mzTab
+   *   `spectra_ref` column; e.g. 'scan_number')
    * @returns This builder for method chaining
    */
   setJoinKey(joinKey: string): this {
@@ -152,6 +209,13 @@ export class MSZXBuilder {
     });
   }
 
+  /** Write the (already converted, possibly compressed) annotation members into `dir`. */
+  private stageAnnotations(dir: string): void {
+    for (const { data, entry } of this.annotations) {
+      fs.writeFileSync(path.join(dir, entry.filename), data);
+    }
+  }
+
   /**
    * Save the MSZX archive to disk.
    *
@@ -178,18 +242,7 @@ export class MSZXBuilder {
       const tempMszPath = path.join(tempDir, manifest.spectra_file);
       fs.copyFileSync(this.mszPath, tempMszPath);
 
-      // Copy annotation files to temp directory
-      for (const { path: annotationPath, entry } of this.annotations) {
-        const tempAnnotationPath = path.join(tempDir, entry.filename);
-
-        if (entry.compressed) {
-          const data = fs.readFileSync(annotationPath);
-          const compressed = native.zstdCompress(data);
-          fs.writeFileSync(tempAnnotationPath, compressed);
-        } else {
-          fs.copyFileSync(annotationPath, tempAnnotationPath);
-        }
-      }
+      this.stageAnnotations(tempDir);
 
       // Create tar archive from temp directory
       await tar.create(
@@ -233,15 +286,7 @@ export class MSZXBuilder {
       const tempMszPath = path.join(tempDir, manifest.spectra_file);
       fs.copyFileSync(this.mszPath, tempMszPath);
 
-      for (const { path: annotationPath, entry } of this.annotations) {
-        const tempAnnotationPath = path.join(tempDir, entry.filename);
-        if (entry.compressed) {
-          const data = fs.readFileSync(annotationPath);
-          fs.writeFileSync(tempAnnotationPath, native.zstdCompress(data));
-        } else {
-          fs.copyFileSync(annotationPath, tempAnnotationPath);
-        }
-      }
+      this.stageAnnotations(tempDir);
 
       tar.create(
         {

@@ -11,7 +11,7 @@ Multi-threaded lossless/lossy compression library for Mass Spectrometry data wit
 - 🎯 **Random Access**: Read individual spectra without full decompression
 - 🔧 **Flexible**: Supports both lossless and lossy compression
 - 📊 **Format Conversion**: mzML ↔ MSZ with filtering options
-- 🗂️ **MSZX Archives**: Bundle MSZ files with annotations and metadata
+- 🗂️ **MSZX Archives**: Bundle MSZ files with search results (stored as mzTab) and metadata
 - 🔒 **Type-Safe**: Full TypeScript support with type definitions
 
 ## Installation
@@ -109,7 +109,9 @@ Same as `MZMLFile`.
 
 ### `MSZXFile`
 
-Handles bundled MSZX archives containing MSZ files with annotations and metadata.
+Handles bundled MSZX archives containing MSZ files with search results and metadata.
+Search results are stored as mzTab; archives written by older versions (raw
+pepXML / Percolator members) are still readable through the same API.
 
 #### Static Methods
 
@@ -118,9 +120,10 @@ Handles bundled MSZX archives containing MSZ files with annotations and metadata
 #### Methods
 
 - **`close(): void`** - Close archive and clean up temporary files
-- **`getAnnotationFile(filename: string): Buffer`** - Get raw annotation file content
+- **`getAnnotationFile(filename: string): Buffer`** - Get raw (decompressed) annotation file content
 - **`getAnnotationFilesByFormat(format: string): string[]`** - Get annotation files by format
-- **`extractMSZX(output: string, options?: ExtractOptions): Promise<MSZXFile>`** - Extract subset to new MSZX
+- **`getPSMReader(filename: string): PSMCollection`** - Parsed PSMs of one annotation member (an `MzTabReader` for mzTab members)
+- **`extract(output: string, options?: ExtractOptions): BaseFile`** - Extract a subset; to a `.mszx` output, annotations are filtered to the extracted scans and stored as mzTab
 
 All MSZ file methods are also available (getMzBinary, getIntenBinary, getXml, decompress, extract).
 
@@ -129,11 +132,15 @@ All MSZ file methods are also available (getMzBinary, getIntenBinary, getXml, de
 - **`archive_path: string`** - Path to the MSZX archive
 - **`manifest: MSZXManifest`** - Archive manifest with metadata
 - **`annotation_files: AnnotationEntry[]`** - List of annotation files
+- **`psms: PSM[]`** - PSMs of the primary annotation (the first mzTab member)
+- **`annotationReader: PSMCollection | null`** - Primary annotation reader
+- **`psmReaders: Map<string, PSMCollection>`** - Parsed readers for every annotation member
 - All MSZ file properties (path, filesize, format, positions, spectra, arguments)
 
 ### `MSZXBuilder`
 
-Builder for creating MSZX archives.
+Builder for creating MSZX archives. Search results are converted to mzTab
+(the only format archives store); the original file is not kept.
 
 ```typescript
 const msz = read('sample.msz') as MSZFile;
@@ -141,7 +148,7 @@ const builder = new MSZXBuilder(msz);
 
 builder
   .setDescription('Proteomics dataset')
-  .addAnnotations('results.pin', { format: 'percolator_tsv' })
+  .addAnnotations('results.pin')          // stored as results.pin.mztab
   .setExtra('experiment_id', 'EXP001');
 
 await builder.save('sample.mszx');
@@ -149,9 +156,11 @@ await builder.save('sample.mszx');
 
 #### Methods
 
-- **`addAnnotations(filePath: string, options?): this`** - Add annotation file
+- **`addAnnotations(filePath: string, options?: { description?, format?, compressed? }): this`** - Add an mzTab, pepXML or Percolator TSV/PIN file, converted to mzTab (`format` is an input-format hint; `compressed` defaults to `true`)
+- **`addPSMs(psms: Iterable<PSM>, options?: { filename?, searchInfo?, description?, compressed? }): this`** - Add in-memory PSMs, written as mzTab
+- **`addMzTab(content: string | Buffer, options: { filename, description?, compressed?, numRecords? }): this`** - Add an mzTab document verbatim under an exact member name
 - **`setDescription(description: string): this`** - Set archive description
-- **`setJoinKey(joinKey: string): this`** - Set join key (default: 'scan_number')
+- **`setJoinKey(joinKey: string): this`** - Set join key (default: 'spectra_ref')
 - **`setExtra(key: string, value: any): this`** - Add custom metadata
 - **`save(outputPath: string): Promise<string>`** - Save archive
 
@@ -359,14 +368,12 @@ const builder = new MSZXBuilder(msz);
 
 builder
   .setDescription('Annotated proteomics dataset')
-  .setJoinKey('scan_number')
   .addAnnotations('percolator.pin', {
-    format: 'percolator_tsv',
-    description: 'Percolator PSM results',
+    description: 'Percolator PSM results',  // -> percolator.pin.mztab.zst
   })
   .addAnnotations('results.pepXML', {
-    format: 'pepxml',
-    description: 'X!Tandem search results',
+    description: 'X!Tandem search results', // -> results.pepXML.mztab
+    compressed: false,
   })
   .setExtra('experiment', 'EXP001')
   .setExtra('date', '2024-01-15');
@@ -394,15 +401,47 @@ for (let i = 0; i < limit; i++) {
   console.log(`Scan ${spectrum.scan}: ${spectrum.size} peaks`);
 }
 
-// Access annotation files
+// Access search results
 for (const entry of mszx.annotation_files) {
   console.log(`${entry.filename}: ${entry.format} (${entry.num_records} records)`);
-  const content = mszx.getAnnotationFile(entry.filename);
-  // Process annotation content...
 }
+for (const psm of mszx.psms) {               // primary (mzTab) annotation
+  console.log(psm.scan_number, psm.peptide, psm.score, psm.q_value);
+}
+const reader = mszx.getPSMReader(mszx.annotation_files[0].filename);
+console.log(reader.searchInfo.software, reader.getBestByScan(1234));
 
 mszx.close();
 ```
+
+#### Search Results (mzTab)
+
+The annotation helpers can also be used on their own:
+
+```typescript
+import fs from 'node:fs';
+import { readPSMs, toMzTab, MzTabReader } from 'mscompress';
+
+// Parse mzTab, pepXML or Percolator TSV/PIN (format auto-detected)
+const psms = readPSMs(fs.readFileSync('results.pin'), 'results.pin');
+
+// Convert to mzTab text
+const mztab = toMzTab(fs.readFileSync('results.pepXML'), 'results.pepXML');
+
+// Read and filter mzTab
+const reader = new MzTabReader(mztab);
+const subset = reader.filter(new Set([1234, 1240]));
+```
+
+Other exports: `writeMzTab`, `convertToMzTab`, `parsePepXML`, `parsePercolator`,
+`detectAnnotationFormat`, `mzTabMemberName`, `PSMCollection`, `createPSM`,
+`createSearchInfo`, and the `PSM` / `SearchInfo` / `ModificationSpec` types.
+`MSZXBatchWriter.addPSMs(entryIndex, input, options?)` attaches converted
+search results to a batch-archive entry.
+
+Archives written by older versions store raw pepXML / Percolator members; they
+read through the same API and can be converted with the Python tool
+`python -m mscompress.mszx.upgrade in.mszx [-o out.mszx]`.
 
 #### Extract Subset to New MSZX
 
@@ -411,10 +450,11 @@ import { MSZXFile } from 'mscompress';
 
 const mszx = MSZXFile.open('sample.mszx');
 
-// Extract MS2 spectra with annotations to new archive
-const ms2Archive = await mszx.extractMSZX('ms2-only.mszx', {
+// Extract MS2 spectra to a new archive; annotations are filtered to the
+// extracted scans and stored as mzTab
+const ms2Archive = mszx.extract('ms2-only.mszx', {
   msLevel: 2,
-});
+}) as MSZXFile;
 
 console.log(`Extracted ${ms2Archive.spectra.length} MS2 spectra`);
 ms2Archive.close();

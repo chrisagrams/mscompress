@@ -2,6 +2,8 @@ import pytest
 from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
 from mscompress import read
+from mscompress.annotations import MzTabReader
+from mscompress.types import AnnotationFormat
 
 @pytest.fixture
 def msz_file(msz_file_path):
@@ -121,12 +123,16 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
             assert extracted.spectra[0].scan == scan1
             
             # Verify Annotations
-            pin_reader = extracted.get_annotation_reader("test.pin.zst")
+            # Only mzTab is stored, converted from each source file.
+            assert {e.format for e in extracted.annotation_files} == {AnnotationFormat.MZTAB}
+            pin_reader = extracted.get_annotation_reader("test.pin.mztab.zst")
+            assert isinstance(pin_reader, MzTabReader)
             assert len(pin_reader) == 1
             assert pin_reader[0].scan_number == scan1
             
             # Check PepXML
-            pep_reader = extracted.get_annotation_reader("test.pep.xml.zst")
+            pep_reader = extracted.get_annotation_reader("test.pep.xml.mztab.zst")
+            assert pep_reader.source_format == "pepxml"
             assert len(pep_reader) == 1
             assert pep_reader[0].scan_number == scan1
             
@@ -169,7 +175,7 @@ run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
             assert all(l == target_level for l in extracted_levels)
             
             # Verify annotation is preserved (since it matches a scan in the level)
-            pin_reader = extracted.get_annotation_reader("test.pin.zst")
+            pin_reader = extracted.get_annotation_reader("test.pin.mztab.zst")
             assert len(pin_reader) == 1
             assert pin_reader[0].scan_number == target_scan
             

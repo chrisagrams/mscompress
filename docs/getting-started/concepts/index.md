@@ -8,7 +8,7 @@ Four ideas to keep in your head while you use `mscompress`:
   streams (XML, m/z, intensity) compressed independently so individual spectra
   are randomly addressable.
 - **[MSZX](mszx.md)** — a tar archive bundling an MSZ file with
-  annotation files (pepXML, Percolator TSV) and a JSON manifest.
+  search results (stored as mzTab) and a JSON manifest.
 - **[Lossy vs lossless](lossy-vs-lossless.md)** — which compression path you
   take depends on whether you can tolerate precision loss on m/z and
   intensity arrays.

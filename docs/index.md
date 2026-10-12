@@ -17,8 +17,8 @@ annotations and a JSON manifest.
 - Supports a registry of **pre-compression transforms** (delta encoding, log,
   bit-packing, type casts, variable bit-rate) that improve compression ratio
   on numeric arrays.
-- Bundles **MSZX** archives that ship search results (pepXML / Percolator TSV)
-  alongside the spectra.
+- Bundles **MSZX** archives that ship search results alongside the spectra,
+  stored as mzTab (pepXML and Percolator TSV/PIN output is converted on write).
 
 ## Pick your interface
 

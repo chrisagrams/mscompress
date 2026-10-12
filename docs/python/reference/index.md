@@ -11,7 +11,7 @@ Generated from docstrings. For task-oriented recipes, see the
 - **[`mscompress.mszx`](mszx.md)** — `MSZXFile`, `MSZXBuilder`,
   `MSZXManifest`, `create_mszx`
 - **[`mscompress.metadata`](metadata.md)** — Croissant metadata builders
-- **[`mscompress.annotations`](annotations.md)** — PSM readers
+- **[`mscompress.annotations`](annotations.md)** — PSM readers and the mzTab writer
 - **[`mscompress.parquet`](parquet.md)** — Parquet round-tripping
   (optional extra)
 - **[`mscompress.datasets`](datasets.md)** — PyTorch and JAX adapters

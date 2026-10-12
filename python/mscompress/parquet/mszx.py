@@ -1,8 +1,9 @@
 """parquet -> .mszx + parquet -> annotations TSV.
 
-`parquet_to_mszx` bundles the .msz produced by `parquet_to_msz` with a
-Percolator-style annotations TSV (written here as `_write_annotations_tsv`)
-into a single archive.
+`parquet_to_mszx` bundles the .msz produced by `parquet_to_msz` with the
+per-row annotations into a single archive. The annotations are staged as a
+Percolator-style TSV (`_write_annotations_tsv`) and stored as mzTab, like
+every other annotation source.
 """
 
 from __future__ import annotations
@@ -207,7 +208,7 @@ def parquet_to_mszx(
 
     Produces a `.mszx` containing:
       - `spectra.msz` - compressed mz/intensity/retention-time data
-      - `<source>.tsv.zst` - Percolator-style annotations (peptide/charge/score…)
+      - `<source>.tsv.mztab.zst` - annotations (peptide/charge/score…) as mzTab
       - `manifest.json`
 
     Args:

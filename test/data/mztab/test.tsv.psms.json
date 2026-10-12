@@ -1,0 +1,2759 @@
+{
+ "search_info": {
+  "software": "Percolator",
+  "software_version": null,
+  "primary_score_name": "score",
+  "fixed_mods": [],
+  "variable_mods": []
+ },
+ "psms": [
+  {
+   "scan_number": 4310,
+   "peptide": "TDLNPDNLQGGDDLDPNYVLSSR",
+   "charge": 2,
+   "score": 0.0,
+   "proteins": [
+    "sp|P12277|KCRB_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.328432,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": 0.0,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.328432
+   }
+  },
+  {
+   "scan_number": 4169,
+   "peptide": "QGQSLGPRAGR",
+   "charge": 2,
+   "score": 0.0,
+   "proteins": [
+    "sp|O95922-4|TTLL1_HUMAN",
+    "sp|O95922|TTLL1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.328432,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": 0.0,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.328432
+   }
+  },
+  {
+   "scan_number": 2133,
+   "peptide": "GYNFTTTAER",
+   "charge": 2,
+   "score": 0.0,
+   "proteins": [
+    "sp|Q562R1|ACTBL_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.328432,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": 0.0,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.328432
+   }
+  },
+  {
+   "scan_number": 8020,
+   "peptide": "QAMLTLELER",
+   "charge": 2,
+   "score": -0.124243,
+   "proteins": [
+    "sp|Q86TI0-2|TBCD1_HUMAN",
+    "sp|Q86TI0|TBCD1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.394527,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.124243,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.394527
+   }
+  },
+  {
+   "scan_number": 2854,
+   "peptide": "TGAVPALIR",
+   "charge": 2,
+   "score": -0.164347,
+   "proteins": [
+    "sp|Q8N6G2|TEX26_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.418408,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.164347,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.418408
+   }
+  },
+  {
+   "scan_number": 5554,
+   "peptide": "TLWKFMIF",
+   "charge": 2,
+   "score": -0.257514,
+   "proteins": [
+    "sp|Q03519-2|TAP2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.47897,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.257514,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.47897
+   }
+  },
+  {
+   "scan_number": 4526,
+   "peptide": "KSPEEESRPPPDLAR",
+   "charge": 2,
+   "score": -0.285644,
+   "proteins": [
+    "sp|Q9BWH6-2|RPAP1_HUMAN",
+    "sp|Q9BWH6|RPAP1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.498689,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.285644,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.498689
+   }
+  },
+  {
+   "scan_number": 2206,
+   "peptide": "EVM[15.9949]SLHEASR",
+   "charge": 2,
+   "score": -0.310765,
+   "proteins": [
+    "sp|P58107|EPIPL_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.516863,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.310765,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.516863
+   }
+  },
+  {
+   "scan_number": 3183,
+   "peptide": "DNFTLIPEGTNGTEER",
+   "charge": 2,
+   "score": -0.345919,
+   "proteins": [
+    "sp|Q16555-2|DPYL2_HUMAN",
+    "sp|Q16555|DPYL2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.543184,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.345919,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.543184
+   }
+  },
+  {
+   "scan_number": 5627,
+   "peptide": "LLFEGAGSNPGDK",
+   "charge": 2,
+   "score": -0.41341,
+   "proteins": [
+    "sp|P61421|VA0D1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.596581,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.41341,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.596581
+   }
+  },
+  {
+   "scan_number": 4661,
+   "peptide": "PQIIKMTRILTAFK",
+   "charge": 2,
+   "score": -0.440195,
+   "proteins": [
+    "sp|P31327-3|CPSM_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.618798,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.440195,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.618798
+   }
+  },
+  {
+   "scan_number": 7029,
+   "peptide": "SPLKIHGPIRIR",
+   "charge": 2,
+   "score": -0.444618,
+   "proteins": [
+    "sp|Q86T82|UBP37_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.622522,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.444618,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.622522
+   }
+  },
+  {
+   "scan_number": 2179,
+   "peptide": "EVM[15.9949]LVGIGDK",
+   "charge": 2,
+   "score": -0.450509,
+   "proteins": [
+    "sp|P36542-2|ATPG_HUMAN",
+    "sp|P36542|ATPG_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.627504,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.450509,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.627504
+   }
+  },
+  {
+   "scan_number": 1569,
+   "peptide": "KSSARSTQGIR",
+   "charge": 2,
+   "score": -0.473367,
+   "proteins": [
+    "sp|O60880-4|SH21A_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.647086,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.473367,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.647086
+   }
+  },
+  {
+   "scan_number": 5861,
+   "peptide": "TEEIIKGNMLATLK",
+   "charge": 2,
+   "score": -0.483393,
+   "proteins": [
+    "sp|A4UGR9-2|XIRP2_HUMAN",
+    "sp|A4UGR9-3|XIRP2_HUMAN",
+    "sp|A4UGR9-8|XIRP2_HUMAN",
+    "sp|A4UGR9|XIRP2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.655793,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.483393,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.655793
+   }
+  },
+  {
+   "scan_number": 4393,
+   "peptide": "LGGNVVVSLEGKPL",
+   "charge": 2,
+   "score": -0.489288,
+   "proteins": [
+    "sp|Q9Y281-3|COF2_HUMAN",
+    "sp|Q9Y281|COF2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.660946,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.489288,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.660946
+   }
+  },
+  {
+   "scan_number": 1851,
+   "peptide": "LDSPSRSPSK",
+   "charge": 2,
+   "score": -0.498728,
+   "proteins": [
+    "sp|O14523-2|C2C2L_HUMAN",
+    "sp|O14523|C2C2L_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.669244,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.498728,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.669244
+   }
+  },
+  {
+   "scan_number": 3752,
+   "peptide": "DALPSNVEFLLAR",
+   "charge": 2,
+   "score": -0.508309,
+   "proteins": [
+    "sp|Q6PJ61|FBX46_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.277778,
+   "pep": 0.677725,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.508309,
+    "q-value": 0.277778,
+    "posterior_error_prob": 0.677725
+   }
+  },
+  {
+   "scan_number": 5825,
+   "peptide": "NAVELELAKC[57.0215]R",
+   "charge": 2,
+   "score": -0.567745,
+   "proteins": [
+    "sp|Q6ZP65-2|BICL1_HUMAN",
+    "sp|Q6ZP65|BICL1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.731408,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.567745,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.731408
+   }
+  },
+  {
+   "scan_number": 5481,
+   "peptide": "QITIC[57.0215]NQSPVR",
+   "charge": 2,
+   "score": -0.580404,
+   "proteins": [
+    "sp|P22223-2|CADH3_HUMAN",
+    "sp|P22223|CADH3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.743033,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.580404,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.743033
+   }
+  },
+  {
+   "scan_number": 5485,
+   "peptide": "LLNDISTALRNPNIQR",
+   "charge": 2,
+   "score": -0.582919,
+   "proteins": [
+    "sp|Q96PV0-2|SYGP1_HUMAN",
+    "sp|Q96PV0-3|SYGP1_HUMAN",
+    "sp|Q96PV0-4|SYGP1_HUMAN",
+    "sp|Q96PV0|SYGP1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.745349,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.582919,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.745349
+   }
+  },
+  {
+   "scan_number": 4589,
+   "peptide": "KSPEEESRPPPDLAR",
+   "charge": 2,
+   "score": -0.583931,
+   "proteins": [
+    "sp|Q9BWH6-2|RPAP1_HUMAN",
+    "sp|Q9BWH6|RPAP1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.746281,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.583931,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.746281
+   }
+  },
+  {
+   "scan_number": 4810,
+   "peptide": "TQSPGKC[57.0215]GKNGDK",
+   "charge": 2,
+   "score": -0.59043,
+   "proteins": [
+    "sp|Q4LE39-2|ARI4B_HUMAN",
+    "sp|Q4LE39|ARI4B_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.752275,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.59043,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.752275
+   }
+  },
+  {
+   "scan_number": 1498,
+   "peptide": "KPFNQNKNR",
+   "charge": 2,
+   "score": -0.590973,
+   "proteins": [
+    "sp|P08575-10|PTPRC_HUMAN",
+    "sp|P08575-4|PTPRC_HUMAN",
+    "sp|P08575-5|PTPRC_HUMAN",
+    "sp|P08575-6|PTPRC_HUMAN",
+    "sp|P08575-7|PTPRC_HUMAN",
+    "sp|P08575-8|PTPRC_HUMAN",
+    "sp|P08575-9|PTPRC_HUMAN",
+    "sp|P08575|PTPRC_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.375,
+   "pep": 0.752777,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.590973,
+    "q-value": 0.375,
+    "posterior_error_prob": 0.752777
+   }
+  },
+  {
+   "scan_number": 1370,
+   "peptide": "NLFGSGSLRASESNR",
+   "charge": 2,
+   "score": -0.60307,
+   "proteins": [
+    "sp|Q12756-2|KIF1A_HUMAN",
+    "sp|Q12756-3|KIF1A_HUMAN",
+    "sp|Q12756|KIF1A_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.44,
+   "pep": 0.763963,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.60307,
+    "q-value": 0.44,
+    "posterior_error_prob": 0.763963
+   }
+  },
+  {
+   "scan_number": 2812,
+   "peptide": "KPEGAIC[57.0215]LYTK",
+   "charge": 2,
+   "score": -0.613577,
+   "proteins": [
+    "sp|O60423-1|AT8B3_HUMAN",
+    "sp|O60423-3|AT8B3_HUMAN",
+    "sp|O60423|AT8B3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.444444,
+   "pep": 0.7737,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.613577,
+    "q-value": 0.444444,
+    "posterior_error_prob": 0.7737
+   }
+  },
+  {
+   "scan_number": 3617,
+   "peptide": "QDRELLARLEK",
+   "charge": 2,
+   "score": -0.624845,
+   "proteins": [
+    "sp|Q8TD16-2|BICD2_HUMAN",
+    "sp|Q8TD16|BICD2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.444444,
+   "pep": 0.784157,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.624845,
+    "q-value": 0.444444,
+    "posterior_error_prob": 0.784157
+   }
+  },
+  {
+   "scan_number": 1644,
+   "peptide": "KSSARSTQGIR",
+   "charge": 2,
+   "score": -0.631987,
+   "proteins": [
+    "sp|O60880-4|SH21A_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.5,
+   "pep": 0.790789,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.631987,
+    "q-value": 0.5,
+    "posterior_error_prob": 0.790789
+   }
+  },
+  {
+   "scan_number": 4577,
+   "peptide": "PQIIKMTRILTAFK",
+   "charge": 3,
+   "score": -0.641256,
+   "proteins": [
+    "sp|P31327-3|CPSM_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.575758,
+   "pep": 0.799395,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.641256,
+    "q-value": 0.575758,
+    "posterior_error_prob": 0.799395
+   }
+  },
+  {
+   "scan_number": 4516,
+   "peptide": "NISAKTAPRK",
+   "charge": 2,
+   "score": -0.643358,
+   "proteins": [
+    "sp|Q8IZ96-10|CKLF1_HUMAN",
+    "sp|Q8IZ96-17|CKLF1_HUMAN",
+    "sp|Q8IZ96-8|CKLF1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.575758,
+   "pep": 0.801347,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.643358,
+    "q-value": 0.575758,
+    "posterior_error_prob": 0.801347
+   }
+  },
+  {
+   "scan_number": 1278,
+   "peptide": "SGSSPGLRDGSGTPSR",
+   "charge": 2,
+   "score": -0.64381,
+   "proteins": [
+    "sp|Q9UQ35-2|SRRM2_HUMAN",
+    "sp|Q9UQ35|SRRM2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.575758,
+   "pep": 0.801766,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.64381,
+    "q-value": 0.575758,
+    "posterior_error_prob": 0.801766
+   }
+  },
+  {
+   "scan_number": 3990,
+   "peptide": "QHVKELVNM[15.9949]ILM[15.9949]K",
+   "charge": 2,
+   "score": -0.650288,
+   "proteins": [
+    "sp|Q9H981-2|ARP8_HUMAN",
+    "sp|Q9H981|ARP8_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.575758,
+   "pep": 0.807778,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.650288,
+    "q-value": 0.575758,
+    "posterior_error_prob": 0.807778
+   }
+  },
+  {
+   "scan_number": 2737,
+   "peptide": "VEGPAFTDAIR",
+   "charge": 2,
+   "score": -0.654563,
+   "proteins": [
+    "sp|Q96TA1-2|NIBA2_HUMAN",
+    "sp|Q96TA1|NIBA2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.575758,
+   "pep": 0.811744,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.654563,
+    "q-value": 0.575758,
+    "posterior_error_prob": 0.811744
+   }
+  },
+  {
+   "scan_number": 4590,
+   "peptide": "PQIIKMTRILTAFK",
+   "charge": 2,
+   "score": -0.661198,
+   "proteins": [
+    "sp|P31327-3|CPSM_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.817893,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.661198,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.817893
+   }
+  },
+  {
+   "scan_number": 4905,
+   "peptide": "DLVEAVAHILGIR",
+   "charge": 2,
+   "score": -0.68498,
+   "proteins": [
+    "sp|P49327|FAS_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.839877,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.68498,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.839877
+   }
+  },
+  {
+   "scan_number": 1943,
+   "peptide": "VLTQM[15.9949]GSPSIR",
+   "charge": 2,
+   "score": -0.688015,
+   "proteins": [
+    "sp|P84022-2|SMAD3_HUMAN",
+    "sp|P84022-3|SMAD3_HUMAN",
+    "sp|P84022-4|SMAD3_HUMAN",
+    "sp|P84022|SMAD3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.842673,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.688015,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.842673
+   }
+  },
+  {
+   "scan_number": 2764,
+   "peptide": "SKNIILR",
+   "charge": 2,
+   "score": -0.691949,
+   "proteins": [
+    "sp|Q8N1T3-3|MYO1H_HUMAN",
+    "sp|Q8N1T3|MYO1H_HUMAN",
+    "sp|Q8WYB5-2|KAT6B_HUMAN",
+    "sp|Q8WYB5-3|KAT6B_HUMAN",
+    "sp|Q8WYB5|KAT6B_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.846296,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.691949,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.846296
+   }
+  },
+  {
+   "scan_number": 1228,
+   "peptide": "GGGGPGGGAPGGPGLGLGSLGEER",
+   "charge": 3,
+   "score": -0.700492,
+   "proteins": [
+    "sp|Q8NFZ4|NLGN2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.854147,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.700492,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.854147
+   }
+  },
+  {
+   "scan_number": 1391,
+   "peptide": "WLSYIDEATMSNGK",
+   "charge": 2,
+   "score": -0.711507,
+   "proteins": [
+    "sp|P10911-2|MCF2_HUMAN",
+    "sp|P10911-6|MCF2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.864238,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.711507,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.864238
+   }
+  },
+  {
+   "scan_number": 6442,
+   "peptide": "TRFTC[57.0215]PFVEK",
+   "charge": 2,
+   "score": -0.713755,
+   "proteins": [
+    "sp|Q9BZ72-2|PITM2_HUMAN",
+    "sp|Q9BZ72|PITM2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.866293,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.713755,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.866293
+   }
+  },
+  {
+   "scan_number": 5199,
+   "peptide": "TVSGM[15.9949]DGM[15.9949]KC[57.0215]GPGLR",
+   "charge": 2,
+   "score": -0.716116,
+   "proteins": [
+    "sp|Q9NQ30-2|ESM1_HUMAN",
+    "sp|Q9NQ30|ESM1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.585366,
+   "pep": 0.868448,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.716116,
+    "q-value": 0.585366,
+    "posterior_error_prob": 0.868448
+   }
+  },
+  {
+   "scan_number": 2034,
+   "peptide": "KAEC[57.0215]LVALGR",
+   "charge": 2,
+   "score": -0.717802,
+   "proteins": [
+    "sp|Q8IYR2|SMYD4_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.595238,
+   "pep": 0.869986,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.717802,
+    "q-value": 0.595238,
+    "posterior_error_prob": 0.869986
+   }
+  },
+  {
+   "scan_number": 8413,
+   "peptide": "AVC[57.0215]M[15.9949]LSNTTAIAEAWAR",
+   "charge": 3,
+   "score": -0.72165,
+   "proteins": [
+    "sp|P0DPH7-2|TBA3C_HUMAN",
+    "sp|P0DPH7|TBA3C_HUMAN",
+    "sp|P0DPH8|TBA3D_HUMAN",
+    "sp|P68363-2|TBA1B_HUMAN",
+    "sp|P68363|TBA1B_HUMAN",
+    "sp|P68366-2|TBA4A_HUMAN",
+    "sp|P68366|TBA4A_HUMAN",
+    "sp|Q6PEY2|TBA3E_HUMAN",
+    "sp|Q71U36-2|TBA1A_HUMAN",
+    "sp|Q71U36|TBA1A_HUMAN",
+    "sp|Q9NY65-2|TBA8_HUMAN",
+    "sp|Q9NY65|TBA8_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.613636,
+   "pep": 0.873492,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.72165,
+    "q-value": 0.613636,
+    "posterior_error_prob": 0.873492
+   }
+  },
+  {
+   "scan_number": 2527,
+   "peptide": "KFTM[15.9949]LALR",
+   "charge": 2,
+   "score": -0.725333,
+   "proteins": [
+    "sp|Q96SQ9-2|CP2S1_HUMAN",
+    "sp|Q96SQ9|CP2S1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.613636,
+   "pep": 0.876841,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.725333,
+    "q-value": 0.613636,
+    "posterior_error_prob": 0.876841
+   }
+  },
+  {
+   "scan_number": 3122,
+   "peptide": "IC[57.0215]PHAGAQDK",
+   "charge": 2,
+   "score": -0.797952,
+   "proteins": [
+    "sp|Q9H7L2|KI3X1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.622222,
+   "pep": 0.941082,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.797952,
+    "q-value": 0.622222,
+    "posterior_error_prob": 0.941082
+   }
+  },
+  {
+   "scan_number": 4459,
+   "peptide": "QPSTGDYYRQLGR",
+   "charge": 2,
+   "score": -0.836348,
+   "proteins": [
+    "sp|B1AK53|ESPN_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.97298,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.836348,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.97298
+   }
+  },
+  {
+   "scan_number": 5197,
+   "peptide": "GLGGRAPSGAKPRQGK",
+   "charge": 2,
+   "score": -0.848438,
+   "proteins": [
+    "sp|Q96MM3|ZFP42_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.982648,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.848438,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.982648
+   }
+  },
+  {
+   "scan_number": 4007,
+   "peptide": "RSSSVKNITPR",
+   "charge": 2,
+   "score": -0.848733,
+   "proteins": [
+    "sp|Q9UQR0|SCML2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.982882,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.848733,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.982882
+   }
+  },
+  {
+   "scan_number": 2291,
+   "peptide": "QTRTRGPAPSAMPQSR",
+   "charge": 2,
+   "score": -0.850207,
+   "proteins": [
+    "sp|O15020-2|SPTN2_HUMAN",
+    "sp|O15020|SPTN2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.984048,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.850207,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.984048
+   }
+  },
+  {
+   "scan_number": 1642,
+   "peptide": "APGPGTPSHRRR",
+   "charge": 2,
+   "score": -0.861063,
+   "proteins": [
+    "sp|Q9NRH1-2|YAE1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.992553,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.861063,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.992553
+   }
+  },
+  {
+   "scan_number": 6513,
+   "peptide": "TRFTC[57.0215]PFVEK",
+   "charge": 2,
+   "score": -0.862739,
+   "proteins": [
+    "sp|Q9BZ72-2|PITM2_HUMAN",
+    "sp|Q9BZ72|PITM2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.993853,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.862739,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.993853
+   }
+  },
+  {
+   "scan_number": 3671,
+   "peptide": "LNEEM[15.9949]ITETAFR",
+   "charge": 2,
+   "score": -0.864528,
+   "proteins": [
+    "sp|Q4UJ75|A20A4_HUMAN",
+    "sp|Q5CZ79-2|AN20B_HUMAN",
+    "sp|Q5CZ79|AN20B_HUMAN",
+    "sp|Q5SQ80|A20A2_HUMAN",
+    "sp|Q5TYW2|A20A1_HUMAN",
+    "sp|Q5VUR7|A20A3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.995238,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.864528,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.995238
+   }
+  },
+  {
+   "scan_number": 6378,
+   "peptide": "TRFTC[57.0215]PFVEK",
+   "charge": 2,
+   "score": -0.865816,
+   "proteins": [
+    "sp|Q9BZ72-2|PITM2_HUMAN",
+    "sp|Q9BZ72|PITM2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.996232,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.865816,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.996232
+   }
+  },
+  {
+   "scan_number": 1986,
+   "peptide": "ASVSQAVFAR",
+   "charge": 2,
+   "score": -0.870282,
+   "proteins": [
+    "sp|Q9UPW6-2|SATB2_HUMAN",
+    "sp|Q9UPW6|SATB2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 0.999665,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.870282,
+    "q-value": 0.827586,
+    "posterior_error_prob": 0.999665
+   }
+  },
+  {
+   "scan_number": 5843,
+   "peptide": "QLEAETGC[57.0215]KIM[15.9949]VRGK",
+   "charge": 2,
+   "score": -0.873317,
+   "proteins": [
+    "sp|Q96PU8-3|QKI_HUMAN",
+    "sp|Q96PU8-5|QKI_HUMAN",
+    "sp|Q96PU8-6|QKI_HUMAN",
+    "sp|Q96PU8-8|QKI_HUMAN",
+    "sp|Q96PU8-9|QKI_HUMAN",
+    "sp|Q96PU8|QKI_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.873317,
+    "q-value": 0.827586,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2878,
+   "peptide": "TGAVPALIR",
+   "charge": 2,
+   "score": -0.8754,
+   "proteins": [
+    "sp|Q8N6G2|TEX26_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.8754,
+    "q-value": 0.827586,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4554,
+   "peptide": "TPAEVSHRFR",
+   "charge": 2,
+   "score": -0.878219,
+   "proteins": [
+    "sp|Q3T8J9-3|GON4L_HUMAN",
+    "sp|Q3T8J9|GON4L_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.878219,
+    "q-value": 0.827586,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 7263,
+   "peptide": "AGDALNERKYR",
+   "charge": 2,
+   "score": -0.878875,
+   "proteins": [
+    "sp|P20929-1|NEBU_HUMAN",
+    "sp|P20929-3|NEBU_HUMAN",
+    "sp|P20929-4|NEBU_HUMAN",
+    "sp|P20929|NEBU_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.827586,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.878875,
+    "q-value": 0.827586,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5896,
+   "peptide": "QLEAETGC[57.0215]KIM[15.9949]VRGK",
+   "charge": 2,
+   "score": -0.887672,
+   "proteins": [
+    "sp|Q96PU8-3|QKI_HUMAN",
+    "sp|Q96PU8-5|QKI_HUMAN",
+    "sp|Q96PU8-6|QKI_HUMAN",
+    "sp|Q96PU8-8|QKI_HUMAN",
+    "sp|Q96PU8-9|QKI_HUMAN",
+    "sp|Q96PU8|QKI_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.887672,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5024,
+   "peptide": "GLGGRAPSGAKPRQGK",
+   "charge": 2,
+   "score": -0.896513,
+   "proteins": [
+    "sp|Q96MM3|ZFP42_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.896513,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4844,
+   "peptide": "TGLPGNQGEPGSK",
+   "charge": 2,
+   "score": -0.897091,
+   "proteins": [
+    "sp|Q8IZC6-2|CORA1_HUMAN",
+    "sp|Q8IZC6|CORA1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.897091,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2333,
+   "peptide": "LLDIC[57.0215]AAM[15.9949]GLLEK",
+   "charge": 2,
+   "score": -0.900187,
+   "proteins": [
+    "sp|O95671-2|ASML_HUMAN",
+    "sp|O95671-3|ASML_HUMAN",
+    "sp|O95671|ASML_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.900187,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2324,
+   "peptide": "EAAPNEELVQR",
+   "charge": 2,
+   "score": -0.901472,
+   "proteins": [
+    "sp|Q8NCE0-2|SEN2_HUMAN",
+    "sp|Q8NCE0-4|SEN2_HUMAN",
+    "sp|Q8NCE0|SEN2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.901472,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1426,
+   "peptide": "KPFNQNKNR",
+   "charge": 2,
+   "score": -0.905514,
+   "proteins": [
+    "sp|P08575-10|PTPRC_HUMAN",
+    "sp|P08575-4|PTPRC_HUMAN",
+    "sp|P08575-5|PTPRC_HUMAN",
+    "sp|P08575-6|PTPRC_HUMAN",
+    "sp|P08575-7|PTPRC_HUMAN",
+    "sp|P08575-8|PTPRC_HUMAN",
+    "sp|P08575-9|PTPRC_HUMAN",
+    "sp|P08575|PTPRC_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.905514,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4017,
+   "peptide": "FEGPHGQPVGGLR",
+   "charge": 2,
+   "score": -0.906527,
+   "proteins": [
+    "sp|O94913|PCF11_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.906527,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5460,
+   "peptide": "ADPSILQNLR",
+   "charge": 2,
+   "score": -0.906679,
+   "proteins": [
+    "sp|Q567U6|CCD93_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.906679,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 6284,
+   "peptide": "TAEEQRLFLMDR",
+   "charge": 2,
+   "score": -0.906757,
+   "proteins": [
+    "sp|Q5CZC0-2|FSIP2_HUMAN",
+    "sp|Q5CZC0|FSIP2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.906757,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2187,
+   "peptide": "TGILQEAKR",
+   "charge": 2,
+   "score": -0.906863,
+   "proteins": [
+    "sp|Q9UMS6-2|SYNP2_HUMAN",
+    "sp|Q9UMS6-3|SYNP2_HUMAN",
+    "sp|Q9UMS6-4|SYNP2_HUMAN",
+    "sp|Q9UMS6-5|SYNP2_HUMAN",
+    "sp|Q9UMS6|SYNP2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.906863,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4735,
+   "peptide": "SLADEAEVHLKFSAK",
+   "charge": 2,
+   "score": -0.9072,
+   "proteins": [
+    "sp|O60861-1|GAS7_HUMAN",
+    "sp|O60861-2|GAS7_HUMAN",
+    "sp|O60861-4|GAS7_HUMAN",
+    "sp|O60861|GAS7_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.9072,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 3697,
+   "peptide": "LEAHWRGALAR",
+   "charge": 2,
+   "score": -0.910909,
+   "proteins": [
+    "sp|Q8N1T3-3|MYO1H_HUMAN",
+    "sp|Q8N1T3|MYO1H_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.910909,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5396,
+   "peptide": "ADPSILQNLR",
+   "charge": 2,
+   "score": -0.910981,
+   "proteins": [
+    "sp|Q567U6|CCD93_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.910981,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1748,
+   "peptide": "KSSARSTQGIR",
+   "charge": 2,
+   "score": -0.913061,
+   "proteins": [
+    "sp|O60880-4|SH21A_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.913061,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2762,
+   "peptide": "SSYDM[15.9949]YHLSREGEAHER",
+   "charge": 2,
+   "score": -0.915743,
+   "proteins": [
+    "sp|P43626-2|KI2L1_HUMAN",
+    "sp|P43626|KI2L1_HUMAN",
+    "sp|P43628|KI2L3_HUMAN",
+    "sp|P43631|KI2S2_HUMAN",
+    "sp|P43632|KI2S4_HUMAN",
+    "sp|Q14953|KI2S5_HUMAN",
+    "sp|Q14954|KI2S1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.915743,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 7969,
+   "peptide": "QAMLTLELER",
+   "charge": 2,
+   "score": -0.917259,
+   "proteins": [
+    "sp|Q86TI0-2|TBCD1_HUMAN",
+    "sp|Q86TI0|TBCD1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.917259,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5117,
+   "peptide": "GLGGRAPSGAKPRQGK",
+   "charge": 2,
+   "score": -0.921039,
+   "proteins": [
+    "sp|Q96MM3|ZFP42_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.921039,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2522,
+   "peptide": "LQC[57.0215]LRLEDC[57.0215]LATPR",
+   "charge": 2,
+   "score": -0.921418,
+   "proteins": [
+    "sp|Q86W28-2|NALP8_HUMAN",
+    "sp|Q86W28|NALP8_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.921418,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2279,
+   "peptide": "LSQPVSKAISTR",
+   "charge": 2,
+   "score": -0.921505,
+   "proteins": [
+    "sp|O95425-2|SVIL_HUMAN",
+    "sp|O95425-3|SVIL_HUMAN",
+    "sp|O95425-4|SVIL_HUMAN",
+    "sp|O95425|SVIL_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.921505,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1241,
+   "peptide": "ATIKC[57.0215]ETSPPSSPR",
+   "charge": 2,
+   "score": -0.923305,
+   "proteins": [
+    "sp|O75335-1|LIPA4_HUMAN",
+    "sp|O75335-2|LIPA4_HUMAN",
+    "sp|O75335|LIPA4_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.833333,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.923305,
+    "q-value": 0.833333,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5608,
+   "peptide": "TIRSTQTALR",
+   "charge": 2,
+   "score": -0.924219,
+   "proteins": [
+    "sp|Q8N8K9-2|K1958_HUMAN",
+    "sp|Q8N8K9-3|K1958_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.848101,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.924219,
+    "q-value": 0.848101,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1461,
+   "peptide": "NDVDLRSSNDK",
+   "charge": 2,
+   "score": -0.931584,
+   "proteins": [
+    "sp|A2AJT9-2|BCLA3_HUMAN",
+    "sp|A2AJT9-3|BCLA3_HUMAN",
+    "sp|A2AJT9|BCLA3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.864198,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.931584,
+    "q-value": 0.864198,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1200,
+   "peptide": "EEISSMKPK",
+   "charge": 2,
+   "score": -0.931702,
+   "proteins": [
+    "sp|Q4G0P3-10|HYDIN_HUMAN",
+    "sp|Q4G0P3-5|HYDIN_HUMAN",
+    "sp|Q4G0P3-6|HYDIN_HUMAN",
+    "sp|Q4G0P3-8|HYDIN_HUMAN",
+    "sp|Q4G0P3|HYDIN_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.864198,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.931702,
+    "q-value": 0.864198,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5671,
+   "peptide": "TIRSTQTALR",
+   "charge": 2,
+   "score": -0.939232,
+   "proteins": [
+    "sp|Q8N8K9-2|K1958_HUMAN",
+    "sp|Q8N8K9-3|K1958_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.928571,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.939232,
+    "q-value": 0.928571,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 6569,
+   "peptide": "TSLLELM[15.9949]IGRK",
+   "charge": 2,
+   "score": -0.941033,
+   "proteins": [
+    "sp|Q96N23-2|CFA54_HUMAN",
+    "sp|Q96N23|CFA54_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.928571,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.941033,
+    "q-value": 0.928571,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4660,
+   "peptide": "KSPEEESRPPPDLAR",
+   "charge": 2,
+   "score": -0.941225,
+   "proteins": [
+    "sp|Q9BWH6-2|RPAP1_HUMAN",
+    "sp|Q9BWH6|RPAP1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.928571,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.941225,
+    "q-value": 0.928571,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 3089,
+   "peptide": "TPEPRRSPLGQK",
+   "charge": 2,
+   "score": -0.945642,
+   "proteins": [
+    "sp|P54278-3|PMS2_HUMAN",
+    "sp|P54278|PMS2_HUMAN",
+    "sp|Q68D20|PMS2L_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.929412,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.945642,
+    "q-value": 0.929412,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4186,
+   "peptide": "QGQSLGPRAGR",
+   "charge": 2,
+   "score": -0.94661,
+   "proteins": [
+    "sp|O95922-4|TTLL1_HUMAN",
+    "sp|O95922|TTLL1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.94186,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.94661,
+    "q-value": 0.94186,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 3720,
+   "peptide": "KYYSTTHGALLSGQR",
+   "charge": 2,
+   "score": -0.947062,
+   "proteins": [
+    "sp|Q9NWM0-2|SMOX_HUMAN",
+    "sp|Q9NWM0-3|SMOX_HUMAN",
+    "sp|Q9NWM0-4|SMOX_HUMAN",
+    "sp|Q9NWM0-5|SMOX_HUMAN",
+    "sp|Q9NWM0-6|SMOX_HUMAN",
+    "sp|Q9NWM0|SMOX_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.942529,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.947062,
+    "q-value": 0.942529,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 3545,
+   "peptide": "QDRELLARLEK",
+   "charge": 2,
+   "score": -0.947598,
+   "proteins": [
+    "sp|Q8TD16-2|BICD2_HUMAN",
+    "sp|Q8TD16|BICD2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.943182,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.947598,
+    "q-value": 0.943182,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1818,
+   "peptide": "ITELQAQNSEHQAR",
+   "charge": 2,
+   "score": -0.948527,
+   "proteins": [
+    "sp|Q8WXW3|PIBF1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.948527,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2519,
+   "peptide": "DIEDFLLPTR",
+   "charge": 2,
+   "score": -0.952308,
+   "proteins": [
+    "sp|Q9NZN1|IRPL1_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.952308,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4581,
+   "peptide": "NRVAILAELDK",
+   "charge": 2,
+   "score": -0.95524,
+   "proteins": [
+    "sp|Q9NRY2-2|SOSSC_HUMAN",
+    "sp|Q9NRY2|SOSSC_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.95524,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1661,
+   "peptide": "LSLTM[15.9949]GGVQAR",
+   "charge": 2,
+   "score": -0.955529,
+   "proteins": [
+    "sp|O75815-3|BCAR3_HUMAN",
+    "sp|O75815|BCAR3_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.955529,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1994,
+   "peptide": "SVAGGRALVGR",
+   "charge": 2,
+   "score": -0.956879,
+   "proteins": [
+    "sp|Q6ZMS7|ZN783_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.956879,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 4216,
+   "peptide": "THSIGRPFAC[57.0215]NEC[57.0215]GKTYR",
+   "charge": 2,
+   "score": -0.95692,
+   "proteins": [
+    "sp|A6NDX5|ZN840_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.95692,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2617,
+   "peptide": "TEWKSNVYLAR",
+   "charge": 2,
+   "score": -0.957397,
+   "proteins": [
+    "sp|Q8NEZ4-2|KMT2C_HUMAN",
+    "sp|Q8NEZ4-3|KMT2C_HUMAN",
+    "sp|Q8NEZ4|KMT2C_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.957397,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 6116,
+   "peptide": "LAAANGALLR",
+   "charge": 2,
+   "score": -0.957924,
+   "proteins": [
+    "sp|Q5VZI3-2|TM268_HUMAN",
+    "sp|Q5VZI3-3|TM268_HUMAN",
+    "sp|Q5VZI3|TM268_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.957924,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1764,
+   "peptide": "TLFREAEEALR",
+   "charge": 2,
+   "score": -0.958748,
+   "proteins": [
+    "sp|O60303|KATIP_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.958748,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 1619,
+   "peptide": "TATTTPGFVDTRK",
+   "charge": 2,
+   "score": -0.959258,
+   "proteins": [
+    "sp|P78312-2|F193A_HUMAN",
+    "sp|P78312-3|F193A_HUMAN",
+    "sp|P78312-4|F193A_HUMAN",
+    "sp|P78312-5|F193A_HUMAN",
+    "sp|P78312-6|F193A_HUMAN",
+    "sp|P78312|F193A_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.959258,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 2429,
+   "peptide": "KLEMKALR",
+   "charge": 2,
+   "score": -0.959456,
+   "proteins": [
+    "sp|Q9NYY8-2|FAKD2_HUMAN",
+    "sp|Q9NYY8|FAKD2_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.959456,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  },
+  {
+   "scan_number": 5705,
+   "peptide": "IYEIEDRTR",
+   "charge": 2,
+   "score": -0.9611,
+   "proteins": [
+    "sp|Q8NHM5-2|KDM2B_HUMAN",
+    "sp|Q8NHM5-3|KDM2B_HUMAN",
+    "sp|Q8NHM5-4|KDM2B_HUMAN",
+    "sp|Q8NHM5-5|KDM2B_HUMAN",
+    "sp|Q8NHM5|KDM2B_HUMAN"
+   ],
+   "spectrum_index": null,
+   "q_value": 0.950495,
+   "pep": 1.0,
+   "retention_time": null,
+   "precursor_mz": null,
+   "precursor_mass": null,
+   "mass_diff": null,
+   "modified_peptide": null,
+   "num_matched_ions": null,
+   "num_total_ions": null,
+   "rank": 1,
+   "is_decoy": false,
+   "extra": {
+    "score": -0.9611,
+    "q-value": 0.950495,
+    "posterior_error_prob": 1.0
+   }
+  }
+ ]
+}
