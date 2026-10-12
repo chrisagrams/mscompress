@@ -37,7 +37,7 @@ directories:
 
 # electron-vite emits the app to out/; the renderer/main/preload are already
 # bundled there. node_modules is intentionally excluded from the asar because
-# the only runtime native dependency (mscompress / node-ts) is shipped via
+# the only runtime native dependency (mscompress / node) is shipped via
 # extraResources below and resolved from resources at runtime.
 files:
   - out/**
@@ -49,31 +49,31 @@ files:
   - '!tsconfig*.json'
   - '!components.json'
 
-# Ship the native mscompress binding (node-ts) outside the asar so its .node
-# addon can be dlopen'd at runtime. bindings.ts resolves resources/node-ts/dist.
+# Ship the native mscompress binding (node/) outside the asar so its .node
+# addon can be dlopen'd at runtime. bindings.ts resolves resources/node/dist.
 extraResources:
-  - from: ../node-ts/dist
-    to: node-ts/dist
-  - from: ../node-ts/build/Release/mscompress.node
-    to: node-ts/build/Release/mscompress.node
-  - from: ../node-ts/package.json
-    to: node-ts/package.json
-  # node-ts's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
+  - from: ../node/dist
+    to: node/dist
+  - from: ../node/build/Release/mscompress.node
+    to: node/build/Release/mscompress.node
+  - from: ../node/package.json
+    to: node/package.json
+  # node's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
   # transitive deps as siblings of dist so Node resolves them from
-  # resources/node-ts/node_modules. (Only the tar closure — not the full 289MB
+  # resources/node/node_modules. (Only the tar closure — not the full 289MB
   # node_modules, which also carries prebuild-install/dev tooling we don't need.)
-  - from: ../node-ts/node_modules/tar
-    to: node-ts/node_modules/tar
-  - from: ../node-ts/node_modules/@isaacs/fs-minipass
-    to: node-ts/node_modules/@isaacs/fs-minipass
-  - from: ../node-ts/node_modules/chownr
-    to: node-ts/node_modules/chownr
-  - from: ../node-ts/node_modules/minipass
-    to: node-ts/node_modules/minipass
-  - from: ../node-ts/node_modules/minizlib
-    to: node-ts/node_modules/minizlib
-  - from: ../node-ts/node_modules/yallist
-    to: node-ts/node_modules/yallist
+  - from: ../node/node_modules/tar
+    to: node/node_modules/tar
+  - from: ../node/node_modules/@isaacs/fs-minipass
+    to: node/node_modules/@isaacs/fs-minipass
+  - from: ../node/node_modules/chownr
+    to: node/node_modules/chownr
+  - from: ../node/node_modules/minipass
+    to: node/node_modules/minipass
+  - from: ../node/node_modules/minizlib
+    to: node/node_modules/minizlib
+  - from: ../node/node_modules/yallist
+    to: node/node_modules/yallist
 
 linux:
   target:

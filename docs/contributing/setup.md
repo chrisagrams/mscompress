@@ -41,7 +41,7 @@ See [Build modes](../python/build-modes.md).
 ## Node.js
 
 ```bash
-cd node-ts
+cd node
 npm install
 npm run build
 npm test

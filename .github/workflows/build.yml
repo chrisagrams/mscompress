@@ -348,32 +348,32 @@ jobs:
         run: python vendor/generate_config.py
 
       - name: Install dependencies
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm install --ignore-scripts
 
       - name: Build prebuild (Unix)
         if: matrix.platform != 'windows'
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npx prebuild -r napi --target 8 --backend cmake-js -- -G "Unix Makefiles"
 
       - name: Build prebuild (Windows)
         if: matrix.platform == 'windows'
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npx prebuild -r napi --target 8 --backend cmake-js
 
       - name: Build TypeScript
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm run build:ts
 
       - name: Run tests
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm test
 
       - name: Upload prebuild artifact
         uses: actions/upload-artifact@v6
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
-          path: ./node-ts/prebuilds/*.tar.gz
+          path: ./node/prebuilds/*.tar.gz
 
   publish-python:
     name: Publish Python Package to PyPI
@@ -485,27 +485,27 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           pattern: prebuild-*
-          path: ./node-ts/prebuilds
+          path: ./node/prebuilds
           merge-multiple: true
 
       - name: Upload prebuilds to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: ./node-ts/prebuilds/*.tar.gz
+          files: ./node/prebuilds/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm install --ignore-scripts
 
       - name: Build TypeScript
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm run build:ts
 
       - name: Publish to npm
-        working-directory: ./node-ts
+        working-directory: ./node
         run: npm publish --provenance --access public
 
   build-electron:
@@ -531,18 +531,18 @@ jobs:
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
 
-      # The Electron app loads the native mscompress binding (node-ts), so build
+      # The Electron app loads the native mscompress binding (node/), so build
       # that first: the .node addon is bundled into the app via extraResources.
-      - name: Install node-ts dependencies
-        working-directory: ./node-ts
+      - name: Install node dependencies
+        working-directory: ./node
         run: npm install --ignore-scripts
 
-      - name: Build node-ts native addon
-        working-directory: ./node-ts
+      - name: Build node native addon
+        working-directory: ./node
         run: npx prebuild -r napi --target 8 --backend cmake-js -- -G "Unix Makefiles"
 
-      - name: Build node-ts TypeScript
-        working-directory: ./node-ts
+      - name: Build node TypeScript
+        working-directory: ./node
         run: npm run build:ts
 
       # Build + package the Electron app (electron-vite -> electron-builder).

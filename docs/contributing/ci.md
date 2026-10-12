@@ -25,7 +25,7 @@ on every PR; three more run on tagged releases.
 - Compiler differences (MSVC vs gcc vs clang) — especially around
   SIMD flags for the base64 vendor library
 - Linker issues on arm64
-- TypeScript regressions in `node-ts`
+- TypeScript regressions in `node`
 
 ## Adding to CI
 

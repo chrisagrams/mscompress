@@ -3,23 +3,24 @@ cmake_minimum_required(VERSION 3.15)
 # Version is read from version.txt (maintained by release-please), the source of truth.
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../version.txt" MSC_VERSION LIMIT_COUNT 1)
 string(STRIP "${MSC_VERSION}" MSC_VERSION)
+if(NOT MSC_VERSION)
+    message(FATAL_ERROR "Could not read version from version.txt")
+endif()
 project(mscompress VERSION ${MSC_VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
-
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Static libs must be PIC since they link into the shared .node addon
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(APPLE)
-    # Set the compiler to Clang
     set(CMAKE_C_COMPILER "/usr/bin/clang")
     set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
 endif()
 
-
 # Set directories
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vendor)
-
 
 include_directories(
   ${CMAKE_JS_INC}
@@ -30,50 +31,63 @@ include_directories(
   ${VENDOR_DIR}/yxml
   ${VENDOR_DIR}/lz4/include
   ${SRC_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/native
 )
 
-get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-message("Include dirs are: ${dirs}")
+# C core sources
+file(GLOB C_SOURCE_FILES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c)
 
+# C++ native addon sources
+set(CPP_SOURCE_FILES
+  src/native/addon.cpp
+  src/native/types.cpp
+  src/native/file_ops.cpp
+  src/native/format.cpp
+  src/native/division.cpp
+  src/native/spectrum.cpp
+  src/native/compress.cpp
+  src/native/decompress.cpp
+  src/native/extract.cpp
+  src/native/zstd_utils.cpp
+  src/native/mszx.cpp
+  src/native/batch.cpp
+)
 
-# Common source files
-file(GLOB SOURCE_FILES ${SRC_DIR}/*.c ${SRC_DIR}/algos/*.c *.cpp)
+add_library(${PROJECT_NAME} SHARED ${C_SOURCE_FILES} ${CPP_SOURCE_FILES} ${CMAKE_JS_SRC})
+target_compile_definitions(${PROJECT_NAME} PRIVATE VERSION="${PROJECT_VERSION}")
 
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+if(WIN32)
+    # Windows SDK headers (winnt.h) require an architecture macro to be defined
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _AMD64_=1)
+    # Prefix zlib symbols to avoid clashing with Node.js's bundled zlib
+    target_compile_definitions(${PROJECT_NAME} PRIVATE Z_PREFIX)
+    set(ZLIB_EXTRA_CFLAGS "-DZ_PREFIX")
+endif()
 
+# Vendor libraries
+include(${VENDOR_DIR}/Lz4Include.cmake)
+include(${VENDOR_DIR}/ZlibInclude.cmake)
+include(${VENDOR_DIR}/ZstdInclude.cmake)
+set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C)
+include(${VENDOR_DIR}/YxmlInclude.cmake)
+include(${VENDOR_DIR}/Base64SetEnvFlags.cmake)
+include(${VENDOR_DIR}/Base64Include.cmake)
+include(${VENDOR_DIR}/Blosc2Include.cmake) # shuffle filters only, not the library
 
-#lz4
-include (${VENDOR_DIR}/Lz4Include.cmake) # Add lz4 library
-
-#zlib
-include (${VENDOR_DIR}/ZlibInclude.cmake) # Add zlib library with macOS fdopen workaround
-
-
-#zstd
-include (${VENDOR_DIR}/ZstdInclude.cmake) # Add zstd library
-set_target_properties(zstd PROPERTIES LINKER_LANGUAGE C) # set zstd library language to C
-
-#yxml
-include (${VENDOR_DIR}/YxmlInclude.cmake) # Add yxml library
-
-#base64
-include (${VENDOR_DIR}/Base64SetEnvFlags.cmake) # set compiler flags
-include (${VENDOR_DIR}/Base64Include.cmake) # Add base64 library
-
-# Define an option to choose between library and executable
-option(BUILD_SHARED_LIB "Build shared library (node-addon)" ON)
-
-
-# Create the shared library (node-addon)
+# Node addon settings
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
-# Linking stage
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY})
+# On Windows, generate node.lib from the .def file if cmake-js didn't do it
+if(WIN32 AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
+    if(NOT EXISTS ${CMAKE_JS_NODELIB_TARGET})
+        execute_process(
+            COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS}
+        )
+    endif()
+endif()
 
-get_target_property(TMP_TARGET_LINK_LIBRARIES ${PROJECT_NAME} LINK_LIBRARIES)
-message("Link libraries of target ${PROJECT_NAME}: ${TMP_TARGET_LINK_LIBRARIES}")
-
+# Linking
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB} zstd yxml base64 lz4 ${ZLIB_LIBRARY} blosc2_shuffle)
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"
@@ -83,4 +97,4 @@ execute_process(COMMAND node -p "require('node-addon-api').include"
 string(REPLACE "\n" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
 string(REPLACE "\"" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${NODE_ADDON_API_DIR})
-add_definitions(-DNAPI_VERSION=3)
+add_definitions(-DNAPI_VERSION=8)

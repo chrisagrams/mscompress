@@ -1,4 +1,4 @@
-// Thin main-process wrapper around the native `mscompress` node-ts binding.
+// Thin main-process wrapper around the native `mscompress` node binding.
 // This module is the ONLY place the addon is required, and it must never be
 // imported from the renderer (it is externalized from the Vite bundle).
 import { createRequire } from "module"
@@ -155,15 +155,15 @@ let cached: MscompressModule | null = null
 /**
  * Lazily load the native addon (deferred so the app can start even if the
  * binding is temporarily unavailable, and to keep startup cheap). In a packaged
- * app the `mscompress` package (node-ts dist + build/Release/*.node) is shipped
- * under `resources/node-ts` via electron-builder `extraResources`; resolve it
+ * app the `mscompress` package (node dist + build/Release/*.node) is shipped
+ * under `resources/node` via electron-builder `extraResources`; resolve it
  * from there first. In dev / the Node smoke test `process.resourcesPath` either
  * points elsewhere or is undefined, so we fall back to normal resolution of the
  * `mscompress` node_modules symlink.
  */
 function loadModule(): MscompressModule {
   const resourced = process.resourcesPath
-    ? join(process.resourcesPath, "node-ts", "dist", "index.js")
+    ? join(process.resourcesPath, "node", "dist", "index.js")
     : ""
   if (resourced && existsSync(resourced)) {
     return require(resourced) as MscompressModule
