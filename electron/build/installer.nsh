@@ -2,6 +2,7 @@
 ;
 ; Adds Explorer right-click context-menu verbs that shell out to the bundled
 ; standalone CLI (resources/cli/mscompress.exe) with NO GUI:
+;   .mzML -> "Compress here"    (writes <name>.msz next to the file)
 ;   .msz  -> "Decompress here"  (writes <name>.mzML next to the file)
 ;   .mszx -> "Extract here"     (writes a <name>/ directory next to the file)
 ;
@@ -19,6 +20,11 @@
 !macro customInstall
   DetailPrint "Registering MScompress context-menu actions…"
 
+  ; ---- .mzML : Compress here ----
+  WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.mzML\shell\MScompressCompress" "" "Compress here"
+  WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.mzML\shell\MScompressCompress" "Icon" "$INSTDIR\resources\cli\mscompress.exe,0"
+  WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.mzML\shell\MScompressCompress\command" "" 'cmd /s /c ""$INSTDIR\resources\cli\mscompress.exe" "%1" & echo. & pause"'
+
   ; ---- .msz : Decompress here ----
   WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.msz\shell\MScompressDecompress" "" "Decompress here"
   WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.msz\shell\MScompressDecompress" "Icon" "$INSTDIR\resources\cli\mscompress.exe,0"
@@ -35,6 +41,7 @@
 
 !macro customUnInstall
   DetailPrint "Removing MScompress context-menu actions…"
+  DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.mzML\shell\MScompressCompress"
   DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.msz\shell\MScompressDecompress"
   DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.mszx\shell\MScompressExtract"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'

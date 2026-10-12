@@ -37,8 +37,8 @@ directories:
 
 # electron-vite emits the app to out/; the renderer/main/preload are already
 # bundled there. node_modules is intentionally excluded from the asar because
-# the only runtime native dependency (mscompress / node-ts) is shipped via
-# extraResources below and resolved from resources at runtime.
+# the only runtime dependency (the native mscompress binding, node-ts) is
+# shipped via extraResources below.
 files:
   - out/**
   - package.json
@@ -50,30 +50,31 @@ files:
   - '!components.json'
 
 # Ship the native mscompress binding (node-ts) outside the asar so its .node
-# addon can be dlopen'd at runtime. bindings.ts resolves resources/node-ts/dist.
+# addon can be dlopen'd. It lands at resources/node_modules/mscompress, which
+# Node's normal resolution reaches by walking up from resources/app.asar/out/main,
+# so `import "mscompress"` works unchanged in dev and packaged builds.
 extraResources:
   - from: ../node-ts/dist
-    to: node-ts/dist
+    to: node_modules/mscompress/dist
   - from: ../node-ts/build/Release/mscompress.node
-    to: node-ts/build/Release/mscompress.node
+    to: node_modules/mscompress/build/Release/mscompress.node
   - from: ../node-ts/package.json
-    to: node-ts/package.json
+    to: node_modules/mscompress/package.json
   # node-ts's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
-  # transitive deps as siblings of dist so Node resolves them from
-  # resources/node-ts/node_modules. (Only the tar closure — not the full 289MB
-  # node_modules, which also carries prebuild-install/dev tooling we don't need.)
+  # transitive deps under mscompress/node_modules. (Only the tar closure — not
+  # the full node_modules, which also carries prebuild-install/dev tooling.)
   - from: ../node-ts/node_modules/tar
-    to: node-ts/node_modules/tar
+    to: node_modules/mscompress/node_modules/tar
   - from: ../node-ts/node_modules/@isaacs/fs-minipass
-    to: node-ts/node_modules/@isaacs/fs-minipass
+    to: node_modules/mscompress/node_modules/@isaacs/fs-minipass
   - from: ../node-ts/node_modules/chownr
-    to: node-ts/node_modules/chownr
+    to: node_modules/mscompress/node_modules/chownr
   - from: ../node-ts/node_modules/minipass
-    to: node-ts/node_modules/minipass
+    to: node_modules/mscompress/node_modules/minipass
   - from: ../node-ts/node_modules/minizlib
-    to: node-ts/node_modules/minizlib
+    to: node_modules/mscompress/node_modules/minizlib
   - from: ../node-ts/node_modules/yallist
-    to: node-ts/node_modules/yallist
+    to: node_modules/mscompress/node_modules/yallist
 
 linux:
   target:
@@ -90,8 +91,8 @@ mac:
 
 win:
   # NSIS installer (not a bare dir): an installer is required to register the
-  # file associations and to write the "Decompress/Extract here" context-menu
-  # verbs (see build/installer.nsh). The standalone CLI is shipped below.
+  # file associations and to write the "Compress/Decompress/Extract here"
+  # context-menu verbs (see build/installer.nsh). The standalone CLI is shipped below.
   target:
     - nsis
   icon: assets/icons/icon.ico

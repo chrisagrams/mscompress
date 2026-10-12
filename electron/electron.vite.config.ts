@@ -5,12 +5,15 @@ import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // mscompress is a devDependency (so electron-builder doesn't copy the
+    // symlinked node-ts tree into the asar) but must stay external: it is
+    // shipped via extraResources and loads its .node addon relative to itself.
+    plugins: [externalizeDepsPlugin({ include: ["mscompress"] })],
     build: {
       rollupOptions: {
         input: {
           index: resolve("src/main/index.ts"),
-          "convert-worker": resolve("src/main/convert-worker.ts"),
+          "convert-worker": resolve("src/main/bindings/convert-worker.ts"),
         },
         // Keep shared chunks flat in out/main (not out/main/chunks) so the
         // `./convert-worker.js` URL resolved from the shared bindings chunk lands

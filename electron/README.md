@@ -8,8 +8,8 @@ compression toolkit. This is a ground-up rewrite of the previous vanilla-JS GUI.
 
 ## Architecture
 
-- **Main process** — all native/binding work. `src/main/bindings.ts` is the only
-  place the native `mscompress` addon is loaded; `ipc.ts` registers the
+- **Main process** — all native/binding work. `src/main/bindings/` is the only
+  place the native `mscompress` addon is imported; `ipc.ts` registers the
   channel-whitelisted handlers; `queue.ts` is the MSTransfer batch queue;
   `settings.ts` persists global settings.
 - **Preload** — `src/preload/index.ts` exposes a single typed `window.api` over a
@@ -43,13 +43,13 @@ npm run dev        # Vite dev server + Electron
 
 ```sh
 npm run build          # strict typecheck (main + renderer) + electron-vite build
-npm run smoke:bindings # exercise the native binding wrappers against test data
 ```
 
 ## Package
 
-electron-builder bundles the native `mscompress.node` addon under
-`resources/node-ts` (outside the asar) so the packaged app can load it. Output
+electron-builder ships the native `mscompress` binding under
+`resources/node_modules/mscompress` (outside the asar) so the packaged app can
+load it. Output
 goes to `release/`.
 
 ```sh

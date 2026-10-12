@@ -37,11 +37,13 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
 - Package manager: npm.
 
 ## Implemented architecture
-- **Main** (`src/main/`): `index.ts` (window + app lifecycle), `bindings.ts`
-  (the ONLY place `mscompress` is required — analyze / compress / decompress /
-  extract / computeQC / readMszx + getVersion/getNumThreads/getFilesize),
-  `ipc.ts` (all `ipcMain.handle` handlers + broadcasts), `queue.ts` (MSTransfer
-  batch queue), `settings.ts` (persisted global settings).
+- **Main** (`src/main/`): `index.ts` (window + app lifecycle), `bindings/`
+  (the ONLY place `mscompress` is imported — `analyze.ts`, `mszx.ts`
+  (readMszx), `qc.ts` (computeQC), `convert.ts` (compress / decompress /
+  extract / compressBatch), `worker.ts` + `convert-worker.ts` (worker-thread
+  offload), `formats.ts` (shared helpers); `index.ts` re-exports the public
+  surface), `ipc.ts` (all `ipcMain.handle` handlers + broadcasts), `queue.ts`
+  (MSTransfer batch queue), `settings.ts` (persisted global settings).
 - **Preload** (`src/preload/index.ts`): exposes the single typed `window.api`.
 - **Shared** (`src/shared/ipc.ts`): channel whitelist (`IPC`) + all cross-process
   types (`Api`, `FileSummary`, `QCData`, `QueueState`, `AppSettings`, …). No
@@ -49,8 +51,7 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
 - **Renderer** (`src/renderer/src/`): `App.tsx` shell, `components/` (LeftRail,
   Inspector, ConvertTab, QCTab, ExtractQueueTab, ArchiveTab, SettingsDialog),
   `files.ts` (open-files list). Renderer reaches main only via `window.api`.
-- `bindings.ts`, `queue.ts`, and `settings.ts` are kept **electron-free** so the
-  Node smoke test (`npm run smoke:bindings`) can drive them directly; electron
+- `bindings/`, `queue.ts`, and `settings.ts` are kept **electron-free**; electron
   paths (userData, downloads, local-archive dir) are injected via
   `configureSettings()` / `configureQueue()` from `index.ts`.
 
@@ -86,18 +87,20 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
   `configureQueue({ threads })`. Do not add a per-job thread control.
 - IPC option/type additions go in `src/shared/ipc.ts`; add the channel to `IPC`,
   the method to `Api`, the handler in `ipc.ts`, and the preload wiring.
-- `bindings.ts` imports **types** from `../shared/ipc.ts` (note the `.ts`
-  extension — needed so the standalone Node smoke test resolves it, since the
-  file now also value-imports from shared).
+- `bindings/` uses the real `mscompress` types (`BaseFile`, `MSZXBatchFile`,
+  …) — don't re-declare the binding's shapes locally.
 
 ## Packaging (electron-builder)
 - Config in `electron-builder.yml`; appId `gy.lab.mscompress`, productName
   `MScompress`, icons from `assets/icons`.
-- **Native addon**: `node_modules` is excluded from the asar; instead the
-  `node-ts` binding (`dist` + `build/Release/mscompress.node` + `package.json`)
-  is shipped via `extraResources` to `resources/node-ts`, and `bindings.ts`
-  resolves it from `process.resourcesPath/node-ts/dist/index.js` when packaged
-  (falling back to the `mscompress` node_modules symlink in dev / smoke test).
+- **Native addon**: `mscompress` is a devDependency (so electron-builder
+  doesn't copy the symlinked node-ts tree into the asar) that the main build
+  keeps external (`externalizeDepsPlugin({ include: ["mscompress"] })`). The
+  `node-ts` binding (`dist` + `build/Release/mscompress.node` + `package.json`
+  + the `tar` closure) is shipped via `extraResources` to
+  `resources/node_modules/mscompress`, which Node's normal resolution reaches
+  from `resources/app.asar/out/main` — a plain `import "mscompress"` works in
+  dev and packaged builds.
 - Build the native binding (`node-ts`) BEFORE packaging.
   `npm run build` = typecheck + electron-vite build; `npm run dist:dir` =
   build + `electron-builder --dir` (unpacked); `npm run dist` / `dist:linux` =

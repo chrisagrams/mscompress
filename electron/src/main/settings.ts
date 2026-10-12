@@ -1,10 +1,10 @@
-// Persisted global settings. Electron-free (so it's smoke-testable under Node):
-// the main process injects the storage dir + environment-derived defaults via
-// configureSettings(); everything else is plain fs + JSON with validation and
-// safe fallbacks when the file is missing or corrupt.
+// Persisted global settings. Electron-free: the main process injects the storage
+// dir + environment-derived defaults via configureSettings(); everything else is
+// plain fs + JSON with validation and safe fallbacks when the file is missing or
+// corrupt.
 import { mkdirSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
-import type { AppSettings, Preset } from "../shared/ipc.ts"
+import type { AppSettings, Preset } from "../shared/ipc"
 
 const PRESETS: Preset[] = ["fastest", "fast", "default", "better"]
 

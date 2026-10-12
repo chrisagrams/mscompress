@@ -1,10 +1,9 @@
 // MSTransfer batch queue: an in-memory job queue that runs T4 convert jobs and
-// optionally transfers outputs to a remote destination. Electron-free so it can
-// be exercised directly from a Node smoke test; the main process wires it to
-// IPC + configures the local archive dir.
+// optionally transfers outputs to a remote destination. Electron-free; the main
+// process wires it to IPC + configures the local archive dir.
 import { copyFileSync, mkdirSync, rmSync, statSync } from "fs"
 import { basename, join } from "path"
-import { REMOTE_DESTINATIONS } from "../shared/ipc.ts"
+import { REMOTE_DESTINATIONS } from "../shared/ipc"
 import type {
   CompressOptions,
   ConvertResult,
@@ -13,8 +12,8 @@ import type {
   QueueAddRequest,
   QueueJob,
   QueueState,
-} from "../shared/ipc.ts"
-import * as bindings from "./bindings.ts"
+} from "../shared/ipc"
+import * as bindings from "./bindings"
 
 type Listener = (state: QueueState) => void
 
