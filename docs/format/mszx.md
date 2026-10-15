@@ -4,6 +4,9 @@ MSZX is a **tar archive** bundling MSZ-compressed spectra with annotation files
 and a JSON manifest. It's a transport format — what you ship when you want to
 give someone "the data plus the identifications."
 
+Search results (PSM annotations) are stored **only as mzTab** — see
+[Search results (mzTab)](#search-results-mztab).
+
 There are two layouts, distinguished by the manifest:
 
 | | v1 — single file | v2 — batch |
@@ -24,10 +27,9 @@ compressed by the MSZ pipeline; the container itself never is.
 archive.mszx                 (uncompressed tar)
 ├── manifest.json
 ├── spectra.msz              (or whatever the manifest names it)
-└── annotations/
-    ├── psm.pin              (Percolator TSV)
-    ├── search.pep.xml       (pepXML)
-    └── ...
+├── psm.pin.mztab.zst        (converted from Percolator output)
+├── search.pep.xml.mztab.zst (converted from pepXML)
+└── ...
 ```
 
 ```json
@@ -38,13 +40,13 @@ archive.mszx                 (uncompressed tar)
   "num_spectra": 12453,
   "annotations": [
     {
-      "filename": "annotations/psm.pin",
-      "format": "percolator_tsv",
-      "compressed": false,
+      "filename": "psm.pin.mztab.zst",
+      "format": "mztab",
+      "compressed": true,
       "num_records": 8102
     }
   ],
-  "join_key": "scan_number",
+  "join_key": "spectra_ref",
   "description": "DDA proteomics run #42",
   "source_file": "run42.mzML",
   "extra": { "instrument": "Orbitrap Eclipse", "study_id": "PXD012345" }
@@ -70,8 +72,7 @@ cohort.mszx                  (uncompressed tar)
 ├── runA.msz
 ├── runB.msz
 ├── runB__2.msz              (basename collision -> __N suffix)
-├── annotations/
-│   └── runA.pin
+├── runA.pin.mztab.zst
 └── manifest.json            (written LAST — sizes aren't known until then)
 ```
 
@@ -87,11 +88,11 @@ cohort.mszx                  (uncompressed tar)
       "original": "runA.mzML",
       "size": 964881,
       "num_spectra": 8213,
-      "join_key": "scan_number",
+      "join_key": "spectra_ref",
       "annotations": [
         {
-          "filename": "annotations/runA.pin",
-          "format": "percolator_tsv",
+          "filename": "runA.pin.mztab.zst",
+          "format": "mztab",
           "compressed": true,
           "num_records": 4021
         }
@@ -135,10 +136,90 @@ Used by both versions.
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `filename` | string | yes | Path inside the archive |
-| `format` | string | yes | `percolator_tsv`, `pepxml`, `tsv`, or another reader-supported format |
+| `format` | string | yes | `mztab` for everything the builders and `add_psms`/`addPSMs` write; `percolator_tsv`, `pepxml` or `tsv` only in [legacy archives](#legacy-archives) |
 | `compressed` | bool | yes | Payload is zstd-compressed |
 | `description` | string | no | Free-text description |
 | `num_records` | int | no | Record/PSM count |
+
+Member naming: an annotation converted from `<name>` is stored as
+`<name>.mztab`, plus `.zst` when compressed (`test.pepXML` →
+`test.pepXML.mztab.zst`). mzTab input keeps its own name. Builders reject two
+annotations with the same member name.
+
+## Search results (mzTab)
+
+Every annotation member is an [mzTab 1.0](https://github.com/HUPO-PSI/mzTab)
+document in **Summary** mode, **Identification** type, containing only the
+metadata (`MTD`) and PSM (`PSH` header + `PSM` rows) sections. Engine output —
+pepXML, Percolator TSV/PIN — is converted when the archive is written and the
+original file is **not** stored. Python and Node write the same layout and read
+each other's files.
+
+The text is UTF-8, tab-separated, `\n`-terminated; missing values are the
+literal `null`. Readers ignore `COM` lines, blank lines, and any protein,
+peptide or small-molecule sections in third-party files, and look columns up
+by header name, so mzTab from other tools also reads.
+
+### Metadata (`MTD`)
+
+| Key | Content |
+|-----|---------|
+| `mzTab-version` / `mzTab-mode` / `mzTab-type` | `1.0.0` / `Summary` / `Identification` |
+| `mzTab-ID` | Optional title |
+| `description` | `Converted by mscompress from <format> (<file>)` |
+| `ms_run[1]-location` | `file://` + the spectra file name — the MSZ for single-file archives, the source mzML for batch entries |
+| `software[1]` | The search engine; `[MS, MS:1001490, Percolator, ]` for Percolator, else `[MS, MS:1001456, analysis software, <name>]`. `software[1]-setting[1]` holds `version=<version>` when known |
+| `psm_search_engine_score[1]` | Primary score — a PSI-MS term where one exists (`X!Tandem:hyperscore`, `X!Tandem:expect`, `SEQUEST:xcorr`, `percolator:score`), else a user param with the engine's score name |
+| `psm_search_engine_score[2]` | q-value (`percolator:Q value` or `PSM-level q-value`) |
+| `psm_search_engine_score[3]` | Posterior error probability (`percolator:PEP` for Percolator) |
+| `fixed_mod[k]`, `variable_mod[k]` | Searched modifications as `[CHEMMOD, CHEMMOD:+57.021465, , ]`, with `-site` (residue, `N-term`, `C-term`) and `-position` lines. When none were searched, a single `No fixed/variable modifications searched` term |
+| `custom[n]` | Provenance: `[, , source_format, <format>]` and `[, , source_file, <original file name>]` |
+
+Parameters use the mzTab `[cv, accession, name, value]` notation.
+
+### PSM rows
+
+There is **one row per (PSM, protein)**: a PSM mapped to N proteins becomes N
+consecutive rows sharing the same `PSM_ID` and differing only in `accession`
+(a PSM with no protein has a single row with `accession` `null`). Readers
+group rows by `PSM_ID` back into one PSM.
+
+| Column | Value |
+|--------|-------|
+| `sequence` | Peptide sequence |
+| `PSM_ID` | 1-based sequential id |
+| `accession`, `unique` | Protein accession; `1` if the PSM maps to exactly one protein |
+| `search_engine` | Same parameter as `software[1]` |
+| `search_engine_score[1..3]` | Primary score, q-value, PEP (`null` when unknown) |
+| `retention_time` | Seconds |
+| `charge`, `exp_mass_to_charge` | Precursor charge and m/z |
+| `spectra_ref` | `ms_run[1]:index=<spectrum index>` when the index is known, else `ms_run[1]:scan=<scan number>` |
+| `opt_global_cv_MS:1002217_decoy_peptide` | `1` for decoys, `0` for targets |
+| `opt_global_modified_sequence`, `opt_global_rank`, `opt_global_scan_number`, `opt_global_spectrum_index`, `opt_global_precursor_mass`, `opt_global_mass_diff`, `opt_global_num_matched_ions`, `opt_global_num_total_ions` | The corresponding `PSM` fields |
+| `opt_global_extra_<key>` | Engine-specific values (e.g. pepXML search scores, Percolator features), one column per distinct key |
+
+The remaining standard columns (`database`, `database_version`,
+`modifications`, `calc_mass_to_charge`, `pre`, `post`, `start`, `end`) are
+`null`.
+
+Floats are written in shortest round-trip form, which differs textually
+between Python and Node (`1e-05` vs `0.00001`); compare parsed values, not
+bytes. When a subset is extracted to a new archive, each mzTab is filtered by
+keeping every non-PSM line verbatim and only the PSM rows of the extracted
+scans.
+
+### Legacy archives
+
+Archives written before mzTab became the only stored format carry the
+engine's own files, with `format` `percolator_tsv`, `pepxml` or `tsv` and
+`join_key` `scan_number`. They remain readable — each member is parsed with
+its engine-specific reader — but nothing writes them any more. Readers prefer
+an mzTab entry as the primary annotation when one is present.
+
+To convert one, run `python -m mscompress.mszx.upgrade in.mszx [-o out.mszx]`
+(or `mscompress.mszx.upgrade_mszx()`): each legacy member is replaced by its
+mzTab conversion and the manifest is updated; spectra are copied
+byte-for-byte.
 
 ## Version negotiation
 
@@ -176,7 +257,7 @@ either USTAR or pax.
 ## Building MSZX archives
 
 - [Python MSZX guide](../python/guides/mszx.md) — `MSZXBuilder`, `create_mszx`,
-  `MSZXBatchWriter`, `compress_batch()`
+  `MSZXBatchWriter`, `compress_batch()`, `upgrade_mszx()`
 - [Node.js MSZX guide](../node/guides/mszx.md) — `MSZXBuilder`, `createMSZX`,
   `MSZXBatchWriter`, `compressBatch()`
 - [CLI reference](../cli/reference.md) — `--batch`

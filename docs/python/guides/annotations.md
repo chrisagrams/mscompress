@@ -6,11 +6,14 @@ by common search and rescoring tools and normalizes them into a single
 indexing, and scan-number lookup — so downstream code never has to branch
 on the source format.
 
-The package handles two concerns:
+The package handles three concerns:
 
-- **Readers** parse a PSM file into `PSM` objects. `TSVReader`
-  (Percolator `.pin` / `.tsv`) and `PepXMLReader` (pepXML) are the concrete
-  implementations; `PSMReader` is a factory that picks one for you.
+- **Readers** parse a PSM file into `PSM` objects. `MzTabReader` (mzTab),
+  `TSVReader` (Percolator `.pin` / `.tsv`) and `PepXMLReader` (pepXML) are the
+  concrete implementations; `PSMReader` is a factory that picks one for you.
+- **mzTab conversion** (`write_mztab`, `reader_to_mztab`) turns PSMs from any
+  reader into mzTab 1.0 — the only format MSZX archives store search results
+  in.
 - **Annotation files** (`PathAnnotationFile`, `MSZXAnnotationFile`) abstract
   *where* the bytes come from — a file on disk, or a member inside an MSZX
   archive — with transparent zstd decompression.
@@ -25,6 +28,10 @@ if the extension is ambiguous, and returns the appropriate concrete reader.
 ```python
 from mscompress.annotations import PSMReader
 
+with PSMReader("results.mztab") as reader:      # mzTab
+    for psm in reader:
+        print(psm.scan_number, psm.peptide, psm.q_value)
+
 with PSMReader("results.pin") as reader:        # Percolator TSV
     for psm in reader:
         print(psm.scan_number, psm.peptide, psm.score)
@@ -38,12 +45,13 @@ Detection rules:
 
 | Extension | Resolved format |
 |-----------|-----------------|
+| `.mztab` | mzTab (`MzTabReader`) |
 | `.pin`, `.tsv` | Percolator TSV (`TSVReader`) |
 | `.pepxml`, `.pep.xml` | pepXML (`PepXMLReader`) |
-| `.xml`, unknown | content sniffed (`pepXML` / `spectrum_query` → pepXML; `SpecId` / `PSMId` / `ScanNr` → Percolator) |
+| `.xml`, unknown | content sniffed (leading `MTD` line or a `PSH` header → mzTab; `pepXML` / `spectrum_query` → pepXML; `SpecId` / `PSMId` / `ScanNr` → Percolator) |
 
 A trailing `.zst` is stripped before detection, so `results.pin.zst`
-resolves to Percolator TSV and is decompressed transparently. When the
+resolves to Percolator TSV (and `results.pin.mztab.zst` to mzTab) and is decompressed transparently. When the
 format still cannot be determined, pass it explicitly with the
 `AnnotationFormat` enum:
 
@@ -60,7 +68,13 @@ If you already know the format, construct the reader directly. The concrete
 readers accept format-specific options that the factory does not surface.
 
 ```python
-from mscompress.annotations import TSVReader, PepXMLReader
+from mscompress.annotations import MzTabReader, TSVReader, PepXMLReader
+
+# mzTab: also exposes the raw MTD section and the conversion provenance
+reader = MzTabReader("results.mztab")
+reader.metadata          # {"mzTab-version": "1.0.0", ...}
+reader.source_format     # e.g. "pepxml" if converted by mscompress, else None
+reader.source_name       # e.g. "search.pep.xml"
 
 # Percolator: customize the decoy-protein prefix
 with TSVReader("results.pin", decoy_prefix="rev_") as reader:
@@ -98,6 +112,7 @@ with PSMReader("results.pin") as reader:
     best = reader.get_best_by_scan(1234)  # highest-scoring PSM, or None
     present = reader.has_scan(1234)        # bool
     all_psms = reader.psms                # list[PSM]
+    info = reader.search_info             # SearchInfo (software, scores, mods)
 ```
 
 `get_by_scan` returns *every* PSM for a scan (a scan may have multiple
@@ -140,10 +155,57 @@ psm.extra["deltCn"]        # Percolator feature
 psm.extra.get("hyperscore")
 ```
 
+For Percolator output, `q_value` and `pep` are filled from the `q-value` and
+`posterior_error_prob` columns when present (they also remain in `extra`).
+
+## Search metadata
+
+`reader.search_info` returns a `SearchInfo` describing the search as a whole,
+populated where the source format records it:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `software` | str \| None | Search engine / rescoring tool (pepXML `search_engine`; `"Percolator"` for Percolator output) |
+| `software_version` | str \| None | Version string, if recorded |
+| `primary_score_name` | str \| None | Name of the score stored in `PSM.score` (e.g. `"hyperscore"`, `"xcorr"`, `"score"`) |
+| `fixed_mods` | list[ModificationSpec] | Fixed modifications searched |
+| `variable_mods` | list[ModificationSpec] | Variable modifications searched |
+
+A `ModificationSpec` has `massdiff` (Da), `site` (residue letter, `"N-term"`
+or `"C-term"`) and `position` (`"Anywhere"`, `"Any N-term"`, `"Any C-term"`,
+`"Protein N-term"`, `"Protein C-term"`). This is the metadata written into the
+`MTD` section when PSMs are converted to mzTab.
+
+## Converting to mzTab
+
+MSZX archives store search results only as mzTab, and the builders convert
+for you (see [MSZX archives](mszx.md)). To produce mzTab yourself:
+
+```python
+from mscompress.annotations import PSMReader, reader_to_mztab, write_mztab, SearchInfo
+
+# Any reader -> mzTab text (mzTab input is returned unchanged)
+text = reader_to_mztab(PSMReader("search.pep.xml"), ms_run_location="run.msz")
+
+# In-memory PSMs -> mzTab text
+text = write_mztab(
+    psms,
+    search_info=SearchInfo(software="Comet", primary_score_name="xcorr"),
+    ms_run_location="run.msz",
+)
+```
+
+`write_mztab(psms, search_info=None, ms_run_location=None, source_format=None,
+source_name=None, title=None)` returns the document as a string;
+`reader_to_mztab(reader, ms_run_location=None, title=None)` fills
+`search_info`, `source_format` and `source_name` from the reader. The layout
+is described in the [MSZX format spec](../../format/mszx.md#search-results-mztab);
+the Node.js binding writes and reads the same files.
+
 ## Reading annotations bundled in MSZX
 
-MSZX archives can carry one or more annotation files alongside the spectra.
-Open the archive with `MSZXFile.open` (or the generic `read`) and access the
+MSZX archives can carry one or more annotation files alongside the spectra,
+stored as mzTab. Open the archive with `MSZXFile.open` (or the generic `read`) and access the
 bundled readers through the archive — no manual extraction or decompression
 needed.
 
@@ -161,16 +223,25 @@ When an archive bundles several annotation files, address them by name or
 by format:
 
 ```python
+from mscompress.types import AnnotationFormat
+
 with MSZXFile.open("run.mszx") as archive:
     archive.annotation_files                       # list of manifest entries
     archive.annotation_readers                     # {filename: reader}
 
-    pin = archive.get_annotation_reader("results.pin.zst")
-    pepxmls = archive.get_annotation_readers_by_format("pepxml")
+    pin = archive.get_annotation_reader("results.pin.mztab.zst")
+    mztabs = archive.get_annotation_readers_by_format(AnnotationFormat.MZTAB)
 ```
 
-`archive.annotations` returns the primary reader (the first bundled
-annotation), or `None` for archives that contain only spectra.
+`archive.annotations` returns the primary reader — the first mzTab entry —
+or `None` for archives that contain only spectra.
+
+Archives written before mzTab became the only stored format carry the
+engine's own files (pepXML, Percolator TSV/PIN). These are still readable:
+each member is opened with its legacy reader (`PepXMLReader` / `TSVReader`)
+and exposes the same interface, and `archive.annotations` falls back to the
+first of them when the archive has no mzTab entry. To convert such an archive
+in place, use [`upgrade_mszx`](mszx.md#upgrading-older-archives).
 
 ## Joining PSMs to spectra
 

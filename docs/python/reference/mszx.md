@@ -1,7 +1,7 @@
 # `mscompress.mszx`
 
-MSZX archive support — bundle MSZ spectra with annotation files in a
-self-describing tar archive.
+MSZX archive support — bundle MSZ spectra with search results (stored as
+mzTab) in a self-describing tar archive.
 
 Single-file (v1) archives use `MSZXFile`/`MSZXBuilder`; multi-file (v2 "batch")
 archives use `MSZXBatchFile`/`MSZXBatchWriter`. See the
@@ -30,3 +30,7 @@ archives use `MSZXBatchFile`/`MSZXBatchWriter`. See the
 ::: mscompress.mszx.MSZXBatchManifest
 
 ::: mscompress.mszx.SpectraFileEntry
+
+## Upgrading older archives
+
+::: mscompress.mszx.upgrade.upgrade_mszx

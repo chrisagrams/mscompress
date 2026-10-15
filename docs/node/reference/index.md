@@ -37,6 +37,23 @@ import {
   type MSZXManifestData,
   createMSZX,
 
+  // Search results (stored in archives as mzTab)
+  MzTabReader,
+  PSMCollection,
+  writeMzTab,
+  readPSMs,
+  toMzTab,
+  convertToMzTab,
+  parsePepXML,
+  parsePercolator,
+  detectAnnotationFormat,
+  mzTabMemberName,
+  createPSM,
+  createSearchInfo,
+  type PSM,
+  type SearchInfo,
+  type ModificationSpec,
+
   // Module functions
   read,
   getNumThreads,
@@ -113,13 +130,18 @@ type ExtractOptions = {
 
 ### `MSZXFile`
 
-Reader for `.mszx` archives. `manifest`, `spectra`, `openAnnotation()`,
-`close()`.
+Reader for `.mszx` archives. `open()`, `manifest`, `spectra`,
+`annotation_files`, `getAnnotationFile()`, `getAnnotationFilesByFormat()`,
+`getPSMReader()`, `psmReaders`, `annotationReader`, `psms`, `extract()`,
+`close()`. Archives written before mzTab became the only stored format
+(raw pepXML / Percolator members) read through the same accessors.
 
 ### `MSZXBuilder`
 
-Fluent builder. `setSpectra()`, `setDescription()`, `setJoinKey()`,
-`addAnnotation()`, `setExtra()`, `save()`.
+Fluent builder. `new MSZXBuilder(msz, sourceName?)`, `addAnnotations()`
+(converts to mzTab), `addPSMs()`, `addMzTab()`, `setDescription()`,
+`setJoinKey()` (default `"spectra_ref"`), `setExtra()`, `save()`,
+`saveSync()`.
 
 ### `MSZXManifest`
 
@@ -139,7 +161,8 @@ Also opens a v1 archive as a collection of one.
 Incremental writer for a v2 archive. Drives the same C writer as the CLI, so
 output is byte-identical.
 
-`add(source, entryName?)` (async), `addAnnotation()`, `setJoinKey()`,
+`add(source, entryName?)` (async), `addPSMs()` (converts to mzTab),
+`addAnnotation()`, `setJoinKey()`,
 `setDescription()`, `setExtra()`, `finish()`, `abort()`, `entries`, `length`.
 
 ### `compressBatch(inputs, output, options?)`
@@ -157,9 +180,57 @@ Expand paths and directories into the sorted, deduplicated mzML list
 Manifest record for a v2 archive. `spectra_files`, `description`, `extra`,
 `fromSingleFile()`.
 
-### `createMSZX(options)`
+### `createMSZX(msz, outputPath, options?)`
 
-Convenience function. See the [MSZX guide](../guides/mszx.md).
+Convenience function. `options.annotations` is a list of file paths, each
+converted to mzTab. See the [MSZX guide](../guides/mszx.md).
+
+## Search results
+
+MSZX archives store PSM annotations only as mzTab 1.0; see the
+[format spec](../../format/mszx.md#search-results-mztab).
+
+### `PSMCollection`
+
+Parsed PSMs with a query API: `psms`, `length`, `at()`, `getByScan()`,
+`getBestByScan()`, `hasScan()`, `scanNumbers`, `searchInfo`, `format`,
+`sourceFormat`, `sourceName`, iterable.
+
+### `MzTabReader extends PSMCollection`
+
+`new MzTabReader(data: string | Buffer)`. Adds `metadata` (the `MTD` map),
+`text`, and `filter(scanNumbers: Set<number>): string`, which returns the
+document with only the PSM rows of those scans.
+
+### `writeMzTab(psms, options?)`
+
+Serialize PSMs to mzTab text. Options: `searchInfo`, `msRunLocation`,
+`sourceFormat`, `sourceName`, `title`.
+
+### `readPSMs(data, nameHint?, format?, options?)`
+
+Parse mzTab, pepXML or Percolator TSV/PIN (zstd buffers are decompressed;
+format auto-detected unless given) into a `PSMCollection`.
+
+### `toMzTab(data, nameHint?, options?)` / `convertToMzTab(data, nameHint?, options?)`
+
+Convert any supported input to mzTab text; mzTab input is returned unchanged.
+`convertToMzTab` also returns `numRecords` and `inputFormat`. Options:
+`format`, `msRunLocation`, `sourceName`, `title`, `searchInfo`, plus parser
+options.
+
+### `parsePepXML(data, options?)` / `parsePercolator(data, options?)`
+
+Engine-specific parsers returning `{ psms, searchInfo }`. Options: `minRank`,
+`decoyPrefix` (pepXML); `decoyPrefix` (Percolator).
+
+### `detectAnnotationFormat(text, nameHint?)` / `mzTabMemberName(name, compressed, isMzTab?)`
+
+The format-detection and member-naming rules (`<name>.mztab`, plus `.zst`).
+
+### `createPSM(fields)` / `createSearchInfo(fields?)`
+
+Build a `PSM` / `SearchInfo` with every unspecified field defaulted.
 
 ## Module functions
 

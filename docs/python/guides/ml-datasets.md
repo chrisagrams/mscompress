@@ -12,11 +12,12 @@ pip install 'mscompress[torch]'
 
 ```python
 from mscompress.datasets.torch import MSCompressDatasetMember
+from mscompress.types import AnnotationFormat
 from torch.utils.data import DataLoader
 
 dataset = MSCompressDatasetMember(
     "run.mszx",
-    load_annotation="percolator",   # join PSMs into each example
+    load_annotations=[AnnotationFormat.MZTAB],   # join PSMs into each example
 )
 
 loader = DataLoader(dataset, batch_size=64, num_workers=4)
@@ -24,6 +25,11 @@ for batch in loader:
     mz, intensity, peptide, score = batch
     ...
 ```
+
+`load_annotations` selects annotation members by their manifest `format`.
+Archives store search results as mzTab, so pass `AnnotationFormat.MZTAB`;
+the legacy formats (`PERCOLATOR_TSV`, `PEPXML`) only match archives written
+before the switch to mzTab.
 
 `MSCompressDatasetMember` implements the `torch.utils.data.Dataset`
 protocol — random-access indexing into the MSZX without a full
@@ -41,7 +47,7 @@ pip install 'mscompress[jax]'
 from mscompress.datasets.jax import MSCompressJaxDataset
 import grain
 
-source = MSCompressJaxDataset("run.mszx", load_annotation="percolator")
+source = MSCompressJaxDataset("run.mszx", load_annotations=[AnnotationFormat.MZTAB])
 sampler = grain.IndexSampler(num_records=len(source), shard_options=...)
 loader = grain.DataLoader(
     data_source=source,
