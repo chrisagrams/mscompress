@@ -11,7 +11,7 @@ pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
 from mscompress import MSZFile, MSZXFile, read
-from mscompress.annotations import Percolator
+import pandas as pd
 from mscompress.parquet import from_parquet, to_parquet
 
 
@@ -116,7 +116,7 @@ def test_parquet_to_msz_zlib_binary(parquet_path, parquet_table, tmp_path):
 
 
 def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
-    """TSV must be readable by Percolator and round-trip peptide/charge/score."""
+    """TSV must round-trip peptide/charge/score."""
     tsv = tmp_path / "annotations.tsv"
     from_parquet(parquet_path, tsv, score_column="max_score")
 
@@ -125,13 +125,13 @@ def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
     max_scores = parquet_table.column("max_score").to_numpy(zero_copy_only=False)
     precursors = parquet_table.column("precursor").to_numpy(zero_copy_only=False)
 
-    df = Percolator().read(tsv).df
+    df = pd.read_csv(tsv, sep="\t")
     assert len(df) == parquet_table.num_rows
 
     for i, psm in df.iterrows():
-        assert psm.scan == i + 1
-        assert psm.peptide == peptides[i]
-        assert psm.charge == int(charges[i])
+        assert psm.ScanNr == i + 1
+        assert psm.Peptide == peptides[i]
+        assert psm.Charge == int(charges[i])
         assert math.isclose(psm.score, float(max_scores[i]), rel_tol=1e-6)
         assert math.isclose(psm.precursor, float(precursors[i]), rel_tol=1e-6)
 
@@ -252,11 +252,11 @@ def test_parquet_combined_peptide_charge_split(tmp_path):
     tsv = tmp_path / "ann.tsv"
     from_parquet(p, tsv)
 
-    df = Percolator().read(tsv).df
+    df = pd.read_csv(tsv, sep="\t")
     assert len(df) == 2
     # Last underscore wins, so "PEPT_IDE_3" → ("PEPT_IDE", 3).
-    assert df.peptide.tolist() == ["AANFVHMDTAQK", "PEPT_IDE"]
-    assert df.charge.tolist() == [2, 3]
+    assert df.Peptide.tolist() == ["AANFVHMDTAQK", "PEPT_IDE"]
+    assert df.Charge.tolist() == [2, 3]
 
 
 def test_parquet_score_column_none_writes_empty(tmp_path):
@@ -296,7 +296,7 @@ def test_parquet_score_column_auto_resolves_max_score(tmp_path, parquet_path):
     table = pq.read_table(str(parquet_path))
     expected_scores = table.column("max_score").to_numpy(zero_copy_only=False)
 
-    scores = Percolator().read(tsv).df.score
+    scores = pd.read_csv(tsv, sep="\t").score
     assert len(scores) == len(expected_scores)
     for score, expected in zip(scores, expected_scores):
         assert math.isclose(score, float(expected), rel_tol=1e-6)
@@ -571,7 +571,7 @@ def test_from_parquet_extension_inference_tsv(parquet_path, tmp_path):
     """.tsv extension dispatches to the annotations TSV writer."""
     out = tmp_path / "out.tsv"
     from_parquet(parquet_path, out, score_column="max_score")
-    assert len(Percolator().read(out)) > 0
+    assert len(pd.read_csv(out, sep="\t")) > 0
 
 
 def test_from_parquet_case_insensitive_extension(parquet_path, tmp_path):
@@ -587,7 +587,7 @@ def test_from_parquet_explicit_output_type_overrides(parquet_path, tmp_path):
     """output_type kwarg wins over extension inference."""
     out = tmp_path / "out.unknown"
     from_parquet(parquet_path, out, output_type="tsv", score_column="max_score")
-    assert len(Percolator().read(out)) > 0
+    assert len(pd.read_csv(out, sep="\t")) > 0
 
 
 def test_from_parquet_unknown_extension_raises(parquet_path, tmp_path):

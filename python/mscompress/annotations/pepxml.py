@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import re
+
+import pandas as pd
 from typing import Any, Dict, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
@@ -13,19 +15,13 @@ from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
 from mscompress.annotations.table import PSMTable
 from mscompress.types import AnnotationFormat
 
-# Preference order for the primary score.
+# Preference order for the primary score; otherwise the first one listed.
 _PRIMARY_SCORES = ("hyperscore", "xcorr", "expect")
+_ION_COUNTS = ["num_matched_ions", "num_total_ions"]
 
 
 def _tag(elem: ET.Element) -> str:
     return elem.tag.rsplit("}", 1)[-1]
-
-
-def _float(value: Optional[str]) -> Optional[float]:
-    try:
-        return float(value) if value is not None else None
-    except ValueError:
-        return None
 
 
 class PepXML(SearchResultsFormat):
@@ -59,6 +55,7 @@ class PepXML(SearchResultsFormat):
         decoy_prefix = self.decoy_prefix or "DECOY_"
         have_summary = False
         rows: List[Dict[str, Any]] = []
+        score_names: List[str] = []
 
         for _, elem in ET.iterparse(io.BytesIO(data), events=("end",)):
             tag = _tag(elem)
@@ -67,17 +64,18 @@ class PepXML(SearchResultsFormat):
                 decoy_prefix = self.decoy_prefix or file_decoy_prefix or decoy_prefix
                 have_summary = True
             elif tag == "spectrum_query":
-                rows.extend(self._spectrum_query(elem, md, decoy_prefix))
+                rows.extend(self._spectrum_query(elem, md, decoy_prefix, score_names))
                 elem.clear()
 
+        df = pd.DataFrame(rows)
         if rows:
-            md.primary_score = next(
-                (s for s in _PRIMARY_SCORES if s in rows[0]), rows[0]["_first_score"]
-            )
-        for row in rows:
-            del row["_first_score"]
-            row["score"] = row.get(md.primary_score) if md.primary_score else None
-        return PSMTable(rows, md)
+            # Optional attributes: strings, or None where the file omits them.
+            df[_ION_COUNTS] = df[_ION_COUNTS].apply(pd.to_numeric)
+        if score_names:
+            md.primary_score = next((s for s in _PRIMARY_SCORES if s in score_names),
+                                    score_names[0])
+            df["score"] = df[md.primary_score]
+        return PSMTable(df, md)
 
     def _search_summary(self, elem: ET.Element) -> Tuple[SearchMetadata, Optional[str]]:
         """Search engine, modifications and decoy prefix."""
@@ -97,79 +95,65 @@ class PepXML(SearchResultsFormat):
             tag = _tag(child)
             if tag == "parameter" and child.get("name") == "decoy_prefix":
                 decoy_prefix = child.get("value") or None
-                continue
-            massdiff = _float(child.get("massdiff"))
-            if massdiff is None:
-                continue
-            if tag == "aminoacid_modification":
-                spec = ModificationSpec(massdiff, child.get("aminoacid", ""), "Anywhere")
+            elif tag == "aminoacid_modification":
+                spec = ModificationSpec(float(child.get("massdiff")), child.get("aminoacid"))
+                (md.variable_mods if child.get("variable") == "Y" else md.fixed_mods).append(spec)
             elif tag == "terminal_modification":
-                end = "N" if child.get("terminus", "n").upper() == "N" else "C"
-                scope = "Protein" if child.get("protein_terminus", "N").upper() == "Y" else "Any"
-                spec = ModificationSpec(massdiff, f"{end}-term", f"{scope} {end}-term")
-            else:
-                continue
-            variable = child.get("variable", "N").upper() == "Y"
-            (md.variable_mods if variable else md.fixed_mods).append(spec)
+                end = child.get("terminus").upper()
+                scope = "Protein" if child.get("protein_terminus") == "Y" else "Any"
+                spec = ModificationSpec(float(child.get("massdiff")), f"{end}-term",
+                                        f"{scope} {end}-term")
+                (md.variable_mods if child.get("variable") == "Y" else md.fixed_mods).append(spec)
         return md, decoy_prefix
 
     def _spectrum_query(
-        self, query: ET.Element, md: SearchMetadata, decoy_prefix: str
+        self, query: ET.Element, md: SearchMetadata, decoy_prefix: str, score_names: List[str]
     ) -> List[Dict[str, Any]]:
         """One row per search hit of rank <= max_rank."""
-        scan_match = re.search(r"\.(\d+)\.", query.get("spectrum", ""))
-        scan = int(scan_match.group(1)) if scan_match else int(query.get("start_scan", 0))
-        charge = int(query.get("assumed_charge", 0)) or None
-        precursor_mass = _float(query.get("precursor_neutral_mass"))
-
-        def mz(mass: Optional[float]) -> Optional[float]:
-            if mass is None or not charge:
-                return None
-            return (mass + charge * mods.PROTON_MASS) / charge
+        charge = int(query.get("assumed_charge"))
+        precursor_mass = float(query.get("precursor_neutral_mass"))
 
         rows = []
         for hit in query.iter():
-            if _tag(hit) != "search_hit" or int(hit.get("hit_rank", 1)) > self.max_rank:
+            if _tag(hit) != "search_hit" or int(hit.get("hit_rank")) > self.max_rank:
                 continue
-            peptide = hit.get("peptide", "")
-            proteins = [hit.get("protein")] if hit.get("protein") else []
+            peptide = hit.get("peptide")
+            proteins = [hit.get("protein")]
             scores: Dict[str, float] = {}
             pep = None
             for child in hit.iter():
                 tag = _tag(child)
-                if tag == "alternative_protein" and child.get("protein") not in (None, *proteins):
+                if tag == "alternative_protein" and child.get("protein") not in proteins:
                     proteins.append(child.get("protein"))
                 elif tag == "search_score":
-                    value = _float(child.get("value"))
-                    if value is not None:
-                        scores[child.get("name", "")] = value
+                    scores[child.get("name")] = float(child.get("value"))
                 elif tag == "peptideprophet_result":
-                    probability = _float(child.get("probability"))
-                    if probability is not None:
-                        pep = 1.0 - probability
+                    pep = 1.0 - float(child.get("probability"))
+            if not score_names:
+                score_names.extend(scores)
 
             hit_mods, modified = self._hit_mods(hit, peptide, md)
+            calc_mass = float(hit.get("calc_neutral_pep_mass"))
             rows.append({
-                "scan": scan,
+                "scan": int(query.get("start_scan")),
                 "peptide": peptide,
                 "modifications": mods.format_modifications(hit_mods),
                 "charge": charge,
                 "pep": pep,
-                "retention_time": _float(query.get("retention_time_sec")),
-                "precursor_mz": mz(precursor_mass),
-                "calc_mz": mz(_float(hit.get("calc_neutral_pep_mass"))),
+                "retention_time": query.get("retention_time_sec"),
+                "precursor_mz": (precursor_mass + charge * mods.PROTON_MASS) / charge,
+                "calc_mz": (calc_mass + charge * mods.PROTON_MASS) / charge,
                 "proteins": proteins,
-                "pre": hit.get("peptide_prev_aa") or None,
-                "post": hit.get("peptide_next_aa") or None,
-                "is_decoy": bool(proteins) and all(p.startswith(decoy_prefix) for p in proteins),
-                "rank": int(hit.get("hit_rank", 1)),
+                "pre": hit.get("peptide_prev_aa"),
+                "post": hit.get("peptide_next_aa"),
+                "is_decoy": all(p.startswith(decoy_prefix) for p in proteins),
+                "rank": int(hit.get("hit_rank")),
                 "modified_peptide": modified or peptide,
                 "precursor_mass": precursor_mass,
-                "mass_diff": _float(hit.get("massdiff")),
-                "num_matched_ions": int(hit.get("num_matched_ions", 0)),
-                "num_total_ions": int(hit.get("tot_num_ions", 0)),
+                "mass_diff": float(hit.get("massdiff")),
+                "num_matched_ions": hit.get("num_matched_ions"),
+                "num_total_ions": hit.get("tot_num_ions"),
                 **scores,
-                "_first_score": next(iter(scores), None),
             })
         return rows
 
@@ -178,32 +162,18 @@ class PepXML(SearchResultsFormat):
         hit: ET.Element, peptide: str, md: SearchMetadata
     ) -> Tuple[List[mods.Mod], Optional[str]]:
         """A hit's modifications, and its modified sequence if given."""
-        info = next((e for e in hit if _tag(e) == "modification_info"), None)
-        if info is None:
-            return mods.with_fixed_mods([], peptide, md.fixed_mods), None
-
         found: List[mods.Mod] = []
-        for site, attr, base in (("N-term", "mod_nterm_mass", mods.N_TERM_MASS),
-                                 ("C-term", "mod_cterm_mass", mods.C_TERM_MASS)):
-            mass = _float(info.get(attr))
-            if mass is not None:
-                pos = 0 if site == "N-term" else len(peptide) + 1
-                found.append((pos, mass - base, site))
-        for aa_mod in info:
-            if _tag(aa_mod) != "mod_aminoacid_mass":
-                continue
-            pos = int(aa_mod.get("position", "0"))
-            if not 1 <= pos <= len(peptide):
-                continue
-            site = peptide[pos - 1]
-            # pepXML 1.2+ gives the shift directly; older files only the
-            # modified residue's total mass.
-            delta = _float(aa_mod.get("variable")) or _float(aa_mod.get("static"))
-            if delta is None:
-                mass = _float(aa_mod.get("mass"))
-                if mass is None or site not in mods.RESIDUE_MASSES:
-                    continue
-                delta = mass - mods.RESIDUE_MASSES[site]
-            found.append((pos, delta, site))
+        info = next((e for e in hit if _tag(e) == "modification_info"), None)
+        if info is not None:
+            if (nterm := info.get("mod_nterm_mass")) is not None:
+                found.append((0, float(nterm) - mods.N_TERM_MASS, "N-term"))
+            if (cterm := info.get("mod_cterm_mass")) is not None:
+                found.append((len(peptide) + 1, float(cterm) - mods.C_TERM_MASS, "C-term"))
+            for aa_mod in info:
+                if _tag(aa_mod) == "mod_aminoacid_mass":
+                    # The modified residue's total mass.
+                    pos = int(aa_mod.get("position"))
+                    site = peptide[pos - 1]
+                    found.append((pos, float(aa_mod.get("mass")) - mods.RESIDUE_MASSES[site], site))
         found = mods.with_fixed_mods(found, peptide, md.fixed_mods)
-        return found, info.get("modified_peptide")
+        return found, info.get("modified_peptide") if info is not None else None

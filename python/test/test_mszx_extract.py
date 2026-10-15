@@ -12,10 +12,10 @@ def msz_file(msz_file_path):
 @pytest.fixture
 def dummy_pin(tmp_path):
     # distinct scan numbers: 100, 101, 102
-    content = """SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.100.100.2\t1\t100\tPEPTIDEA\tPROT1\t0.9
-run.101.101.2\t1\t101\tPEPTIDEB\tPROT2\t0.8
-run.102.102.2\t-1\t102\tPEPTIDEC\tDECOY1\t0.1
+    content = """SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.100.100.2\t1\t100\t0.9\tK.PEPTIDEA.R\tPROT1
+run.101.101.2\t1\t101\t0.8\tK.PEPTIDEB.R\tPROT2
+run.102.102.2\t-1\t102\t0.1\tK.PEPTIDEC.R\tDECOY1
 """
     p = tmp_path / "test.pin"
     p.write_text(content)
@@ -29,17 +29,17 @@ def dummy_pepxml(tmp_path):
   <msms_run_summary>
     <spectrum_query spectrum="run.100.100.2" start_scan="100" end_scan="100" precursor_neutral_mass="1000.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.101.101.2" start_scan="101" end_scan="101" precursor_neutral_mass="1100.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.102.102.2" start_scan="102" end_scan="102" precursor_neutral_mass="1200.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
   </msms_run_summary>
@@ -68,10 +68,10 @@ def test_mszx_extract_filter_scans(tmp_path, msz_file, dummy_pin, dummy_pepxml):
     # scan3 = int(scans[2])
     
     # Update dummy pin
-    content = f"""SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.{scan1}.{scan1}.2\t1\t{scan1}\tPEPTIDEA\tPROT1\t0.9
-run.{scan2}.{scan2}.2\t1\t{scan2}\tPEPTIDEB\tPROT2\t0.8
-run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
+    content = f"""SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.{scan1}.{scan1}.2\t1\t{scan1}\t0.9\tK.PEPTIDEA.R\tPROT1
+run.{scan2}.{scan2}.2\t1\t{scan2}\t0.8\tK.PEPTIDEB.R\tPROT2
+run.999.999.2\t-1\t999\t0.1\tK.PEPTIDEC.R\tDECOY1
 """
     dummy_pin.write_text(content)
     
@@ -81,17 +81,17 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
   <msms_run_summary>
     <spectrum_query spectrum="run.{scan1}.{scan1}.2" start_scan="{scan1}" end_scan="{scan1}" precursor_neutral_mass="1000.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.{scan2}.{scan2}.2" start_scan="{scan2}" end_scan="{scan2}" precursor_neutral_mass="1100.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.999.999.2" start_scan="999" end_scan="999" precursor_neutral_mass="1200.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
   </msms_run_summary>
@@ -155,8 +155,8 @@ def test_mszx_extract_filter_ms_level(tmp_path, msz_file, dummy_pin):
             target_scan = int(scans[i])
             break
             
-    content = f"""SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
+    content = f"""SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.{target_scan}.{target_scan}.2\t1\t{target_scan}\t0.9\tK.PEPTIDEA.R\tPROT1
 """
     dummy_pin.write_text(content)
     
