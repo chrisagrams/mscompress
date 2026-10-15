@@ -5,8 +5,8 @@ MTD	description	Converted by mscompress from percolator_tsv (test.tsv)
 MTD	ms_run[1]-location	file://test.mzML
 MTD	software[1]	[MS, MS:1001490, Percolator, ]
 MTD	psm_search_engine_score[1]	[MS, MS:1001492, percolator:score, ]
-MTD	psm_search_engine_score[2]	[MS, MS:1001491, percolator:Q value, ]
-MTD	psm_search_engine_score[3]	[MS, MS:1001493, percolator:PEP, ]
+MTD	psm_search_engine_score[2]	[MS, MS:1002354, PSM-level q-value, ]
+MTD	psm_search_engine_score[3]	[, , posterior error probability, ]
 MTD	fixed_mod[1]	[MS, MS:1002453, No fixed modifications searched, ]
 MTD	variable_mod[1]	[UNIMOD, UNIMOD:35, Oxidation, ]
 MTD	variable_mod[1]-site	M

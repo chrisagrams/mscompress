@@ -93,7 +93,7 @@ def test_percolator_reader(percolator_tsv_file_path):
         "EVMSLHEASR", "3-UNIMOD:35", "R", "K")
 
     md = table.metadata
-    assert (md.software, md.primary_score) == ("Percolator", "score")
+    assert (md.software, md.primary_score) == ("Percolator", "percolator:score")
     # Percolator doesn't record the searched mods; the observed ones are declared.
     assert [(m.site, m.massdiff) for m in md.variable_mods] == [("M", 15.9949), ("C", 57.0215)]
 

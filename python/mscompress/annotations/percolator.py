@@ -75,7 +75,8 @@ class Percolator(SearchResultsFormat):
                 df[core] = raw[column]
                 used.add(column)
         if "score" in raw.columns:
-            md.primary_score = "score"
+            # Only Percolator's own output has a Percolator score.
+            md.primary_score = "percolator:score" if md.software else "score"
 
         for col in header:
             if col not in used:

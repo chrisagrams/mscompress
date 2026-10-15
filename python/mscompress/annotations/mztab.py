@@ -63,11 +63,6 @@ _COPIED = {
     if col is not None and col not in ("scan", "proteins", "is_decoy")
 }
 
-def _clean(value: str) -> str:
-    """Replace characters that would break a TSV cell."""
-    return re.sub(r"[\t\r\n]", " ", value)
-
-
 class Param(NamedTuple):
     """A controlled-vocabulary parameter, written ``[cv, accession, name, value]``.
 
@@ -80,7 +75,7 @@ class Param(NamedTuple):
     value: str = ""
 
     def __str__(self) -> str:
-        return "[" + ", ".join(_clean(part) for part in self) + "]"
+        return "[" + ", ".join(self) + "]"
 
     @classmethod
     def parse(cls, text: str) -> Optional[Param]:
@@ -117,20 +112,16 @@ class CV:
     }
     GENERIC_SOFTWARE = "MS:1001456"
 
-    # Primary score name (lowercase) -> parameter, and back by accession.
+    # Primary score name (lowercase) -> parameter.
     SCORES: Dict[str, Param] = {
         "hyperscore": Param("MS", "MS:1001331", "X!Tandem:hyperscore"),
         "expect": Param("MS", "MS:1001330", "X!Tandem:expect"),
         "xcorr": Param("MS", "MS:1001155", "SEQUEST:xcorr"),
+        "percolator:score": Param("MS", "MS:1001492", "percolator:score"),
     }
     GENERIC_SCORE = Param("MS", "MS:1001153", "search engine specific score")
-    SCORE_NAMES: Dict[str, Optional[str]] = {
-        "MS:1001331": "hyperscore",
-        "MS:1001330": "expect",
-        "MS:1001155": "xcorr",
-        "MS:1001492": "score",
-        "MS:1001153": None,
-    }
+    Q_VALUE = Param("MS", "MS:1002354", "PSM-level q-value")
+    PEP = Param("", "", "posterior error probability")
 
     NO_FIXED_MODS = Param("MS", "MS:1002453", "No fixed modifications searched")
     NO_VARIABLE_MODS = Param("MS", "MS:1002454", "No variable modifications searched")
@@ -161,24 +152,20 @@ class CV:
     @classmethod
     def scores(cls, md: SearchMetadata) -> List[Param]:
         """Parameters for the primary score, q-value and PEP, in that order."""
-        percolator = cls._key(md.software or "") == "percolator"
-        name = (md.primary_score or "").lower()
+        name = md.primary_score
         if not name:
             primary = cls.GENERIC_SCORE
-        elif name == "score" and percolator:
-            primary = Param("MS", "MS:1001492", "percolator:score")
         else:
-            primary = cls.SCORES.get(name, Param("", "", md.primary_score or ""))
-        if percolator:
-            return [primary, Param("MS", "MS:1001491", "percolator:Q value"),
-                    Param("MS", "MS:1001493", "percolator:PEP")]
-        return [primary, Param("MS", "MS:1002354", "PSM-level q-value"),
-                Param("", "", "posterior error probability")]
+            primary = cls.SCORES.get(name.lower(), Param("", "", name))
+        return [primary, cls.Q_VALUE, cls.PEP]
 
     @classmethod
     def score_name(cls, param: Param) -> Optional[str]:
         """Primary score name for a score parameter."""
-        return cls.SCORE_NAMES.get(param.accession, param.name or None)
+        if param.accession == cls.GENERIC_SCORE.accession:
+            return None
+        names = {p.accession: name for name, p in cls.SCORES.items()}
+        return names.get(param.accession, param.name or None)
 
     @staticmethod
     def modification(spec: ModificationSpec) -> Param:
@@ -254,7 +241,7 @@ class MetadataSection:
                                       ("source_file", md.source_file)) if v]
         for n, (key, value) in enumerate(custom, start=1):
             pairs.append((f"custom[{n}]", Param("", "", key, value)))
-        return [f"MTD\t{key}\t{_clean(str(value))}" for key, value in pairs]
+        return [f"MTD\t{key}\t{value}" for key, value in pairs]
 
     @staticmethod
     def parse(pairs: Dict[str, str]) -> SearchMetadata:
