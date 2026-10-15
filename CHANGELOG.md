@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/chrisagrams/mscompress/compare/v1.1.1...v1.1.2) (2026-10-15)
+
+
+### Code Refactoring
+
+* **python:** unify search results on a pandas PSMTable stored as mzTab ([cdb0d22](https://github.com/chrisagrams/mscompress/commit/cdb0d226e40e40cad867aa4a729dc2849d88de00))
+
 ## [1.1.1](https://github.com/chrisagrams/mscompress/compare/v1.1.0...v1.1.1) (2026-10-06)
 
 
