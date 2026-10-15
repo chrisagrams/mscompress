@@ -139,8 +139,8 @@ class PSMTable:
 
     def to_mztab(self, path: Union[str, PathLike, None] = None) -> str:
         """
-        Serialize as mzTab 1.0. See :func:`mscompress.annotations.write_mztab`.
+        Serialize as mzTab 1.0. See :meth:`mscompress.annotations.MzTab.write`.
         """
-        from mscompress.annotations.mztab import write_mztab
+        from mscompress.annotations.mztab import MzTab
 
-        return write_mztab(self, path)
+        return MzTab().write(self, path)

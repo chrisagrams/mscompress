@@ -18,7 +18,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from mscompress.annotations import read_percolator
+from mscompress.annotations import Percolator
 from mscompress.mszx import MSZXBuilder
 
 from mscompress.parquet.msz import parquet_to_msz
@@ -247,7 +247,7 @@ def parquet_to_mszx(
             if not is_long:
                 _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
                 builder.add_psms(
-                    read_percolator(tmp_tsv),
+                    Percolator().read(tmp_tsv),
                     description=description or f"Annotations extracted from {parquet_path.name}",
                 )
             if description:

@@ -35,7 +35,7 @@ def _mszx_with_psms(tmp_path_factory):
     import tarfile
 
     from mscompress import read
-    from mscompress.annotations import read_pepxml
+    from mscompress.annotations import PepXML
     from mscompress.mszx import MSZXBuilder
 
     out_dir = tmp_path_factory.mktemp("mszx")
@@ -44,7 +44,7 @@ def _mszx_with_psms(tmp_path_factory):
         pepxml = tar.extractfile("HSA.pepXML.zst").read()
     out = out_dir / "test.mszx"
     with read(str(out_dir / "temp.msz")) as msz:
-        MSZXBuilder(msz).add_psms(read_pepxml(pepxml), name="HSA.pepXML").save(out)
+        MSZXBuilder(msz).add_psms(PepXML().read(pepxml), name="HSA.pepXML").save(out)
     return str(out)
 
 

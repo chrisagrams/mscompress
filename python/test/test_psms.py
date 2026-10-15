@@ -13,13 +13,13 @@ from mscompress import MSZXBatchWriter, read
 from mscompress.annotations import (
     PSM_COLUMNS,
     ModificationSpec,
+    MzTab,
+    PepXML,
+    Percolator,
     PSMTable,
     SearchMetadata,
-    read_mztab,
-    read_pepxml,
-    read_percolator,
+    SearchResultsFormat,
     read_psms,
-    write_mztab,
 )
 from mscompress.mszx import MSZXBatchFile, MSZXBuilder, MSZXFile, create_mszx
 from mscompress.types import AnnotationFormat
@@ -48,7 +48,7 @@ def _assert_metadata_close(actual, expected):
 
 
 def test_pepxml_reader(pepxml_file_path):
-    table = read_pepxml(pepxml_file_path)
+    table = PepXML().read(pepxml_file_path)
     df = table.df
     assert len(df) == 100
     assert list(df.columns[: len(PSM_COLUMNS)]) == PSM_COLUMNS
@@ -71,7 +71,7 @@ def test_pepxml_reader(pepxml_file_path):
 
 
 def test_pepxml_modifications(pepxml_file_path):
-    df = read_pepxml(pepxml_file_path).df
+    df = PepXML().read(pepxml_file_path).df
     mods = df.groupby("modified_peptide").modifications.unique()
     # Variable mods from mod_aminoacid_mass, fixed C mods added from the summary.
     assert list(mods["M[147]TAM[147]DNASK"]) == ["1-UNIMOD:35,4-UNIMOD:35"]
@@ -80,7 +80,7 @@ def test_pepxml_modifications(pepxml_file_path):
 
 
 def test_percolator_reader(percolator_tsv_file_path):
-    table = read_percolator(percolator_tsv_file_path)
+    table = Percolator().read(percolator_tsv_file_path)
     df = table.df
     assert len(df) == 100
     assert (df.scan[0], df.peptide[0]) == (4310, "TDLNPDNLQGGDDLDPNYVLSSR")
@@ -104,7 +104,7 @@ def test_pin_reader_handles_labels_and_spilled_proteins():
         "run.7.7.2_1\t1\t7\t1000.5\tK.n[42.0106]PEPC[57.0215]K.L\tP1\tP2\n"
         "run.8.8.3_1\t-1\t8\t999.1\t-.ABC.-\tDECOY_P3\n"
     )
-    df = read_percolator(pin.encode()).df
+    df = Percolator().read(pin.encode()).df
     assert df.scan.tolist() == [7, 8] and df.charge.tolist() == [2, 3]
     assert df.is_decoy.tolist() == [False, True]
     assert df.proteins[0] == ["P1", "P2"]
@@ -112,6 +112,20 @@ def test_pin_reader_handles_labels_and_spilled_proteins():
     assert df.modifications[0] == "0-UNIMOD:1,4-UNIMOD:4"
     assert df.ExpMass.tolist() == [1000.5, 999.1]
     assert df.score.isna().all()
+
+
+def test_formats_share_the_base_class():
+    for fmt in (MzTab, PepXML, Percolator):
+        assert issubclass(fmt, SearchResultsFormat)
+    # Search results are only ever stored as mzTab.
+    assert hasattr(MzTab, "write")
+    assert not hasattr(PepXML, "write") and not hasattr(Percolator, "write")
+
+
+def test_reader_options(pepxml_file_path):
+    # The file declares decoy_prefix "rev_"; an explicit prefix wins.
+    assert PepXML(decoy_prefix="sp|").read(pepxml_file_path).df.is_decoy.sum() == 78
+    assert len(PepXML(max_rank=0).read(pepxml_file_path)) == 0
 
 
 def test_read_psms_detects_formats(pepxml_file_path, percolator_tsv_file_path):
@@ -129,14 +143,14 @@ def test_read_psms_detects_formats(pepxml_file_path, percolator_tsv_file_path):
 @pytest.mark.parametrize("source", ["pepXML/test.pepXML", "percolator/test.tsv"])
 def test_conversion_matches_checked_in_mztab(test_data_dir, source, tmp_path):
     table = read_psms(Path(test_data_dir) / source)
-    text = write_mztab(table, ms_run_location="test.mzML")
+    text = MzTab().write(table, ms_run_location="test.mzML")
     assert text == (_MZTAB_DIR / f"{Path(source).name}.mztab").read_text()
 
 
 @pytest.mark.parametrize("source", ["pepXML/test.pepXML", "percolator/test.tsv"])
 def test_mztab_round_trip(test_data_dir, source):
     table = read_psms(Path(test_data_dir) / source)
-    back = read_mztab(table.to_mztab().encode())
+    back = MzTab().read(table.to_mztab().encode())
     pd.testing.assert_frame_equal(back.df, table.df, check_dtype=False)
     _assert_metadata_close(back.metadata, table.metadata)
 
@@ -148,7 +162,7 @@ def test_writer_layout():
          "delta score": 3.0, "label": "x"},
         {"scan": 9, "peptide": "OTHER", "charge": 3, "score": math.inf, "is_decoy": True},
     ], SearchMetadata(software="Comet", software_version="2024.01", primary_score="xcorr"))
-    text = write_mztab(table, ms_run_location="run.msz")
+    text = MzTab().write(table, ms_run_location="run.msz")
     lines = text.splitlines()
 
     assert lines[:3] == [
@@ -172,7 +186,7 @@ def test_writer_layout():
     assert rows[2]["opt_global_cv_MS:1002217_decoy_peptide"] == "1"
     assert rows[2]["opt_global_label"] == "null"
 
-    back = read_mztab(text.encode())
+    back = MzTab().read(text.encode())
     assert back.df.proteins[0] == ["P1", "P2"]
     assert back.df.score[1] == math.inf
     assert back.df.delta_score[0] == 3.0 and back.df.label[0] == "x"
@@ -184,18 +198,18 @@ def test_mod_params_in_metadata():
         variable_mods=[ModificationSpec(-17.026549, "N-term", "Any N-term"),
                        ModificationSpec(12.5, "K")],
     )
-    text = write_mztab(PSMTable(None, md))
+    text = MzTab().write(PSMTable(None, md))
     assert "MTD\tfixed_mod[1]\t[UNIMOD, UNIMOD:4, Carbamidomethyl, ]" in text
     # Shifts without a UNIMOD entry in the table are written as CHEMMOD.
     assert "MTD\tvariable_mod[1]\t[CHEMMOD, CHEMMOD:-17.026549, CHEMMOD:-17.026549, ]" in text
     assert "MTD\tvariable_mod[2]\t[CHEMMOD, CHEMMOD:+12.5, CHEMMOD:+12.5, ]" in text
-    assert read_mztab(text.encode()).metadata == md
+    assert MzTab().read(text.encode()).metadata == md
 
 
 def test_unknown_software_round_trips_as_none():
-    text = write_mztab(PSMTable([{"scan": 1, "peptide": "A"}]))
+    text = MzTab().write(PSMTable([{"scan": 1, "peptide": "A"}]))
     assert "MTD\tsoftware[1]\t[MS, MS:1001456, analysis software, ]" in text
-    assert read_mztab(text.encode()).metadata.software is None
+    assert MzTab().read(text.encode()).metadata.software is None
 
 
 def test_reads_third_party_mztab():
@@ -214,7 +228,7 @@ def test_reads_third_party_mztab():
         "PRH\taccession",
         "PRT\tP1",
     ]) + "\n"
-    table = read_mztab(text.encode())
+    table = MzTab().read(text.encode())
     psm = table.df.iloc[0]
     assert (psm.scan, psm.charge, psm.retention_time) == (42, 2, 10.5)
     assert (psm.q_value, psm.score) == (0.001, 1e-5) and pd.isna(psm.pep)
@@ -263,7 +277,7 @@ def test_builder_stores_only_mztab(tmp_path, msz_file_path, pepxml_file_path,
         assert mszx.psms is table
         assert table.metadata.ms_run_location == "test.msz"
         assert table.metadata.source_format == "pepxml"
-        pd.testing.assert_frame_equal(table.df, read_pepxml(pepxml_file_path).df,
+        pd.testing.assert_frame_equal(table.df, PepXML().read(pepxml_file_path).df,
                                       check_dtype=False)
 
 

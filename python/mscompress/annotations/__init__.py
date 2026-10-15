@@ -1,27 +1,29 @@
 """Search results (peptide-spectrum matches).
 
-Every supported input (pepXML, Percolator .tsv/.pin, mzTab) is read into a
-:class:`PSMTable`: a pandas DataFrame with a fixed set of core columns plus
-the :class:`SearchMetadata` of the search. MSZX archives store PSM tables as
-mzTab 1.0.
+Every supported input is read into a :class:`PSMTable`: a pandas DataFrame
+with a fixed set of core columns plus the :class:`SearchMetadata` of the
+search. Each format is a :class:`SearchResultsFormat` with a ``read()``;
+:class:`MzTab`, the format MSZX archives store, also has ``write()``.
 
 Example:
     ```python
-    from mscompress.annotations import read_psms
+    from mscompress.annotations import MzTab, PepXML, read_psms
 
-    table = read_psms("results.pepXML")
+    table = read_psms("results.pepXML")          # any format, detected
+    table = PepXML(max_rank=2).read("results.pepXML")
     confident = table.df[table.df.q_value < 0.01]
-    table.to_mztab("results.mztab")
+    MzTab().write(table, "results.mztab")
     ```
 """
 
 from __future__ import annotations
 
-from mscompress.annotations.detect import detect_format, read_psms
+from mscompress.annotations.base import SearchResultsFormat
+from mscompress.annotations.detect import FORMATS, detect_format, read_psms
 from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
-from mscompress.annotations.mztab import mztab_member_name, read_mztab, write_mztab
-from mscompress.annotations.pepxml import read_pepxml
-from mscompress.annotations.percolator import read_percolator
+from mscompress.annotations.mztab import MzTab
+from mscompress.annotations.pepxml import PepXML
+from mscompress.annotations.percolator import Percolator
 from mscompress.annotations.table import PSM_COLUMNS, PSMTable
 
 __all__ = [
@@ -29,11 +31,11 @@ __all__ = [
     "PSM_COLUMNS",
     "SearchMetadata",
     "ModificationSpec",
+    "SearchResultsFormat",
+    "MzTab",
+    "PepXML",
+    "Percolator",
+    "FORMATS",
     "read_psms",
-    "read_pepxml",
-    "read_percolator",
-    "read_mztab",
-    "write_mztab",
-    "mztab_member_name",
     "detect_format",
 ]

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
-from mscompress.annotations import PSMTable, mztab_member_name, read_psms, write_mztab
+from mscompress.annotations import MzTab, PSMTable, read_psms
 from mscompress.annotations._io import compress
 from mscompress.mszx.batch import MSZXBatchFile, compress_batch
 from mscompress.mszx.metadata import (
@@ -97,11 +97,11 @@ class MSZXBuilder:
         """
         table = psms if isinstance(psms, PSMTable) else read_psms(psms)
         name = name or table.metadata.source_file or f"psms{len(self._annotations) + 1}"
-        filename = mztab_member_name(name, self.compression)
+        filename = MzTab.member_name(name, self.compression)
         if any(entry.filename == filename for _, entry in self._annotations):
             raise ValueError(f"Duplicate annotation member name: {filename}")
 
-        data = write_mztab(table, ms_run_location=self._msz_path.name).encode("utf-8")
+        data = MzTab().write(table, ms_run_location=self._msz_path.name).encode("utf-8")
         if self.compression:
             data = compress(data)
         entry = AnnotationEntry(

@@ -240,9 +240,9 @@ class MSZXBatchFile:
 
     def get_psms(self, key: Union[int, str], filename: str) -> PSMTable:
         """The search results stored (as mzTab) under a spectra entry."""
-        from mscompress.annotations import read_mztab
+        from mscompress.annotations import MzTab
 
-        return read_mztab(self.get_annotation(key, filename))
+        return MzTab().read(self.get_annotation(key, filename))
 
     # -- bulk output -------------------------------------------------------
 

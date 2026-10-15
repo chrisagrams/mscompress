@@ -1655,7 +1655,7 @@ cdef class MSZXFile(MSZFile):
         # at the top of this file).
         import tarfile
         import warnings
-        from mscompress.annotations import read_mztab
+        from mscompress.annotations import MzTab
         from mscompress.mszx.metadata import MSZXManifest
         from mscompress.types import AnnotationFormat
 
@@ -1687,7 +1687,7 @@ cdef class MSZXFile(MSZFile):
                     continue
                 try:
                     handle = tar.extractfile(tar.getmember(entry.filename))
-                    psm_tables[entry.filename] = read_mztab(handle.read())
+                    psm_tables[entry.filename] = MzTab().read(handle.read())
                 except KeyError:
                     warnings.warn(
                         f"Annotation file '{entry.filename}' not found in archive",
@@ -2780,9 +2780,7 @@ cdef class MSZXBatchWriter:
         str: The archive member name written.
         """
         # Local imports avoid the _core <-> annotations circular at load.
-        from mscompress.annotations import (
-            PSMTable, mztab_member_name, read_psms, write_mztab,
-        )
+        from mscompress.annotations import MzTab, PSMTable, read_psms
         from mscompress.annotations._io import compress
 
         self._check_open()
@@ -2791,11 +2789,11 @@ cdef class MSZXBatchWriter:
 
         table = source if isinstance(source, PSMTable) else read_psms(source)
         location = Path(self._entries[entry_index]).name
-        data = write_mztab(table, ms_run_location=location).encode("utf-8")
+        data = MzTab().write(table, ms_run_location=location).encode("utf-8")
         if compressed:
             data = compress(data)
 
-        member = mztab_member_name(name or table.metadata.source_file or "psms", compressed)
+        member = MzTab.member_name(name or table.metadata.source_file or "psms", compressed)
         self.add_annotation(entry_index, data, member, format="mztab",
                             compressed=compressed, num_records=len(table))
         return member
