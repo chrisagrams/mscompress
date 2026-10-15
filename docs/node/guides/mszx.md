@@ -152,10 +152,7 @@ rules.
 Archives written before mzTab became the only stored format carry the
 engine's own files (manifest `format` `pepxml`, `percolator_tsv` or `tsv`).
 They still open and read through the API above — `getPSMReader` parses each
-legacy member with its engine parser. To convert such an archive to mzTab,
-use the Python upgrade tool (`python -m mscompress.mszx.upgrade in.mszx [-o
-out.mszx]`); see the
-[Python MSZX guide](../../python/guides/mszx.md#upgrading-older-archives).
+legacy member with its engine parser.
 
 ## Batch archives — many runs in one file
 

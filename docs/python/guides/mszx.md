@@ -184,33 +184,6 @@ with MSZXBatchFile.open(path) as archive:     # v1 -> 1 member, v2 -> N
 `MSZFile`, so `archive.spectra` works directly). Opting into the collection view
 is explicit.
 
-## Upgrading older archives
-
-Archives written before mzTab became the only stored format contain the
-engine's own files (pepXML, Percolator TSV/PIN). They still open and read
-normally — legacy members are parsed with `PepXMLReader` / `TSVReader` — but
-can be converted so every annotation is mzTab:
-
-```python
-from mscompress.mszx import upgrade_mszx
-
-upgrade_mszx("old.mszx")                         # rewrite in place
-upgrade_mszx("old.mszx", output="new.mszx")      # or write a copy
-```
-
-or from the shell:
-
-```bash
-python -m mscompress.mszx.upgrade old.mszx [-o new.mszx]
-```
-
-Each non-mzTab member is converted, renamed to `<name>.mztab` (keeping its
-`.zst` and directory prefix if it had them), and the original is dropped; the
-manifest entries and `join_key` (`"spectra_ref"`) are updated. Spectra and any
-other members are copied byte-for-byte. Both v1 and v2 archives are supported,
-and an archive that is already all-mzTab is left as is (or copied unchanged
-to `output`).
-
 ## Reproducibility
 
 Batch archives contain no timestamps, so the same inputs and settings produce

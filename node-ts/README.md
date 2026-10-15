@@ -440,8 +440,7 @@ Other exports: `writeMzTab`, `convertToMzTab`, `parsePepXML`, `parsePercolator`,
 search results to a batch-archive entry.
 
 Archives written by older versions store raw pepXML / Percolator members; they
-read through the same API and can be converted with the Python tool
-`python -m mscompress.mszx.upgrade in.mszx [-o out.mszx]`.
+read through the same API.
 
 #### Extract Subset to New MSZX
 

@@ -49,6 +49,4 @@ See:
 ## Older archives
 
 Archives written before mzTab became the only stored format carry the raw
-pepXML / Percolator files. They are still readable through the same APIs, and
-`python -m mscompress.mszx.upgrade in.mszx [-o out.mszx]` converts them to
-mzTab.
+pepXML / Percolator files. They are still readable through the same APIs.

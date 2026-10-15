@@ -216,11 +216,6 @@ engine's own files, with `format` `percolator_tsv`, `pepxml` or `tsv` and
 its engine-specific reader — but nothing writes them any more. Readers prefer
 an mzTab entry as the primary annotation when one is present.
 
-To convert one, run `python -m mscompress.mszx.upgrade in.mszx [-o out.mszx]`
-(or `mscompress.mszx.upgrade_mszx()`): each legacy member is replaced by its
-mzTab conversion and the manifest is updated; spectra are copied
-byte-for-byte.
-
 ## Version negotiation
 
 Readers parse the leading integer of `version` as the major, and treat the
@@ -257,7 +252,7 @@ either USTAR or pax.
 ## Building MSZX archives
 
 - [Python MSZX guide](../python/guides/mszx.md) — `MSZXBuilder`, `create_mszx`,
-  `MSZXBatchWriter`, `compress_batch()`, `upgrade_mszx()`
+  `MSZXBatchWriter`, `compress_batch()`
 - [Node.js MSZX guide](../node/guides/mszx.md) — `MSZXBuilder`, `createMSZX`,
   `MSZXBatchWriter`, `compressBatch()`
 - [CLI reference](../cli/reference.md) — `--batch`

@@ -240,8 +240,7 @@ Archives written before mzTab became the only stored format carry the
 engine's own files (pepXML, Percolator TSV/PIN). These are still readable:
 each member is opened with its legacy reader (`PepXMLReader` / `TSVReader`)
 and exposes the same interface, and `archive.annotations` falls back to the
-first of them when the archive has no mzTab entry. To convert such an archive
-in place, use [`upgrade_mszx`](mszx.md#upgrading-older-archives).
+first of them when the archive has no mzTab entry.
 
 ## Joining PSMs to spectra
 

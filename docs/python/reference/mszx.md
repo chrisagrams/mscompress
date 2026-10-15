@@ -30,7 +30,3 @@ archives use `MSZXBatchFile`/`MSZXBatchWriter`. See the
 ::: mscompress.mszx.MSZXBatchManifest
 
 ::: mscompress.mszx.SpectraFileEntry
-
-## Upgrading older archives
-
-::: mscompress.mszx.upgrade.upgrade_mszx
