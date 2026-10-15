@@ -48,7 +48,6 @@ __all__ = [
     "MSZXManifest",
     "SpectraFileEntry",
     "create_mszx",
-    "upgrade_mszx",
 ]
 
 
@@ -269,12 +268,3 @@ def create_mszx(
 
     return builder.save(output_path)
 
-
-def __getattr__(name: str) -> Any:
-    # Imported lazily so `python -m mscompress.mszx.upgrade` does not find the
-    # module already loaded by this package (runpy warns about that).
-    if name == "upgrade_mszx":
-        from mscompress.mszx.upgrade import upgrade_mszx
-
-        return upgrade_mszx
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

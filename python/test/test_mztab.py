@@ -3,7 +3,6 @@
 import dataclasses
 import json
 import math
-import shutil
 import tarfile
 from pathlib import Path
 
@@ -20,7 +19,7 @@ from mscompress.annotations import (
     reader_to_mztab,
     write_mztab,
 )
-from mscompress.mszx import MSZXBatchFile, MSZXFile, create_mszx, upgrade_mszx
+from mscompress.mszx import MSZXBatchFile, MSZXFile, create_mszx
 from mscompress.types import AnnotationFormat
 
 _MZTAB_DIR = Path(__file__).resolve().parents[2] / "test" / "data" / "mztab"
@@ -235,58 +234,22 @@ def test_legacy_archive_still_reads(mszx_file_path):
         assert len(mszx.annotations) == 100
 
 
-def test_upgrade_legacy_single_file_archive(tmp_path, mszx_file_path):
-    with MSZXFile.open(mszx_file_path) as legacy:
-        expected = _as_dicts(legacy.annotations)
-        n_spectra = len(legacy.spectra)
-
-    out = upgrade_mszx(mszx_file_path, tmp_path / "upgraded.mszx")
-
-    with tarfile.open(out) as tar:
-        assert "HSA.pepXML.mztab.zst" in tar.getnames()
-        assert "HSA.pepXML.zst" not in tar.getnames()
-    with MSZXFile.open(out) as mszx:
-        entry = mszx.annotation_files[0]
-        assert (entry.filename, entry.format) == ("HSA.pepXML.mztab.zst", AnnotationFormat.MZTAB)
-        assert len(mszx.spectra) == n_spectra
-        assert isinstance(mszx.annotations, MzTabReader)
-        assert mszx.annotations.source_name == "HSA.pepXML"
-        _assert_psms_equal(_as_dicts(mszx.annotations), expected)
-
-
-def test_upgrade_in_place_is_idempotent(tmp_path, mszx_file_path):
-    target = tmp_path / "copy.mszx"
-    shutil.copy(mszx_file_path, target)
-    upgrade_mszx(target)
-    first = target.read_bytes()
-    upgrade_mszx(target)
-    assert target.read_bytes() == first
-
-
-def test_batch_writer_add_psms_and_upgrade(tmp_path, mzml_file_path, pepxml_file_path):
+def test_batch_writer_add_psms(tmp_path, mzml_file_path, pepxml_file_path):
     out = tmp_path / "batch.mszx"
     with MSZXBatchWriter(out) as writer:
         idx = writer.add(mzml_file_path)
         member = writer.add_psms(idx, pepxml_file_path)
         assert member == "test.pepXML.mztab.zst"
-        # A legacy-style raw member, as older writers produced.
-        writer.add_annotation(idx, Path(pepxml_file_path).read_bytes(),
-                              "legacy.pepXML", format="pepxml")
 
-    upgraded = upgrade_mszx(out, tmp_path / "batch_upgraded.mszx")
-    with MSZXBatchFile.open(upgraded) as archive:
+    with MSZXBatchFile.open(out) as archive:
         anns = archive.entries[0].annotations
         assert [(a.filename, a.format) for a in anns] == [
             ("test.pepXML.mztab.zst", AnnotationFormat.MZTAB),
-            ("legacy.pepXML.mztab", AnnotationFormat.MZTAB),
         ]
-        assert archive.entries[0].join_key == "spectra_ref"
         assert len(archive[0].spectra) > 0
 
-        stored = zstd.ZstdDecompressor().decompress(
-            archive.get_annotation(0, "test.pepXML.mztab.zst"))
-        text = archive.get_annotation(0, "legacy.pepXML.mztab").decode()
+        text = zstd.ZstdDecompressor().decompress(
+            archive.get_annotation(0, "test.pepXML.mztab.zst")).decode()
         assert "MTD\tms_run[1]-location\tfile://test.mzML" in text
-        a = _mztab_reader(stored.decode(), tmp_path, "a.mztab")
-        b = _mztab_reader(text, tmp_path, "b.mztab")
-        _assert_psms_equal(_as_dicts(a), _as_dicts(b))
+        expected = _as_dicts(PSMReader(pepxml_file_path))
+        _assert_psms_equal(_as_dicts(_mztab_reader(text, tmp_path, "a.mztab")), expected)
