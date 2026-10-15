@@ -212,31 +212,6 @@ def test_unknown_software_round_trips_as_none():
     assert MzTab().read(text.encode()).metadata.software is None
 
 
-def test_reads_third_party_mztab():
-    text = "\n".join([
-        "COM\tmade elsewhere",
-        "MTD\tmzTab-version\t1.0.0",
-        "MTD\tpsm_search_engine_score[1]\t[MS, MS:1002354, PSM-level q-value, ]",
-        "MTD\tpsm_search_engine_score[2]\t[MS, MS:1001330, X!Tandem:expect, ]",
-        "MTD\tpsm_search_engine_score[3]\t[, , other score, ]",
-        "",
-        "PSH\tsequence\tPSM_ID\taccession\tcharge\tretention_time\tspectra_ref"
-        "\tsearch_engine_score[1]\tsearch_engine_score[2]\tsearch_engine_score[3]"
-        "\topt_ms_run[1]_foo",
-        "PSM\tAAK\t1\tP1\t2\t10.5|11.0\tms_run[1]:controllerType=0 controllerNumber=1 scan=42"
-        "\t0.001\t1e-5\t7\tbar",
-        "PRH\taccession",
-        "PRT\tP1",
-    ]) + "\n"
-    table = MzTab().read(text.encode())
-    psm = table.df.iloc[0]
-    assert (psm.scan, psm.charge, psm.retention_time) == (42, 2, 10.5)
-    assert (psm.q_value, psm.score) == (0.001, 1e-5) and pd.isna(psm.pep)
-    assert psm["search_engine_score[3]"] == 7
-    assert psm["opt_ms_run[1]_foo"] == "bar"
-    assert table.metadata.primary_score == "expect"
-
-
 # -- PSMTable ---------------------------------------------------------------
 
 

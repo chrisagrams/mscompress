@@ -16,12 +16,12 @@ import re
 from dataclasses import replace
 from os import PathLike, fspath
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
-from mscompress.annotations import _cv
+from mscompress.annotations import mods
 from mscompress.annotations.base import SearchResultsFormat
 from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
 from mscompress.annotations.table import PSM_COLUMNS, PSMTable
@@ -56,15 +56,149 @@ _PSH: List[Tuple[str, Optional[str]]] = [
     ("end", None),
     (DECOY_COLUMN, "is_decoy"),
 ]
-# Columns that read straight back into a PSMTable column. The rest (scores,
-# spectra_ref, accession, decoy flag) need converting.
+# Columns that read straight back into a PSMTable column. The rest
+# (spectra_ref, accession, decoy flag) need converting.
 _COPIED = {
     mztab: col for mztab, col in _PSH
-    if col in ("peptide", "modifications", "retention_time", "charge",
-               "precursor_mz", "calc_mz", "pre", "post")
+    if col is not None and col not in ("scan", "proteins", "is_decoy")
 }
 
-_INDEXED_KEY = re.compile(r"^([A-Za-z_]+)\[(\d+)\](?:-(.+))?$")
+def _clean(value: str) -> str:
+    """Replace characters that would break a TSV cell."""
+    return re.sub(r"[\t\r\n]", " ", value)
+
+
+class Param(NamedTuple):
+    """A controlled-vocabulary parameter, written ``[cv, accession, name, value]``.
+
+    User parameters leave ``cv`` and ``accession`` empty.
+    """
+
+    cv: str
+    accession: str
+    name: str
+    value: str = ""
+
+    def __str__(self) -> str:
+        return "[" + ", ".join(_clean(part) for part in self) + "]"
+
+    @classmethod
+    def parse(cls, text: str) -> Optional[Param]:
+        text = text.strip()
+        if not (text.startswith("[") and text.endswith("]")):
+            return None
+        parts = [p.strip() for p in text[1:-1].split(",", 3)]
+        return cls(*parts) if len(parts) == 4 else None
+
+
+class CV:
+    """The PSI-MS and UNIMOD terms used to describe a search in mzTab."""
+
+    # Search engines with their own PSI-MS term, keyed by _key(name).
+    SOFTWARE: Dict[str, Tuple[str, str]] = {
+        "percolator": ("MS:1001490", "Percolator"),
+        "xtandem": ("MS:1001476", "X!Tandem"),
+        "msfragger": ("MS:1003014", "MSFragger"),
+        "comet": ("MS:1002251", "Comet"),
+        "mascot": ("MS:1001207", "Mascot"),
+        "sequest": ("MS:1001208", "SEQUEST"),
+        "msgf": ("MS:1002048", "MS-GF+"),
+        "myrimatch": ("MS:1001585", "MyriMatch"),
+        "omssa": ("MS:1001475", "OMSSA"),
+        "sage": ("MS:1004007", "Sage"),
+        "maxquant": ("MS:1001583", "MaxQuant"),
+        "andromeda": ("MS:1002337", "Andromeda"),
+        "peptideprophet": ("MS:1002287", "PeptideProphet"),
+        "byonic": ("MS:1002261", "Byonic"),
+        "metamorpheus": ("MS:1002826", "MetaMorpheus"),
+        "pfind": ("MS:1003011", "pFind"),
+        "prolucid": ("MS:1002596", "ProLuCID"),
+        "tide": ("MS:1002575", "Tide"),
+    }
+    GENERIC_SOFTWARE = "MS:1001456"
+
+    # Primary score name (lowercase) -> parameter, and back by accession.
+    SCORES: Dict[str, Param] = {
+        "hyperscore": Param("MS", "MS:1001331", "X!Tandem:hyperscore"),
+        "expect": Param("MS", "MS:1001330", "X!Tandem:expect"),
+        "xcorr": Param("MS", "MS:1001155", "SEQUEST:xcorr"),
+    }
+    GENERIC_SCORE = Param("MS", "MS:1001153", "search engine specific score")
+    SCORE_NAMES: Dict[str, Optional[str]] = {
+        "MS:1001331": "hyperscore",
+        "MS:1001330": "expect",
+        "MS:1001155": "xcorr",
+        "MS:1001492": "score",
+        "MS:1001153": None,
+    }
+
+    NO_FIXED_MODS = Param("MS", "MS:1002453", "No fixed modifications searched")
+    NO_VARIABLE_MODS = Param("MS", "MS:1002454", "No variable modifications searched")
+
+    @staticmethod
+    def _key(name: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", name.lower())
+
+    @classmethod
+    def software(cls, md: SearchMetadata) -> Param:
+        """Software as its PSI-MS term, with the version in the value slot."""
+        version = md.software_version or ""
+        if not md.software:
+            return Param("MS", cls.GENERIC_SOFTWARE, "analysis software", version)
+        term = cls.SOFTWARE.get(cls._key(md.software))
+        if term is None:
+            return Param("", "", md.software, version)
+        return Param("MS", term[0], term[1], version)
+
+    @classmethod
+    def read_software(cls, param: Param) -> Tuple[Optional[str], Optional[str]]:
+        """(software, version) from a ``software[1]`` parameter."""
+        names = {acc: name for acc, name in cls.SOFTWARE.values()}
+        software = None if param.accession == cls.GENERIC_SOFTWARE else (
+            names.get(param.accession, param.name or None))
+        return software, param.value or None
+
+    @classmethod
+    def scores(cls, md: SearchMetadata) -> List[Param]:
+        """Parameters for the primary score, q-value and PEP, in that order."""
+        percolator = cls._key(md.software or "") == "percolator"
+        name = (md.primary_score or "").lower()
+        if not name:
+            primary = cls.GENERIC_SCORE
+        elif name == "score" and percolator:
+            primary = Param("MS", "MS:1001492", "percolator:score")
+        else:
+            primary = cls.SCORES.get(name, Param("", "", md.primary_score or ""))
+        if percolator:
+            return [primary, Param("MS", "MS:1001491", "percolator:Q value"),
+                    Param("MS", "MS:1001493", "percolator:PEP")]
+        return [primary, Param("MS", "MS:1002354", "PSM-level q-value"),
+                Param("", "", "posterior error probability")]
+
+    @classmethod
+    def score_name(cls, param: Param) -> Optional[str]:
+        """Primary score name for a score parameter."""
+        return cls.SCORE_NAMES.get(param.accession, param.name or None)
+
+    @staticmethod
+    def modification(spec: ModificationSpec) -> Param:
+        """UNIMOD parameter for a modification, or CHEMMOD when there is none."""
+        hit = mods.unimod(spec.massdiff)
+        if hit:
+            return Param("UNIMOD", f"UNIMOD:{hit[0]}", hit[1])
+        accession = mods.chemmod(spec.massdiff)
+        # The name repeats the accession: jmzTab rejects an empty name.
+        return Param("CHEMMOD", accession, accession)
+
+    @staticmethod
+    def modification_mass(param: Param) -> Optional[float]:
+        """Mass shift of a UNIMOD / CHEMMOD parameter, if known."""
+        if param.accession.startswith("CHEMMOD:"):
+            try:
+                return float(param.accession[len("CHEMMOD:"):])
+            except ValueError:
+                return None
+        return mods.UNIMOD_MASSES.get(param.accession)
 
 
 def _format_floats(col: pd.Series) -> pd.Series:
@@ -80,149 +214,88 @@ def _format_floats(col: pd.Series) -> pd.Series:
     return col.map(fmt).astype(object)
 
 
-Pair = Tuple[str, str]
-
-
 class MetadataSection:
     """
     The ``MTD`` section: :class:`SearchMetadata` as mzTab key/value lines.
 
-    ``lines()`` writes it and ``parse()`` reads it back. Reading also works
-    out which ``search_engine_score[n]`` column holds the score, q-value and
-    PEP, since third-party files order them differently.
+    Only the layout :meth:`lines` writes is read back: the score columns are
+    always the primary score, q-value and PEP, in that order.
     """
 
-    #: The score columns as written: mzTab column -> PSMTable column.
-    WRITTEN_SCORES = {
-        "search_engine_score[1]": "score",
-        "search_engine_score[2]": "q_value",
-        "search_engine_score[3]": "pep",
-    }
-
-    def __init__(self, metadata: SearchMetadata,
-                 score_columns: Optional[Dict[str, str]] = None):
-        self.metadata = metadata
-        #: mzTab score column -> PSMTable column (``score``, ``q_value``, ``pep``).
-        self.score_columns = dict(self.WRITTEN_SCORES if score_columns is None else score_columns)
-
-    # -- writing -----------------------------------------------------------
-
-    def lines(self) -> List[str]:
-        """The ``MTD`` lines, in the order mzTab lists them."""
-        pairs = [
-            *self._header(),
-            *self._software(),
-            *self._scores(),
-            *self._mods("fixed_mod", self.metadata.fixed_mods, _cv.NO_FIXED_MODS),
-            *self._mods("variable_mod", self.metadata.variable_mods, _cv.NO_VARIABLE_MODS),
-            *self._custom(),
-        ]
-        return [f"MTD\t{key}\t{_cv.clean(value)}" for key, value in pairs]
-
-    def _header(self) -> List[Pair]:
-        md = self.metadata
+    @staticmethod
+    def lines(md: SearchMetadata) -> List[str]:
+        """The ``MTD`` lines for a search."""
         if md.source_format:
             description = f"Converted by mscompress from {md.source_format}"
             if md.source_file:
                 description += f" ({md.source_file})"
         else:
             description = "PSMs written by mscompress"
-        location = f"file://{md.ms_run_location}" if md.ms_run_location else NULL
-        return [
+        pairs: List[Tuple[str, object]] = [
             ("mzTab-version", "1.0.0"),
             ("mzTab-mode", "Summary"),
             ("mzTab-type", "Identification"),
             ("description", description),
-            ("ms_run[1]-location", location),
+            ("ms_run[1]-location",
+             f"file://{md.ms_run_location}" if md.ms_run_location else NULL),
+            ("software[1]", CV.software(md)),
         ]
-
-    def _software(self) -> List[Pair]:
-        return [("software[1]", _cv.format_param(_cv.software_param(self.metadata)))]
-
-    def _scores(self) -> List[Pair]:
-        return [(f"psm_search_engine_score[{n}]", _cv.format_param(param))
-                for n, param in enumerate(_cv.score_params(self.metadata), start=1)]
+        for n, param in enumerate(CV.scores(md), start=1):
+            pairs.append((f"psm_search_engine_score[{n}]", param))
+        for kind, specs, none in (("fixed_mod", md.fixed_mods, CV.NO_FIXED_MODS),
+                                  ("variable_mod", md.variable_mods, CV.NO_VARIABLE_MODS)):
+            if not specs:
+                pairs.append((f"{kind}[1]", none))
+            for n, spec in enumerate(specs, start=1):
+                pairs += [(f"{kind}[{n}]", CV.modification(spec)),
+                          (f"{kind}[{n}]-site", spec.site),
+                          (f"{kind}[{n}]-position", spec.position)]
+        custom = [(k, v) for k, v in (("source_format", md.source_format),
+                                      ("source_file", md.source_file)) if v]
+        for n, (key, value) in enumerate(custom, start=1):
+            pairs.append((f"custom[{n}]", Param("", "", key, value)))
+        return [f"MTD\t{key}\t{_clean(str(value))}" for key, value in pairs]
 
     @staticmethod
-    def _mods(kind: str, specs: List[ModificationSpec], none: _cv.Param) -> List[Pair]:
-        if not specs:
-            return [(f"{kind}[1]", _cv.format_param(none))]
-        pairs = []
-        for k, spec in enumerate(specs, start=1):
-            pairs += [
-                (f"{kind}[{k}]", _cv.format_param(_cv.mod_param(spec))),
-                (f"{kind}[{k}]-site", spec.site),
-                (f"{kind}[{k}]-position", spec.position),
-            ]
-        return pairs
-
-    def _custom(self) -> List[Pair]:
-        md = self.metadata
-        values = [(k, v) for k, v in (("source_format", md.source_format),
-                                      ("source_file", md.source_file)) if v]
-        return [(f"custom[{n}]", _cv.format_param(("", "", key, value)))
-                for n, (key, value) in enumerate(values, start=1)]
-
-    # -- reading -----------------------------------------------------------
-
-    @classmethod
-    def parse(cls, pairs: Dict[str, str]) -> MetadataSection:
-        """Read ``MTD`` key/value pairs."""
-        section = cls(SearchMetadata(), score_columns={})
-        md = section.metadata
-        location = pairs.get("ms_run[1]-location")
-        if location and location != NULL:
+    def parse(pairs: Dict[str, str]) -> SearchMetadata:
+        """Search metadata from ``MTD`` key/value pairs."""
+        md = SearchMetadata()
+        location = pairs.get("ms_run[1]-location", NULL)
+        if location != NULL:
             md.ms_run_location = location.removeprefix("file://")
+        software = Param.parse(pairs.get("software[1]", ""))
+        if software:
+            md.software, md.software_version = CV.read_software(software)
+        score = Param.parse(pairs.get("psm_search_engine_score[1]", ""))
+        if score:
+            md.primary_score = CV.score_name(score)
 
-        mod_fields: Dict[Tuple[str, int], Dict[str, str]] = {}
-        for key, value in pairs.items():
-            match = _INDEXED_KEY.match(key)
-            if not match:
-                continue
-            name, n, sub = match.group(1), int(match.group(2)), match.group(3)
-            if name in ("fixed_mod", "variable_mod"):
-                mod_fields.setdefault((name, n), {})[sub or "param"] = value
-                continue
-            param = _cv.parse_param(value)
-            if param is None or sub is not None:
-                continue
-            if name == "software" and n == 1:
-                md.software, md.software_version = _cv.software_from_param(param)
-            elif name == "psm_search_engine_score":
-                section._read_score(n, param)
-            elif name == "custom" and param[2] in ("source_format", "source_file"):
-                setattr(md, param[2], param[3] or None)
+        for kind, specs in (("fixed_mod", md.fixed_mods), ("variable_mod", md.variable_mods)):
+            n = 1
+            while f"{kind}[{n}]" in pairs:
+                key = f"{kind}[{n}]"
+                param = Param.parse(pairs[key])
+                mass = CV.modification_mass(param) if param else None
+                if mass is not None:  # None: "No ... modifications searched"
+                    specs.append(ModificationSpec(mass, pairs.get(f"{key}-site", ""),
+                                                  pairs.get(f"{key}-position", "Anywhere")))
+                n += 1
 
-        if not section.score_columns:
-            section.score_columns["search_engine_score[1]"] = "score"
-        for (kind, _), fields in sorted(mod_fields.items()):
-            section._read_mod(kind, fields)
-        return section
-
-    def _read_score(self, n: int, param: _cv.Param) -> None:
-        role = _cv.score_role(param)
-        if role in self.score_columns.values():
-            return
-        self.score_columns[f"search_engine_score[{n}]"] = role
-        if role == "score":
-            self.metadata.primary_score = _cv.score_name(param)
-
-    def _read_mod(self, kind: str, fields: Dict[str, str]) -> None:
-        param = _cv.parse_param(fields.get("param", ""))
-        mass = _cv.mod_mass(param) if param else None
-        if mass is None:
-            return
-        spec = ModificationSpec(mass, fields.get("site", ""), fields.get("position", "Anywhere"))
-        md = self.metadata
-        (md.fixed_mods if kind == "fixed_mod" else md.variable_mods).append(spec)
+        n = 1
+        while f"custom[{n}]" in pairs:
+            param = Param.parse(pairs[f"custom[{n}]"])
+            if param and param.name in ("source_format", "source_file"):
+                setattr(md, param.name, param.value or None)
+            n += 1
+        return md
 
 
 class MzTab(SearchResultsFormat):
     """
     mzTab 1.0 (PSM section): read, and written for MSZX storage.
 
-    Reads files written by mscompress as well as third-party mzTab: columns
-    are looked up by name and missing optional columns are tolerated.
+    Reads the layout :meth:`write` produces (what MSZX archives contain);
+    mzTab from other tools is not supported.
     """
 
     format = AnnotationFormat.MZTAB
@@ -265,7 +338,7 @@ class MzTab(SearchResultsFormat):
         psms = self._psm_frame(table.df, md)
         body = psms.to_csv(sep="\t", index=False, na_rep=NULL,
                            quoting=csv.QUOTE_NONE, lineterminator="\n")
-        text = "\n".join(MetadataSection(md).lines()) + "\n" + body
+        text = "\n".join(MetadataSection.lines(md)) + "\n" + body
         if path is not None:
             Path(fspath(path)).write_text(text, encoding="utf-8")
         return text
@@ -278,7 +351,7 @@ class MzTab(SearchResultsFormat):
         out["PSM_ID"] = np.arange(1, len(df) + 1)
         n_proteins = df["proteins"].map(len)
         out["unique"] = np.where(n_proteins == 0, None, np.where(n_proteins == 1, "1", "0"))
-        out["search_engine"] = _cv.format_param(_cv.software_param(md))
+        out["search_engine"] = str(CV.software(md))
         out["spectra_ref"] = "ms_run[1]:scan=" + df["scan"].astype("string")
         out[DECOY_COLUMN] = df["is_decoy"].astype(int)
         for col in df.columns[len(PSM_COLUMNS):]:
@@ -306,52 +379,29 @@ class MzTab(SearchResultsFormat):
             elif line.startswith(("PSH\t", "PSM\t")):
                 table_lines.append(line)
 
-        section = MetadataSection.parse(mtd)
-        md = section.metadata
+        md = MetadataSection.parse(mtd)
         if not table_lines:
             return PSMTable(None, md)
         raw = pd.read_csv(io.StringIO("\n".join(table_lines)), sep="\t",
                           na_values=[NULL], keep_default_na=False,
                           quoting=csv.QUOTE_NONE, float_precision="round_trip",
                           dtype={"accession": object})
-        return PSMTable(self._parse_psms(raw.iloc[:, 1:], section.score_columns), md)
+        return PSMTable(self._parse_psms(raw.iloc[:, 1:]), md)
 
     @staticmethod
-    def _parse_psms(raw: pd.DataFrame, score_columns: Dict[str, str]) -> pd.DataFrame:
+    def _parse_psms(raw: pd.DataFrame) -> pd.DataFrame:
         """PSMTable columns from the PSH/PSM table (without the line tag)."""
         # Protein rows of one PSM share its PSM_ID.
-        psm_id = raw["PSM_ID"] if "PSM_ID" in raw.columns else pd.Series(range(len(raw)))
-        if "accession" in raw.columns:
-            proteins = list(raw.groupby(psm_id.to_numpy(), sort=False)["accession"].agg(
-                lambda s: [str(a) for a in s if pd.notna(a)]
-            ))
-        else:
-            proteins = None
-        raw = raw[~psm_id.duplicated().to_numpy()].reset_index(drop=True)
+        proteins = raw.groupby("PSM_ID", sort=False)["accession"].agg(
+            lambda s: [str(a) for a in s if pd.notna(a)]
+        )
+        raw = raw.drop_duplicates("PSM_ID").reset_index(drop=True)
 
-        df = pd.DataFrame(index=raw.index)
-        ref = raw.get("spectra_ref", pd.Series([None] * len(raw))).astype("string")
-        df["scan"] = ref.str.extract(r"scan=(\d+)", expand=False)
-        index = ref.str.extract(r"index=(\d+)", expand=False)
-        if index.notna().any():
-            df["spectrum_index"] = pd.to_numeric(index).astype("Int64")
-        df["proteins"] = proteins if proteins is not None else [[] for _ in range(len(raw))]
-        for column, role in score_columns.items():
-            if column in raw.columns:
-                df[role] = raw[column]
-        for mztab, col in _COPIED.items():
-            if mztab in raw.columns:
-                df[col] = raw[mztab]
-        if "retention_time" in df.columns and not pd.api.types.is_numeric_dtype(df["retention_time"]):
-            # mzTab allows "t1|t2"; keep the first.
-            df["retention_time"] = df["retention_time"].astype("string").str.split("|").str[0]
-        if DECOY_COLUMN in raw.columns:
-            df["is_decoy"] = raw[DECOY_COLUMN].astype("string").isin(["1", "true", "True"])
-
-        # Anything not mapped above is kept; unmapped scores keep their name.
-        mapped = {m for m, _ in _PSH if not m.startswith("search_engine_score[")}
-        mapped |= set(score_columns)
+        df = pd.DataFrame({col: raw[mztab] for mztab, col in _COPIED.items()})
+        df["scan"] = raw["spectra_ref"].str.extract(r"scan=(\d+)", expand=False)
+        df["proteins"] = list(proteins)
+        df["is_decoy"] = raw[DECOY_COLUMN] == 1
         for col in raw.columns:
-            if col not in mapped:
+            if col.startswith(OPT_PREFIX) and col != DECOY_COLUMN:
                 df[col.removeprefix(OPT_PREFIX)] = raw[col]
         return df
