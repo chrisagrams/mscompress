@@ -249,12 +249,14 @@ class MetadataSection:
                                                   pairs.get(f"{key}-position", "Anywhere")))
                 n += 1
 
+        custom = {}
         n = 1
         while f"custom[{n}]" in pairs:
-            param = Param.parse(pairs[f"custom[{n}]"])
-            if param and param.name in ("source_format", "source_file"):
-                setattr(md, param.name, param.value or None)
+            if param := Param.parse(pairs[f"custom[{n}]"]):
+                custom[param.name] = param.value or None
             n += 1
+        md.source_format = custom.get("source_format")
+        md.source_file = custom.get("source_file")
         return md
 
 
