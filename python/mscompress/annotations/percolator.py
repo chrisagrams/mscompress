@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import io
 import re
-from typing import List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import pandas as pd
 
 from mscompress.annotations import mods
 from mscompress.annotations.base import SearchResultsFormat
-from mscompress.annotations.metadata import SearchMetadata
+from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
 from mscompress.annotations.table import PSMTable, psm_frame
 from mscompress.types import AnnotationFormat
 
@@ -90,7 +90,7 @@ class Percolator(SearchResultsFormat):
                               columns=["pre", "peptide", "modified_peptide", "post", "mods"])
         df[["pre", "peptide", "modified_peptide", "post"]] = parsed.iloc[:, :4]
         df["modifications"] = parsed["mods"].map(mods.format_modifications)
-        md.variable_mods = mods.observed_mods(m for found in parsed["mods"] for m in found)
+        md.variable_mods = self._observed_mods(parsed["mods"])
 
         df["proteins"] = [cell.strip(";").split(";") if isinstance(cell, str) else []
                           for cell in df["proteins"]]
@@ -101,6 +101,22 @@ class Percolator(SearchResultsFormat):
                               for ps in df["proteins"]]
         # The id and label are now in scan / charge / rank / is_decoy.
         return PSMTable(psm_frame(df.drop(columns=[header[0], "Label"], errors="ignore")), md)
+
+    @staticmethod
+    def _observed_mods(per_psm: Iterable[List[mods.Mod]]) -> List[ModificationSpec]:
+        """
+        The distinct mods seen in the peptides, declared as variable.
+
+        Percolator output doesn't record the mods searched, and without these
+        the mzTab header would say none were. Fixed and variable mods can't be
+        told apart, so all are declared variable.
+        """
+        seen: Dict[Tuple[str, float], ModificationSpec] = {}
+        for found in per_psm:
+            for _, delta, site in found:
+                position = {"N-term": "Any N-term", "C-term": "Any C-term"}.get(site, "Anywhere")
+                seen.setdefault((site, delta), ModificationSpec(delta, site, position))
+        return list(seen.values())
 
     @staticmethod
     def _split_peptide(value: str) -> Tuple[str, str, str, str, List[mods.Mod]]:

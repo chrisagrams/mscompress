@@ -11,8 +11,6 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from mscompress.annotations.metadata import ModificationSpec
-
 # (position, massdiff, site)
 Mod = Tuple[int, float, str]
 
@@ -83,12 +81,3 @@ def format_modifications(mods: Iterable[Mod]) -> Optional[str]:
     if not ordered:
         return None
     return ",".join(f"{pos}-{accession(delta)}" for pos, delta, _ in ordered)
-
-
-def observed_mods(mods: Iterable[Mod]) -> List[ModificationSpec]:
-    """Distinct (site, mass) pairs, for sources that don't declare their mods."""
-    seen: Dict[Tuple[str, float], ModificationSpec] = {}
-    for pos, delta, site in mods:
-        position = {"N-term": "Any N-term", "C-term": "Any C-term"}.get(site, "Anywhere")
-        seen.setdefault((site, round(delta, 4)), ModificationSpec(delta, site, position))
-    return list(seen.values())
