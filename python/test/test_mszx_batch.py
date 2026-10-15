@@ -342,8 +342,8 @@ def test_batch_file_opens_a_v1_archive_as_one_member(mszx_file_path):
         assert len(archive[0].spectra) == 100
 
 
-def test_v1_annotations_survive_the_adaptation(mszx_file_path):
-    with MSZXBatchFile.open(mszx_file_path) as archive:
+def test_v1_annotations_survive_the_adaptation(legacy_mszx_file_path):
+    with MSZXBatchFile.open(legacy_mszx_file_path) as archive:
         entry = archive.entries[0]
         assert [a.filename for a in entry.annotations] == ["HSA.pepXML.zst"]
         assert archive.get_annotation(0, "HSA.pepXML.zst")

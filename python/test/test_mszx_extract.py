@@ -2,6 +2,8 @@ import pytest
 from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
 from mscompress import read
+from mscompress.annotations import PSMTable
+from mscompress.types import AnnotationFormat
 
 @pytest.fixture
 def msz_file(msz_file_path):
@@ -10,10 +12,10 @@ def msz_file(msz_file_path):
 @pytest.fixture
 def dummy_pin(tmp_path):
     # distinct scan numbers: 100, 101, 102
-    content = """SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.100.100.2\t1\t100\tPEPTIDEA\tPROT1\t0.9
-run.101.101.2\t1\t101\tPEPTIDEB\tPROT2\t0.8
-run.102.102.2\t-1\t102\tPEPTIDEC\tDECOY1\t0.1
+    content = """SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.100.100.2\t1\t100\t0.9\tK.PEPTIDEA.R\tPROT1
+run.101.101.2\t1\t101\t0.8\tK.PEPTIDEB.R\tPROT2
+run.102.102.2\t-1\t102\t0.1\tK.PEPTIDEC.R\tDECOY1
 """
     p = tmp_path / "test.pin"
     p.write_text(content)
@@ -27,17 +29,17 @@ def dummy_pepxml(tmp_path):
   <msms_run_summary>
     <spectrum_query spectrum="run.100.100.2" start_scan="100" end_scan="100" precursor_neutral_mass="1000.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.101.101.2" start_scan="101" end_scan="101" precursor_neutral_mass="1100.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.102.102.2" start_scan="102" end_scan="102" precursor_neutral_mass="1200.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
   </msms_run_summary>
@@ -53,7 +55,7 @@ def test_mszx_extract_filter_scans(tmp_path, msz_file, dummy_pin, dummy_pepxml):
     create_mszx(
         msz_file,
         mszx_path,
-        annotations=[dummy_pin, dummy_pepxml],
+        psms=[dummy_pin, dummy_pepxml],
         description="Source Archive"
     )
     
@@ -66,10 +68,10 @@ def test_mszx_extract_filter_scans(tmp_path, msz_file, dummy_pin, dummy_pepxml):
     # scan3 = int(scans[2])
     
     # Update dummy pin
-    content = f"""SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.{scan1}.{scan1}.2\t1\t{scan1}\tPEPTIDEA\tPROT1\t0.9
-run.{scan2}.{scan2}.2\t1\t{scan2}\tPEPTIDEB\tPROT2\t0.8
-run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
+    content = f"""SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.{scan1}.{scan1}.2\t1\t{scan1}\t0.9\tK.PEPTIDEA.R\tPROT1
+run.{scan2}.{scan2}.2\t1\t{scan2}\t0.8\tK.PEPTIDEB.R\tPROT2
+run.999.999.2\t-1\t999\t0.1\tK.PEPTIDEC.R\tDECOY1
 """
     dummy_pin.write_text(content)
     
@@ -79,17 +81,17 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
   <msms_run_summary>
     <spectrum_query spectrum="run.{scan1}.{scan1}.2" start_scan="{scan1}" end_scan="{scan1}" precursor_neutral_mass="1000.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEA" protein="PROT1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.{scan2}.{scan2}.2" start_scan="{scan2}" end_scan="{scan2}" precursor_neutral_mass="1100.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEB" protein="PROT2" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
     <spectrum_query spectrum="run.999.999.2" start_scan="999" end_scan="999" precursor_neutral_mass="1200.0" assumed_charge="2">
       <search_result>
-        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1"/>
+        <search_hit hit_rank="1" peptide="PEPTIDEC" protein="DECOY1" massdiff="0.0" calc_neutral_pep_mass="1000.0"/>
       </search_result>
     </spectrum_query>
   </msms_run_summary>
@@ -104,7 +106,7 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
     create_mszx(
         msz_file,
         mszx_path,
-        annotations=[dummy_pin, dummy_pepxml],
+        psms=[dummy_pin, dummy_pepxml],
         description="Source Archive"
     )
 
@@ -121,14 +123,16 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
             assert extracted.spectra[0].scan == scan1
             
             # Verify Annotations
-            pin_reader = extracted.get_annotation_reader("test.pin.zst")
-            assert len(pin_reader) == 1
-            assert pin_reader[0].scan_number == scan1
-            
+            # Only mzTab is stored, converted from each source file.
+            assert {e.format for e in extracted.annotation_files} == {AnnotationFormat.MZTAB}
+            pin = extracted.get_psms("test.pin.mztab.zst")
+            assert isinstance(pin, PSMTable)
+            assert pin.df.scan.tolist() == [scan1]
+
             # Check PepXML
-            pep_reader = extracted.get_annotation_reader("test.pep.xml.zst")
-            assert len(pep_reader) == 1
-            assert pep_reader[0].scan_number == scan1
+            pep = extracted.get_psms("test.pep.xml.mztab.zst")
+            assert pep.metadata.source_format == "pepxml"
+            assert pep.df.scan.tolist() == [scan1]
             
         finally:
             extracted.close()
@@ -151,13 +155,13 @@ def test_mszx_extract_filter_ms_level(tmp_path, msz_file, dummy_pin):
             target_scan = int(scans[i])
             break
             
-    content = f"""SpecId\tLabel\tScanNr\tPeptide\tProteins\tScore
-run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
+    content = f"""SpecId\tLabel\tScanNr\tScore\tPeptide\tProteins
+run.{target_scan}.{target_scan}.2\t1\t{target_scan}\t0.9\tK.PEPTIDEA.R\tPROT1
 """
     dummy_pin.write_text(content)
     
     mszx_path = tmp_path / "level_test.mszx"
-    create_mszx(msz_file, mszx_path, annotations=[dummy_pin])
+    create_mszx(msz_file, mszx_path, psms=[dummy_pin])
     
     with MSZXFile.open(mszx_path) as source:
         output_path = tmp_path / "extracted_level.mszx"
@@ -169,9 +173,8 @@ run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
             assert all(l == target_level for l in extracted_levels)
             
             # Verify annotation is preserved (since it matches a scan in the level)
-            pin_reader = extracted.get_annotation_reader("test.pin.zst")
-            assert len(pin_reader) == 1
-            assert pin_reader[0].scan_number == target_scan
+            pin = extracted.get_psms("test.pin.mztab.zst")
+            assert pin.df.scan.tolist() == [target_scan]
             
         finally:
             extracted.close()

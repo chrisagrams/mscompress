@@ -16,6 +16,10 @@ from libc.math cimport nan
 import math
 import re
 
+from mscompress.annotations import MzTab, PSMTable, read_psms
+from mscompress.annotations._io import compress
+from mscompress.types import AnnotationFormat, SpectrumTransform
+
 np.import_array()
 
 # Create a numpy dtype that matches C long (32-bit on Windows, typically 64-bit on Linux/Mac)
@@ -1632,9 +1636,8 @@ cdef class MSZXFile(MSZFile):
     directory-output mzML+annotations respectively.
     """
     cdef object _manifest                # MSZXManifest
-    cdef dict _annotations               # {filename: PSMReader}
+    cdef dict _psm_tables                # {filename: PSMTable}
     cdef object _archive_path            # pathlib.Path
-    cdef object _primary_annotation_reader
     cdef public bint _closed             # idempotent-close guard (visible to Python)
 
     @classmethod
@@ -1650,13 +1653,10 @@ cdef class MSZXFile(MSZFile):
         Args:
             path: Path to the .mszx file.
         """
-        # Local imports break the circular module load between _core and
-        # the Python-side annotation/tarfile machinery (mscompress.mszx
-        # re-exports MSZXFile from _core, so it can't be imported eagerly
-        # at the top of this file).
+        # mscompress.mszx imports MSZXFile from _core, so importing it at
+        # the top of this file would be circular.
         import tarfile
         import warnings
-        from mscompress.annotations import PSMReader, MSZXAnnotationFile
         from mscompress.mszx.metadata import MSZXManifest
 
         archive_path = Path(path)
@@ -1675,24 +1675,26 @@ cdef class MSZXFile(MSZFile):
 
             manifest = MSZXManifest.from_json(manifest_file.read().decode("utf-8"))
 
-            annotation_readers = {}
+            psm_tables = {}
             for entry in manifest.annotations:
-                try:
-                    member = tar.getmember(entry.filename)
-                    mszx_source = MSZXAnnotationFile(
-                        mszx_file=tar,
-                        member=member,
-                        name=entry.filename,
+                if entry.format != AnnotationFormat.MZTAB:
+                    warnings.warn(
+                        f"Skipping annotation '{entry.filename}': only mzTab "
+                        f"search results are read (format is {entry.format.value!r})",
+                        UserWarning,
+                        stacklevel=2,
                     )
-                    reader = PSMReader(mszx_source)
-                    annotation_readers[entry.filename] = reader
+                    continue
+                try:
+                    handle = tar.extractfile(tar.getmember(entry.filename))
+                    psm_tables[entry.filename] = MzTab().read(handle.read())
                 except KeyError:
                     warnings.warn(
                         f"Annotation file '{entry.filename}' not found in archive",
                         UserWarning,
                         stacklevel=2,
                     )
-                except (ValueError, Exception) as e:
+                except Exception as e:
                     warnings.warn(
                         f"Could not parse annotation file '{entry.filename}': {e}",
                         UserWarning,
@@ -1706,11 +1708,8 @@ cdef class MSZXFile(MSZFile):
             manifest.spectra_file.encode(),
         )
         self._manifest = manifest
-        self._annotations = annotation_readers
+        self._psm_tables = psm_tables
         self._archive_path = archive_path
-        self._primary_annotation_reader = (
-            next(iter(annotation_readers.values())) if annotation_readers else None
-        )
         self._closed = False
         return self
 
@@ -1732,8 +1731,7 @@ cdef class MSZXFile(MSZFile):
         self._closed = True
         # Drop Python references so the underlying data can be GC'd before
         # the C resources are torn down by the parent.
-        self._annotations = None
-        self._primary_annotation_reader = None
+        self._psm_tables = None
         self._manifest = None
         MSZFile._cleanup(self)
 
@@ -1748,33 +1746,25 @@ cdef class MSZXFile(MSZFile):
         return self._archive_path
 
     @property
-    def annotations(self):
-        """Primary annotation reader, or None if no annotations."""
-        return self._primary_annotation_reader
+    def psms(self):
+        """The first stored PSMTable, or None if the archive has no search results."""
+        return next(iter(self._psm_tables.values()), None)
 
     @property
-    def annotation_readers(self):
-        """Dict of all annotation readers, keyed by filename."""
-        return self._annotations
+    def psm_tables(self):
+        """Every stored PSMTable, keyed by archive member name."""
+        return self._psm_tables
+
+    def get_psms(self, filename):
+        """The PSMTable stored under an archive member name."""
+        if filename in self._psm_tables:
+            return self._psm_tables[filename]
+        raise KeyError(f"Search results not found: {filename}")
 
     @property
     def annotation_files(self):
         """List of annotation entries in the archive."""
         return self._manifest.annotations
-
-    def get_annotation_reader(self, filename):
-        """Get the annotation reader for a specific file by name."""
-        if filename in self._annotations:
-            return self._annotations[filename]
-        raise KeyError(f"Annotation file not found: {filename}")
-
-    def get_annotation_readers_by_format(self, format):
-        """Get all annotation readers matching a specific format."""
-        return [
-            self._annotations[entry.filename]
-            for entry in self._manifest.annotations
-            if entry.format == format and entry.filename in self._annotations
-        ]
 
     def describe(self):
         """Description including the archive metadata."""
@@ -1790,9 +1780,9 @@ cdef class MSZXFile(MSZFile):
         Decompress the embedded MSZ to mzML.
 
         If `output` is an existing directory or has no file extension, the
-        mzML is written inside it as `<archive_stem>.mzML` and any cached
-        annotation readers are written alongside (using the entry's name
-        with any trailing `.zst` suffix stripped). Otherwise, `output` is
+        mzML is written inside it as `<archive_stem>.mzML` and the search
+        results are written alongside as mzTab (using the entry's name with
+        any trailing `.zst` suffix stripped). Otherwise, `output` is
         treated as a single file path and only the mzML is written.
         """
         out_path = Path(os.fspath(output))
@@ -1805,9 +1795,9 @@ cdef class MSZXFile(MSZFile):
         mzml_path = out_path / f"{self._archive_path.stem}.mzML"
         result = MSZFile.decompress(self, mzml_path)
 
-        for filename, reader in self._annotations.items():
+        for filename, table in self._psm_tables.items():
             out_name = filename[:-4] if filename.endswith(".zst") else filename
-            (out_path / out_name).write_bytes(reader.source.read())
+            MzTab().write(table, out_path / out_name)
 
         return result
 
@@ -1828,7 +1818,6 @@ cdef class MSZXFile(MSZFile):
         import tempfile
         import warnings
         from mscompress.mszx import MSZXBuilder
-        from mscompress.annotations import PSMReader
 
         output_path = Path(output)
         if not output_path.suffix:
@@ -1891,17 +1880,9 @@ cdef class MSZXFile(MSZFile):
                 for k, v in self._manifest.extra.items():
                     builder.set_extra(k, v)
 
-                for filename, reader in self._annotations.items():
-                    fname_path = Path(filename)
-                    temp_filename = fname_path.stem if fname_path.suffix.lower() == ".zst" else filename
-                    temp_ann_path = temp_path / temp_filename
-
-                    try:
-                        reader.filter_to_file(temp_ann_path, target_scans)
-                        new_reader = PSMReader(temp_ann_path)
-                        builder.add_annotations(new_reader)
-                    except Exception as e:
-                        warnings.warn(f"Failed to filter annotation {filename}: {e}")
+                for filename, table in self._psm_tables.items():
+                    name = filename[:-4] if filename.endswith(".zst") else filename
+                    builder.add_psms(table.filter_scans(target_scans), name=name)
 
                 builder.save(output_path)
             finally:
@@ -2433,7 +2414,6 @@ cdef class Spectra:
             transform: A callable matching the SpectrumTransform protocol,
                        or None to clear the transform.
         """
-        from mscompress.types import SpectrumTransform
         if transform is not None and not isinstance(transform, SpectrumTransform):
             raise TypeError(
                 "transform must be a callable with signature "
@@ -2633,8 +2613,7 @@ cdef class MSZXBatchWriter:
     Example:
         with MSZXBatchWriter("cohort.mszx", threads=8) as w:
             idx = w.add("run1.mzML")
-            w.add_annotation(idx, pin_bytes, "annotations/run1.pin",
-                             format="percolator_tsv")
+            w.add_psms(idx, "run1.pin")   # stored as run1.pin.mztab.zst
     """
 
     cdef batch_writer_t* _writer
@@ -2784,6 +2763,35 @@ cdef class MSZXBatchWriter:
             raise ValueError(
                 f"Could not add annotation {os.fsdecode(fname)!r} to entry {entry_index}"
             )
+
+    def add_psms(self, int entry_index, source, name=None, compressed=True) -> str:
+        """
+        Attach search results to a spectra entry, stored as mzTab.
+
+        Parameters:
+        entry_index (int): Value returned by `add()`.
+        source: A `PSMTable`, or a pepXML / Percolator / mzTab file to read.
+        name (Optional[str]): Member name; `.mztab` (and `.zst`) is appended.
+            Defaults to the source file name.
+        compressed (bool): zstd-compress the member (default True).
+
+        Returns:
+        str: The archive member name written.
+        """
+        self._check_open()
+        if not 0 <= entry_index < len(self._entries):
+            raise ValueError(f"Unknown entry index {entry_index}")
+
+        table = source if isinstance(source, PSMTable) else read_psms(source)
+        location = Path(self._entries[entry_index]).name
+        data = MzTab().write(table, ms_run_location=location).encode("utf-8")
+        if compressed:
+            data = compress(data)
+
+        member = MzTab.member_name(name or table.metadata.source_file or "psms", compressed)
+        self.add_annotation(entry_index, data, member, format="mztab",
+                            compressed=compressed, num_records=len(table))
+        return member
 
     def set_join_key(self, int entry_index, join_key) -> None:
         """Set the column used to join annotations to spectra for one entry."""

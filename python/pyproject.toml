@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "mlcroissant>=1.0.0",
     "numpy>=1.19",
+    "pandas>=2.0",
     "zstandard>=0.19.0",
 ]
 
@@ -33,6 +34,7 @@ jax = ["jax>=0.4", "grain>=0.2"]
 all = [
     "mlcroissant>=1.0.0",
     "numpy>=1.19",
+    "pandas>=2.0",
     "zstandard>=0.19.0",
     "torch>=2.3; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "pyarrow>=14",
