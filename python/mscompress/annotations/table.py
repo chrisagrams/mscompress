@@ -2,59 +2,53 @@
 
 from __future__ import annotations
 
-from os import PathLike
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
 
 from mscompress.annotations.metadata import SearchMetadata
 
-# Columns every PSMTable has, in this order. Readers add their own columns
-# after these (engine scores, rank, ...); those are stored in mzTab as
-# ``opt_global_<name>``.
-PSM_COLUMNS: List[str] = [
-    "scan",            # scan number the PSM was identified in
-    "peptide",         # bare amino-acid sequence
-    "modifications",   # mzTab notation, e.g. "1-UNIMOD:35,5-UNIMOD:4"
-    "charge",
-    "score",           # primary score, named by metadata.primary_score
-    "q_value",
-    "pep",             # posterior error probability
-    "retention_time",  # seconds
-    "precursor_mz",    # observed
-    "calc_mz",         # theoretical
-    "proteins",        # list of protein accessions
-    "pre",             # residue before the peptide
-    "post",            # residue after the peptide
-    "is_decoy",
-]
-
-_INT_COLUMNS = ("scan", "charge")
-_FLOAT_COLUMNS = ("score", "q_value", "pep", "retention_time", "precursor_mz", "calc_mz")
+# Columns every PSMTable has, in this order, and their dtypes. Readers add
+# their own columns after these (engine scores, rank, ...); those are stored
+# in mzTab as ``opt_global_<name>``.
+PSM_SCHEMA: Dict[str, str] = {
+    "scan": "Int64",               # scan number the PSM was identified in
+    "peptide": "string",           # bare amino-acid sequence
+    "modifications": "string",     # mzTab notation, e.g. "1-UNIMOD:35,5-UNIMOD:4"
+    "charge": "Int64",
+    "score": "float64",            # primary score, named by metadata.primary_score
+    "q_value": "float64",
+    "pep": "float64",              # posterior error probability
+    "retention_time": "float64",   # seconds
+    "precursor_mz": "float64",     # observed
+    "calc_mz": "float64",          # theoretical
+    "proteins": "object",          # list of protein accessions
+    "pre": "string",               # residue before the peptide
+    "post": "string",              # residue after the peptide
+    "is_decoy": "bool",
+}
+PSM_COLUMNS: List[str] = list(PSM_SCHEMA)
 
 
-def _normalize(df: pd.DataFrame) -> pd.DataFrame:
-    """Add missing core columns, put them first and fix their dtypes."""
-    df = df.copy()
-    n = len(df)
-    for col in PSM_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
-    for col in _INT_COLUMNS:
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-    for col in _FLOAT_COLUMNS:
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
-    df["is_decoy"] = df["is_decoy"].fillna(False).astype(bool)
-    df["proteins"] = pd.Series(
-        [list(p) if isinstance(p, (list, tuple, np.ndarray)) else [] for p in df["proteins"]],
-        index=df.index, dtype=object,
-    )
-    for col in ("peptide", "modifications", "pre", "post"):
-        df[col] = df[col].astype(object).where(df[col].notna(), None)
-    extras = [c for c in df.columns if c not in PSM_COLUMNS]
-    df = df[PSM_COLUMNS + extras]
-    df.index = pd.RangeIndex(n)
+def psm_frame(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    The DataFrame for a PSMTable, built from ``PSM_SCHEMA``.
+
+    Every core column is present with its schema dtype: taken from ``data``
+    when it has the column (cast to that dtype), else empty (NA, no
+    proteins, not a decoy). ``data``'s other columns follow. Readers build
+    their tables with this.
+    """
+    n = len(data)
+    df = pd.DataFrame({col: pd.Series(index=range(n), dtype=dtype)
+                       for col, dtype in PSM_SCHEMA.items()})
+    df["proteins"] = [[] for _ in range(n)]
+    df["is_decoy"] = False
+    if len(data.columns):
+        data = data.reset_index(drop=True)
+        df[list(data.columns)] = data.astype(
+            {col: dtype for col, dtype in PSM_SCHEMA.items() if col in data})
     return df
 
 
@@ -64,8 +58,9 @@ class PSMTable:
     search that produced them.
 
     Every reader returns a ``PSMTable``, and an MSZX archive stores it as
-    mzTab. ``df`` always has the columns in :data:`PSM_COLUMNS` (missing
-    values are NA); readers add engine-specific columns after them.
+    mzTab. ``df`` has the columns in :data:`PSM_SCHEMA` first, with those
+    dtypes (built with :func:`psm_frame`); readers add engine-specific
+    columns after them.
 
     Example:
         ```python
@@ -75,20 +70,15 @@ class PSMTable:
         ```
     """
 
-    def __init__(
-        self,
-        df: Union[pd.DataFrame, Iterable[Mapping[str, Any]], None] = None,
-        metadata: Optional[SearchMetadata] = None,
-    ):
+    def __init__(self, df: Optional[pd.DataFrame] = None,
+                 metadata: Optional[SearchMetadata] = None):
         """
         Args:
-            df: PSMs as a DataFrame or an iterable of row dicts. It is copied;
-                treat ``self.df`` as read-only (build a new table to change it).
+            df: PSMs, as built by :func:`psm_frame`. Treat ``self.df`` as
+                read-only (build a new table to change it).
             metadata: Search metadata.
         """
-        if not isinstance(df, pd.DataFrame):
-            df = pd.DataFrame(list(df) if df is not None else [])
-        self.df: pd.DataFrame = _normalize(df)
+        self.df: pd.DataFrame = df if df is not None else psm_frame(pd.DataFrame())
         self.metadata: SearchMetadata = metadata or SearchMetadata()
         self._rows_by_scan: Optional[Dict[int, np.ndarray]] = None
         self._records: Optional[List[Dict[str, Any]]] = None
@@ -135,12 +125,4 @@ class PSMTable:
     def filter_scans(self, scans: Iterable[int]) -> PSMTable:
         """A new table with only the PSMs for the given scans."""
         keep = self.df["scan"].isin(set(int(s) for s in scans))
-        return PSMTable(self.df[keep], self.metadata)
-
-    def to_mztab(self, path: Union[str, PathLike, None] = None) -> str:
-        """
-        Serialize as mzTab 1.0. See :meth:`mscompress.annotations.MzTab.write`.
-        """
-        from mscompress.annotations.mztab import MzTab
-
-        return MzTab().write(self, path)
+        return PSMTable(self.df[keep].reset_index(drop=True), self.metadata)

@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 from mscompress.annotations import mods
 from mscompress.annotations.base import SearchResultsFormat
 from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
-from mscompress.annotations.table import PSMTable
+from mscompress.annotations.table import PSMTable, psm_frame
 from mscompress.types import AnnotationFormat
 
 # Preference order for the primary score; otherwise the first one listed.
@@ -69,13 +69,13 @@ class PepXML(SearchResultsFormat):
 
         df = pd.DataFrame(rows)
         if rows:
-            # Optional attributes: strings, or None where the file omits them.
+            # Attributes arrive as strings; psm_frame casts the core columns.
             df[_ION_COUNTS] = df[_ION_COUNTS].apply(pd.to_numeric)
         if score_names:
             md.primary_score = next((s for s in _PRIMARY_SCORES if s in score_names),
                                     score_names[0])
             df["score"] = df[md.primary_score]
-        return PSMTable(df, md)
+        return PSMTable(psm_frame(df), md)
 
     def _search_summary(self, elem: ET.Element) -> Tuple[SearchMetadata, Optional[str]]:
         """Search engine, modifications and decoy prefix."""

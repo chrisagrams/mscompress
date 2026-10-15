@@ -16,6 +16,10 @@ from libc.math cimport nan
 import math
 import re
 
+from mscompress.annotations import MzTab, PSMTable, read_psms
+from mscompress.annotations._io import compress
+from mscompress.types import AnnotationFormat, SpectrumTransform
+
 np.import_array()
 
 # Create a numpy dtype that matches C long (32-bit on Windows, typically 64-bit on Linux/Mac)
@@ -1649,15 +1653,11 @@ cdef class MSZXFile(MSZFile):
         Args:
             path: Path to the .mszx file.
         """
-        # Local imports break the circular module load between _core and
-        # the Python-side annotation/tarfile machinery (mscompress.mszx
-        # re-exports MSZXFile from _core, so it can't be imported eagerly
-        # at the top of this file).
+        # mscompress.mszx imports MSZXFile from _core, so importing it at
+        # the top of this file would be circular.
         import tarfile
         import warnings
-        from mscompress.annotations import MzTab
         from mscompress.mszx.metadata import MSZXManifest
-        from mscompress.types import AnnotationFormat
 
         archive_path = Path(path)
         if not archive_path.exists():
@@ -1797,7 +1797,7 @@ cdef class MSZXFile(MSZFile):
 
         for filename, table in self._psm_tables.items():
             out_name = filename[:-4] if filename.endswith(".zst") else filename
-            table.to_mztab(out_path / out_name)
+            MzTab().write(table, out_path / out_name)
 
         return result
 
@@ -2414,7 +2414,6 @@ cdef class Spectra:
             transform: A callable matching the SpectrumTransform protocol,
                        or None to clear the transform.
         """
-        from mscompress.types import SpectrumTransform
         if transform is not None and not isinstance(transform, SpectrumTransform):
             raise TypeError(
                 "transform must be a callable with signature "
@@ -2779,10 +2778,6 @@ cdef class MSZXBatchWriter:
         Returns:
         str: The archive member name written.
         """
-        # Local imports avoid the _core <-> annotations circular at load.
-        from mscompress.annotations import MzTab, PSMTable, read_psms
-        from mscompress.annotations._io import compress
-
         self._check_open()
         if not 0 <= entry_index < len(self._entries):
             raise ValueError(f"Unknown entry index {entry_index}")

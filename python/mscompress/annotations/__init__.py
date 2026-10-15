@@ -24,11 +24,13 @@ from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
 from mscompress.annotations.mztab import MzTab
 from mscompress.annotations.pepxml import PepXML
 from mscompress.annotations.percolator import Percolator
-from mscompress.annotations.table import PSM_COLUMNS, PSMTable
+from mscompress.annotations.table import PSM_COLUMNS, PSM_SCHEMA, PSMTable, psm_frame
 
 __all__ = [
     "PSMTable",
     "PSM_COLUMNS",
+    "PSM_SCHEMA",
+    "psm_frame",
     "SearchMetadata",
     "ModificationSpec",
     "SearchResultsFormat",

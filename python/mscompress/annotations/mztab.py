@@ -24,7 +24,7 @@ import pandas as pd
 from mscompress.annotations import mods
 from mscompress.annotations.base import SearchResultsFormat
 from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
-from mscompress.annotations.table import PSM_COLUMNS, PSMTable
+from mscompress.annotations.table import PSM_COLUMNS, PSMTable, psm_frame
 from mscompress.types import AnnotationFormat
 
 NULL = "null"
@@ -281,8 +281,6 @@ class MzTab(SearchResultsFormat):
             name += ".mztab"
         return name + ".zst" if compressed else name
 
-    # -- writing -----------------------------------------------------------
-
     def write(
         self,
         table: PSMTable,
@@ -334,8 +332,6 @@ class MzTab(SearchResultsFormat):
         out.insert(0, "PSH", "PSM")
         return out
 
-    # -- reading -----------------------------------------------------------
-
     def _parse(self, data: bytes) -> PSMTable:
         mtd: Dict[str, str] = {}
         table_lines: List[str] = []
@@ -348,13 +344,13 @@ class MzTab(SearchResultsFormat):
                 table_lines.append(line)
 
         md = MetadataSection.parse(mtd)
-        if not table_lines:
+        if len(table_lines) < 2:  # no PSM rows
             return PSMTable(None, md)
         raw = pd.read_csv(io.StringIO("\n".join(table_lines)), sep="\t",
                           na_values=[NULL], keep_default_na=False,
                           quoting=csv.QUOTE_NONE, float_precision="round_trip",
                           dtype={"accession": object})
-        return PSMTable(self._parse_psms(raw.iloc[:, 1:]), md)
+        return PSMTable(psm_frame(self._parse_psms(raw.iloc[:, 1:])), md)
 
     @staticmethod
     def _parse_psms(raw: pd.DataFrame) -> pd.DataFrame:
@@ -366,7 +362,7 @@ class MzTab(SearchResultsFormat):
         raw = raw.drop_duplicates("PSM_ID").reset_index(drop=True)
 
         df = pd.DataFrame({col: raw[mztab] for mztab, col in _PSH if col})
-        df["scan"] = raw["spectra_ref"].str.extract(r"scan=(\d+)", expand=False)
+        df["scan"] = pd.to_numeric(raw["spectra_ref"].str.extract(r"scan=(\d+)", expand=False))
         df["proteins"] = list(proteins)
         for col in raw.columns:
             if col.startswith(OPT_PREFIX) and col != DECOY_COLUMN:

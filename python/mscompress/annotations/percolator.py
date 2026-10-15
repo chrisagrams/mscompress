@@ -11,7 +11,7 @@ import pandas as pd
 from mscompress.annotations import mods
 from mscompress.annotations.base import SearchResultsFormat
 from mscompress.annotations.metadata import SearchMetadata
-from mscompress.annotations.table import PSMTable
+from mscompress.annotations.table import PSMTable, psm_frame
 from mscompress.types import AnnotationFormat
 
 # Percolator output and .pin files name some columns differently; both map
@@ -80,9 +80,9 @@ class Percolator(SearchResultsFormat):
         # Percolator output has no scan or charge column: take them from the id.
         ids = df[header[0]].str.extract(_ID)
         if "scan" not in df:
-            df["scan"] = ids[0]
+            df["scan"] = pd.to_numeric(ids[0])
         if "charge" not in df:
-            df["charge"] = ids[1]
+            df["charge"] = pd.to_numeric(ids[1])
         if ids[2].notna().any():
             df["rank"] = pd.to_numeric(ids[2])
 
@@ -92,14 +92,15 @@ class Percolator(SearchResultsFormat):
         df["modifications"] = parsed["mods"].map(mods.format_modifications)
         md.variable_mods = mods.observed_mods(m for found in parsed["mods"] for m in found)
 
-        df["proteins"] = df["proteins"].str.strip(";").str.split(";")
+        df["proteins"] = [cell.strip(";").split(";") if isinstance(cell, str) else []
+                          for cell in df["proteins"]]
         if "Label" in df:
             df["is_decoy"] = df["Label"] == -1
         else:
             df["is_decoy"] = [all(p.startswith(self.decoy_prefix) for p in ps)
                               for ps in df["proteins"]]
         # The id and label are now in scan / charge / rank / is_decoy.
-        return PSMTable(df.drop(columns=[header[0], "Label"], errors="ignore"), md)
+        return PSMTable(psm_frame(df.drop(columns=[header[0], "Label"], errors="ignore")), md)
 
     @staticmethod
     def _split_peptide(value: str) -> Tuple[str, str, str, str, List[mods.Mod]]:

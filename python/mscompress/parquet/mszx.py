@@ -19,7 +19,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from mscompress.annotations import PSMTable, SearchMetadata
+from mscompress.annotations import PSMTable, SearchMetadata, psm_frame
 from mscompress.mszx import MSZXBuilder
 
 from mscompress.parquet.msz import parquet_to_msz
@@ -240,7 +240,7 @@ def parquet_to_mszx(
                     source_file=parquet_path.name,
                 )
                 builder.add_psms(
-                    PSMTable(df, md),
+                    PSMTable(psm_frame(df), md),
                     name=parquet_path.stem,
                     description=description or f"Annotations extracted from {parquet_path.name}",
                 )

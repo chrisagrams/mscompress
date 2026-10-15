@@ -12,6 +12,7 @@ import zstandard as zstd
 from mscompress import MSZXBatchWriter, read
 from mscompress.annotations import (
     PSM_COLUMNS,
+    PSM_SCHEMA,
     ModificationSpec,
     MzTab,
     PepXML,
@@ -19,12 +20,18 @@ from mscompress.annotations import (
     PSMTable,
     SearchMetadata,
     SearchResultsFormat,
+    psm_frame,
     read_psms,
 )
 from mscompress.mszx import MSZXBatchFile, MSZXBuilder, MSZXFile, create_mszx
 from mscompress.types import AnnotationFormat
 
 _MZTAB_DIR = Path(__file__).resolve().parents[2] / "test" / "data" / "mztab"
+
+
+def _table(rows, metadata=None):
+    """A hand-built table."""
+    return PSMTable(psm_frame(pd.DataFrame(rows)), metadata)
 
 
 def _rows(text, tag="PSM"):
@@ -150,17 +157,18 @@ def test_conversion_matches_checked_in_mztab(test_data_dir, source, tmp_path):
 @pytest.mark.parametrize("source", ["pepXML/test.pepXML", "percolator/test.tsv"])
 def test_mztab_round_trip(test_data_dir, source):
     table = read_psms(Path(test_data_dir) / source)
-    back = MzTab().read(table.to_mztab().encode())
+    back = MzTab().read(MzTab().write(table).encode())
     pd.testing.assert_frame_equal(back.df, table.df, check_dtype=False)
     _assert_metadata_close(back.metadata, table.metadata)
 
 
 def test_writer_layout():
-    table = PSMTable([
+    table = _table([
         {"scan": 7, "peptide": "PEPTIDE", "charge": 2, "score": 1.5,
          "proteins": ["P1", "P2"], "q_value": 0.01, "retention_time": 12.5,
-         "delta score": 3.0, "label": "x"},
-        {"scan": 9, "peptide": "OTHER", "charge": 3, "score": math.inf, "is_decoy": True},
+         "is_decoy": False, "delta score": 3.0, "label": "x"},
+        {"scan": 9, "peptide": "OTHER", "charge": 3, "score": math.inf,
+         "proteins": [], "is_decoy": True},
     ], SearchMetadata(software="Comet", software_version="2024.01", primary_score="xcorr"))
     text = MzTab().write(table, ms_run_location="run.msz")
     lines = text.splitlines()
@@ -207,7 +215,7 @@ def test_mod_params_in_metadata():
 
 
 def test_unknown_software_round_trips_as_none():
-    text = MzTab().write(PSMTable([{"scan": 1, "peptide": "A"}]))
+    text = MzTab().write(_table([{"scan": 1, "peptide": "A"}]))
     assert "MTD\tsoftware[1]\t[MS, MS:1001456, analysis software, ]" in text
     assert MzTab().read(text.encode()).metadata.software is None
 
@@ -216,7 +224,7 @@ def test_unknown_software_round_trips_as_none():
 
 
 def test_table_lookup_and_filter():
-    table = PSMTable([
+    table = _table([
         {"scan": 5, "peptide": "A", "score": 1.0},
         {"scan": 3, "peptide": "B", "score": 2.0},
         {"scan": 5, "peptide": "C", "score": 3.0},
@@ -228,6 +236,16 @@ def test_table_lookup_and_filter():
     assert table.records_for_scan(4) == []
     assert table.filter_scans({3}).df.peptide.tolist() == ["B"]
     assert len(PSMTable()) == 0
+    # Core columns the rows don't have are empty: NA, no proteins, not a decoy.
+    assert table.df.proteins.tolist() == [[], [], []]
+    assert table.df.is_decoy.tolist() == [False] * 3
+
+
+@pytest.mark.parametrize("source", ["pepXML/test.pepXML", "percolator/test.tsv",
+                                    "mztab/test.pepXML.mztab"])
+def test_readers_produce_the_schema(test_data_dir, source):
+    df = read_psms(Path(test_data_dir) / source).df
+    assert {c: str(t) for c, t in df.dtypes.iloc[:len(PSM_SCHEMA)].items()} == PSM_SCHEMA
 
 
 # -- archives --------------------------------------------------------------
@@ -260,7 +278,7 @@ def test_builder_names_and_duplicates(tmp_path, msz_file_path):
     with read(msz_file_path) as msz:
         builder = MSZXBuilder(msz, compression=False)
         builder.add_psms(_MZTAB_DIR / "test.tsv.mztab")
-        builder.add_psms(PSMTable([{"scan": 1, "peptide": "A"}]), name="mine")
+        builder.add_psms(_table([{"scan": 1, "peptide": "A"}]), name="mine")
         with pytest.raises(ValueError, match="Duplicate"):
             builder.add_psms(PSMTable(), name="mine.mztab")
         out = builder.save(tmp_path / "out.mszx")
