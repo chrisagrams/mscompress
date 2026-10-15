@@ -160,7 +160,7 @@ def _score_params(md: SearchMetadata) -> List[Param]:
 
 
 def _mod_param(spec: ModificationSpec) -> Param:
-    hit = mods.unimod(spec.massdiff, spec.site)
+    hit = mods.unimod(spec.massdiff)
     if hit:
         return ("UNIMOD", f"UNIMOD:{hit[0]}", hit[1], "")
     accession = mods.chemmod(spec.massdiff)

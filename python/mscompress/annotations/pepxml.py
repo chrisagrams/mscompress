@@ -67,7 +67,6 @@ def _hit_mods(hit: ET.Element, peptide: str, md: SearchMetadata) -> tuple[List[m
     """A hit's modifications, and its modified sequence if given."""
     found: List[mods.Mod] = []
     modified = None
-    specs = md.fixed_mods + md.variable_mods
     info = next((e for e in hit if _tag(e) == "modification_info"), None)
     if info is not None:
         modified = info.get("modified_peptide")
@@ -76,7 +75,7 @@ def _hit_mods(hit: ET.Element, peptide: str, md: SearchMetadata) -> tuple[List[m
             mass = _float(info.get(attr))
             if mass is not None:
                 pos = 0 if site == "N-term" else len(peptide) + 1
-                found.append((pos, mods.snap(mass - base, site, specs), site))
+                found.append((pos, mass - base, site))
         for aa_mod in info:
             if _tag(aa_mod) != "mod_aminoacid_mass":
                 continue
@@ -92,7 +91,7 @@ def _hit_mods(hit: ET.Element, peptide: str, md: SearchMetadata) -> tuple[List[m
                 if mass is None or site not in mods.RESIDUE_MASSES:
                     continue
                 delta = mass - mods.RESIDUE_MASSES[site]
-            found.append((pos, mods.snap(delta, site, specs), site))
+            found.append((pos, delta, site))
     return mods.with_fixed_mods(found, peptide, md.fixed_mods), modified
 
 

@@ -186,7 +186,7 @@ def test_mod_params_in_metadata():
     )
     text = write_mztab(PSMTable(None, md))
     assert "MTD\tfixed_mod[1]\t[UNIMOD, UNIMOD:4, Carbamidomethyl, ]" in text
-    # Gln->pyro-Glu only applies to Q; elsewhere the shift is a CHEMMOD.
+    # Shifts without a UNIMOD entry in the table are written as CHEMMOD.
     assert "MTD\tvariable_mod[1]\t[CHEMMOD, CHEMMOD:-17.026549, CHEMMOD:-17.026549, ]" in text
     assert "MTD\tvariable_mod[2]\t[CHEMMOD, CHEMMOD:+12.5, CHEMMOD:+12.5, ]" in text
     assert read_mztab(text.encode()).metadata == md

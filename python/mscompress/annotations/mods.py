@@ -9,38 +9,36 @@ the N-terminus and ``len(peptide) + 1`` for the C-terminus.
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from mscompress.annotations.metadata import ModificationSpec
 
 # (position, massdiff, site)
 Mod = Tuple[int, float, str]
 
-# Common UNIMOD entries: (record id, title, monoisotopic delta, sites or None
-# for any). mzTab requires a UNIMOD accession over CHEMMOD when one exists.
-UNIMOD: List[Tuple[int, str, float, Optional[Set[str]]]] = [
-    (1, "Acetyl", 42.010565, None),
-    (4, "Carbamidomethyl", 57.021464, None),
-    (5, "Carbamyl", 43.005814, None),
-    (7, "Deamidated", 0.984016, None),
-    (21, "Phospho", 79.966331, None),
-    (24, "Propionamide", 71.037114, None),
-    (27, "Glu->pyro-Glu", -18.010565, {"E"}),
-    (28, "Gln->pyro-Glu", -17.026549, {"Q"}),
-    (34, "Methyl", 14.01565, None),
-    (35, "Oxidation", 15.994915, None),
-    (36, "Dimethyl", 28.0313, None),
-    (108, "Nethylmaleimide", 125.047679, None),
-    (121, "GG", 114.042927, None),
-    (188, "Label:13C(6)", 6.020129, None),
-    (214, "iTRAQ4plex", 144.102063, None),
-    (259, "Label:13C(6)15N(2)", 8.014199, None),
-    (267, "Label:13C(6)15N(4)", 10.008269, None),
-    (730, "iTRAQ8plex", 304.20536, None),
-    (737, "TMT6plex", 229.162932, None),
-    (2016, "TMTpro", 304.207146, None),
+# Common UNIMOD entries: (record id, title, monoisotopic delta). mzTab
+# requires a UNIMOD accession over CHEMMOD when one exists.
+UNIMOD: List[Tuple[int, str, float]] = [
+    (1, "Acetyl", 42.010565),
+    (4, "Carbamidomethyl", 57.021464),
+    (5, "Carbamyl", 43.005814),
+    (7, "Deamidated", 0.984016),
+    (21, "Phospho", 79.966331),
+    (24, "Propionamide", 71.037114),
+    (34, "Methyl", 14.01565),
+    (35, "Oxidation", 15.994915),
+    (36, "Dimethyl", 28.0313),
+    (108, "Nethylmaleimide", 125.047679),
+    (121, "GG", 114.042927),
+    (188, "Label:13C(6)", 6.020129),
+    (214, "iTRAQ4plex", 144.102063),
+    (259, "Label:13C(6)15N(2)", 8.014199),
+    (267, "Label:13C(6)15N(4)", 10.008269),
+    (730, "iTRAQ8plex", 304.20536),
+    (737, "TMT6plex", 229.162932),
+    (2016, "TMTpro", 304.207146),
 ]
-UNIMOD_MASSES: Dict[str, float] = {f"UNIMOD:{rid}": mass for rid, _, mass, _ in UNIMOD}
+UNIMOD_MASSES: Dict[str, float] = {f"UNIMOD:{rid}": mass for rid, _, mass in UNIMOD}
 # iTRAQ8plex and TMTpro are 0.0018 Da apart.
 UNIMOD_TOLERANCE = 0.001
 
@@ -57,13 +55,13 @@ C_TERM_MASS = 17.00274  # OH
 PROTON_MASS = 1.007276
 
 
-def unimod(massdiff: float, site: str) -> Optional[Tuple[int, str]]:
-    """Closest UNIMOD (record id, title) for a mass shift at a site."""
+def unimod(massdiff: float) -> Optional[Tuple[int, str]]:
+    """Closest UNIMOD (record id, title) for a mass shift."""
     best: Optional[Tuple[int, str]] = None
     best_err = UNIMOD_TOLERANCE
-    for rid, title, mass, sites in UNIMOD:
+    for rid, title, mass in UNIMOD:
         err = abs(mass - massdiff)
-        if err <= best_err and (sites is None or site in sites):
+        if err <= best_err:
             best, best_err = (rid, title), err
     return best
 
@@ -73,21 +71,10 @@ def chemmod(massdiff: float) -> str:
     return f"CHEMMOD:{'-' if massdiff < 0 else '+'}{abs(massdiff)!r}"
 
 
-def accession(massdiff: float, site: str) -> str:
+def accession(massdiff: float) -> str:
     """UNIMOD accession for a mass shift, or a CHEMMOD fallback."""
-    hit = unimod(massdiff, site)
+    hit = unimod(massdiff)
     return f"UNIMOD:{hit[0]}" if hit else chemmod(massdiff)
-
-
-def snap(massdiff: float, site: str, specs: Iterable[ModificationSpec],
-         tolerance: float = 0.01) -> float:
-    """The declared mass of a matching modification, else ``massdiff``."""
-    best, best_err = massdiff, tolerance
-    for spec in specs:
-        err = abs(spec.massdiff - massdiff)
-        if spec.site == site and err <= best_err:
-            best, best_err = spec.massdiff, err
-    return best
 
 
 def with_fixed_mods(mods: List[Mod], peptide: str,
@@ -112,7 +99,7 @@ def format_modifications(mods: Iterable[Mod]) -> Optional[str]:
     ordered = sorted(mods, key=lambda m: m[0])
     if not ordered:
         return None
-    return ",".join(f"{pos}-{accession(delta, site)}" for pos, delta, site in ordered)
+    return ",".join(f"{pos}-{accession(delta)}" for pos, delta, _ in ordered)
 
 
 def observed_mods(mods: Iterable[Mod]) -> List[ModificationSpec]:
