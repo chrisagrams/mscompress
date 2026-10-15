@@ -80,6 +80,143 @@ def _format_floats(col: pd.Series) -> pd.Series:
     return col.map(fmt).astype(object)
 
 
+Pair = Tuple[str, str]
+
+
+class MetadataSection:
+    """
+    The ``MTD`` section: :class:`SearchMetadata` as mzTab key/value lines.
+
+    ``lines()`` writes it and ``parse()`` reads it back. Reading also works
+    out which ``search_engine_score[n]`` column holds the score, q-value and
+    PEP, since third-party files order them differently.
+    """
+
+    #: The score columns as written: mzTab column -> PSMTable column.
+    WRITTEN_SCORES = {
+        "search_engine_score[1]": "score",
+        "search_engine_score[2]": "q_value",
+        "search_engine_score[3]": "pep",
+    }
+
+    def __init__(self, metadata: SearchMetadata,
+                 score_columns: Optional[Dict[str, str]] = None):
+        self.metadata = metadata
+        #: mzTab score column -> PSMTable column (``score``, ``q_value``, ``pep``).
+        self.score_columns = dict(self.WRITTEN_SCORES if score_columns is None else score_columns)
+
+    # -- writing -----------------------------------------------------------
+
+    def lines(self) -> List[str]:
+        """The ``MTD`` lines, in the order mzTab lists them."""
+        pairs = [
+            *self._header(),
+            *self._software(),
+            *self._scores(),
+            *self._mods("fixed_mod", self.metadata.fixed_mods, _cv.NO_FIXED_MODS),
+            *self._mods("variable_mod", self.metadata.variable_mods, _cv.NO_VARIABLE_MODS),
+            *self._custom(),
+        ]
+        return [f"MTD\t{key}\t{_cv.clean(value)}" for key, value in pairs]
+
+    def _header(self) -> List[Pair]:
+        md = self.metadata
+        if md.source_format:
+            description = f"Converted by mscompress from {md.source_format}"
+            if md.source_file:
+                description += f" ({md.source_file})"
+        else:
+            description = "PSMs written by mscompress"
+        location = f"file://{md.ms_run_location}" if md.ms_run_location else NULL
+        return [
+            ("mzTab-version", "1.0.0"),
+            ("mzTab-mode", "Summary"),
+            ("mzTab-type", "Identification"),
+            ("description", description),
+            ("ms_run[1]-location", location),
+        ]
+
+    def _software(self) -> List[Pair]:
+        return [("software[1]", _cv.format_param(_cv.software_param(self.metadata)))]
+
+    def _scores(self) -> List[Pair]:
+        return [(f"psm_search_engine_score[{n}]", _cv.format_param(param))
+                for n, param in enumerate(_cv.score_params(self.metadata), start=1)]
+
+    @staticmethod
+    def _mods(kind: str, specs: List[ModificationSpec], none: _cv.Param) -> List[Pair]:
+        if not specs:
+            return [(f"{kind}[1]", _cv.format_param(none))]
+        pairs = []
+        for k, spec in enumerate(specs, start=1):
+            pairs += [
+                (f"{kind}[{k}]", _cv.format_param(_cv.mod_param(spec))),
+                (f"{kind}[{k}]-site", spec.site),
+                (f"{kind}[{k}]-position", spec.position),
+            ]
+        return pairs
+
+    def _custom(self) -> List[Pair]:
+        md = self.metadata
+        values = [(k, v) for k, v in (("source_format", md.source_format),
+                                      ("source_file", md.source_file)) if v]
+        return [(f"custom[{n}]", _cv.format_param(("", "", key, value)))
+                for n, (key, value) in enumerate(values, start=1)]
+
+    # -- reading -----------------------------------------------------------
+
+    @classmethod
+    def parse(cls, pairs: Dict[str, str]) -> MetadataSection:
+        """Read ``MTD`` key/value pairs."""
+        section = cls(SearchMetadata(), score_columns={})
+        md = section.metadata
+        location = pairs.get("ms_run[1]-location")
+        if location and location != NULL:
+            md.ms_run_location = location.removeprefix("file://")
+
+        mod_fields: Dict[Tuple[str, int], Dict[str, str]] = {}
+        for key, value in pairs.items():
+            match = _INDEXED_KEY.match(key)
+            if not match:
+                continue
+            name, n, sub = match.group(1), int(match.group(2)), match.group(3)
+            if name in ("fixed_mod", "variable_mod"):
+                mod_fields.setdefault((name, n), {})[sub or "param"] = value
+                continue
+            param = _cv.parse_param(value)
+            if param is None or sub is not None:
+                continue
+            if name == "software" and n == 1:
+                md.software, md.software_version = _cv.software_from_param(param)
+            elif name == "psm_search_engine_score":
+                section._read_score(n, param)
+            elif name == "custom" and param[2] in ("source_format", "source_file"):
+                setattr(md, param[2], param[3] or None)
+
+        if not section.score_columns:
+            section.score_columns["search_engine_score[1]"] = "score"
+        for (kind, _), fields in sorted(mod_fields.items()):
+            section._read_mod(kind, fields)
+        return section
+
+    def _read_score(self, n: int, param: _cv.Param) -> None:
+        role = _cv.score_role(param)
+        if role in self.score_columns.values():
+            return
+        self.score_columns[f"search_engine_score[{n}]"] = role
+        if role == "score":
+            self.metadata.primary_score = _cv.score_name(param)
+
+    def _read_mod(self, kind: str, fields: Dict[str, str]) -> None:
+        param = _cv.parse_param(fields.get("param", ""))
+        mass = _cv.mod_mass(param) if param else None
+        if mass is None:
+            return
+        spec = ModificationSpec(mass, fields.get("site", ""), fields.get("position", "Anywhere"))
+        md = self.metadata
+        (md.fixed_mods if kind == "fixed_mod" else md.variable_mods).append(spec)
+
+
 class MzTab(SearchResultsFormat):
     """
     mzTab 1.0 (PSM section): read, and written for MSZX storage.
@@ -128,43 +265,10 @@ class MzTab(SearchResultsFormat):
         psms = self._psm_frame(table.df, md)
         body = psms.to_csv(sep="\t", index=False, na_rep=NULL,
                            quoting=csv.QUOTE_NONE, lineterminator="\n")
-        text = "\n".join(self._metadata_lines(md)) + "\n" + body
+        text = "\n".join(MetadataSection(md).lines()) + "\n" + body
         if path is not None:
             Path(fspath(path)).write_text(text, encoding="utf-8")
         return text
-
-    @staticmethod
-    def _metadata_lines(md: SearchMetadata) -> List[str]:
-        lines: List[Tuple[str, str]] = [
-            ("mzTab-version", "1.0.0"),
-            ("mzTab-mode", "Summary"),
-            ("mzTab-type", "Identification"),
-        ]
-        if md.source_format:
-            description = f"Converted by mscompress from {md.source_format}"
-            if md.source_file:
-                description += f" ({md.source_file})"
-        else:
-            description = "PSMs written by mscompress"
-        lines.append(("description", description))
-        lines.append(("ms_run[1]-location",
-                      f"file://{md.ms_run_location}" if md.ms_run_location else NULL))
-        lines.append(("software[1]", _cv.format_param(_cv.software_param(md))))
-        for n, param in enumerate(_cv.score_params(md), start=1):
-            lines.append((f"psm_search_engine_score[{n}]", _cv.format_param(param)))
-        for kind, specs, none in (("fixed_mod", md.fixed_mods, _cv.NO_FIXED_MODS),
-                                  ("variable_mod", md.variable_mods, _cv.NO_VARIABLE_MODS)):
-            if not specs:
-                lines.append((f"{kind}[1]", _cv.format_param(none)))
-            for k, spec in enumerate(specs, start=1):
-                lines.append((f"{kind}[{k}]", _cv.format_param(_cv.mod_param(spec))))
-                lines.append((f"{kind}[{k}]-site", spec.site))
-                lines.append((f"{kind}[{k}]-position", spec.position))
-        custom = [(k, v) for k, v in (("source_format", md.source_format),
-                                      ("source_file", md.source_file)) if v]
-        for n, (key, value) in enumerate(custom, start=1):
-            lines.append((f"custom[{n}]", _cv.format_param(("", "", key, value))))
-        return [f"MTD\t{key}\t{_cv.clean(value)}" for key, value in lines]
 
     @staticmethod
     def _psm_frame(df: pd.DataFrame, md: SearchMetadata) -> pd.DataFrame:
@@ -202,65 +306,15 @@ class MzTab(SearchResultsFormat):
             elif line.startswith(("PSH\t", "PSM\t")):
                 table_lines.append(line)
 
-        md, score_columns = self._parse_metadata(mtd)
+        section = MetadataSection.parse(mtd)
+        md = section.metadata
         if not table_lines:
             return PSMTable(None, md)
         raw = pd.read_csv(io.StringIO("\n".join(table_lines)), sep="\t",
                           na_values=[NULL], keep_default_na=False,
                           quoting=csv.QUOTE_NONE, float_precision="round_trip",
                           dtype={"accession": object})
-        return PSMTable(self._parse_psms(raw.iloc[:, 1:], score_columns), md)
-
-    @staticmethod
-    def _parse_metadata(mtd: Dict[str, str]) -> Tuple[SearchMetadata, Dict[str, str]]:
-        """
-        Search metadata from ``MTD`` pairs.
-
-        Returns:
-            The metadata, and the core column (``score``, ``q_value``,
-            ``pep``) each ``search_engine_score[n]`` column is read into.
-        """
-        md = SearchMetadata()
-        location = mtd.get("ms_run[1]-location")
-        if location and location != NULL:
-            md.ms_run_location = location.removeprefix("file://")
-
-        scores: Dict[str, str] = {}
-        mod_fields: Dict[Tuple[str, int], Dict[str, str]] = {}
-        for key, value in mtd.items():
-            match = _INDEXED_KEY.match(key)
-            if not match:
-                continue
-            name, n, sub = match.group(1), int(match.group(2)), match.group(3)
-            if name in ("fixed_mod", "variable_mod"):
-                mod_fields.setdefault((name, n), {})[sub or "param"] = value
-                continue
-            param = _cv.parse_param(value)
-            if param is None or sub is not None:
-                continue
-            if name == "software" and n == 1:
-                md.software, md.software_version = _cv.software_from_param(param)
-            elif name == "psm_search_engine_score":
-                role = _cv.score_role(param)
-                column = f"search_engine_score[{n}]"
-                if role not in scores.values():
-                    scores[column] = role
-                    if role == "score":
-                        md.primary_score = _cv.score_name(param)
-            elif name == "custom" and param[2] in ("source_format", "source_file"):
-                setattr(md, param[2], param[3] or None)
-        if not scores:
-            scores["search_engine_score[1]"] = "score"
-
-        for (kind, _), fields in sorted(mod_fields.items()):
-            param = _cv.parse_param(fields.get("param", ""))
-            mass = _cv.mod_mass(param) if param else None
-            if mass is None:
-                continue
-            spec = ModificationSpec(mass, fields.get("site", ""),
-                                    fields.get("position", "Anywhere"))
-            (md.fixed_mods if kind == "fixed_mod" else md.variable_mods).append(spec)
-        return md, scores
+        return PSMTable(self._parse_psms(raw.iloc[:, 1:], section.score_columns), md)
 
     @staticmethod
     def _parse_psms(raw: pd.DataFrame, score_columns: Dict[str, str]) -> pd.DataFrame:
