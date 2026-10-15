@@ -80,10 +80,6 @@ def _format_floats(col: pd.Series) -> pd.Series:
     return col.map(fmt).astype(object)
 
 
-def _clean_strings(col: pd.Series) -> pd.Series:
-    return col.map(lambda v: _cv.clean(v) if isinstance(v, str) else v)
-
-
 class MzTab(SearchResultsFormat):
     """
     mzTab 1.0 (PSM section): read, and written for MSZX storage.
@@ -187,14 +183,9 @@ class MzTab(SearchResultsFormat):
         for col in out.columns:
             if pd.api.types.is_float_dtype(out[col]):
                 out[col] = _format_floats(out[col])
-            elif col != "accession" and (
-                out[col].dtype == object or pd.api.types.is_string_dtype(out[col])
-            ):
-                out[col] = _clean_strings(out[col])
 
         # One row per protein, sharing PSM_ID; protein-less PSMs keep one row.
         out = out.explode("accession")
-        out["accession"] = _clean_strings(out["accession"])
         out.insert(0, "PSH", "PSM")
         return out
 
