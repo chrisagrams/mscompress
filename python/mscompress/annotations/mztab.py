@@ -182,19 +182,6 @@ class CV:
         return mods.UNIMOD_MASSES.get(param.accession)
 
 
-def _format_floats(col: pd.Series) -> pd.Series:
-    """Shortest round-trip text; mzTab spells infinity INF / -INF."""
-
-    def fmt(v: float) -> Optional[str]:
-        if np.isnan(v):
-            return None
-        if np.isinf(v):
-            return "INF" if v > 0 else "-INF"
-        return repr(float(v))
-
-    return col.map(fmt).astype(object)
-
-
 class MetadataSection:
     """
     The ``MTD`` section: :class:`SearchMetadata` as mzTab key/value lines.
@@ -338,9 +325,9 @@ class MzTab(SearchResultsFormat):
         for col in df.columns[len(PSM_COLUMNS):]:
             out[OPT_PREFIX + re.sub(r"\s", "_", str(col))] = df[col]
 
-        for col in out.columns:
-            if pd.api.types.is_float_dtype(out[col]):
-                out[col] = _format_floats(out[col])
+        # mzTab spells infinity INF / -INF. (Two scalar calls: pandas 3's list
+        # form raises on this frame.)
+        out = out.replace(np.inf, "INF").replace(-np.inf, "-INF")
 
         # One row per protein, sharing PSM_ID; protein-less PSMs keep one row.
         out = out.explode("accession")
