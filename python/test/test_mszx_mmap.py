@@ -28,7 +28,7 @@ def standalone_msz_path(mszx_file_path, tmp_path):
     """Extract the MSZ entry from the test MSZX into a standalone .msz file."""
     with tarfile.open(mszx_file_path, "r") as tar:
         msz_member = next(m for m in tar.getmembers() if m.name.endswith(".msz"))
-        tar.extract(msz_member, tmp_path)
+        tar.extract(msz_member, tmp_path, filter="data")
     return tmp_path / msz_member.name
 
 

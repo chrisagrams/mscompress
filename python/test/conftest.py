@@ -40,7 +40,7 @@ def _mszx_with_psms(tmp_path_factory):
 
     out_dir = tmp_path_factory.mktemp("mszx")
     with tarfile.open(_TEST_DATA_DIR / "mszx" / "test.mszx") as tar:
-        tar.extract("temp.msz", out_dir)
+        tar.extract("temp.msz", out_dir, filter="data")
         pepxml = tar.extractfile("HSA.pepXML.zst").read()
     out = out_dir / "test.mszx"
     with read(str(out_dir / "temp.msz")) as msz:
