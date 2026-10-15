@@ -6,7 +6,6 @@ torch = pytest.importorskip("torch")
 from torch.utils.data import DataLoader
 
 from mscompress.datasets.torch import MSCompressDataset, MSCompressDatasetMember
-from mscompress.types import AnnotationFormat
 
 
 def _collate(batch):
@@ -108,13 +107,16 @@ def test_dataloader_multiworker(test_data_dir):
 
 
 def test_mscompress_dataset_w_annotations(mszx_file_path):
-    dataset = MSCompressDataset(
-        mszx_file_path, load_annotations=[AnnotationFormat.PEPXML]
-    )
+    dataset = MSCompressDataset(mszx_file_path, load_psms=True)
     assert len(dataset) > 0
+    n_with_psms = 0
     for i in range(len(dataset)):
         sample = dataset[i]
         assert isinstance(sample, tuple) and len(sample) == 3
-        mz, intensity, psm = sample
+        mz, intensity, psms = sample
         assert mz.ndim == 1 and intensity.ndim == 1
-        assert psm is not None
+        assert isinstance(psms, list)
+        n_with_psms += bool(psms)
+        for psm in psms:
+            assert psm["peptide"] and psm["scan"] is not None
+    assert n_with_psms > 0

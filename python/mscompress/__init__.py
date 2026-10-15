@@ -68,10 +68,10 @@ from mscompress.mszx import (
 )
 
 from mscompress.annotations import (
-    # Search results types
-    PSM,
-    TSVReader,
-    PepXMLReader,
+    # Search results
+    PSMTable,
+    SearchMetadata,
+    read_psms,
 )
 
 # Optional parquet support (requires the [parquet] extra).
@@ -133,10 +133,10 @@ __all__ = [
     # MSZX convenience functions
     "create_mszx",
     "compress_batch",
-    # Search results types
-    "PSM",
-    "TSVReader",
-    "PepXMLReader",
+    # Search results
+    "PSMTable",
+    "SearchMetadata",
+    "read_psms",
 ]
 
 if _HAS_PARQUET:

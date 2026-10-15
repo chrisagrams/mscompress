@@ -23,7 +23,7 @@ import os
 import tarfile
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
 from mscompress._core import MSZFile  # ty: ignore[unresolved-import]
 from mscompress.mszx.metadata import (
@@ -32,6 +32,9 @@ from mscompress.mszx.metadata import (
     SpectraFileEntry,
     is_batch_manifest,
 )
+
+if TYPE_CHECKING:
+    from mscompress.annotations import PSMTable
 
 __all__ = [
     "MSZXBatchFile",
@@ -234,6 +237,12 @@ class MSZXBatchFile:
             if handle is None:
                 raise ValueError(f"Could not read annotation {filename!r}")
             return handle.read()
+
+    def get_psms(self, key: Union[int, str], filename: str) -> PSMTable:
+        """The search results stored (as mzTab) under a spectra entry."""
+        from mscompress.annotations import read_mztab
+
+        return read_mztab(self.get_annotation(key, filename))
 
     # -- bulk output -------------------------------------------------------
 

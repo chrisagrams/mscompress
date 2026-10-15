@@ -6,6 +6,7 @@ from xml.etree.ElementTree import Element
 import numpy as np
 import numpy.typing as npt
 
+from .annotations import PSMTable
 from .types import AlgorithmInfo, SpectrumTransform
 
 class RuntimeArguments:
@@ -407,7 +408,7 @@ class MSZXFile(MSZFile):
 
     Extends MSZFile so all spectrum properties and methods work directly on
     the embedded MSZ payload, while adding access to the archive manifest and
-    bundled annotation readers. Open via the `open()` classmethod.
+    the stored search results. Open via the `open()` classmethod.
     """
 
     _closed: bool
@@ -417,7 +418,7 @@ class MSZXFile(MSZFile):
         """Open an MSZX archive for reading.
 
         Mmaps the embedded MSZ payload directly out of the archive (no temp
-        extraction) and eagerly reads annotation entries into memory.
+        extraction) and eagerly reads the stored mzTab search results.
 
         Args:
             path: Path to the .mszx file.
@@ -439,26 +440,22 @@ class MSZXFile(MSZFile):
         ...
 
     @property
-    def annotations(self) -> Any:
-        """Primary annotation reader, or None if no annotations."""
+    def psms(self) -> Optional[PSMTable]:
+        """The first stored PSMTable, or None if the archive has no search results."""
         ...
 
     @property
-    def annotation_readers(self) -> Dict[str, Any]:
-        """Dict of all annotation readers, keyed by filename."""
+    def psm_tables(self) -> Dict[str, PSMTable]:
+        """Every stored PSMTable, keyed by archive member name."""
+        ...
+
+    def get_psms(self, filename: str) -> PSMTable:
+        """The PSMTable stored under an archive member name."""
         ...
 
     @property
     def annotation_files(self) -> list:
         """List of annotation entries in the archive."""
-        ...
-
-    def get_annotation_reader(self, filename: str) -> Any:
-        """Get the annotation reader for a specific file by name."""
-        ...
-
-    def get_annotation_readers_by_format(self, format: str) -> list:
-        """Get all annotation readers matching a specific format."""
         ...
 
     def describe(self) -> Dict[str, Any]:
@@ -469,8 +466,8 @@ class MSZXFile(MSZFile):
         """Decompress the embedded MSZ to mzML.
 
         If `output` is an existing directory or has no file extension, the
-        mzML is written inside it as `<archive_stem>.mzML` and any cached
-        annotation readers are written alongside. Otherwise `output` is
+        mzML is written inside it as `<archive_stem>.mzML` and the search
+        results are written alongside as mzTab. Otherwise `output` is
         treated as a single file path and only the mzML is written.
         """
         ...
@@ -679,15 +676,14 @@ class MSZXBatchWriter:
     def add_psms(
         self,
         entry_index: int,
-        source: Any,
-        filename: Optional[str] = None,
+        source: Union[PSMTable, str, PathLike],
+        name: Optional[str] = None,
         compressed: bool = True,
-        description: Optional[str] = None,
     ) -> str:
         """Attach search results to a spectra entry, stored as mzTab.
 
-        `source` is a results file path or a `BasePSMReader`. Engine output is
-        converted to mzTab; returns the archive member name written.
+        `source` is a `PSMTable` or a pepXML / Percolator / mzTab file;
+        returns the archive member name written.
         """
         ...
 

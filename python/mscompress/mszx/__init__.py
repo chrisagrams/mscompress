@@ -18,19 +18,9 @@ import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import zstandard as zstd
-
 from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
-from mscompress.annotations import (
-    PSM,
-    BasePSMReader,
-    PSMReader,
-    SearchInfo,
-    mztab_member_name,
-    reader_to_mztab,
-    write_mztab,
-)
-from mscompress.annotations._base import DEFAULT_ZSTD_COMPRESSION_LEVEL
+from mscompress.annotations import PSMTable, mztab_member_name, read_psms, write_mztab
+from mscompress.annotations._io import compress
 from mscompress.mszx.batch import MSZXBatchFile, compress_batch
 from mscompress.mszx.metadata import (
     MSZXBatchManifest,
@@ -59,7 +49,7 @@ class MSZXBuilder:
         ```python
         msz = mscompress.read("sample.msz")
         builder = MSZXBuilder(msz)
-        builder.add_annotations(reader, description="Percolator results")
+        builder.add_psms("results.pepXML", description="MSFragger results")
         builder.set_description("Proteomics dataset with PSM annotations")
         builder.save("sample.mszx")
         ```
@@ -88,78 +78,39 @@ class MSZXBuilder:
         self._join_key = "spectra_ref"
         self._extra: Dict[str, Any] = {}
 
-    def add_annotations(
+    def add_psms(
         self,
-        reader: BasePSMReader,
+        psms: Union[PSMTable, str, Path],
+        name: Optional[str] = None,
         description: Optional[str] = None,
     ) -> MSZXBuilder:
         """
         Add search results to the archive, stored as mzTab.
 
-        Engine output (pepXML, Percolator TSV, ...) is converted to mzTab;
-        the original file is not stored. mzTab input is stored unchanged.
-
         Args:
-            reader: BasePSMReader instance containing the PSMs.
-            description: Optional description of the annotations.
+            psms: A PSMTable, or a pepXML / Percolator / mzTab file to read.
+            name: Member name (``.mztab`` and, when compressing, ``.zst`` are
+                appended). Defaults to the source file name.
+            description: Optional description of the search results.
         Returns:
             Self for method chaining.
         """
-        mztab = reader_to_mztab(reader, ms_run_location=self._msz_path.name)
-        source_name = reader.name or f"annotations{len(self._annotations) + 1}"
-        return self._add_mztab(
-            mztab.encode("utf-8"),
-            mztab_member_name(source_name, self.compression),
-            len(reader),
-            description,
-        )
-
-    def add_psms(
-        self,
-        psms: List[PSM],
-        filename: str,
-        search_info: Optional[SearchInfo] = None,
-        description: Optional[str] = None,
-    ) -> MSZXBuilder:
-        """
-        Add in-memory PSMs to the archive, stored as mzTab.
-
-        Args:
-            psms: PSMs to store.
-            filename: Base name for the archive member (``.mztab`` is appended).
-            search_info: Optional search metadata for the mzTab header.
-            description: Optional description of the annotations.
-        Returns:
-            Self for method chaining.
-        """
-        mztab = write_mztab(
-            psms, search_info=search_info, ms_run_location=self._msz_path.name
-        )
-        return self._add_mztab(
-            mztab.encode("utf-8"),
-            mztab_member_name(filename, self.compression),
-            len(psms),
-            description,
-        )
-
-    def _add_mztab(
-        self,
-        data: bytes,
-        filename: str,
-        num_records: int,
-        description: Optional[str],
-    ) -> MSZXBuilder:
+        table = psms if isinstance(psms, PSMTable) else read_psms(psms)
+        name = name or table.metadata.source_file or f"psms{len(self._annotations) + 1}"
+        filename = mztab_member_name(name, self.compression)
         if any(entry.filename == filename for _, entry in self._annotations):
             raise ValueError(f"Duplicate annotation member name: {filename}")
+
+        data = write_mztab(table, ms_run_location=self._msz_path.name).encode("utf-8")
+        if self.compression:
+            data = compress(data)
         entry = AnnotationEntry(
             filename=filename,
             format=AnnotationFormat.MZTAB,
             compressed=self.compression,
             description=description,
-            num_records=num_records,
+            num_records=len(table),
         )
-        if self.compression:
-            data = zstd.ZstdCompressor(level=DEFAULT_ZSTD_COMPRESSION_LEVEL).compress(data)
         self._annotations.append((data, entry))
         return self
 
@@ -225,7 +176,7 @@ class MSZXBuilder:
 def create_mszx(
     msz: MSZFile,
     output_path: Union[str, Path],
-    annotations: Optional[List[Union[str, Path, BasePSMReader]]] = None,
+    psms: Optional[List[Union[str, Path, PSMTable]]] = None,
     description: Optional[str] = None,
 ) -> Path:
     """
@@ -236,7 +187,8 @@ def create_mszx(
     Args:
         msz: MSZFile object.
         output_path: Output path for the .mszx file.
-        annotations: List of file paths or readers for annotations.
+        psms: Search results to store: PSMTables, or pepXML / Percolator /
+            mzTab files.
         description: Optional description for the archive.
 
     Returns:
@@ -248,23 +200,14 @@ def create_mszx(
         create_mszx(
             msz,
             "sample.mszx",
-            annotations=["sample.pin", "sample.pepXML"],
+            psms=["sample.pepXML", "sample.percolator.tsv"],
             description="Annotated proteomics dataset",
         )
         ```
     """
     builder = MSZXBuilder(msz)
-
     if description:
         builder.set_description(description)
-
-    if annotations:
-        for annotation in annotations:
-            if isinstance(annotation, (str, Path)):
-                reader = PSMReader(annotation)
-                builder.add_annotations(reader)
-            elif isinstance(annotation, BasePSMReader):
-                builder.add_annotations(annotation)
-
+    for table in psms or []:
+        builder.add_psms(table)
     return builder.save(output_path)
-

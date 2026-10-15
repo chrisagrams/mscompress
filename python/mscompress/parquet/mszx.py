@@ -2,8 +2,8 @@
 
 `parquet_to_mszx` bundles the .msz produced by `parquet_to_msz` with the
 per-row annotations into a single archive. The annotations are staged as a
-Percolator-style TSV (`_write_annotations_tsv`) and stored as mzTab, like
-every other annotation source.
+Percolator-style TSV (`_write_annotations_tsv`), read into a PSMTable and
+stored as mzTab, like every other source of search results.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from mscompress.annotations import TSVReader
+from mscompress.annotations import read_percolator
 from mscompress.mszx import MSZXBuilder
 
 from mscompress.parquet.msz import parquet_to_msz
@@ -131,8 +131,7 @@ def _write_annotations_tsv(
 
     Returns the number of rows written.
 
-    `score_column=None` writes empty `score` cells (callers downstream of
-    `TSVReader` will see `score=0.0`). Pass an explicit column name to require
+    `score_column=None` writes empty `score` cells (read back as NA). Pass an explicit column name to require
     it; if absent from the schema, `_resolve_schema` raises.
     """
     pf = pq.ParquetFile(str(parquet_path))
@@ -247,9 +246,8 @@ def parquet_to_mszx(
             builder = MSZXBuilder(msz, source_name=parquet_path.name)
             if not is_long:
                 _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
-                reader = TSVReader(tmp_tsv)
-                builder.add_annotations(
-                    reader,
+                builder.add_psms(
+                    read_percolator(tmp_tsv),
                     description=description or f"Annotations extracted from {parquet_path.name}",
                 )
             if description:

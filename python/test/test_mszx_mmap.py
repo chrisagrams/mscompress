@@ -92,7 +92,7 @@ def test_pickle_roundtrip_via_archive(mszx_file_path):
     try:
         assert isinstance(restored, MSZXFile)
         assert len(restored.spectra) > 0
-        assert restored.annotations is not None
+        assert restored.psms is not None
     finally:
         restored.close()
 
@@ -117,3 +117,4 @@ def test_decompress_to_directory(mszx_file_path, tmp_path):
     assert len(annotation_files) > 0
     # No .zst suffix should leak through.
     assert not any(f.endswith(".zst") for f in annotation_files)
+    assert annotation_files == ["HSA.pepXML.mztab"]

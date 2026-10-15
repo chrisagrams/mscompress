@@ -1,102 +1,39 @@
-"""Annotation file handling for peptide identification files.
+"""Search results (peptide-spectrum matches).
 
-This package provides implementations for reading and writing annotation
-files with compression support.
-
-The annotation abstraction provides transparent zstd compression/decompression
-when reading and writing to archives.
+Every supported input (pepXML, Percolator .tsv/.pin, mzTab) is read into a
+:class:`PSMTable`: a pandas DataFrame with a fixed set of core columns plus
+the :class:`SearchMetadata` of the search. MSZX archives store PSM tables as
+mzTab 1.0.
 
 Example:
-    Basic usage with auto-detection:
-
     ```python
-    from mscompress.annotations import PSMReader
-    reader = PSMReader("results.pin")
-    for psm in reader:
-        print(psm.peptide, psm.score)
-    ```
+    from mscompress.annotations import read_psms
 
-    With context manager:
-
-    ```python
-    with PSMReader("results.pepXML") as reader:
-        for psm in reader:
-            print(psm.peptide)
-    ```
-
-    Using annotation files with compression:
-
-    ```python
-    from mscompress.annotations import AnnotationFile
-
-    # Read a compressed annotation file
-    annotation = AnnotationFile.from_file("results.pin.zst")
-    for psm in annotation:
-        print(psm.peptide, psm.score)
-
-    # Create from reader and save compressed
-    reader = PINReader("results.pin")
-    annotation = AnnotationFile.from_reader(reader)
-    annotation.save("results.pin.zst", compress=True)
-    ```
-
-    Using specific readers:
-
-    ```python
-    from mscompress.annotations import PINReader, PepXMLReader
-    pin_reader = PINReader("results.pin")
-    pepxml_reader = PepXMLReader("results.pepXML")
+    table = read_psms("results.pepXML")
+    confident = table.df[table.df.q_value < 0.01]
+    table.to_mztab("results.mztab")
     ```
 """
 
 from __future__ import annotations
 
-# Core types
-from mscompress.annotations.psms._types import PSM, ModificationSpec, SearchInfo
-
-# PSM Base class
-from mscompress.annotations.psms._base import BasePSMReader
-
-# Generic PSM reader
-from mscompress.annotations.psms.reader import PSMReader
-
-# Specific PSM readers
-from mscompress.annotations.psms.percolator import TSVReader
-from mscompress.annotations.psms.pepxml import PepXMLReader
-from mscompress.annotations.psms.mztab import (
-    MzTabReader,
-    mztab_member_name,
-    reader_to_mztab,
-    write_mztab,
-)
-
-# Annotation file abstraction
-from mscompress.annotations._base import (
-    BaseAnnotationFile,
-    MSZXAnnotationFile,
-    PathAnnotationFile,
-)
-
+from mscompress.annotations.detect import detect_format, read_psms
+from mscompress.annotations.metadata import ModificationSpec, SearchMetadata
+from mscompress.annotations.mztab import mztab_member_name, read_mztab, write_mztab
+from mscompress.annotations.pepxml import read_pepxml
+from mscompress.annotations.percolator import read_percolator
+from mscompress.annotations.table import PSM_COLUMNS, PSMTable
 
 __all__ = [
-    # Types
-    "PSM",
+    "PSMTable",
+    "PSM_COLUMNS",
+    "SearchMetadata",
     "ModificationSpec",
-    "SearchInfo",
-    # PSM Base class
-    "BasePSMReader",
-    # Generic PSM reader
-    "PSMReader",
-    # Specific PSM readers
-    "TSVReader",
-    "PepXMLReader",
-    "MzTabReader",
-    # mzTab conversion
-    "mztab_member_name",
-    "reader_to_mztab",
+    "read_psms",
+    "read_pepxml",
+    "read_percolator",
+    "read_mztab",
     "write_mztab",
-    # Annotation file abstraction
-    "BaseAnnotationFile",
-    "MSZXAnnotationFile",
-    "PathAnnotationFile",
+    "mztab_member_name",
+    "detect_format",
 ]

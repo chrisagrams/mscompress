@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from mscompress.mszx import MSZXFile, create_mszx
 from mscompress import read
-from mscompress.annotations import MzTabReader
+from mscompress.annotations import PSMTable
 from mscompress.types import AnnotationFormat
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def test_mszx_extract_filter_scans(tmp_path, msz_file, dummy_pin, dummy_pepxml):
     create_mszx(
         msz_file,
         mszx_path,
-        annotations=[dummy_pin, dummy_pepxml],
+        psms=[dummy_pin, dummy_pepxml],
         description="Source Archive"
     )
     
@@ -106,7 +106,7 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
     create_mszx(
         msz_file,
         mszx_path,
-        annotations=[dummy_pin, dummy_pepxml],
+        psms=[dummy_pin, dummy_pepxml],
         description="Source Archive"
     )
 
@@ -125,16 +125,14 @@ run.999.999.2\t-1\t999\tPEPTIDEC\tDECOY1\t0.1
             # Verify Annotations
             # Only mzTab is stored, converted from each source file.
             assert {e.format for e in extracted.annotation_files} == {AnnotationFormat.MZTAB}
-            pin_reader = extracted.get_annotation_reader("test.pin.mztab.zst")
-            assert isinstance(pin_reader, MzTabReader)
-            assert len(pin_reader) == 1
-            assert pin_reader[0].scan_number == scan1
-            
+            pin = extracted.get_psms("test.pin.mztab.zst")
+            assert isinstance(pin, PSMTable)
+            assert pin.df.scan.tolist() == [scan1]
+
             # Check PepXML
-            pep_reader = extracted.get_annotation_reader("test.pep.xml.mztab.zst")
-            assert pep_reader.source_format == "pepxml"
-            assert len(pep_reader) == 1
-            assert pep_reader[0].scan_number == scan1
+            pep = extracted.get_psms("test.pep.xml.mztab.zst")
+            assert pep.metadata.source_format == "pepxml"
+            assert pep.df.scan.tolist() == [scan1]
             
         finally:
             extracted.close()
@@ -163,7 +161,7 @@ run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
     dummy_pin.write_text(content)
     
     mszx_path = tmp_path / "level_test.mszx"
-    create_mszx(msz_file, mszx_path, annotations=[dummy_pin])
+    create_mszx(msz_file, mszx_path, psms=[dummy_pin])
     
     with MSZXFile.open(mszx_path) as source:
         output_path = tmp_path / "extracted_level.mszx"
@@ -175,9 +173,8 @@ run.{target_scan}.{target_scan}.2\t1\t{target_scan}\tPEPTIDEA\tPROT1\t0.9
             assert all(l == target_level for l in extracted_levels)
             
             # Verify annotation is preserved (since it matches a scan in the level)
-            pin_reader = extracted.get_annotation_reader("test.pin.mztab.zst")
-            assert len(pin_reader) == 1
-            assert pin_reader[0].scan_number == target_scan
+            pin = extracted.get_psms("test.pin.mztab.zst")
+            assert pin.df.scan.tolist() == [target_scan]
             
         finally:
             extracted.close()
