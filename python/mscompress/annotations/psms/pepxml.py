@@ -14,7 +14,7 @@ from xml.etree import ElementTree as ET
 
 from mscompress.annotations._base import BaseAnnotationFile
 from mscompress.annotations.psms._base import BasePSMReader
-from mscompress.annotations.psms._types import PSM
+from mscompress.annotations.psms._types import PSM, ModificationSpec, SearchInfo
 from mscompress.types import AnnotationFormat
 
 
@@ -73,14 +73,57 @@ class PepXMLReader(BasePSMReader):
         # Use iterparse with BytesIO for memory efficiency
         context = ET.iterparse(io.BytesIO(data), events=("end",))
 
+        have_summary = False
         for event, elem in context:
             # Handle both namespaced and non-namespaced elements
             tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
 
-            if tag == "spectrum_query":
+            if tag == "search_summary" and not have_summary:
+                self._search_info = self._parse_search_summary(elem)
+                have_summary = True
+            elif tag == "spectrum_query":
                 psms = self._parse_spectrum_query(elem)
                 self._psms.extend(psms)
                 elem.clear()
+
+        # The primary score is whichever one PSM.score was taken from; decide
+        # it from the first hit, using the same preference order.
+        if self._psms and self._search_info.primary_score_name is None:
+            scores = self._psms[0].extra
+            for name in ("hyperscore", "xcorr", "expect"):
+                if name in scores:
+                    self._search_info.primary_score_name = name
+                    break
+            else:
+                if scores:
+                    self._search_info.primary_score_name = next(iter(scores))
+
+    @staticmethod
+    def _parse_search_summary(elem: ET.Element) -> SearchInfo:
+        """Parse search engine and modifications from a search_summary element."""
+        info = SearchInfo(
+            software=elem.get("search_engine") or None,
+            software_version=elem.get("search_engine_version") or None,
+        )
+        for child in elem:
+            tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+            try:
+                massdiff = float(child.get("massdiff", ""))
+            except ValueError:
+                continue
+            variable = child.get("variable", "N").upper() == "Y"
+
+            if tag == "aminoacid_modification":
+                mod = ModificationSpec(massdiff, child.get("aminoacid", ""), "Anywhere")
+            elif tag == "terminal_modification":
+                end = "N" if child.get("terminus", "n").upper() == "N" else "C"
+                scope = "Protein" if child.get("protein_terminus", "N").upper() == "Y" else "Any"
+                mod = ModificationSpec(massdiff, f"{end}-term", f"{scope} {end}-term")
+            else:
+                continue
+
+            (info.variable_mods if variable else info.fixed_mods).append(mod)
+        return info
 
     def _parse_spectrum_query(self, elem: ET.Element) -> List[PSM]:
         """Parse a spectrum_query element."""

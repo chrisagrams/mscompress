@@ -21,7 +21,7 @@ from typing import (
 )
 
 from mscompress.annotations._base import BaseAnnotationFile, PathAnnotationFile
-from mscompress.annotations.psms._types import PSM
+from mscompress.annotations.psms._types import PSM, SearchInfo
 from mscompress.types import AnnotationFormat
 
 
@@ -67,6 +67,7 @@ class BasePSMReader(ABC):
             self._file_path = path
 
         self._psms: List[PSM] = []
+        self._search_info = SearchInfo()
         self._scan_index: Dict[int, List[int]] = {}  # scan_number -> [psm indices]
         self._parsed = False
         self._iter_index = 0
@@ -97,6 +98,12 @@ class BasePSMReader(ABC):
         """List of all PSMs (triggers parsing if needed)."""
         self._ensure_parsed()
         return self._psms
+
+    @property
+    def search_info(self) -> SearchInfo:
+        """Search-level metadata (software, scores, modifications), if known."""
+        self._ensure_parsed()
+        return self._search_info
 
     def _ensure_parsed(self) -> None:
         """Ensure the file has been parsed."""
