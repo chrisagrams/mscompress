@@ -56,12 +56,6 @@ _PSH: List[Tuple[str, Optional[str]]] = [
     ("end", None),
     (DECOY_COLUMN, "is_decoy"),
 ]
-# Columns that read straight back into a PSMTable column. The rest
-# (spectra_ref, accession, decoy flag) need converting.
-_COPIED = {
-    mztab: col for mztab, col in _PSH
-    if col is not None and col not in ("scan", "proteins", "is_decoy")
-}
 
 class Param(NamedTuple):
     """A controlled-vocabulary parameter, written ``[cv, accession, name, value]``.
@@ -384,10 +378,9 @@ class MzTab(SearchResultsFormat):
         )
         raw = raw.drop_duplicates("PSM_ID").reset_index(drop=True)
 
-        df = pd.DataFrame({col: raw[mztab] for mztab, col in _COPIED.items()})
+        df = pd.DataFrame({col: raw[mztab] for mztab, col in _PSH if col})
         df["scan"] = raw["spectra_ref"].str.extract(r"scan=(\d+)", expand=False)
         df["proteins"] = list(proteins)
-        df["is_decoy"] = raw[DECOY_COLUMN] == 1
         for col in raw.columns:
             if col.startswith(OPT_PREFIX) and col != DECOY_COLUMN:
                 df[col.removeprefix(OPT_PREFIX)] = raw[col]
