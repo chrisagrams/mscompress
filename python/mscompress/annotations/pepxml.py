@@ -175,5 +175,28 @@ class PepXML(SearchResultsFormat):
                     pos = int(aa_mod.get("position"))
                     site = peptide[pos - 1]
                     found.append((pos, float(aa_mod.get("mass")) - mods.RESIDUE_MASSES[site], site))
-        found = mods.with_fixed_mods(found, peptide, md.fixed_mods)
+        found += PepXML._fixed_mods(found, peptide, md.fixed_mods)
         return found, info.get("modified_peptide") if info is not None else None
+
+    @staticmethod
+    def _fixed_mods(
+        found: List[mods.Mod], peptide: str, fixed_mods: List[ModificationSpec]
+    ) -> List[mods.Mod]:
+        """
+        Declared fixed modifications missing from a hit's ``modification_info``.
+
+        Some engines (MSFragger) leave fixed mods out of each hit, others
+        (Comet) list them. A listed position's mass already includes any
+        fixed mod, so only positions that aren't listed are added.
+        """
+        listed = {pos for pos, _, _ in found}
+        added: List[mods.Mod] = []
+        for spec in fixed_mods:
+            if spec.site == "N-term":
+                positions = [0] if spec.position.startswith("Any") else []
+            elif spec.site == "C-term":
+                positions = [len(peptide) + 1] if spec.position.startswith("Any") else []
+            else:
+                positions = [i + 1 for i, aa in enumerate(peptide) if aa == spec.site]
+            added += [(pos, spec.massdiff, spec.site) for pos in positions if pos not in listed]
+        return added

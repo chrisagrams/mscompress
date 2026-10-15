@@ -77,23 +77,6 @@ def accession(massdiff: float) -> str:
     return f"UNIMOD:{hit[0]}" if hit else chemmod(massdiff)
 
 
-def with_fixed_mods(mods: List[Mod], peptide: str,
-                    fixed_mods: Iterable[ModificationSpec]) -> List[Mod]:
-    """Add declared fixed modifications that a modified sequence left out."""
-    out = list(mods)
-    for spec in fixed_mods:
-        if spec.site == "N-term":
-            positions = [0] if spec.position.startswith("Any") else []
-        elif spec.site == "C-term":
-            positions = [len(peptide) + 1] if spec.position.startswith("Any") else []
-        else:
-            positions = [i + 1 for i, aa in enumerate(peptide) if aa == spec.site]
-        for pos in positions:
-            if not any(p == pos and abs(d - spec.massdiff) < 0.01 for p, d, _ in out):
-                out.append((pos, spec.massdiff, spec.site))
-    return out
-
-
 def format_modifications(mods: Iterable[Mod]) -> Optional[str]:
     """mzTab ``modifications`` cell, or None when unmodified."""
     ordered = sorted(mods, key=lambda m: m[0])
