@@ -622,15 +622,24 @@ static int cv_tag_value(const char* tag, size_t len, char* buf, size_t cap) {
    return 1;
 }
 
+/* Fields scan_spectrum_meta() still has to find. */
+#define META_LEVEL 0x01
+#define META_RT 0x02
+#define META_PRECURSOR 0x04
+#define META_CHARGE 0x08
+#define META_TIC 0x10
+#define META_BASE_PEAK 0x20
+
 /**
- * @brief Reads a spectrum's metadata in one pass over its cvParam tags.
+ * @brief Reads a spectrum's metadata in one forward pass over its MS cvParams.
  *
- * Spectrum-level metadata precedes the binaryDataArrayList, so the walk ends
- * there (or at </spectrum>, whichever comes first). The first occurrence of
- * each accession wins.
+ * memmem() jumps from one `accession="MS:` to the next, so other tags and
+ * attributes are skipped without stopping, and the pass ends as soon as every
+ * requested field is found. The first occurrence of each accession wins.
  *
  * @param p Start of the <spectrum> element.
- * @param end Upper bound for the walk (e.g. the first <binary>).
+ * @param end Upper bound for the pass: the first <binary>, since spectrum-level
+ *            metadata precedes the binaryDataArrayList.
  * @param flags `MSLEVEL`, `RETTIME` and/or `SPECMETA`; other fields are skipped.
  * @param ms_level Output MS level; 0 when absent.
  * @param m Output metadata; retention time is in seconds.
@@ -640,73 +649,73 @@ static void scan_spectrum_meta(const char* p, const char* end, int flags,
    *ms_level = 0;
    m->rt_sec = m->precursor_mz = m->tic = m->base_peak_mz = NAN;
    m->charge = 0;
-   int want_charge = flags & SPECMETA;
+
+   int want = 0;
+   if (flags & MSLEVEL) want |= META_LEVEL;
+   if (flags & (RETTIME | SPECMETA)) want |= META_RT;
+   if (flags & SPECMETA)
+      want |= META_PRECURSOR | META_CHARGE | META_TIC | META_BASE_PEAK;
+
+   const char* start = p;
    char val[64];
 
-   while (p < end && (p = memchr(p, '<', (size_t)(end - p))) != NULL) {
-      const char* tag = p;
-      const char* close = memchr(tag, '>', (size_t)(end - tag));
+   while (want && p < end) {
+      const char* acc = memmem(p, (size_t)(end - p), "accession=\"MS:", 14);
+      if (acc == NULL)
+         break;
+      p = acc + 14;
+
+      int field;
+      float* dst = NULL;
+      switch (strtol(p, NULL, 10)) {
+         case 1000511: field = META_LEVEL; break;
+         case 1000016: field = META_RT; dst = &m->rt_sec; break;
+         case 1000744: field = META_PRECURSOR; dst = &m->precursor_mz; break;
+         case 1000041: field = META_CHARGE; break;
+         case 1000285: field = META_TIC; dst = &m->tic; break;
+         case 1000504: field = META_BASE_PEAK; dst = &m->base_peak_mz; break;
+         default: continue;
+      }
+      if (!(want & field))
+         continue;
+      want &= ~field;
+
+      // Bound the attribute lookups to this one tag.
+      const char* tag = acc;
+      while (tag > start && *tag != '<') tag--;
+      const char* close = memchr(acc, '>', (size_t)(end - acc));
       if (close == NULL)
          break;
       p = close + 1;
       size_t tl = (size_t)(close - tag);
 
-      if (tl >= 8 && memcmp(tag + 1, "cvParam", 7) == 0) {
-         const char* acc = memmem(tag, tl, "accession=\"MS:", 14);
-         if (acc == NULL)
-            continue;
-         long id = strtol(acc + 14, NULL, 10);
-         float* dst = NULL;
-         switch (id) {
-            case 1000511: /* ms level */
-               if ((flags & MSLEVEL) && *ms_level == 0 &&
-                   cv_tag_value(tag, tl, val, sizeof(val))) {
-                  long lv = strtol(val, NULL, 10);
-                  *ms_level = (lv < 0 || lv > UINT16_MAX) ? 0 : (uint16_t)lv;
-               }
-               continue;
-            case 1000041: /* charge state */
-               if (want_charge && cv_tag_value(tag, tl, val, sizeof(val))) {
-                  long z = strtol(val, NULL, 10);
-                  if (z >= -128 && z <= 127) m->charge = (int8_t)z;
-                  want_charge = 0;
-               }
-               continue;
-            case 1000016: /* scan start time */
-               if (flags & (RETTIME | SPECMETA)) dst = &m->rt_sec;
-               break;
-            case 1000744: /* selected ion m/z */
-               if (flags & SPECMETA) dst = &m->precursor_mz;
-               break;
-            case 1000285: /* total ion current */
-               if (flags & SPECMETA) dst = &m->tic;
-               break;
-            case 1000504: /* base peak m/z */
-               if (flags & SPECMETA) dst = &m->base_peak_mz;
-               break;
-            default:
-               continue;
-         }
-         if (dst == NULL || !isnan(*dst) ||
-             !cv_tag_value(tag, tl, val, sizeof(val)))
-            continue;
-         char* e;
-         double v = strtod(val, &e);
-         if (e == val)
-            continue;
-         if (dst == &m->rt_sec) {
-            if (memmem(tag, tl, "unitAccession=\"UO:0000031\"", 26))
-               v *= 60.0; /* minute */
-            else if (memmem(tag, tl, "unitAccession=\"UO:0000032\"", 26))
-               v *= 3600.0; /* hour */
-            else if (memmem(tag, tl, "unitAccession=\"UO:0000028\"", 26))
-               v /= 1000.0; /* millisecond */
-         }
-         *dst = (float)v;
-      } else if ((tl >= 10 && memcmp(tag, "</spectrum", 10) == 0) ||
-                 (tl >= 20 && memcmp(tag, "<binaryDataArrayList", 20) == 0)) {
-         break;
+      if (!cv_tag_value(tag, tl, val, sizeof(val)))
+         continue;
+
+      if (field == META_LEVEL) {
+         long lv = strtol(val, NULL, 10);
+         *ms_level = (lv < 0 || lv > UINT16_MAX) ? 0 : (uint16_t)lv;
+         continue;
       }
+      if (field == META_CHARGE) {
+         long z = strtol(val, NULL, 10);
+         if (z >= -128 && z <= 127) m->charge = (int8_t)z;
+         continue;
+      }
+
+      char* e;
+      double v = strtod(val, &e);
+      if (e == val)
+         continue;
+      if (field == META_RT) {
+         if (memmem(tag, tl, "unitAccession=\"UO:0000031\"", 26))
+            v *= 60.0; /* minute */
+         else if (memmem(tag, tl, "unitAccession=\"UO:0000032\"", 26))
+            v *= 3600.0; /* hour */
+         else if (memmem(tag, tl, "unitAccession=\"UO:0000028\"", 26))
+            v /= 1000.0; /* millisecond */
+      }
+      *dst = (float)v;
    }
 }
 
