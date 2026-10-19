@@ -1,0 +1,12 @@
+{
+  "name": "mscompress-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo root. Exists only to host git hooks (husky) for the JS/TS subprojects (electron/, node-ts/). The C library, CLI, and Python packages live in their own directories and are unaffected.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
