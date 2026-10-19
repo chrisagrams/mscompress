@@ -1,6 +1,10 @@
 appId: gy.lab.mscompress
 productName: MScompress
-copyright: Copyright © 2026 Gao Lab
+copyright: Copyright © 2026 Chris Grams
+
+# Release asset names, e.g. MSCompress-1.2.0-mac-arm64.dmg. The version comes
+# from package.json, which release-please bumps alongside version.txt.
+artifactName: MSCompress-${version}-${os}-${arch}.${ext}
 
 # Ship only the en-US Chromium locale pack. Electron bundles ~55 .pak locale
 # files (~43 MB) by default; the app is English-only, so the rest are dead weight.
@@ -37,8 +41,8 @@ directories:
 
 # electron-vite emits the app to out/; the renderer/main/preload are already
 # bundled there. node_modules is intentionally excluded from the asar because
-# the only runtime native dependency (mscompress / node) is shipped via
-# extraResources below and resolved from resources at runtime.
+# the only runtime dependency (the native mscompress binding, node) is
+# shipped via extraResources below.
 files:
   - out/**
   - package.json
@@ -49,31 +53,32 @@ files:
   - '!tsconfig*.json'
   - '!components.json'
 
-# Ship the native mscompress binding (node/) outside the asar so its .node
-# addon can be dlopen'd at runtime. bindings.ts resolves resources/node/dist.
+# Ship the native mscompress binding (node) outside the asar so its .node
+# addon can be dlopen'd. It lands at resources/node_modules/mscompress, which
+# Node's normal resolution reaches by walking up from resources/app.asar/out/main,
+# so `import "mscompress"` works unchanged in dev and packaged builds.
 extraResources:
   - from: ../node/dist
-    to: node/dist
+    to: node_modules/mscompress/dist
   - from: ../node/build/Release/mscompress.node
-    to: node/build/Release/mscompress.node
+    to: node_modules/mscompress/build/Release/mscompress.node
   - from: ../node/package.json
-    to: node/package.json
+    to: node_modules/mscompress/package.json
   # node's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
-  # transitive deps as siblings of dist so Node resolves them from
-  # resources/node/node_modules. (Only the tar closure — not the full 289MB
-  # node_modules, which also carries prebuild-install/dev tooling we don't need.)
+  # transitive deps under mscompress/node_modules. (Only the tar closure — not
+  # the full node_modules, which also carries prebuild-install/dev tooling.)
   - from: ../node/node_modules/tar
-    to: node/node_modules/tar
+    to: node_modules/mscompress/node_modules/tar
   - from: ../node/node_modules/@isaacs/fs-minipass
-    to: node/node_modules/@isaacs/fs-minipass
+    to: node_modules/mscompress/node_modules/@isaacs/fs-minipass
   - from: ../node/node_modules/chownr
-    to: node/node_modules/chownr
+    to: node_modules/mscompress/node_modules/chownr
   - from: ../node/node_modules/minipass
-    to: node/node_modules/minipass
+    to: node_modules/mscompress/node_modules/minipass
   - from: ../node/node_modules/minizlib
-    to: node/node_modules/minizlib
+    to: node_modules/mscompress/node_modules/minizlib
   - from: ../node/node_modules/yallist
-    to: node/node_modules/yallist
+    to: node_modules/mscompress/node_modules/yallist
 
 linux:
   target:
@@ -90,8 +95,8 @@ mac:
 
 win:
   # NSIS installer (not a bare dir): an installer is required to register the
-  # file associations and to write the "Decompress/Extract here" context-menu
-  # verbs (see build/installer.nsh). The standalone CLI is shipped below.
+  # file associations and to write the "Compress/Decompress/Extract here"
+  # context-menu verbs (see build/installer.nsh). The standalone CLI is shipped below.
   target:
     - nsis
   icon: assets/icons/icon.ico

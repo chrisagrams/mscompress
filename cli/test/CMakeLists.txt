@@ -93,6 +93,18 @@ add_test(NAME BatchRejectTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
 )
 
+# Per-spectrum index: golden table, --no-index (and querying it errors), and
+# decompression skipping the index member.
+add_test(NAME BatchIndexTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEST_MZML_B=${TEST_DATA_DIR}/sciex_ttof6600_100.mzML
+    -DGOLDEN_TSV=${TEST_DATA_DIR}/mszx/index_golden.tsv
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_index
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_index.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}
@@ -179,6 +191,18 @@ add_test(NAME CompressNonIndexedMzMLLossy
     -DINPUT_FILE=${TEST_DATA_DIR}/nonindexed_test.mzML
     -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_nonindexed_mzml_lossy
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
+# --extract with --extract-scans / --extract-indices on mzML and msz input -
+# regression test for GitHub issue #195 (only the first ceil(N/2) scans were
+# extracted; extracting an mzML's final spectrum crashed).
+add_test(NAME ExtractTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEST_MSZ=${TEST_DATA_DIR}/test.msz
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_extract
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_extract.cmake
 )
 
 # Verbose mode test

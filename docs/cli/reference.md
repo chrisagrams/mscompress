@@ -49,7 +49,9 @@ Compress many mzML into one `.mszx` archive. See the
 | `-o` | `--output` | path | Output archive path. Required output form for batch |
 | — | `--from-file` | path | Read newline-separated input paths from a manifest (`-` = stdin) |
 | — | `--continue-on-error` | — | Skip an unusable input instead of aborting |
+| — | `--no-index` | — | Don't write the per-spectrum index (written by default) |
 | — | `--list` | — | Print a `.mszx` table of contents and exit |
+| — | `--query` | filter | With `--list`, print the indexed spectra matching `filter` as TSV |
 
 ### When batch mode is inferred
 
@@ -65,6 +67,36 @@ You rarely need `--batch`. It is inferred when any of these hold:
 The legacy two-positional form `mscompress input output` is never batch: the
 `.mzML` extension test above is what keeps it that way even when the output file
 already exists from a previous run.
+
+### Querying the spectrum index
+
+Batch archives carry a [per-spectrum index](../format/mszx.md#spectrum-index)
+unless written with `--no-index`. `--list --query` reads only that index — no
+member is decompressed — and prints one TSV row per matching spectrum:
+
+```bash
+mscompress --list cohort.mszx --query "ms_level=2,charge=2,precursor_mz=340:360"
+```
+
+```
+entry_name	entry	spectrum_idx	scan	ms_level	rt_sec	precursor_mz	charge	tic	base_peak_mz
+test.msz	3	11	12	2	1.232269	342.119659	2	161081.9	132.045135
+test.msz	3	34	35	2	3.080272	356.595734	2	116166.4	91.0580139
+```
+
+A filter is a comma-separated list of `column=value` terms, all of which must
+match:
+
+- `column=v` tests equality; `column=lo:hi` tests an inclusive range, and
+  either side may be left open (`rt=600:`, `precursor_mz=:510`).
+- Columns: `entry`, `spectrum_idx`, `scan`, `ms_level`, `rt_sec`,
+  `precursor_mz`, `charge`, `tic`, `base_peak_mz`. Aliases: `rt` → `rt_sec`,
+  `mz` / `precursor` → `precursor_mz`, `level` → `ms_level`.
+- Missing values print as `NA` and never match a term.
+
+`--query` is an error without `--list`, and on an archive that has no index
+(written with `--no-index` or by an older mscompress) — there is no fallback
+scan.
 
 ### Error handling
 
@@ -138,5 +170,6 @@ find runs -name '*.mzML' | mscompress --from-file - -o cohort.mszx
 
 ```bash
 mscompress --list cohort.mszx               # table of contents
+mscompress --list cohort.mszx --query "rt=600:660,level=2"   # indexed spectra
 mscompress cohort.mszx out/                 # expand every member to out/*.mzML
 ```

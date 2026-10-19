@@ -8,10 +8,10 @@ on:
   pull_request:
     branches:
       - 'dev'
+  # Dispatched by release-please.yml once a release is cut (not workflow_call:
+  # PyPI/npm trusted publishing need build.yml to be the top-level workflow).
+  # Releases flow exclusively through release-please, so there is no tag-push trigger.
   workflow_dispatch:
-  # Called by release-please.yml once a release is cut. Releases flow exclusively
-  # through release-please now, so there is no tag-push trigger here.
-  workflow_call:
     inputs:
       publish:
         description: 'Publish artifacts (PyPI, npm, Docker, GitHub Release)'
@@ -155,12 +155,10 @@ jobs:
 
       - name: Upload to GitHub Release
         if: inputs.publish
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          files: ./cli/release/*
+        shell: bash
+        run: gh release upload "${{ inputs.release_tag }}" ./cli/release/* --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Memory-leak gate: builds the CLI with AddressSanitizer + LeakSanitizer and runs
   # the full ctest suite under it. Catches leak classes like the unbalanced zlib
@@ -489,12 +487,9 @@ jobs:
           merge-multiple: true
 
       - name: Upload prebuilds to GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          files: ./node/prebuilds/*.tar.gz
+        run: gh release upload "${{ inputs.release_tag }}" ./node/prebuilds/*.tar.gz --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         working-directory: ./node
@@ -508,9 +503,94 @@ jobs:
         working-directory: ./node
         run: npm publish --provenance --access public
 
-  build-electron:
-    name: Build Electron GUI - linux x86_64
+  # Renderer checks for the Electron GUI. The e2e suite drives the renderer on a
+  # Vite dev server with a stubbed window.api, so it needs neither Electron nor
+  # the native addon; node dist is still built because typecheck resolves it.
+  test-electron:
+    name: Test Electron GUI
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Install node dependencies
+        working-directory: ./node
+        run: npm install --ignore-scripts
+
+      - name: Build node TypeScript
+        working-directory: ./node
+        run: npm run build:ts
+
+      - name: Install Electron app dependencies
+        working-directory: ./electron
+        run: npm install --ignore-scripts
+
+      # --ignore-scripts skips puppeteer's postinstall, so fetch its browser here.
+      - name: Install Puppeteer browser
+        working-directory: ./electron
+        run: npx puppeteer browsers install chrome
+
+      - name: Check formatting
+        working-directory: ./electron
+        run: npm run format:check
+
+      - name: Lint + typecheck
+        working-directory: ./electron
+        run: npm run lint
+
+      - name: Run e2e tests
+        working-directory: ./electron
+        run: npm test
+
+  build-electron:
+    name: Build Electron GUI - ${{ matrix.platform }} ${{ matrix.arch }}
+    needs: test-electron
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # `unpacked` is electron-builder's --dir output folder: the arch suffix
+        # is omitted for x64, and macOS uses mac*/ rather than *-unpacked.
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            arch: x64
+            builder_args: --linux --x64
+            unpacked: linux-unpacked
+          - platform: linux
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            builder_args: --linux --arm64
+            unpacked: linux-arm64-unpacked
+          - platform: macos
+            runner: macos-latest
+            arch: arm64
+            builder_args: --mac --arm64
+            unpacked: mac-arm64
+          - platform: macos
+            runner: macos-15-intel
+            arch: x64
+            builder_args: --mac --x64
+            unpacked: mac
+          - platform: windows
+            runner: windows-2025-vs2026
+            arch: x64
+            builder_args: --win --x64
+            unpacked: win-unpacked
+    env:
+      # No signing certificates yet; stop electron-builder from looking for one.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -523,6 +603,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Setup MSBuild (Windows)
+        if: matrix.platform == 'windows'
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -531,15 +617,30 @@ jobs:
       - name: Generate config.h for base64
         run: python vendor/generate_config.py
 
-      # The Electron app loads the native mscompress binding (node/), so build
+      # The NSIS installer bundles the standalone CLI for its context-menu verbs;
+      # electron-builder.yml expects it at cli/build-win/Release/mscompress.exe.
+      - name: Build CLI (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: ./cli
+        run: |
+          cmake -A x64 -S . -B build-win
+          cmake --build build-win --config Release
+
+      # The Electron app loads the native mscompress binding (node), so build
       # that first: the .node addon is bundled into the app via extraResources.
       - name: Install node dependencies
         working-directory: ./node
         run: npm install --ignore-scripts
 
-      - name: Build node native addon
+      - name: Build node native addon (Unix)
+        if: matrix.platform != 'windows'
         working-directory: ./node
         run: npx prebuild -r napi --target 8 --backend cmake-js -- -G "Unix Makefiles"
+
+      - name: Build node native addon (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: ./node
+        run: npx prebuild -r napi --target 8 --backend cmake-js
 
       - name: Build node TypeScript
         working-directory: ./node
@@ -554,16 +655,34 @@ jobs:
         working-directory: ./electron
         run: npm run build
 
+      # --publish never: uploads go through action-gh-release below, not
+      # electron-builder's own publisher (which auto-triggers on tags in CI).
       - name: Package unpacked app (electron-builder)
+        if: ${{ !inputs.publish }}
         working-directory: ./electron
-        run: npx electron-builder --dir --linux
+        run: npx electron-builder ${{ matrix.builder_args }} --dir --publish never
+
+      - name: Package installers (electron-builder)
+        if: inputs.publish
+        working-directory: ./electron
+        run: npx electron-builder ${{ matrix.builder_args }} --publish never
 
       - name: Upload unpacked Electron app
+        if: ${{ !inputs.publish }}
         uses: actions/upload-artifact@v6
         with:
-          name: electron-linux-x86_64
-          # electron-builder names the x64 output "linux-unpacked" (the arch
-          # suffix only appears for non-x64, e.g. "linux-arm64-unpacked"), so
-          # the glob must match both spellings.
-          path: ./electron/release/linux*unpacked
+          name: electron-${{ matrix.platform }}-${{ matrix.arch }}
+          path: ./electron/release/${{ matrix.unpacked }}
           if-no-files-found: error
+
+      - name: Upload installers to GitHub Release
+        if: inputs.publish
+        shell: bash
+        # Each platform emits only one of these; nullglob drops the others.
+        run: |
+          shopt -s nullglob
+          files=(./electron/release/*.AppImage ./electron/release/*.dmg ./electron/release/*.exe)
+          if [ ${#files[@]} -eq 0 ]; then echo "no installers found" >&2; exit 1; fi
+          gh release upload "${{ inputs.release_tag }}" "${files[@]}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

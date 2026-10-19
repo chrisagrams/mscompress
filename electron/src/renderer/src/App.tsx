@@ -8,7 +8,6 @@ import {
   FileArchive,
   Activity,
   Database,
-  Scissors,
   Settings as SettingsIcon,
   PanelRight,
   PanelRightClose,
@@ -23,16 +22,10 @@ import { MscLogo } from "@/components/MscLogo"
 import { Inspector } from "@/components/Inspector"
 import { ConvertTab } from "@/components/ConvertTab"
 import { QCTab } from "@/components/QCTab"
-import { ExtractQueueTab } from "@/components/ExtractQueueTab"
 import { ArchiveTab } from "@/components/ArchiveTab"
 import { SettingsDialog } from "@/components/SettingsDialog"
 import { ingestPaths, type FileEntry } from "@/files"
-import {
-  TITLE_BAR_OVERLAY,
-  type AppSettings,
-  type QueueState,
-  type SystemMemory,
-} from "@shared/ipc"
+import { TITLE_BAR_OVERLAY, type AppSettings, type SystemMemory } from "@shared/ipc"
 
 const GB = 1024 ** 3
 
@@ -62,21 +55,6 @@ function App() {
 
   // undefined when no files are open (empty state).
   const selectedEntry = files.find((f) => f.path === selectedPath) ?? files[0]
-
-  // Live MSTransfer queue state (single subscription shared by the rail + tab).
-  const [queue, setQueue] = useState<QueueState>({
-    jobs: [],
-    running: 0,
-    paused: true,
-    maxConcurrency: 1,
-  })
-  useEffect(() => {
-    window.api
-      .getQueueState()
-      .then(setQueue)
-      .catch(() => {})
-    return window.api.onQueueUpdate(setQueue)
-  }, [])
 
   // Add opened/dropped files (deduped by path) and select the first new one.
   // The checkbox multi-selection is left untouched — adding files must not
@@ -171,14 +149,8 @@ function App() {
     if (settings) void window.api.setSettings({ theme: dark ? "light" : "dark" })
   }
 
-  // Real current-operation label: a direct convert takes precedence, else a
-  // running queue job (with its real progress %), else idle.
-  const runningJob = queue.jobs.find((j) => j.status === "running")
-  const currentOp = activeOp
-    ? `${activeOp.op} · ${activeOp.file}`
-    : runningJob
-      ? `${runningJob.op} · ${runningJob.fileName} (${runningJob.progress}%)`
-      : "Ready"
+  // Real current-operation label: the running convert, else idle.
+  const currentOp = activeOp ? `${activeOp.op} · ${activeOp.file}` : "Ready"
 
   const memLabel = mem
     ? `${(mem.rssBytes / GB).toFixed(1)} / ${(mem.totalBytes / GB).toFixed(0)} GB`
@@ -258,7 +230,6 @@ function App() {
               selectedPaths={selectedPaths}
               onMultiSelect={setSelectedPaths}
               onAddFiles={addFiles}
-              queue={queue}
             />
           </aside>
 
@@ -275,12 +246,6 @@ function App() {
                   </TabsTrigger>
                   <TabsTrigger value="qc" className="gap-1.5 text-xs data-[state=active]:bg-accent">
                     <Activity className="size-3.5" /> QC
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="extract"
-                    className="gap-1.5 text-xs data-[state=active]:bg-accent"
-                  >
-                    <Scissors className="size-3.5" /> Queue
                   </TabsTrigger>
                   <TabsTrigger
                     value="archive"
@@ -319,9 +284,6 @@ function App() {
                   ) : (
                     <NoFile />
                   )}
-                </TabsContent>
-                <TabsContent value="extract" className="m-0">
-                  <ExtractQueueTab queue={queue} />
                 </TabsContent>
                 <TabsContent value="archive" className="m-0">
                   {selectedEntry ? (

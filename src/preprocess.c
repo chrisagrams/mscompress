@@ -23,14 +23,12 @@
 #include <string.h>
 
 /**
- * @brief Search for needle in haystack, reading at most hay_len bytes.
- *
- * Uses memmem where available (glibc / BSD — SIMD-optimized on modern glibc),
- * falls back to a portable loop on Windows.
+ * @brief memmem() for Windows, whose C runtime lacks it. Elsewhere the libc
+ * version is used (SIMD-optimized on modern glibc).
  */
 #ifdef _WIN32
-static void* bounded_search(const void* haystack, size_t hay_len,
-                            const void* needle, size_t needle_len) {
+static void* memmem(const void* haystack, size_t hay_len, const void* needle,
+                    size_t needle_len) {
    const char* h = (const char*)haystack;
    for (size_t i = 0; i + needle_len <= hay_len; i++) {
       if (memcmp(h + i, needle, needle_len) == 0)
@@ -38,8 +36,6 @@ static void* bounded_search(const void* haystack, size_t hay_len,
    }
    return NULL;
 }
-#else
-#define bounded_search memmem
 #endif
 
 #include "mscompress.h"
@@ -180,6 +176,7 @@ void dealloc_division(division_t* div) {
    if (div->scans != NULL) { free(div->scans); div->scans = NULL; }
    if (div->ms_levels != NULL) { free(div->ms_levels); div->ms_levels = NULL; }
    if (div->ret_times != NULL) { free(div->ret_times); div->ret_times = NULL; }
+   if (div->meta != NULL) { free(div->meta); div->meta = NULL; }
    free(div);
 }
 
@@ -314,6 +311,7 @@ division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
    d->scans = malloc(n_mz * sizeof(uint32_t));
    d->ms_levels = malloc(n_mz * sizeof(uint16_t));
    d->ret_times = NULL;
+   d->meta = NULL;
 
    if (d->spectra == NULL || d->xml == NULL || d->mz == NULL ||
        d->inten == NULL)
@@ -577,31 +575,6 @@ char* get_binary_end(char* ptr) {
 }
 
 /**
- * @brief Extracts the MS level from a spectrum XML block by finding the MS:1000511 accession.
- * @param spectrum_start Pointer to the start of the spectrum XML block.
- * @param search_len Number of bytes to search from spectrum_start.
- * @return The MS level as a long integer (e.g., 1 for MS1, 2 for MS2). Returns 0 on failure.
- */
-long get_ms_level(char* spectrum_start, size_t search_len) {
-   char* ptr =
-       bounded_search(spectrum_start, search_len, "\"MS:1000511\"", 12);
-   if (ptr == NULL)
-      return 0;
-   ptr += sizeof("\"MS:1000511\"");
-   size_t remaining = search_len - (ptr - spectrum_start);
-
-   ptr = bounded_search(ptr, remaining, "value=\"", 7);
-   if (ptr == NULL)
-      return 0;
-   ptr += sizeof("value=\"") - 1;
-
-   char* e = memchr(ptr, '"', search_len - (ptr - spectrum_start));
-   if (e == NULL)
-      return 0;
-   return strtol(ptr, &e, 10);
-}
-
-/**
  * @brief Extracts the scan number from a spectrum XML block by parsing the "scan=" attribute.
  *
  * Search is limited to the opening <spectrum ...> tag to avoid O(n^2) scanning
@@ -618,7 +591,7 @@ long get_scan(char* spectrum_start) {
       return -1;
 
    size_t tag_len = (size_t)(tag_end - spectrum_start);
-   char* ptr = bounded_search(spectrum_start, tag_len, "scan=", 5);
+   char* ptr = memmem(spectrum_start, tag_len, "scan=", 5);
    if (ptr == NULL)
       return -1;
 
@@ -634,52 +607,116 @@ long get_scan(char* spectrum_start) {
    return val;
 }
 
+/* Copies the value attribute of the cvParam tag [tag, tag+len) into `buf`;
+ * 0 when it has none. */
+static int cv_tag_value(const char* tag, size_t len, char* buf, size_t cap) {
+   const char* v = memmem(tag, len, "value=\"", 7);
+   if (v == NULL)
+      return 0;
+   v += 7;
+   const char* q = memchr(v, '"', len - (size_t)(v - tag));
+   if (q == NULL || q == v || (size_t)(q - v) >= cap)
+      return 0;
+   memcpy(buf, v, (size_t)(q - v));
+   buf[q - v] = '\0';
+   return 1;
+}
+
+/* Fields scan_spectrum_meta() still has to find. */
+#define META_LEVEL 0x01
+#define META_RT 0x02
+#define META_PRECURSOR 0x04
+#define META_CHARGE 0x08
+#define META_TIC 0x10
+#define META_BASE_PEAK 0x20
+
 /**
- * @brief Extract retention time (in seconds) from spectrum XML block.
- * @param spectrum_start Pointer to the start of the spectrum XML block.
- * @param search_len Number of bytes to search from spectrum_start.
- * @return Retention time as a float. Returns 0 on failure.
+ * @brief Reads a spectrum's metadata in one forward pass over its MS cvParams.
+ *
+ * memmem() jumps from one `accession="MS:` to the next, so other tags and
+ * attributes are skipped without stopping, and the pass ends as soon as every
+ * requested field is found. The first occurrence of each accession wins.
+ *
+ * @param p Start of the <spectrum> element.
+ * @param end Upper bound for the pass: the first <binary>, since spectrum-level
+ *            metadata precedes the binaryDataArrayList.
+ * @param flags `MSLEVEL`, `RETTIME` and/or `SPECMETA`; other fields are skipped.
+ * @param ms_level Output MS level; 0 when absent.
+ * @param m Output metadata; retention time is in seconds.
  */
-float get_ret_time(char* spectrum_start, size_t search_len) {
-   // Find the position of the retention time cvParam
-   char* ptr = bounded_search(spectrum_start, search_len,
-                              "accession=\"MS:1000016\"", 21);
-   if (ptr == NULL)
-      return 0;
-   ptr += sizeof("accession=\"MS:1000016\"");
-   size_t remaining = search_len - (ptr - spectrum_start);
+static void scan_spectrum_meta(const char* p, const char* end, int flags,
+                               uint16_t* ms_level, spectrum_meta_t* m) {
+   *ms_level = 0;
+   m->rt_sec = m->precursor_mz = m->tic = m->base_peak_mz = NAN;
+   m->charge = 0;
 
-   // Move the pointer to the value attribute
-   ptr = bounded_search(ptr, remaining, "value=\"", 7);
-   if (ptr == NULL)
-      return 0;
-   ptr += sizeof("value=\"") - 1;
-   remaining = search_len - (ptr - spectrum_start);
+   int want = 0;
+   if (flags & MSLEVEL) want |= META_LEVEL;
+   if (flags & (RETTIME | SPECMETA)) want |= META_RT;
+   if (flags & SPECMETA)
+      want |= META_PRECURSOR | META_CHARGE | META_TIC | META_BASE_PEAK;
 
-   char* e = memchr(ptr, '"', remaining);
-   if (e == NULL)
-      return 0;
+   const char* start = p;
+   char val[64];
 
-   // Convert the retention time string to float
-   float retention_time = strtof(ptr, &e);
-   remaining = search_len - (e - spectrum_start);
+   while (want && p < end) {
+      const char* acc = memmem(p, (size_t)(end - p), "accession=\"MS:", 14);
+      if (acc == NULL)
+         break;
+      p = acc + 14;
 
-   // Find the unit of the retention time
-   ptr = bounded_search(e, remaining, "unitAccession=\"", 15);
-   if (ptr == NULL)
-      return 0;
-   ptr += sizeof("unitAccession=\"") - 1;
-   remaining = search_len - (ptr - spectrum_start);
+      int field;
+      float* dst = NULL;
+      switch (strtol(p, NULL, 10)) {
+         case 1000511: field = META_LEVEL; break;
+         case 1000016: field = META_RT; dst = &m->rt_sec; break;
+         case 1000744: field = META_PRECURSOR; dst = &m->precursor_mz; break;
+         case 1000041: field = META_CHARGE; break;
+         case 1000285: field = META_TIC; dst = &m->tic; break;
+         case 1000504: field = META_BASE_PEAK; dst = &m->base_peak_mz; break;
+         default: continue;
+      }
+      if (!(want & field))
+         continue;
+      want &= ~field;
 
-   e = memchr(ptr, '"', remaining);
-   if (e == NULL)
-      return 0;
+      // Bound the attribute lookups to this one tag.
+      const char* tag = acc;
+      while (tag > start && *tag != '<') tag--;
+      const char* close = memchr(acc, '>', (size_t)(end - acc));
+      if (close == NULL)
+         break;
+      p = close + 1;
+      size_t tl = (size_t)(close - tag);
 
-   // Check if the unit is minutes and convert to seconds if necessary
-   if (strncmp(ptr, "UO:0000031", e - ptr) == 0) {
-      retention_time *= 60.0f;  // Convert minutes to seconds
+      if (!cv_tag_value(tag, tl, val, sizeof(val)))
+         continue;
+
+      if (field == META_LEVEL) {
+         long lv = strtol(val, NULL, 10);
+         *ms_level = (lv < 0 || lv > UINT16_MAX) ? 0 : (uint16_t)lv;
+         continue;
+      }
+      if (field == META_CHARGE) {
+         long z = strtol(val, NULL, 10);
+         if (z >= -128 && z <= 127) m->charge = (int8_t)z;
+         continue;
+      }
+
+      char* e;
+      double v = strtod(val, &e);
+      if (e == val)
+         continue;
+      if (field == META_RT) {
+         if (memmem(tag, tl, "unitAccession=\"UO:0000031\"", 26))
+            v *= 60.0; /* minute */
+         else if (memmem(tag, tl, "unitAccession=\"UO:0000032\"", 26))
+            v *= 3600.0; /* hour */
+         else if (memmem(tag, tl, "unitAccession=\"UO:0000028\"", 26))
+            v /= 1000.0; /* millisecond */
+      }
+      *dst = (float)v;
    }
-   return retention_time;
 }
 
 /**
@@ -693,7 +730,9 @@ float get_ret_time(char* spectrum_start, size_t search_len) {
  * @param df A populated data_format_t struct containing the expected total spectrum count.
  *           May be modified (source_total_spec reduced) if fewer spectra are found.
  * @param end The byte offset of the end of the file (used as the final XML end position).
- * @param flags Bitmask of extraction flags: `SCANNUM`, `MSLEVEL`, `RETTIME`.
+ * @param flags Bitmask of extraction flags: `SCANNUM`, `MSLEVEL`, `RETTIME`,
+ *              `SPECMETA`. Everything but the scan number comes from a single
+ *              pass over each spectrum's metadata.
  * @return A malloc'd `division_t` containing all position data and metadata arrays, or `NULL` on error.
  * @note The caller is responsible for freeing the returned struct with `dealloc_division()`.
  */
@@ -718,6 +757,10 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
    uint16_t* ms_levels =
        (uint16_t*)calloc(df->source_total_spec, sizeof(uint16_t));
    float* ret_times = (float*)calloc(df->source_total_spec, sizeof(float));
+   spectrum_meta_t* meta =
+       (flags & SPECMETA)
+           ? (spectrum_meta_t*)malloc(df->source_total_spec * sizeof(*meta))
+           : NULL;
 
    if (xml_dp == NULL || mz_dp == NULL || inten_dp == NULL) {
       warning("scan_mzml: failed to allocate memory.\n");
@@ -760,34 +803,32 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
                  // mzML file. Break and handle accordingly.
 
       spectra_dp->start_positions[spec_curr] = ptr - input_map;
+      char* spec_start = ptr;
 
-      // Find end of this spectrum to bound metadata searches, preventing
-      // O(n^2) scanning when attributes are absent.
-      char* spec_end = strstr(ptr, "</spectrum>");
-      size_t spec_len =
-          spec_end ? (size_t)(spec_end - ptr) : (size_t)(end - (ptr - input_map));
+      // Now, get the binaries and set the start and end positions
+      ptr = get_binary_start(ptr);
+      if (ptr == NULL)
+         return NULL;
 
       // From here, get any metadata we want to extract from the spectrum
       if (flags & SCANNUM) {  // If we want to extract scan numbers
-         long scan = get_scan(ptr);
+         long scan = get_scan(spec_start);
          // Fall back to index+1 when scan= attribute is absent (e.g. Sciex
          // TTOF6600 files that use sample/period/cycle/experiment IDs).
          scans[spec_curr] =
              (scan > 0) ? (uint32_t)scan : (uint32_t)(spec_curr + 1);
       }
 
-      if (flags & MSLEVEL) {  // If we want to extract ms levels
-         ms_levels[spec_curr] = get_ms_level(ptr, spec_len);
+      if (flags & (MSLEVEL | RETTIME | SPECMETA)) {
+         // All of it precedes the first <binary>, so that bounds the walk.
+         uint16_t level;
+         spectrum_meta_t m;
+         scan_spectrum_meta(spec_start, ptr, flags, &level, &m);
+         if (flags & MSLEVEL) ms_levels[spec_curr] = level;
+         if (flags & RETTIME)
+            ret_times[spec_curr] = isnan(m.rt_sec) ? 0.0f : m.rt_sec;
+         if (meta) meta[spec_curr] = m;
       }
-
-      if (flags & RETTIME) {  // If we want to extract ret_times
-         ret_times[spec_curr] = get_ret_time(ptr, spec_len);
-      }
-
-      // Now, get the binaries and set the start and end positions
-      ptr = get_binary_start(ptr);
-      if (ptr == NULL)
-         return NULL;
       mz_dp->start_positions[mz_curr] = ptr - input_map;
       xml_dp->end_positions[xml_curr++] = mz_dp->start_positions[mz_curr];
 
@@ -873,6 +914,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
    div->scans = scans;
    div->ms_levels = ms_levels;
    div->ret_times = ret_times;
+   div->meta = meta;
 
    return div;
 }
@@ -895,7 +937,8 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 division_t* extract_one_spectra(division_t* div, long index) {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -938,9 +981,12 @@ division_t* extract_one_spectra(division_t* div, long index) {
    inten_dp->end_positions[1] = div->inten->end_positions[index];
    new_div->size += inten_dp->end_positions[1] - inten_dp->start_positions[1];
 
-   // Copy over xml from inden end till next spectra
+   // Copy over xml from inten end till next spectra (or, for the file's last
+   // spectrum, till its own end; the end case copies the rest)
    xml_dp->start_positions[4] = div->inten->end_positions[index];
-   xml_dp->end_positions[4] = div->spectra->start_positions[index + 1];
+   xml_dp->end_positions[4] = index + 1 < div->spectra->total_spec
+                                  ? div->spectra->start_positions[index + 1]
+                                  : div->spectra->end_positions[index];
    new_div->size += xml_dp->end_positions[4] - xml_dp->start_positions[4];
 
    // Copy over xml from last spectra till end
@@ -972,7 +1018,8 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 {
    data_positions_t *spectra_dp, *mz_dp, *inten_dp, *xml_dp;
 
-   division_t* new_div = (division_t*)malloc(sizeof(division_t));
+   // calloc: size is accumulated with += below and must start at zero.
+   division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
       error("extract_one_spectra: failed to allocate division_t.\n");
 
@@ -1036,10 +1083,13 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 
       inten_curr++;
 
-      // Copy over xml from inden end till next spectra
+      // Copy over xml from inten end till next spectra (or, for the file's
+      // last spectrum, till its own end; the end case copies the rest)
       xml_dp->start_positions[xml_curr] = div->inten->end_positions[index];
       xml_dp->end_positions[xml_curr] =
-          div->spectra->start_positions[index + 1];
+          index + 1 < div->spectra->total_spec
+              ? div->spectra->start_positions[index + 1]
+              : div->spectra->end_positions[index];
       new_div->size +=
           xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
 
@@ -1587,6 +1637,7 @@ division_t* read_division(void* input_map, long* position) {
    r->ms_levels = read_uint16_arr(input_map, position);
 
    r->ret_times = NULL;
+   r->meta = NULL;
 
    return r;
 }
@@ -1798,6 +1849,8 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
    for (int i = 0; i < n_divisions - 1; i++) {
       r->divisions[i] =
           alloc_division(n_spec_per_div * 2, n_spec_per_div, n_spec_per_div);
+      if (div->meta)
+         r->divisions[i]->meta = malloc(n_spec_per_div * sizeof(spectrum_meta_t));
 
       for (int j = 0; j < n_spec_per_div; j++) {
          // Copy Spectra
@@ -1827,6 +1880,7 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
          // Copy scans, MS levels, etc.
          r->divisions[i]->scans[j] = div->scans[spec_i];
          r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+         if (div->meta) r->divisions[i]->meta[j] = div->meta[spec_i];
 
          spec_i++;
       }
@@ -1851,6 +1905,8 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
 
    r->divisions[i] =
        alloc_division(n_spec_per_div * 2, n_spec_per_div, n_spec_per_div);
+   if (div->meta)
+      r->divisions[i]->meta = malloc(n_spec_per_div * sizeof(spectrum_meta_t));
 
    for (int j = 0; j < n_spec_per_div; j++) {
       // Copy Spectra
@@ -1880,6 +1936,7 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
       // Copy scans, MS levels, etc.
       r->divisions[i]->scans[j] = div->scans[spec_i];
       r->divisions[i]->ms_levels[j] = div->ms_levels[spec_i];
+      if (div->meta) r->divisions[i]->meta[j] = div->meta[spec_i];
 
       spec_i++;
    }
@@ -2080,6 +2137,45 @@ long* string_to_array(char* str, long* size) {
       error("Scans must be monotonically increasing.\n");
 
    return arr;
+}
+
+/**
+ * @brief Parses a scan-range string into an array of scan numbers.
+ * @param str The input string, in any format `string_to_array()` accepts.
+ * @param size Pointer set to the number of elements in the returned array.
+ * @return Pointer to a malloc'd array of scan numbers, or `NULL` on error.
+ *
+ * Scan numbers are `uint32_t` throughout the library, while `string_to_array()`
+ * returns `long`s, so the values are copied element-wise rather than the
+ * buffer being reinterpreted.
+ *
+ * @warning The caller must free the returned array.
+ */
+uint32_t* string_to_scan_array(char* str, long* size) {
+   long* parsed = string_to_array(str, size);
+   if (parsed == NULL)
+      return NULL;
+
+   // Allocate at least one element: malloc(0) may legitimately return NULL.
+   uint32_t* scans = malloc((*size > 0 ? *size : 1) * sizeof(uint32_t));
+   if (scans == NULL) {
+      error("string_to_scan_array: failed to allocate scan array.\n");
+      free(parsed);
+      return NULL;
+   }
+
+   for (long i = 0; i < *size; i++) {
+      if (parsed[i] < 0 || parsed[i] > UINT32_MAX) {
+         error("Scan number out of range: %ld\n", parsed[i]);
+         free(parsed);
+         free(scans);
+         return NULL;
+      }
+      scans[i] = (uint32_t)parsed[i];
+   }
+
+   free(parsed);
+   return scans;
 }
 
 /**
@@ -2293,6 +2389,24 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
 }
 
 /**
+ * @brief Extracts spectra from a whole-file division, then frees that division.
+ * @param whole Division covering the entire file, as returned by `scan_mzml()`.
+ * @param indices Indices of the spectra to extract.
+ * @param n Number of indices.
+ * @return The extracted division (see `extract_n_spectra()`).
+ *
+ * @note The extracted division shares `whole->spectra`, so ownership of it is
+ *       handed over rather than freed; everything else in `whole` is freed.
+ */
+static division_t* extract_from_whole_file(division_t* whole, long* indices,
+                                           long n) {
+   division_t* div = extract_n_spectra(whole, indices, n);
+   whole->spectra = NULL;
+   dealloc_division(whole);
+   return div;
+}
+
+/**
  * @brief Preprocesses an mzML file: detects format, scans spectra, and creates divisions.
  *
  * Handles scan/index/ms-level filtering, determines the number of divisions,
@@ -2321,41 +2435,44 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
    if (*df == NULL)
       return 1;
 
+   int scan_flags =
+       MSLEVEL | SCANNUM | (arguments->spectrum_meta ? SPECMETA : 0);
+
    division_t* div = NULL;
    if (arguments->indices_length > 0) {
       division_t* tmp = scan_mzml(
           (char*)input_map, *df, input_filesize,
-          MSLEVEL | SCANNUM);  // A division encapsulating the entire file
+          scan_flags);  // A division encapsulating the entire file
       if (tmp == NULL)
          return 1;
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->scans_length > 0) {
       division_t* tmp = scan_mzml(
           (char*)input_map, *df, input_filesize,
-          MSLEVEL | SCANNUM);  // A division encapsulating the entire file
+          scan_flags);  // A division encapsulating the entire file
       if (tmp == NULL)
          return 1;
       arguments->indices =
           map_scan_to_index(arguments->scans, arguments->scans_length, tmp, 0,
                             &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
 
    } else if (arguments->ms_level > 0 || arguments->ms_level == -1) {
       division_t* tmp = scan_mzml(
           (char*)input_map, *df, input_filesize,
-          MSLEVEL | SCANNUM);  // A division encapsulating the entire file
+          scan_flags);  // A division encapsulating the entire file
       if (tmp == NULL)
          return 1;
       arguments->indices = map_ms_level_to_index(arguments->ms_level, tmp, 0,
                                                  &(arguments->indices_length));
-      div =
-          extract_n_spectra(tmp, arguments->indices, arguments->indices_length);
+      div = extract_from_whole_file(tmp, arguments->indices,
+                                    arguments->indices_length);
    } else if (arguments->indices_length == 0 && arguments->scans_length == 0) {
       div = scan_mzml(
           (char*)input_map, *df, input_filesize,
-          MSLEVEL | SCANNUM);  // A division encapsulating the entire file
+          scan_flags);  // A division encapsulating the entire file
    } else
       error("Invalid indicies_size: %ld\n", arguments->indices_length);
 

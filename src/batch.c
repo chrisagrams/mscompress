@@ -450,13 +450,43 @@ static void jb_kv_str(jbuf_t* j, const char* key, const char* value) {
    jb_puts(j, "\"");
 }
 
+/* Append the manifest's optional `index` block (without a leading comma). */
+static void jb_index_block(jbuf_t* j, uint64_t index_size) {
+   const char** names;
+   size_t n;
+
+   jb_puts(j, "\"index\": {");
+   jb_kv_str(j, "entry", MSZX_INDEX_ENTRY);
+   jb_puts(j, ", \"size\": ");
+   jb_i64(j, (int64_t)index_size);
+   jb_puts(j, ", \"format_version\": ");
+   jb_i64(j, MSZX_INDEX_FORMAT_VERSION);
+   jb_puts(j, ", \"columns\": [");
+   n = mszx_index_columns(&names);
+   for (size_t i = 0; i < n; ++i) {
+      jb_puts(j, i ? ", \"" : "\"");
+      jb_puts(j, names[i]);
+      jb_puts(j, "\"");
+   }
+   jb_puts(j, "], \"sorted_by\": [");
+   n = mszx_index_sorted_keys(&names);
+   for (size_t i = 0; i < n; ++i) {
+      jb_puts(j, i ? ", \"" : "\"");
+      jb_puts(j, names[i]);
+      jb_puts(j, "\"");
+   }
+   jb_puts(j, "]}");
+}
+
 /* Build the v2 manifest. Field order is fixed so identical inputs always
  * produce byte-identical archives (there are no timestamps by design).
  * Optional fields are omitted entirely rather than emitted as null, so a
- * reader written against the original v2 schema still parses the result. */
+ * reader written against the original v2 schema still parses the result.
+ * `index_size` < 0 means the archive has no index member; the optional
+ * `index` block is then omitted, and readers use the index only if present. */
 static char* build_manifest(manifest_rec_t* recs, size_t n,
                             const char* description, const char* extra_json,
-                            size_t* out_len) {
+                            int64_t index_size, size_t* out_len) {
    jbuf_t j = {0};
    jb_reserve(&j, 1024);
    if (j.oom) return NULL;
@@ -514,8 +544,12 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
       jb_puts(&j, "}");
       jb_puts(&j, i + 1 < n ? ",\n" : "\n");
    }
-   jb_puts(&j, "  ]\n");
-   jb_puts(&j, "}\n");
+   jb_puts(&j, "  ]");
+   if (index_size >= 0) {
+      jb_puts(&j, ",\n  ");
+      jb_index_block(&j, (uint64_t)index_size);
+   }
+   jb_puts(&j, "\n}\n");
 
    if (j.oom) {
       free(j.buf);
@@ -565,6 +599,9 @@ struct batch_writer {
    strlist_t used_names;
    char* description;
    char* extra_json;
+   /* Per-spectrum index rows, collected while each source is still mapped.
+    * NULL when the index is turned off. */
+   mszx_index_builder_t* index;
    /* Set when an entry failed after its header was written. A half-written
     * entry cannot be un-appended, so the archive is unrecoverable and
     * finish() must refuse rather than emit a corrupt manifest. */
@@ -579,6 +616,7 @@ static void batch_writer_free(batch_writer_t* w) {
    free(w->description);
    free(w->extra_json);
    free(w->out_path);
+   mszx_index_builder_free(w->index);
    free(w);
 }
 
@@ -589,7 +627,10 @@ batch_writer_t* batch_writer_open(const char* out_path) {
    if (!w) return NULL;
 
    w->out_path = strdup(out_path);
-   if (!w->out_path) {
+   w->index = mszx_index_builder_new();
+   if (!w->out_path || !w->index) {
+      free(w->out_path);
+      mszx_index_builder_free(w->index);
       free(w);
       return NULL;
    }
@@ -599,8 +640,7 @@ batch_writer_t* batch_writer_open(const char* out_path) {
    w->out_fd = open_output_file_rw(w->out_path);
    if (w->out_fd < 0) {
       error("batch: cannot open output archive '%s'\n", out_path);
-      free(w->out_path);
-      free(w);
+      batch_writer_free(w);
       return NULL;
    }
    if (!fd_is_seekable(w->out_fd)) {
@@ -608,8 +648,7 @@ batch_writer_t* batch_writer_open(const char* out_path) {
             "('%s')\n",
             out_path);
       close_file(w->out_fd);
-      free(w->out_path);
-      free(w);
+      batch_writer_free(w);
       return NULL;
    }
    return w;
@@ -666,7 +705,14 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
    long bs = args->blocksize;
    int fail = 0;
 
-   if (preprocess_mzml((char*)mapping, (long)filesize, &bs, args, &df, &divs)) {
+   /* The index reads its columns from the metadata pass in scan_mzml. */
+   int saved_meta = args->spectrum_meta;
+   args->spectrum_meta = w->index != NULL;
+   int pre_rc =
+       preprocess_mzml((char*)mapping, (long)filesize, &bs, args, &df, &divs);
+   args->spectrum_meta = saved_meta;
+
+   if (pre_rc) {
       error("batch: preprocess failed for '%s'\n", label);
       fail = 1;
    } else if (compress_mzml((char*)mapping, filesize, args, df, divs,
@@ -681,6 +727,14 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
          if (divs->divisions[i] && divs->divisions[i]->spectra)
             num_spectra += divs->divisions[i]->spectra->total_spec;
       }
+   }
+
+   /* Index rows follow the divisions, so spectrum_idx matches the order of
+    * the compressed entry. */
+   if (!fail && w->index &&
+       mszx_index_builder_add(w->index, (uint32_t)w->n_recs, divs) != 0) {
+      error("batch: failed to index '%s'\n", label);
+      fail = 1;
    }
 
    int64_t payload_end = get_offset(w->out_fd);
@@ -774,6 +828,22 @@ int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
    return 0;
 }
 
+int batch_writer_set_index(batch_writer_t* w, int enabled) {
+   if (!w) return -1;
+   if (w->n_recs > 0) {
+      error("batch: the index must be configured before adding entries\n");
+      return -1;
+   }
+   if (!enabled) {
+      mszx_index_builder_free(w->index);
+      w->index = NULL;
+   } else if (!w->index) {
+      w->index = mszx_index_builder_new();
+      if (!w->index) return -1;
+   }
+   return 0;
+}
+
 int batch_writer_set_description(batch_writer_t* w, const char* description) {
    if (!w || !description) return -1;
    char* dup = strdup(description);
@@ -807,13 +877,29 @@ int batch_writer_finish(batch_writer_t* w) {
    }
 
    int rc = 0;
+   int64_t index_size = -1;
+   if (w->index) {
+      size_t ilen = 0;
+      void* ibuf = mszx_index_builder_serialize(w->index, (uint32_t)w->n_recs,
+                                                &ilen);
+      if (!ibuf || tar_add_file(w->out_fd, MSZX_INDEX_ENTRY, ibuf, ilen)) {
+         error("batch: failed to write %s\n", MSZX_INDEX_ENTRY);
+         rc = -1;
+      }
+      free(ibuf);
+      index_size = (int64_t)ilen;
+   }
+
    size_t mlen = 0;
    char* manifest =
-       build_manifest(w->recs, w->n_recs, w->description, w->extra_json, &mlen);
+       rc ? NULL
+          : build_manifest(w->recs, w->n_recs, w->description, w->extra_json,
+                           index_size, &mlen);
 
    /* manifest.json is written LAST: entry sizes are only known once each
     * payload has streamed out. */
-   if (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen)) {
+   if (rc == 0 &&
+       (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen))) {
       error("batch: failed to write manifest.json\n");
       rc = -1;
    }
@@ -884,6 +970,8 @@ int compress_batch(Arguments* arguments) {
       strlist_free(&files);
       return -1;
    }
+
+   if (!arguments->index) batch_writer_set_index(w, 0);
 
    print("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
          out_path);

@@ -174,7 +174,7 @@ describe("MScompress renderer (e2e)", () => {
     }
   })
 
-  test("Convert tab: presets render, Advanced accordion toggles, Output has Local + Remote", async () => {
+  test("Convert tab: presets render, Advanced accordion toggles, Output has a local directory", async () => {
     const page = await openApp(browser, server.url)
     try {
       await openFixtureFiles(page) // mzML selected → compress op → presets visible
@@ -207,19 +207,10 @@ describe("MScompress renderer (e2e)", () => {
       const advanced = await textOf(page, '[data-testid="advanced-content"]')
       assert.match(advanced, /zstd level/) // advanced controls revealed
 
-      // Output routing exposes Local + Remote (MSTransfer) tabs.
-      const tabs = await page.$$eval('[role="tab"]', (els) => els.map((e) => e.textContent.trim()))
-      assert.ok(
-        tabs.some((t) => t.includes("Local")),
-        "Local output tab present",
-      )
-      assert.ok(
-        tabs.some((t) => t.includes("Remote")),
-        "Remote (MSTransfer) output tab present",
-      )
-      await clickWithText(page, '[role="tab"]', "Remote")
-      await page.waitForFunction(() => document.body.textContent.includes("Remote path"))
-      assert.match(await bodyText(page), /Remote path/)
+      // Output is a local directory only (no remote routing).
+      const body = await bodyText(page)
+      assert.match(body, /Output directory/)
+      assert.doesNotMatch(body, /Remote/)
     } finally {
       await page.close()
     }
@@ -247,25 +238,6 @@ describe("MScompress renderer (e2e)", () => {
       // Heatmap now renders as a <canvas> density image (was plain divs).
       const canvas = await page.$('[data-testid="qc-charts"] canvas')
       assert.ok(canvas, "heatmap canvas rendered")
-    } finally {
-      await page.close()
-    }
-  })
-
-  test("Queue tab renders queue state from getQueueState()", async () => {
-    const page = await openApp(browser, server.url)
-    try {
-      await clickWithText(page, '[role="tab"]', "Queue")
-      await page.waitForSelector('[data-testid="queue-tab"]')
-      // Wait for the job rows (queue state resolves async on mount).
-      await page.waitForFunction(() =>
-        document.querySelector('[data-testid="queue-tab"]')?.textContent.includes("test.mzML"),
-      )
-      const queue = await textOf(page, '[data-testid="queue-tab"]')
-      assert.match(queue, /MSTransfer/)
-      assert.match(queue, /test\.mzML/)
-      assert.match(queue, /sciex_ttof6600_100\.mzML/)
-      assert.match(queue, /1\/2 done/) // one job done out of two
     } finally {
       await page.close()
     }

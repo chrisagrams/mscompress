@@ -107,6 +107,14 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(stream,
            "      --list                    Print a .mszx table of contents "
            "and exit.\n");
+   fprintf(stream,
+           "      --no-index                Do not write the per-spectrum "
+           "index (written by default).\n");
+   fprintf(stream,
+           "      --query filter            With --list, print the indexed "
+           "spectra matching filter as TSV,\n"
+           "                                e.g. \"rt=600:660,ms_level=2,"
+           "precursor_mz=500:510\".\n");
    fprintf(stream, "\n");
    fprintf(stream, "  -h, --help                    Show this help message.\n");
    fprintf(stream,
@@ -223,7 +231,9 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             return 1;
          }
          arguments->scans =
-             (uint32_t *)string_to_array(argv[++i], &arguments->scans_length);
+             string_to_scan_array(argv[++i], &arguments->scans_length);
+         if (!arguments->scans)
+            return 1;
       } else if (strcmp(argv[i], "--ms-level") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing ms level for extraction.");
@@ -308,6 +318,16 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
          arguments->continue_on_error = 1;
       } else if (strcmp(argv[i], "--list") == 0) {
          arguments->list_mode = 1;
+      } else if (strcmp(argv[i], "--no-index") == 0) {
+         arguments->index = 0;
+      } else if (strcmp(argv[i], "--index") == 0) {
+         arguments->index = 1;
+      } else if (strcmp(argv[i], "--query") == 0) {
+         if (i + 1 >= argc) {
+            fprintf(stderr, "%s\n", "Missing filter for --query.");
+            return 1;
+         }
+         arguments->query = argv[++i];
       } else if (strcmp(argv[i], "-o") == 0 ||
                  strcmp(argv[i], "--output") == 0) {
          if (i + 1 >= argc) {
@@ -381,8 +401,11 @@ static int is_batch_request(Arguments* a) {
     * The extension test matters: in the legacy `mscompress input output` form
     * the second positional is an output path, and it exists whenever the
     * command is re-run or an existing file is being overwritten. Counting
-    * bare existence here silently flipped those invocations into batch mode. */
-   if (a->n_inputs >= 2) {
+    * bare existence here silently flipped those invocations into batch mode.
+    *
+    * --extract is skipped entirely: its output is itself an .mzML, so the
+    * extension test cannot tell an existing output from a second input. */
+   if (a->n_inputs >= 2 && !a->extract_only) {
       size_t existing_mzml = 0;
       for (size_t i = 0; i < a->n_inputs; ++i) {
          struct stat st;
@@ -427,16 +450,30 @@ int main(int argc, char* argv[]) {
    prepare_threads(&arguments);  // Populate threads variable if not set.
 
    // --list: print an .mszx table of contents (no decompression) and exit.
+   // With --query, print the matching rows of the spectrum index instead.
+   if (arguments.query && !arguments.list_mode) {
+      fprintf(stderr, "--query is used with --list.\n");
+      exit(1);
+   }
    if (arguments.list_mode) {
       if (!arguments.input_file) {
          fprintf(stderr, "--list requires a .mszx input file.\n");
          exit(1);
       }
+      if (arguments.query)
+         exit(query_mszx(arguments.input_file, arguments.query) == 0 ? 0 : 1);
       exit(list_mszx(arguments.input_file) == 0 ? 0 : 1);
    }
 
    // Batch mode: folder / glob / explicit list / --from-file -> one .mszx.
    int is_batch = is_batch_request(&arguments);
+
+   // Extraction is single-file only. Without this, the extract_only override
+   // below turns COMPRESS_BATCH into EXTRACT with no input mapped.
+   if (is_batch && arguments.extract_only) {
+      fprintf(stderr, "%s\n", "--extract takes a single input file.");
+      exit(1);
+   }
 
    // Legacy single-file forms: a second positional is the output path. Applies
    // to compress/decompress/.mszx-decompress alike (batch ignores this: all

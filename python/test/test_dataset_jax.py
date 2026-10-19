@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-from mscompress.types import AnnotationFormat
 from mscompress.datasets.jax import (
     MSCompressJaxDataset,
     list_collate,
@@ -54,7 +53,7 @@ def test_jax_dataset_directory(test_data_dir):
 def test_jax_dataset_w_annotations(mszx_file_path):
     dataset = MSCompressJaxDataset(
         mszx_file_path,
-        load_annotations=[AnnotationFormat.PEPXML],
+        load_psms=True,
     )
     assert len(dataset.members) > 0
     total_spectra = sum(len(member) for member in dataset.members.values())
@@ -66,12 +65,12 @@ def test_jax_dataset_w_annotations(mszx_file_path):
             sample = member[i]
             assert isinstance(sample, tuple)
             assert len(sample) == 3
-            mz, intensity, psm = sample
+            mz, intensity, psms = sample
             assert isinstance(mz, np.ndarray)
             assert isinstance(intensity, np.ndarray)
             assert mz.ndim == 1
             assert intensity.ndim == 1
-            assert psm is not None
+            assert isinstance(psms, list)
 
 
 def test_jax_dataset_global_getitem(test_data_dir):
@@ -150,7 +149,7 @@ def test_pad_collate_no_mask(msz_file_path):
 def test_pad_collate_with_annotations(mszx_file_path):
     dataset = MSCompressJaxDataset(
         mszx_file_path,
-        load_annotations=[AnnotationFormat.PEPXML],
+        load_psms=True,
     )
     member = next(iter(dataset.members.values()))
     batch = [member[i] for i in range(min(2, len(member)))]
@@ -159,8 +158,8 @@ def test_pad_collate_with_annotations(mszx_file_path):
     assert mz.ndim == 2 and intensity.ndim == 2 and mask.ndim == 2
     assert isinstance(annotations, list)
     assert len(annotations) == len(batch)
-    for ann in annotations:
-        assert isinstance(ann, dict)
+    for psms in annotations:
+        assert isinstance(psms, list)
 
 
 def test_grain_pipeline_smoke(test_data_dir):
