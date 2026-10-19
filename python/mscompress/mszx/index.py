@@ -2,8 +2,9 @@
 
 A batch archive written with the index on carries one ``index.mszxi`` member:
 fixed-width columns with one row per spectrum, ordered by (entry,
-spectrum_idx), plus a sorted copy of selected keys (RT and precursor m/z) for
-fast range queries. The binary layout is documented in ``src/mszx_index.c``;
+spectrum_idx), plus a sorted key on RT and precursor m/z for fast range
+queries. ``entry`` and ``spectrum_idx`` are not stored; they come from a table
+of each entry's first row. The binary layout is documented in ``src/mszx_index.c``;
 this module reads it with numpy views over a memory map, so nothing is parsed
 or copied up front and no MSZ member is opened.
 
@@ -32,7 +33,14 @@ _MAGIC = b"MSZI"
 _FORMAT_VERSION = 1
 _HEADER = struct.Struct("<4sHHQIIII")  # 32 bytes
 _COLUMN_DIR = struct.Struct("<IIQQ")  # 24 bytes
-_KEY_DIR = struct.Struct("<IIQQQ")  # 32 bytes
+_KEY_DIR = struct.Struct("<IIQQ")  # 24 bytes
+
+# Sorted-key kinds: a permutation of the non-NaN rows, or none because the
+# column never decreases within an entry (searched entry by entry).
+_KEY_PERM = 1
+_KEY_RUNS = 2
+# Not stored; derived from the entry offsets.
+_DERIVED = ("entry", "spectrum_idx")
 
 # Column ids and dtype codes are fixed by the on-disk format.
 _COLUMN_NAMES = {
@@ -102,38 +110,53 @@ class SpectrumIndex:
         self._n_rows = int(n_rows)
         self._n_entries = int(n_entries)
         self._columns: Dict[str, np.ndarray] = {}
-        # name -> (perm, keys of valid rows, keys as float64 once needed)
-        self._keys: Dict[str, List[Any]] = {}
+        # name -> perm (None for a key that never decreases within an entry)
+        self._keys: Dict[str, Optional[np.ndarray]] = {}
+        self._derived: Dict[str, np.ndarray] = {}
 
         off = _HEADER.size
+        n_offsets = self._n_entries + 1
+        if off + n_offsets * 8 > len(data):
+            raise ValueError("Spectrum index is truncated")
+        self._offsets = data[off : off + n_offsets * 8].view("<u8")
+        offsets = self._offsets
+        if (
+            offsets[0] != 0
+            or offsets[-1] != self._n_rows
+            or (np.diff(offsets.astype(np.int64)) < 0).any()
+        ):
+            raise ValueError("Corrupt spectrum index entry offsets")
+        off += n_offsets * 8
+
         for _ in range(n_cols):
             col_id, dtype, col_off, nbytes = _COLUMN_DIR.unpack_from(data, off)
             off += _COLUMN_DIR.size
             name = _COLUMN_NAMES.get(col_id)
             dt = _DTYPES.get(dtype)
-            if name is None or dt is None:
+            if name is None or name in _DERIVED or dt is None:
                 continue  # unknown column: skip
+            if nbytes != self._n_rows * dt.itemsize:
+                raise ValueError(f"Corrupt spectrum index section for {name!r}")
             self._columns[name] = self._view(col_off, nbytes, dt, name)
 
         for _ in range(n_keys):
-            col_id, dtype, n_valid, perm_off, keys_off = _KEY_DIR.unpack_from(
-                data, off
-            )
+            col_id, kind, n_valid, perm_off = _KEY_DIR.unpack_from(data, off)
             off += _KEY_DIR.size
             name = _COLUMN_NAMES.get(col_id)
-            dt = _DTYPES.get(dtype)
-            if name is None or dt is None:
-                continue
-            if n_valid > self._n_rows:
-                raise ValueError(f"Corrupt sorted key for {name!r}")
-            perm = self._view(perm_off, self._n_rows * 4, np.dtype("<u4"), name)
-            keys = self._view(keys_off, self._n_rows * dt.itemsize, dt, name)
-            if self._n_rows and int(perm.max()) >= self._n_rows:
-                raise ValueError(f"Corrupt permutation for {name!r}")
-            self._keys[name] = [perm, keys[: int(n_valid)], None]
+            if name not in self._columns:
+                continue  # a key reads values from its column
+            if kind == _KEY_RUNS:
+                self._keys[name] = None
+            elif kind == _KEY_PERM:
+                if n_valid > self._n_rows:
+                    raise ValueError(f"Corrupt sorted key for {name!r}")
+                perm = self._view(perm_off, int(n_valid) * 4, np.dtype("<u4"), name)
+                if len(perm) and int(perm.max()) >= self._n_rows:
+                    raise ValueError(f"Corrupt permutation for {name!r}")
+                self._keys[name] = perm
 
     def _view(self, offset: int, nbytes: int, dtype: np.dtype, name: str) -> np.ndarray:
-        if nbytes != self._n_rows * dtype.itemsize or offset + nbytes > len(self._data):
+        if offset % 8 or offset + nbytes > len(self._data):
             raise ValueError(f"Corrupt spectrum index section for {name!r}")
         return self._data[offset : offset + nbytes].view(dtype)
 
@@ -149,8 +172,8 @@ class SpectrumIndex:
 
     @property
     def columns(self) -> List[str]:
-        """Column names present, in storage order."""
-        return list(self._columns)
+        """Column names: ``entry``, ``spectrum_idx``, then the stored ones."""
+        return [*_DERIVED, *self._columns]
 
     @property
     def sorted_by(self) -> List[str]:
@@ -159,10 +182,30 @@ class SpectrumIndex:
 
     def column(self, name: str) -> np.ndarray:
         """One column as a read-only numpy array (one value per row)."""
+        name = _column_name(name)
+        if name in _DERIVED:
+            if name not in self._derived:
+                values = self.take(name, np.arange(self._n_rows, dtype=np.uint32))
+                values.flags.writeable = False
+                self._derived[name] = values
+            return self._derived[name]
         try:
-            return self._columns[_column_name(name)]
+            return self._columns[name]
         except KeyError:
             raise KeyError(f"No column {name!r} in the spectrum index") from None
+
+    def take(self, name: str, rows: npt.ArrayLike) -> np.ndarray:
+        """Values of one column at ``rows``, without materializing the column."""
+        name = _column_name(name)
+        rows = np.asarray(rows)
+        if name in _DERIVED:
+            entry = (
+                np.searchsorted(self._offsets, rows, side="right") - 1
+            ).astype(np.uint32)
+            if name == "entry":
+                return entry
+            return (rows - self._offsets[entry]).astype(np.uint32)
+        return self.column(name)[rows]
 
     # -- queries -------------------------------------------------------------
 
@@ -176,50 +219,85 @@ class SpectrumIndex:
         """
         bounds = [(_column_name(k), *_bounds(k, v)) for k, v in terms.items()]
         for name, _, _ in bounds:
-            if name not in self._columns:
+            if name not in self._columns and name not in _DERIVED:
                 raise KeyError(f"No column {name!r} in the spectrum index")
 
-        # Drive the scan from the most selective sorted key, if any.
-        driver = None
+        # Drive the scan from the most selective term with a fast path.
+        driver: Optional[Tuple[int, np.ndarray]] = None
         for i, (name, lo, hi) in enumerate(bounds):
-            if name not in self._keys:
-                continue
-            first, last = self._key_bounds(name, lo, hi)
-            if driver is None or last - first < driver[2] - driver[1]:
-                driver = (i, first, last)
+            rows = self._candidates(name, lo, hi)
+            if rows is not None and (driver is None or len(rows) < len(driver[1])):
+                driver = (i, rows)
 
         if driver is None:
             rows = np.arange(self._n_rows, dtype=np.uint32)
         else:
-            i, first, last = driver
-            rows = np.sort(self._keys[bounds[i][0]][0][first:last])
+            rows = driver[1]
 
         for j, (name, lo, hi) in enumerate(bounds):
             if driver is not None and j == driver[0]:
                 continue
-            values = self._columns[name][rows].astype(np.float64)
+            values = self.take(name, rows).astype(np.float64)
             rows = rows[(values >= lo) & (values <= hi)]
         return rows
 
-    def _key_bounds(self, name: str, lo: float, hi: float) -> Tuple[int, int]:
-        entry = self._keys[name]
-        if entry[2] is None:
-            # Compare in float64 so float32 keys match the C reader exactly.
-            entry[2] = entry[1].astype(np.float64)
-        keys = entry[2]
-        first = int(np.searchsorted(keys, lo, side="left"))
-        last = int(np.searchsorted(keys, hi, side="right"))
-        return first, max(first, last)
+    def _candidates(
+        self, name: str, lo: float, hi: float
+    ) -> Optional[npt.NDArray[np.uint32]]:
+        """Ascending rows matching one term, or None if it has no fast path."""
+        offsets = self._offsets.astype(np.int64)
+        if name == "entry":
+            first = 0 if lo == -np.inf else max(0, int(np.ceil(lo)))
+            last = self._n_entries - 1
+            if hi != np.inf:
+                last = min(last, int(np.floor(hi)))
+            if first > last:
+                return np.empty(0, dtype=np.uint32)
+            return np.arange(offsets[first], offsets[last + 1], dtype=np.uint32)
+        if name not in self._keys:
+            return None
+
+        column = self._columns[name]
+        perm = self._keys[name]
+        if perm is not None:
+            first = _bisect(lambda m: float(column[perm[m]]) < lo, len(perm))
+            last = _bisect(lambda m: float(column[perm[m]]) <= hi, len(perm))
+            return np.sort(perm[first : max(first, last)])
+
+        # The column never decreases within an entry: search each one.
+        # Compare in float64 so float32 values match the C reader exactly.
+        lo64, hi64 = np.float64(lo), np.float64(hi)
+        spans = []
+        for a, b in zip(offsets[:-1].tolist(), offsets[1:].tolist()):
+            values = column[a:b]
+            first = a + int(np.searchsorted(values, lo64, side="left"))
+            last = a + int(np.searchsorted(values, hi64, side="right"))
+            if last > first:
+                spans.append(np.arange(first, last, dtype=np.uint32))
+        return np.concatenate(spans) if spans else np.empty(0, dtype=np.uint32)
 
     def to_numpy(self, rows: Optional[npt.ArrayLike] = None) -> np.ndarray:
         """Rows (all by default) as a structured array, one field per column."""
-        idx = np.arange(self._n_rows) if rows is None else np.asarray(rows)
+        idx = np.arange(self._n_rows, dtype=np.uint32) if rows is None else np.asarray(rows)
+        values = {name: self.take(name, idx) for name in self.columns}
         out = np.empty(
-            len(idx), dtype=[(n, c.dtype.newbyteorder("=")) for n, c in self._columns.items()]
+            len(idx), dtype=[(n, v.dtype.newbyteorder("=")) for n, v in values.items()]
         )
-        for name, col in self._columns.items():
-            out[name] = col[idx]
+        for name, v in values.items():
+            out[name] = v
         return out
+
+
+def _bisect(less: Any, n: int) -> int:
+    """First position in [0, n) where ``less`` turns false."""
+    a, b = 0, n
+    while a < b:
+        m = (a + b) // 2
+        if less(m):
+            a = m + 1
+        else:
+            b = m
+    return a
 
 
 def _bounds(name: str, value: Term) -> Tuple[float, float]:
@@ -285,8 +363,8 @@ class QueryResult:
         Hits are grouped by entry, so each member MSZ is opened once (and kept
         open by the archive), and reads within it stay local.
         """
-        entries = self._index.column("entry")[self._rows]
-        positions = self._index.column("spectrum_idx")[self._rows]
+        entries = self._index.take("entry", self._rows)
+        positions = self._index.take("spectrum_idx", self._rows)
         current = None
         member = None
         for entry, position in zip(entries.tolist(), positions.tolist()):
