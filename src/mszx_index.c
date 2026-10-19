@@ -157,8 +157,9 @@ static uint64_t get_u64(const char* p) { uint64_t v; memcpy(&v, p, 8); return v;
 
 static size_t align8(size_t x) { return (x + 7) & ~(size_t)7; }
 
-/* ---------------- per-spectrum metadata extraction ---------------- */
+/* ---------------- rows ---------------- */
 
+/* Metadata is read once, by scan_mzml (SPECMETA); rows only copy it. */
 typedef struct {
    uint32_t entry; /* only used to build the entry offsets */
    uint32_t scan;
@@ -169,83 +170,6 @@ typedef struct {
    float tic;
    float base_peak_mz;
 } index_row_t;
-
-static const char* find_bytes(const char* hay, size_t hay_len, const char* needle) {
-   size_t nl = strlen(needle);
-   if (nl == 0 || hay_len < nl) return NULL;
-   const char* end = hay + hay_len - nl;
-   for (const char* p = hay; p <= end; ++p) {
-      p = memchr(p, needle[0], (size_t)(end - p) + 1);
-      if (!p) return NULL;
-      if (memcmp(p, needle, nl) == 0) return p;
-   }
-   return NULL;
-}
-
-/* Locate the first cvParam in [s, s+len) with `accession` and copy its value
- * attribute into `val` (NUL-terminated). The attribute search is confined to
- * that one tag, so a cvParam without a value never borrows the next one's.
- * Optionally returns the tag's bounds for a unit lookup. */
-static int cv_value(const char* s, size_t len, const char* accession,
-                    char* val, size_t val_cap, const char** tag_start,
-                    size_t* tag_len) {
-   char needle[48];
-   snprintf(needle, sizeof(needle), "accession=\"%s\"", accession);
-   const char* hit = find_bytes(s, len, needle);
-   if (!hit) return 0;
-
-   const char* start = hit;
-   while (start > s && *start != '<') start--;
-   const char* end = memchr(hit, '>', len - (size_t)(hit - s));
-   if (!end) return 0;
-   size_t tl = (size_t)(end - start);
-
-   const char* v = find_bytes(start, tl, "value=\"");
-   if (!v) return 0;
-   v += 7;
-   const char* q = memchr(v, '"', (size_t)(end - v));
-   if (!q) return 0;
-   size_t vl = (size_t)(q - v);
-   if (vl == 0 || vl >= val_cap) return 0;
-   memcpy(val, v, vl);
-   val[vl] = '\0';
-
-   if (tag_start) *tag_start = start;
-   if (tag_len) *tag_len = tl;
-   return 1;
-}
-
-static double cv_double(const char* s, size_t len, const char* accession) {
-   char buf[64];
-   if (!cv_value(s, len, accession, buf, sizeof(buf), NULL, NULL)) return NAN;
-   char* e;
-   double v = strtod(buf, &e);
-   return e == buf ? NAN : v;
-}
-
-/* Retention time in seconds; NaN when absent. */
-static double cv_rt_seconds(const char* s, size_t len) {
-   char buf[64];
-   const char* tag;
-   size_t tl;
-   if (!cv_value(s, len, "MS:1000016", buf, sizeof(buf), &tag, &tl)) return NAN;
-   char* e;
-   double v = strtod(buf, &e);
-   if (e == buf) return NAN;
-   if (find_bytes(tag, tl, "unitAccession=\"UO:0000031\"")) return v * 60.0;
-   if (find_bytes(tag, tl, "unitAccession=\"UO:0000032\"")) return v * 3600.0;
-   if (find_bytes(tag, tl, "unitAccession=\"UO:0000028\"")) return v / 1000.0;
-   return v; /* UO:0000010 (second) or unitless */
-}
-
-static void extract_row(const char* spec, size_t len, index_row_t* r) {
-   r->rt_sec = (float)cv_rt_seconds(spec, len);
-   r->precursor_mz = (float)cv_double(spec, len, "MS:1000744");
-   double z = cv_double(spec, len, "MS:1000041");
-   r->charge = (isnan(z) || z < -128 || z > 127) ? 0 : (int8_t)z;
-   r->tic = (float)cv_double(spec, len, "MS:1000285");
-   r->base_peak_mz = (float)cv_double(spec, len, "MS:1000504");
-}
 
 /* ---------------- builder ---------------- */
 
@@ -270,13 +194,17 @@ size_t mszx_index_builder_rows(const mszx_index_builder_t* b) {
 }
 
 int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
-                           const char* map, size_t len, divisions_t* divs) {
-   if (!b || !map || !divs) return -1;
+                           divisions_t* divs) {
+   if (!b || !divs) return -1;
 
    for (int d = 0; d < divs->n_divisions; ++d) {
       division_t* div = divs->divisions[d];
       if (!div || !div->spectra) continue;
       int n = div->spectra->total_spec;
+      if (n > 0 && !div->meta) {
+         error("mszx index: divisions were scanned without SPECMETA\n");
+         return -1;
+      }
       for (int j = 0; j < n; ++j) {
          if (b->n == b->cap) {
             size_t nc = b->cap ? b->cap * 2 : 1024;
@@ -291,16 +219,6 @@ int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
             return -1;
          }
 
-         uint64_t start = div->spectra->start_positions[j];
-         uint64_t end = div->spectra->end_positions[j];
-         /* Spectrum-level metadata precedes the binaryDataArrayList, so stop
-          * at the first binary payload rather than scanning the base64. */
-         if (div->mz && j < div->mz->total_spec &&
-             div->mz->start_positions[j] > start &&
-             div->mz->start_positions[j] < end)
-            end = div->mz->start_positions[j];
-         if (start > len || end > len || end < start) return -1;
-
          index_row_t* r = &b->rows[b->n];
          memset(r, 0, sizeof(*r));
          r->entry = entry;
@@ -309,7 +227,12 @@ int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
                            ? (uint8_t)(div->ms_levels[j] > 255 ? 255
                                                                : div->ms_levels[j])
                            : 0;
-         extract_row(map + start, (size_t)(end - start), r);
+         const spectrum_meta_t* m = &div->meta[j];
+         r->rt_sec = m->rt_sec;
+         r->precursor_mz = m->precursor_mz;
+         r->charge = m->charge;
+         r->tic = m->tic;
+         r->base_peak_mz = m->base_peak_mz;
          b->n++;
       }
    }
