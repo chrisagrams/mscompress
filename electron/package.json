@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "MScompress desktop GUI (Electron + Vite + React)",
   "main": "./out/main/index.js",
-  "author": "Gao Lab",
+  "author": "Chris Grams",
   "license": "MIT",
   "private": true,
   "type": "module",
