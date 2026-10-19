@@ -58,6 +58,9 @@ void init_args(Arguments* args) {
    args->recursive = 0;
    args->continue_on_error = 0;
    args->list_mode = 0;
+   args->no_index = 0;
+   args->reindex = 0;
+   args->query = NULL;
    args->from_file = NULL;
    args->inputs = NULL;
    args->n_inputs = 0;

@@ -169,7 +169,10 @@ typedef struct {
    int recursive;         // -r/--recursive directory descent
    int continue_on_error; // skip-and-report instead of fail-fast
    int list_mode;         // --list: print an .mszx table of contents
-   char* from_file;       // --from-file manifest of input paths (or "-" for stdin)
+   int no_index;          // --no-index: skip the per-spectrum index
+   int reindex;           // --reindex: (re)build an archive's index in place
+   char* query;           // --query: filter for --list (needs an index)
+   char* from_file;      // --from-file manifest of input paths (or "-" for stdin)
    char** inputs;         // collected positional inputs (files/dirs/globs)
    size_t n_inputs;       // count of collected positional inputs
 } Arguments;
@@ -443,6 +446,9 @@ int open_output_file(char* path);
 /* Like open_output_file but WITHOUT O_APPEND, so lseek()+write() can overwrite
  * earlier bytes. Required by the USTAR writer's seek-back size/checksum patch. */
 int open_output_file_rw(char* path);
+/* Open an existing file read-write without truncating it. */
+int open_existing_file_rw(char* path);
+int truncate_file(int fd, int64_t length);
 /* Returns 1 if fd refers to a seekable regular file, 0 otherwise (pipe/FIFO). */
 int fd_is_seekable(int fd);
 
@@ -476,6 +482,8 @@ typedef struct {
 } mszx_entry_t;
 
 int mszx_list_entries(int fd, mszx_entry_t** out, size_t* out_count);
+/* Read an entry's bytes into a malloc'd, NUL-terminated buffer. */
+char* mszx_read_entry(int fd, const mszx_entry_t* entry);
 void mszx_free_entries(mszx_entry_t* entries, size_t count);
 int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments);
 int list_mszx(char* input_path);
@@ -542,7 +550,103 @@ int batch_writer_finish(batch_writer_t* w);
 /* Close, unlink the partial archive, and free the writer. Safe on NULL. */
 void batch_writer_abort(batch_writer_t* w);
 
+/* Turn the per-spectrum index member (index.mszxi) on or off. On by default.
+ * Must be set before the first entry is added. Returns 0 or -1. */
+int batch_writer_set_index(batch_writer_t* w, int enabled);
+
 int compress_batch(Arguments* arguments);
+
+/* Add or rebuild the per-spectrum index of an existing batch archive, in
+ * place: everything from the old index (or manifest) onward is truncated and
+ * rewritten. The result is byte-identical to writing the archive with the
+ * index on. Returns 0 or -1. */
+int mszx_reindex(const char* path, Arguments* args);
+
+/* Print the indexed spectra of a batch archive matching `query` (see
+ * mszx_index_parse_query) as TSV. Archives without an index are scanned. */
+int query_mszx(char* input_path, const char* query, Arguments* args);
+
+/* mszx_index.c -- per-spectrum index of a batch (v2) .mszx archive. The
+ * on-disk layout is documented at the top of mszx_index.c. */
+
+#define MSZX_INDEX_ENTRY "index.mszxi"
+#define MSZX_INDEX_FORMAT_VERSION 1
+
+/* Column ids. Never renumber: they are stored in the index. */
+#define MSZX_COL_ENTRY 1
+#define MSZX_COL_SPECTRUM_IDX 2
+#define MSZX_COL_SCAN 3
+#define MSZX_COL_MS_LEVEL 4
+#define MSZX_COL_RT_SEC 5
+#define MSZX_COL_PRECURSOR_MZ 6
+#define MSZX_COL_CHARGE 7
+#define MSZX_COL_TIC 8
+#define MSZX_COL_BASE_PEAK_MZ 9
+
+/* Column dtypes. Never renumber. */
+#define MSZX_DT_U8 1
+#define MSZX_DT_I8 2
+#define MSZX_DT_U16 3
+#define MSZX_DT_I16 4
+#define MSZX_DT_U32 5
+#define MSZX_DT_I32 6
+#define MSZX_DT_U64 7
+#define MSZX_DT_I64 8
+#define MSZX_DT_F32 9
+#define MSZX_DT_F64 10
+
+const char* mszx_index_column_name(int id);
+/* Column id for a name or a --query alias (rt, mz, precursor, level); -1 if
+ * unknown. */
+int mszx_index_column_id(const char* name);
+/* Names of the columns / sorted keys this build writes, in order. */
+size_t mszx_index_columns(const char*** names);
+size_t mszx_index_sorted_keys(const char*** names);
+
+typedef struct mszx_index_builder mszx_index_builder_t;
+mszx_index_builder_t* mszx_index_builder_new(void);
+void mszx_index_builder_free(mszx_index_builder_t* b);
+size_t mszx_index_builder_rows(const mszx_index_builder_t* b);
+/* Append one row per spectrum in `divs`, reading metadata out of the mzML
+ * mapping the divisions point into. */
+int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
+                           const char* map, size_t len, divisions_t* divs);
+/* Serialize to a malloc'd buffer. */
+void* mszx_index_builder_serialize(const mszx_index_builder_t* b,
+                                   uint32_t n_entries, size_t* out_len);
+/* Build the serialized index of an archive by decompressing each .msz member
+ * (for archives written without one). `args` may be NULL. */
+int mszx_index_build_from_archive(int fd, Arguments* args, void** out,
+                                  size_t* out_len);
+
+/* Read-only view over a serialized index; `data` is borrowed and must outlive
+ * the handle. */
+typedef struct mszx_index mszx_index_t;
+mszx_index_t* mszx_index_open(const void* data, size_t len);
+void mszx_index_close(mszx_index_t* idx);
+uint64_t mszx_index_n_rows(const mszx_index_t* idx);
+uint32_t mszx_index_n_entries(const mszx_index_t* idx);
+int mszx_index_has_column(const mszx_index_t* idx, int column);
+/* A cell as a double; NaN if the column or row does not exist. */
+double mszx_index_value(const mszx_index_t* idx, int column, uint64_t row);
+
+/* Inclusive range test lo <= value <= hi. Missing (NaN) values never match. */
+typedef struct {
+   int column;
+   double lo;
+   double hi;
+} mszx_index_term_t;
+
+/* Rows matching every term, ascending (so grouped by entry), as a malloc'd
+ * array. No terms selects every row. */
+int mszx_index_query(const mszx_index_t* idx, const mszx_index_term_t* terms,
+                     size_t n_terms, uint32_t** out_rows, size_t* out_n);
+int mszx_index_range(const mszx_index_t* idx, int column, double lo, double hi,
+                     uint32_t** out_rows, size_t* out_n);
+/* Parse "rt=600:660,ms_level=2"; a bare value tests equality and either side
+ * of ':' may be left open. */
+int mszx_index_parse_query(const char* text, mszx_index_term_t** out_terms,
+                           size_t* out_n);
 
 /* mem.c */
 

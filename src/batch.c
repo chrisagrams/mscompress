@@ -403,14 +403,15 @@ static void jb_reserve(jbuf_t* j, size_t extra) {
    j->cap = nc;
 }
 
-static void jb_puts(jbuf_t* j, const char* s) {
-   size_t sl = strlen(s);
+static void jb_putn(jbuf_t* j, const char* s, size_t sl) {
    jb_reserve(j, sl);
    if (j->oom) return;
    memcpy(j->buf + j->len, s, sl);
    j->len += sl;
    j->buf[j->len] = '\0';
 }
+
+static void jb_puts(jbuf_t* j, const char* s) { jb_putn(j, s, strlen(s)); }
 
 static void jb_i64(jbuf_t* j, int64_t v) {
    char num[32];
@@ -450,20 +451,58 @@ static void jb_kv_str(jbuf_t* j, const char* key, const char* value) {
    jb_puts(j, "\"");
 }
 
+/* Append the manifest's optional `index` block (without a leading comma).
+ * Shared by the writer and mszx_reindex so both emit identical bytes. */
+static void jb_index_block(jbuf_t* j, uint64_t index_size) {
+   const char** names;
+   size_t n;
+
+   jb_puts(j, "\"index\": {");
+   jb_kv_str(j, "entry", MSZX_INDEX_ENTRY);
+   jb_puts(j, ", \"size\": ");
+   jb_i64(j, (int64_t)index_size);
+   jb_puts(j, ", \"format_version\": ");
+   jb_i64(j, MSZX_INDEX_FORMAT_VERSION);
+   jb_puts(j, ", \"columns\": [");
+   n = mszx_index_columns(&names);
+   for (size_t i = 0; i < n; ++i) {
+      jb_puts(j, i ? ", \"" : "\"");
+      jb_puts(j, names[i]);
+      jb_puts(j, "\"");
+   }
+   jb_puts(j, "], \"sorted_by\": [");
+   n = mszx_index_sorted_keys(&names);
+   for (size_t i = 0; i < n; ++i) {
+      jb_puts(j, i ? ", \"" : "\"");
+      jb_puts(j, names[i]);
+      jb_puts(j, "\"");
+   }
+   jb_puts(j, "]}");
+}
+
+/* Manifest version: 2.1 adds the optional `index` block. Readers compare only
+ * the major version, so 2.0 readers still open 2.1 archives. */
+#define MANIFEST_VERSION_PLAIN "2.0"
+#define MANIFEST_VERSION_INDEXED "2.1"
+
 /* Build the v2 manifest. Field order is fixed so identical inputs always
  * produce byte-identical archives (there are no timestamps by design).
  * Optional fields are omitted entirely rather than emitted as null, so a
- * reader written against the original v2 schema still parses the result. */
+ * reader written against the original v2 schema still parses the result.
+ * `index_size` < 0 means the archive has no index member. The index block is
+ * the LAST field so mszx_reindex can splice it onto an existing manifest. */
 static char* build_manifest(manifest_rec_t* recs, size_t n,
                             const char* description, const char* extra_json,
-                            size_t* out_len) {
+                            int64_t index_size, size_t* out_len) {
    jbuf_t j = {0};
    jb_reserve(&j, 1024);
    if (j.oom) return NULL;
    j.buf[0] = '\0';
 
    jb_puts(&j, "{\n");
-   jb_puts(&j, "  \"version\": \"2.0\",\n");
+   jb_puts(&j, "  \"version\": \"");
+   jb_puts(&j, index_size >= 0 ? MANIFEST_VERSION_INDEXED : MANIFEST_VERSION_PLAIN);
+   jb_puts(&j, "\",\n");
    jb_puts(&j, "  \"container\": \"batch\",\n");
    if (description) {
       jb_puts(&j, "  ");
@@ -514,8 +553,12 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
       jb_puts(&j, "}");
       jb_puts(&j, i + 1 < n ? ",\n" : "\n");
    }
-   jb_puts(&j, "  ]\n");
-   jb_puts(&j, "}\n");
+   jb_puts(&j, "  ]");
+   if (index_size >= 0) {
+      jb_puts(&j, ",\n  ");
+      jb_index_block(&j, (uint64_t)index_size);
+   }
+   jb_puts(&j, "\n}\n");
 
    if (j.oom) {
       free(j.buf);
@@ -565,6 +608,9 @@ struct batch_writer {
    strlist_t used_names;
    char* description;
    char* extra_json;
+   /* Per-spectrum index rows, collected while each source is still mapped.
+    * NULL when the index is turned off. */
+   mszx_index_builder_t* index;
    /* Set when an entry failed after its header was written. A half-written
     * entry cannot be un-appended, so the archive is unrecoverable and
     * finish() must refuse rather than emit a corrupt manifest. */
@@ -579,6 +625,7 @@ static void batch_writer_free(batch_writer_t* w) {
    free(w->description);
    free(w->extra_json);
    free(w->out_path);
+   mszx_index_builder_free(w->index);
    free(w);
 }
 
@@ -589,7 +636,10 @@ batch_writer_t* batch_writer_open(const char* out_path) {
    if (!w) return NULL;
 
    w->out_path = strdup(out_path);
-   if (!w->out_path) {
+   w->index = mszx_index_builder_new();
+   if (!w->out_path || !w->index) {
+      free(w->out_path);
+      mszx_index_builder_free(w->index);
       free(w);
       return NULL;
    }
@@ -599,8 +649,7 @@ batch_writer_t* batch_writer_open(const char* out_path) {
    w->out_fd = open_output_file_rw(w->out_path);
    if (w->out_fd < 0) {
       error("batch: cannot open output archive '%s'\n", out_path);
-      free(w->out_path);
-      free(w);
+      batch_writer_free(w);
       return NULL;
    }
    if (!fd_is_seekable(w->out_fd)) {
@@ -608,8 +657,7 @@ batch_writer_t* batch_writer_open(const char* out_path) {
             "('%s')\n",
             out_path);
       close_file(w->out_fd);
-      free(w->out_path);
-      free(w);
+      batch_writer_free(w);
       return NULL;
    }
    return w;
@@ -681,6 +729,15 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
          if (divs->divisions[i] && divs->divisions[i]->spectra)
             num_spectra += divs->divisions[i]->spectra->total_spec;
       }
+   }
+
+   /* Index rows come from the divisions, which still point into the mapped
+    * source, so spectrum_idx matches the order of the compressed entry. */
+   if (!fail && w->index &&
+       mszx_index_builder_add(w->index, (uint32_t)w->n_recs, (const char*)mapping,
+                              filesize, divs) != 0) {
+      error("batch: failed to index '%s'\n", label);
+      fail = 1;
    }
 
    int64_t payload_end = get_offset(w->out_fd);
@@ -774,6 +831,22 @@ int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
    return 0;
 }
 
+int batch_writer_set_index(batch_writer_t* w, int enabled) {
+   if (!w) return -1;
+   if (w->n_recs > 0) {
+      error("batch: the index must be configured before adding entries\n");
+      return -1;
+   }
+   if (!enabled) {
+      mszx_index_builder_free(w->index);
+      w->index = NULL;
+   } else if (!w->index) {
+      w->index = mszx_index_builder_new();
+      if (!w->index) return -1;
+   }
+   return 0;
+}
+
 int batch_writer_set_description(batch_writer_t* w, const char* description) {
    if (!w || !description) return -1;
    char* dup = strdup(description);
@@ -807,13 +880,29 @@ int batch_writer_finish(batch_writer_t* w) {
    }
 
    int rc = 0;
+   int64_t index_size = -1;
+   if (w->index) {
+      size_t ilen = 0;
+      void* ibuf = mszx_index_builder_serialize(w->index, (uint32_t)w->n_recs,
+                                                &ilen);
+      if (!ibuf || tar_add_file(w->out_fd, MSZX_INDEX_ENTRY, ibuf, ilen)) {
+         error("batch: failed to write %s\n", MSZX_INDEX_ENTRY);
+         rc = -1;
+      }
+      free(ibuf);
+      index_size = (int64_t)ilen;
+   }
+
    size_t mlen = 0;
    char* manifest =
-       build_manifest(w->recs, w->n_recs, w->description, w->extra_json, &mlen);
+       rc ? NULL
+          : build_manifest(w->recs, w->n_recs, w->description, w->extra_json,
+                           index_size, &mlen);
 
    /* manifest.json is written LAST: entry sizes are only known once each
     * payload has streamed out. */
-   if (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen)) {
+   if (rc == 0 &&
+       (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen))) {
       error("batch: failed to write manifest.json\n");
       rc = -1;
    }
@@ -838,6 +927,166 @@ void batch_writer_abort(batch_writer_t* w) {
    if (w->out_fd >= 0) close_file(w->out_fd);
    if (w->out_path) remove_file(w->out_path);
    batch_writer_free(w);
+}
+
+/* ---------------- in-place reindex ---------------- */
+
+static uint64_t tar_padded(uint64_t n) { return (n + 511) & ~(uint64_t)511; }
+
+/* Rewrite an existing v2 manifest for an archive whose index member is
+ * `index_size` bytes: bump the version to 2.1 and replace (or add) the trailing
+ * index block. Output is byte-identical to build_manifest() for a manifest
+ * this writer produced. Returns a malloc'd buffer or NULL. */
+static char* splice_index_into_manifest(const char* m, uint64_t index_size,
+                                        size_t* out_len) {
+   /* Locate the version string value. */
+   const char* v = strstr(m, "\"version\"");
+   if (!v) return NULL;
+   v = strchr(v + 9, ':');
+   if (!v) return NULL;
+   v++;
+   while (*v == ' ' || *v == '\t' || *v == '\n' || *v == '\r') v++;
+   if (*v != '"') return NULL;
+   const char* v_start = v + 1;
+   const char* v_end = strchr(v_start, '"');
+   if (!v_end || *v_start != '2' || (v_start[1] != '.' && v_start + 1 != v_end))
+      return NULL; /* only major version 2 */
+
+   /* Everything up to the old index block, or up to the closing brace. */
+   const char* body_end = strstr(m, ",\n  \"index\": {");
+   if (!body_end) {
+      body_end = strrchr(m, '}');
+      if (!body_end) return NULL;
+      while (body_end > m && (body_end[-1] == ' ' || body_end[-1] == '\n' ||
+                              body_end[-1] == '\r' || body_end[-1] == '\t'))
+         body_end--;
+   }
+   if (body_end <= v_end) return NULL;
+
+   jbuf_t j = {0};
+   jb_reserve(&j, (size_t)(body_end - m) + 512);
+   if (j.oom) return NULL;
+   j.buf[0] = '\0';
+
+   jb_putn(&j, m, (size_t)(v_start - m));
+   jb_puts(&j, MANIFEST_VERSION_INDEXED);
+   jb_putn(&j, v_end, (size_t)(body_end - v_end));
+   jb_puts(&j, ",\n  ");
+   jb_index_block(&j, index_size);
+   jb_puts(&j, "\n}\n");
+
+   if (j.oom) {
+      free(j.buf);
+      return NULL;
+   }
+   *out_len = j.len;
+   return j.buf;
+}
+
+int mszx_reindex(const char* path, Arguments* args) {
+   if (!path) return -1;
+
+   int fd = open_existing_file_rw((char*)path);
+   if (fd < 0) {
+      error("reindex: cannot open '%s'\n", path);
+      return -1;
+   }
+
+   mszx_entry_t* entries = NULL;
+   size_t n = 0;
+   char* manifest = NULL;
+   char* new_manifest = NULL;
+   void* index = NULL;
+   size_t index_len = 0, mlen = 0;
+   int rc = -1;
+
+   if (mszx_list_entries(fd, &entries, &n) != 0) {
+      error("reindex: '%s' is not a valid USTAR archive\n", path);
+      goto done;
+   }
+
+   /* The tail we rewrite must be exactly [index.mszxi] manifest.json, with no
+    * extended headers in between: everything from its first header on is
+    * truncated. */
+   if (n < 2 || strcmp(entries[n - 1].name, "manifest.json") != 0) {
+      error("reindex: manifest.json is not the last member of '%s'\n", path);
+      goto done;
+   }
+   size_t cut_i = n - 1;
+   if (strcmp(entries[n - 2].name, MSZX_INDEX_ENTRY) == 0) cut_i = n - 2;
+   for (size_t i = 0; i < cut_i; ++i) {
+      if (strcmp(entries[i].name, MSZX_INDEX_ENTRY) == 0) {
+         error("reindex: unexpected %s position in '%s'\n", MSZX_INDEX_ENTRY,
+               path);
+         goto done;
+      }
+   }
+   if (cut_i == 0) {
+      error("reindex: '%s' has no spectra entries\n", path);
+      goto done;
+   }
+   for (size_t i = cut_i - 1; i + 1 < n; ++i) {
+      if (entries[i].offset + (int64_t)tar_padded(entries[i].size) + 512 !=
+          entries[i + 1].offset) {
+         error("reindex: '%s' has extended tar headers near the manifest; "
+               "rewrite it with --batch instead\n",
+               path);
+         goto done;
+      }
+   }
+   int64_t cut = entries[cut_i].offset - 512;
+
+   manifest = mszx_read_entry(fd, &entries[n - 1]);
+   if (!manifest) {
+      error("reindex: cannot read manifest.json\n");
+      goto done;
+   }
+   {
+      const char* c = strstr(manifest, "\"container\"");
+      if (!c || !strstr(c, "\"batch\"")) {
+         error("reindex: '%s' is not a batch (v2) archive\n", path);
+         goto done;
+      }
+   }
+
+   print("=== Indexing %s ===\n", path);
+   if (mszx_index_build_from_archive(fd, args, &index, &index_len) != 0) {
+      error("reindex: failed to build the index\n");
+      goto done;
+   }
+
+   new_manifest =
+       splice_index_into_manifest(manifest, (uint64_t)index_len, &mlen);
+   if (!new_manifest) {
+      error("reindex: unsupported manifest in '%s'\n", path);
+      goto done;
+   }
+
+   /* Everything is computed; only now touch the archive. */
+#ifdef _WIN32
+   if (_lseeki64(fd, cut, SEEK_SET) < 0 || truncate_file(fd, cut) != 0) {
+#else
+   if (lseek(fd, (off_t)cut, SEEK_SET) < 0 || truncate_file(fd, cut) != 0) {
+#endif
+      error("reindex: cannot truncate '%s'\n", path);
+      goto done;
+   }
+   if (tar_add_file(fd, MSZX_INDEX_ENTRY, index, index_len) != 0 ||
+       tar_add_file(fd, "manifest.json", new_manifest, mlen) != 0 ||
+       tar_finish(fd) != 0) {
+      error("reindex: failed while rewriting '%s'; the archive is damaged\n",
+            path);
+      goto done;
+   }
+   rc = 0;
+
+done:
+   free(index);
+   free(manifest);
+   free(new_manifest);
+   mszx_free_entries(entries, n);
+   close_file(fd);
+   return rc;
 }
 
 /* ---------------- CLI driver ---------------- */
@@ -884,6 +1133,8 @@ int compress_batch(Arguments* arguments) {
       strlist_free(&files);
       return -1;
    }
+
+   if (arguments->no_index) batch_writer_set_index(w, 0);
 
    print("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
          out_path);
