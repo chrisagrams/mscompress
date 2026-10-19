@@ -39,25 +39,13 @@
  * Ties keep row order, so the output is byte-reproducible.
  */
 
-#include <errno.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "mscompress.h"
-
-#ifdef _WIN32
-#include <Windows.h>
-#include <io.h>
-#include <fcntl.h>
-#else
-#include <fcntl.h>
-#include <unistd.h>
-#endif
 
 #define IDX_MAGIC "MSZI"
 #define IDX_HEADER_SIZE 32
@@ -760,126 +748,4 @@ int mszx_index_parse_query(const char* text, mszx_index_term_t** out_terms,
    *out_terms = terms;
    *out_n = n;
    return 0;
-}
-
-/* ---------------- building from an existing archive ---------------- */
-
-/* Create an empty, uniquely named temp file opened read-write. */
-static int open_temp_file(char* path, size_t cap) {
-#ifdef _WIN32
-   char dir[MAX_PATH];
-   DWORD dl = GetTempPathA(MAX_PATH, dir);
-   if (dl == 0 || dl > MAX_PATH) return -1;
-   if (cap < MAX_PATH || GetTempFileNameA(dir, "msz", 0, path) == 0) return -1;
-   return _open(path, _O_RDWR | _O_TRUNC | _O_BINARY);
-#else
-   const char* dir = getenv("TMPDIR");
-   if (!dir || !*dir) dir = "/tmp";
-   int n = snprintf(path, cap, "%s/mscompress-index-XXXXXX", dir);
-   if (n < 0 || (size_t)n >= cap) return -1;
-   return mkstemp(path);
-#endif
-}
-
-/* Decompress one member to a temp mzML and add its rows. */
-static int index_msz_member(mszx_index_builder_t* b, uint32_t entry, int fd,
-                            const mszx_entry_t* m, Arguments* args) {
-   size_t pad = 0, map_len = 0;
-   void* base = get_mapping_range(fd, m->offset, m->size, &pad, &map_len);
-   if (!base) {
-      error("mszx index: cannot map entry '%s'\n", m->name);
-      return -1;
-   }
-
-   char tmp_path[4096];
-   int tmp_fd = open_temp_file(tmp_path, sizeof(tmp_path));
-   if (tmp_fd < 0) {
-      error("mszx index: cannot create a temp file\n");
-      remove_mapping(base, map_len);
-      return -1;
-   }
-
-   int rc = decompress_msz((char*)base + pad, m->size, args, tmp_fd);
-   remove_mapping(base, map_len);
-   int64_t mzml_len = get_offset(tmp_fd);
-   /* A trailing NUL keeps the strstr-based scanners inside the mapping even
-    * when the mzML ends exactly on a page boundary. */
-   char nul = '\0';
-   if (rc == 0 && (mzml_len <= 0 || write_to_file(tmp_fd, &nul, 1) != 1))
-      rc = -1;
-   if (rc != 0) error("mszx index: cannot decompress entry '%s'\n", m->name);
-
-   char* map = NULL;
-   size_t map_size = (size_t)mzml_len + 1;
-   if (rc == 0) {
-      map = get_mapping(tmp_fd);
-      if (!map) rc = -1;
-   }
-
-   data_format_t* df = NULL;
-   division_t* div = NULL;
-   if (rc == 0) {
-      df = pattern_detect(map);
-      if (df) div = scan_mzml(map, df, (long)mzml_len, MSLEVEL | SCANNUM);
-      if (!div) {
-         error("mszx index: cannot scan entry '%s'\n", m->name);
-         rc = -1;
-      }
-   }
-   if (rc == 0) {
-      division_t* list[1] = {div};
-      divisions_t divs = {list, 1};
-      rc = mszx_index_builder_add(b, entry, map, (size_t)mzml_len, &divs);
-   }
-
-   if (div) dealloc_division(div);
-   if (df) dealloc_df(df);
-   if (map) remove_mapping(map, map_size);
-   close_file(tmp_fd);
-   remove_file(tmp_path);
-   return rc;
-}
-
-static int ends_with_msz(const char* s) {
-   size_t l = strlen(s);
-   return l > 4 && strcmp(s + l - 4, ".msz") == 0;
-}
-
-int mszx_index_build_from_archive(int fd, Arguments* args, void** out,
-                                  size_t* out_len) {
-   if (fd < 0 || !out || !out_len) return -1;
-
-   Arguments local;
-   if (!args) {
-      init_args(&local);
-      args = &local;
-   }
-   int saved_threads = args->threads;
-   if (args->threads <= 0) args->threads = get_num_threads();
-
-   mszx_entry_t* entries = NULL;
-   size_t n_entries = 0;
-   if (mszx_list_entries(fd, &entries, &n_entries) != 0) {
-      args->threads = saved_threads;
-      return -1;
-   }
-
-   mszx_index_builder_t* b = mszx_index_builder_new();
-   int rc = b ? 0 : -1;
-   uint32_t entry = 0;
-   for (size_t i = 0; i < n_entries && rc == 0; ++i) {
-      if (!ends_with_msz(entries[i].name)) continue;
-      print("\tIndexing %s\n", entries[i].name);
-      rc = index_msz_member(b, entry++, fd, &entries[i], args);
-   }
-
-   if (rc == 0) {
-      *out = mszx_index_builder_serialize(b, entry, out_len);
-      if (!*out) rc = -1;
-   }
-
-   mszx_index_builder_free(b);
-   mszx_free_entries(entries, n_entries);
-   args->threads = saved_threads;
-   return rc;
 }

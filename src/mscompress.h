@@ -553,8 +553,8 @@ int batch_writer_set_index(batch_writer_t* w, int enabled);
 int compress_batch(Arguments* arguments);
 
 /* Print the indexed spectra of a batch archive matching `query` (see
- * mszx_index_parse_query) as TSV. Archives without an index are scanned. */
-int query_mszx(char* input_path, const char* query, Arguments* args);
+ * mszx_index_parse_query) as TSV. Fails if the archive has no index. */
+int query_mszx(char* input_path, const char* query);
 
 /* mszx_index.c -- per-spectrum index of a batch (v2) .mszx archive. The
  * on-disk layout is documented at the top of mszx_index.c. */
@@ -604,10 +604,6 @@ int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
 /* Serialize to a malloc'd buffer. */
 void* mszx_index_builder_serialize(const mszx_index_builder_t* b,
                                    uint32_t n_entries, size_t* out_len);
-/* Build the serialized index of an archive by decompressing each .msz member
- * (for archives written without one). `args` may be NULL. */
-int mszx_index_build_from_archive(int fd, Arguments* args, void** out,
-                                  size_t* out_len);
 
 /* Read-only view over a serialized index; `data` is borrowed and must outlive
  * the handle. */

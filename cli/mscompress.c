@@ -461,9 +461,7 @@ int main(int argc, char* argv[]) {
          exit(1);
       }
       if (arguments.query)
-         exit(query_mszx(arguments.input_file, arguments.query, &arguments) == 0
-                  ? 0
-                  : 1);
+         exit(query_mszx(arguments.input_file, arguments.query) == 0 ? 0 : 1);
       exit(list_mszx(arguments.input_file) == 0 ? 0 : 1);
    }
 

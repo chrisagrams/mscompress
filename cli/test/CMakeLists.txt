@@ -93,7 +93,7 @@ add_test(NAME BatchRejectTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
 )
 
-# Per-spectrum index: golden table, --no-index, fallback scan, and
+# Per-spectrum index: golden table, --no-index (and querying it errors), and
 # decompression skipping the index member.
 add_test(NAME BatchIndexTest
     COMMAND ${CMAKE_COMMAND}

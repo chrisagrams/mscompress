@@ -3,7 +3,7 @@
 #      without the index; the indexed manifest is version 2.1 with an index
 #      block, the other stays 2.0 with no index member.
 #   2. --list --query "entry=0:" prints the full table, byte-identical to GOLDEN_TSV.
-#   3. Querying an archive without an index falls back to a scan and matches.
+#   3. Querying an archive without an index fails with an error.
 #   4. Decompression does not extract index.mszxi as an annotation.
 #
 # Expected variables: EXECUTABLE, TEST_MZML, TEST_MZML_B, GOLDEN_TSV, TEMP_DIR
@@ -75,12 +75,11 @@ if(NOT N_LINES EQUAL 28)  # header + 27 hits
     message(FATAL_ERROR "rt=5:8 expected 27 rows:\n${RUN_OUT}")
 endif()
 
-# --- Step 3: query without an index scans the members ---
-run_ok("${EXECUTABLE}" --list --query "entry=0:" "${NOIDX}")
-file(WRITE "${TEMP_DIR}/scan.tsv" "${RUN_OUT}")
-file(MD5 "${TEMP_DIR}/scan.tsv" SCAN_MD5)
-if(NOT SCAN_MD5 STREQUAL WANT)
-    message(FATAL_ERROR "fallback scan differs from the stored index")
+# --- Step 3: querying an archive without an index is an error ---
+execute_process(COMMAND "${EXECUTABLE}" --list --query "entry=0:" "${NOIDX}"
+    RESULT_VARIABLE R OUTPUT_VARIABLE O ERROR_VARIABLE E)
+if(R EQUAL 0 OR NOT E MATCHES "no spectrum index")
+    message(FATAL_ERROR "--query on an un-indexed archive should fail (${R}):\n${O}\n${E}")
 endif()
 
 # --- Step 4: decompression skips the index member ---

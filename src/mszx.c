@@ -567,13 +567,12 @@ static void print_index_cell(const mszx_index_t* idx, int column, uint32_t row) 
 /**
  * @brief Print the spectra of a batch .mszx matching `query` as TSV.
  *
- * Reads the index member through an mmap — no .msz member is opened. An
- * archive written without an index is indexed in memory first (slow: every
- * member is decompressed).
+ * Reads the index member through an mmap — no .msz member is opened. Fails
+ * on an archive written without an index.
  *
  * @return 0 on success, non-zero on failure.
  */
-int query_mszx(char* input_path, const char* query, Arguments* args) {
+int query_mszx(char* input_path, const char* query) {
    if (!input_path || !query) return -1;
 
    mszx_index_term_t* terms = NULL;
@@ -611,7 +610,6 @@ int query_mszx(char* input_path, const char* query, Arguments* args) {
    size_t map_length = 0;
    const void* data = NULL;
    size_t data_len = 0;
-   void* built = NULL;
    int rc = names ? 0 : -1;
 
    if (rc == 0 && index_entry) {
@@ -626,12 +624,10 @@ int query_mszx(char* input_path, const char* query, Arguments* args) {
          data_len = index_entry->size;
       }
    } else if (rc == 0) {
-      warning("query_mszx: '%s' has no spectrum index; scanning every member "
-              "(slow)\n",
-              input_path);
-      if (mszx_index_build_from_archive(fd, args, &built, &data_len) != 0)
-         rc = -1;
-      data = built;
+      error("query_mszx: '%s' has no spectrum index (it was written with "
+            "--no-index or by an older mscompress)\n",
+            input_path);
+      rc = -1;
    }
 
    mszx_index_t* idx = rc == 0 ? mszx_index_open(data, data_len) : NULL;
@@ -663,7 +659,6 @@ int query_mszx(char* input_path, const char* query, Arguments* args) {
 
    free(rows);
    mszx_index_close(idx);
-   free(built);
    if (map_base) remove_mapping(map_base, map_length);
    free(names);
    free(terms);
