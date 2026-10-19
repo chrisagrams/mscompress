@@ -1,7 +1,7 @@
 # Per-spectrum index (index.mszxi) CLI test:
 #   1. Batch-compress a.mzML (= TEST_MZML) + b.mzML (= TEST_MZML_B) with and
-#      without the index; the indexed manifest is version 2.1 with an index
-#      block, the other stays 2.0 with no index member.
+#      without the index; both manifests are version 2.0, and only the
+#      indexed one has an index block and an index member.
 #   2. --list --query "entry=0:" prints the full table, byte-identical to GOLDEN_TSV.
 #   3. Querying an archive without an index fails with an error.
 #   4. Decompression does not extract index.mszxi as an annotation.
@@ -52,8 +52,8 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${NOIDX}" manifest.json
     WORKING_DIRECTORY "${TEMP_DIR}/m_noidx")
 file(READ "${TEMP_DIR}/m_idx/manifest.json" M_IDX)
 file(READ "${TEMP_DIR}/m_noidx/manifest.json" M_NOIDX)
-if(NOT M_IDX MATCHES "\"version\": \"2.1\"" OR NOT M_IDX MATCHES "\"index\": {\"entry\": \"index.mszxi\"")
-    message(FATAL_ERROR "indexed manifest lacks 2.1 / index block:\n${M_IDX}")
+if(NOT M_IDX MATCHES "\"version\": \"2.0\"" OR NOT M_IDX MATCHES "\"index\": {\"entry\": \"index.mszxi\"")
+    message(FATAL_ERROR "indexed manifest lacks 2.0 / index block:\n${M_IDX}")
 endif()
 if(NOT M_NOIDX MATCHES "\"version\": \"2.0\"" OR M_NOIDX MATCHES "\"index\"")
     message(FATAL_ERROR "--no-index manifest should be plain 2.0:\n${M_NOIDX}")

@@ -478,16 +478,12 @@ static void jb_index_block(jbuf_t* j, uint64_t index_size) {
    jb_puts(j, "]}");
 }
 
-/* Manifest version: 2.1 adds the optional `index` block. Readers compare only
- * the major version, so 2.0 readers still open 2.1 archives. */
-#define MANIFEST_VERSION_PLAIN "2.0"
-#define MANIFEST_VERSION_INDEXED "2.1"
-
 /* Build the v2 manifest. Field order is fixed so identical inputs always
  * produce byte-identical archives (there are no timestamps by design).
  * Optional fields are omitted entirely rather than emitted as null, so a
  * reader written against the original v2 schema still parses the result.
- * `index_size` < 0 means the archive has no index member. */
+ * `index_size` < 0 means the archive has no index member; the optional
+ * `index` block is then omitted, and readers use the index only if present. */
 static char* build_manifest(manifest_rec_t* recs, size_t n,
                             const char* description, const char* extra_json,
                             int64_t index_size, size_t* out_len) {
@@ -497,9 +493,7 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
    j.buf[0] = '\0';
 
    jb_puts(&j, "{\n");
-   jb_puts(&j, "  \"version\": \"");
-   jb_puts(&j, index_size >= 0 ? MANIFEST_VERSION_INDEXED : MANIFEST_VERSION_PLAIN);
-   jb_puts(&j, "\",\n");
+   jb_puts(&j, "  \"version\": \"2.0\",\n");
    jb_puts(&j, "  \"container\": \"batch\",\n");
    if (description) {
       jb_puts(&j, "  ");
