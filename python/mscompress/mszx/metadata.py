@@ -183,6 +183,45 @@ class SpectraFileEntry:
 
 
 @dataclass
+class IndexInfo:
+    """The manifest's optional ``index`` block: where the per-spectrum index
+    lives and what it holds.
+
+    Attributes:
+        entry: Tar member name of the index (``"index.mszxi"``).
+        size: Member size in bytes.
+        format_version: Binary layout version of the index member.
+        columns: Column names, in storage order.
+        sorted_by: Columns with a sorted key (fast range queries).
+    """
+
+    entry: str = "index.mszxi"
+    size: int = 0
+    format_version: int = 1
+    columns: List[str] = field(default_factory=list)
+    sorted_by: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "entry": self.entry,
+            "size": self.size,
+            "format_version": self.format_version,
+            "columns": list(self.columns),
+            "sorted_by": list(self.sorted_by),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> IndexInfo:
+        return cls(
+            entry=data.get("entry", "index.mszxi"),
+            size=data.get("size", 0),
+            format_version=data.get("format_version", 1),
+            columns=list(data.get("columns", [])),
+            sorted_by=list(data.get("sorted_by", [])),
+        )
+
+
+@dataclass
 class MSZXBatchManifest:
     """Manifest of a v2 multi-file ("batch") MSZX archive.
 
@@ -200,6 +239,8 @@ class MSZXBatchManifest:
     spectra_files: List[SpectraFileEntry] = field(default_factory=list)
     description: Optional[str] = None
     extra: Dict[str, Any] = field(default_factory=dict)
+    # Per-spectrum index block; None when the archive has no index.
+    index: Optional[IndexInfo] = None
 
     # Highest batch manifest major version this binding can read. Unannotated
     # on purpose — see the note on MSZXManifest.MAX_SUPPORTED_MAJOR.
@@ -218,6 +259,8 @@ class MSZXBatchManifest:
         if self.extra:
             data["extra"] = self.extra
         data["spectra_files"] = [e.to_dict() for e in self.spectra_files]
+        if self.index is not None:
+            data["index"] = self.index.to_dict()
         return data
 
     def to_json(self, indent: int = 2) -> str:
@@ -247,6 +290,7 @@ class MSZXBatchManifest:
             ],
             description=data.get("description"),
             extra=data.get("extra", {}),
+            index=IndexInfo.from_dict(data["index"]) if "index" in data else None,
         )
 
     @classmethod

@@ -22,6 +22,7 @@ from mscompress._core import MSZFile, MSZXFile  # ty: ignore[unresolved-import]
 from mscompress.annotations import MzTab, PSMTable, read_psms
 from mscompress.annotations._io import compress
 from mscompress.mszx.batch import MSZXBatchFile, compress_batch
+from mscompress.mszx.index import QueryResult, SpectrumIndex
 from mscompress.mszx.metadata import (
     MSZXBatchManifest,
     MSZXManifest,
@@ -31,6 +32,8 @@ from mscompress.types import AnnotationEntry, AnnotationFormat
 
 __all__ = [
     "MSZXBatchFile",
+    "QueryResult",
+    "SpectrumIndex",
     "compress_batch",
     "MSZXBatchManifest",
     "MSZXBuilder",

@@ -214,6 +214,7 @@ cdef extern from "../src/mscompress.h":
     int _batch_writer_set_join_key "batch_writer_set_join_key"(batch_writer_t* w, int entry_index, const char* join_key)
     int _batch_writer_set_description "batch_writer_set_description"(batch_writer_t* w, const char* description)
     int _batch_writer_set_extra_json "batch_writer_set_extra_json"(batch_writer_t* w, const char* extra_json)
+    int _batch_writer_set_index "batch_writer_set_index"(batch_writer_t* w, int enabled)
     int _batch_writer_finish "batch_writer_finish"(batch_writer_t* w)
     void _batch_writer_abort "batch_writer_abort"(batch_writer_t* w)
     void _extract_mzml_filtered "extract_mzml_filtered"(char* input_map, size_t input_filesize, long* indicies, long indicies_length, uint32_t* scans, long scans_length, uint16_t ms_level, division_t* division, int output_fd) nogil
