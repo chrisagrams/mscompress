@@ -705,7 +705,14 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
    long bs = args->blocksize;
    int fail = 0;
 
-   if (preprocess_mzml((char*)mapping, (long)filesize, &bs, args, &df, &divs)) {
+   /* The index reads its columns from the metadata pass in scan_mzml. */
+   int saved_meta = args->spectrum_meta;
+   args->spectrum_meta = w->index != NULL;
+   int pre_rc =
+       preprocess_mzml((char*)mapping, (long)filesize, &bs, args, &df, &divs);
+   args->spectrum_meta = saved_meta;
+
+   if (pre_rc) {
       error("batch: preprocess failed for '%s'\n", label);
       fail = 1;
    } else if (compress_mzml((char*)mapping, filesize, args, df, divs,
@@ -722,11 +729,10 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
       }
    }
 
-   /* Index rows come from the divisions, which still point into the mapped
-    * source, so spectrum_idx matches the order of the compressed entry. */
+   /* Index rows follow the divisions, so spectrum_idx matches the order of
+    * the compressed entry. */
    if (!fail && w->index &&
-       mszx_index_builder_add(w->index, (uint32_t)w->n_recs, (const char*)mapping,
-                              filesize, divs) != 0) {
+       mszx_index_builder_add(w->index, (uint32_t)w->n_recs, divs) != 0) {
       error("batch: failed to index '%s'\n", label);
       fail = 1;
    }
