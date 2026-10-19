@@ -971,7 +971,7 @@ int compress_batch(Arguments* arguments) {
       return -1;
    }
 
-   if (arguments->no_index) batch_writer_set_index(w, 0);
+   if (!arguments->index) batch_writer_set_index(w, 0);
 
    print("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
          out_path);

@@ -169,7 +169,7 @@ typedef struct {
    int recursive;         // -r/--recursive directory descent
    int continue_on_error; // skip-and-report instead of fail-fast
    int list_mode;         // --list: print an .mszx table of contents
-   int no_index;          // --no-index: skip the per-spectrum index
+   int index;             // write the per-spectrum index (--no-index clears)
    char* query;           // --query: filter for --list (needs an index)
    char* from_file;      // --from-file manifest of input paths (or "-" for stdin)
    char** inputs;         // collected positional inputs (files/dirs/globs)

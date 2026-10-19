@@ -319,9 +319,9 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
       } else if (strcmp(argv[i], "--list") == 0) {
          arguments->list_mode = 1;
       } else if (strcmp(argv[i], "--no-index") == 0) {
-         arguments->no_index = 1;
+         arguments->index = 0;
       } else if (strcmp(argv[i], "--index") == 0) {
-         arguments->no_index = 0;
+         arguments->index = 1;
       } else if (strcmp(argv[i], "--query") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing filter for --query.");
