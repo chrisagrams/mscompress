@@ -7,7 +7,7 @@ if(WIN32)
     # (configure sets it on Unix). deflate.c only includes intrinsics headers
     # under HAS_SSE42, so force-include emmintrin.h for __m128i.
     # Build out-of-source (TOP points nmake at the sources) so projects that
-    # pass different ZLIB_EXTRA_CFLAGS (e.g. node-ts's Z_PREFIX vs. the CLI)
+    # pass different ZLIB_EXTRA_CFLAGS (e.g. node's Z_PREFIX vs. the CLI)
     # don't reuse each other's stale zlib.lib from the shared vendor tree.
     set(ZLIB_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/zlib-build)
     file(MAKE_DIRECTORY ${ZLIB_BUILD_DIR})

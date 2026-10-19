@@ -111,7 +111,7 @@ class BatchAddWorker : public Napi::AsyncWorker {
 
 /**
  * Stateful handle to an in-progress .mszx archive. Exposed to JS as the
- * `BatchWriter` class; see node-ts/src/mszx/mszx-batch-writer.ts for the
+ * `BatchWriter` class; see node/src/mszx/mszx-batch-writer.ts for the
  * ergonomic wrapper.
  */
 class BatchWriter : public Napi::ObjectWrap<BatchWriter> {

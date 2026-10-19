@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite"
 export default defineConfig({
   main: {
     // mscompress is a devDependency (so electron-builder doesn't copy the
-    // symlinked node-ts tree into the asar) but must stay external: it is
+    // symlinked node tree into the asar) but must stay external: it is
     // shipped via extraResources and loads its .node addon relative to itself.
     plugins: [externalizeDepsPlugin({ include: ["mscompress"] })],
     build: {

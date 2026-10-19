@@ -437,7 +437,7 @@ If your platform is not supported, the package will attempt to build from source
 
 ```bash
 git clone https://github.com/chrisagrams/mscompress.git
-cd mscompress/node-ts
+cd mscompress/node
 npm install
 npm run build
 npm test

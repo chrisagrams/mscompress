@@ -16,7 +16,7 @@ backed by the same C core.
 | C core | `src/`, `vendor/` | — |
 | CLI | `cli/` | `cli/test/` (ctest) |
 | Python | `python/mscompress/` | `python/test/` (pytest) |
-| Node.js | `node-ts/src/` | `node-ts/test/` (vitest) |
+| Node.js | `node/src/` | `node/test/` (vitest) |
 | Electron app | `electron/` | — |
 
 ## Adding an algorithm

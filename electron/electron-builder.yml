@@ -41,7 +41,7 @@ directories:
 
 # electron-vite emits the app to out/; the renderer/main/preload are already
 # bundled there. node_modules is intentionally excluded from the asar because
-# the only runtime dependency (the native mscompress binding, node-ts) is
+# the only runtime dependency (the native mscompress binding, node) is
 # shipped via extraResources below.
 files:
   - out/**
@@ -53,31 +53,31 @@ files:
   - '!tsconfig*.json'
   - '!components.json'
 
-# Ship the native mscompress binding (node-ts) outside the asar so its .node
+# Ship the native mscompress binding (node) outside the asar so its .node
 # addon can be dlopen'd. It lands at resources/node_modules/mscompress, which
 # Node's normal resolution reaches by walking up from resources/app.asar/out/main,
 # so `import "mscompress"` works unchanged in dev and packaged builds.
 extraResources:
-  - from: ../node-ts/dist
+  - from: ../node/dist
     to: node_modules/mscompress/dist
-  - from: ../node-ts/build/Release/mscompress.node
+  - from: ../node/build/Release/mscompress.node
     to: node_modules/mscompress/build/Release/mscompress.node
-  - from: ../node-ts/package.json
+  - from: ../node/package.json
     to: node_modules/mscompress/package.json
-  # node-ts's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
+  # node's dist imports `tar` at runtime (mszx-file.js). Ship tar + its
   # transitive deps under mscompress/node_modules. (Only the tar closure — not
   # the full node_modules, which also carries prebuild-install/dev tooling.)
-  - from: ../node-ts/node_modules/tar
+  - from: ../node/node_modules/tar
     to: node_modules/mscompress/node_modules/tar
-  - from: ../node-ts/node_modules/@isaacs/fs-minipass
+  - from: ../node/node_modules/@isaacs/fs-minipass
     to: node_modules/mscompress/node_modules/@isaacs/fs-minipass
-  - from: ../node-ts/node_modules/chownr
+  - from: ../node/node_modules/chownr
     to: node_modules/mscompress/node_modules/chownr
-  - from: ../node-ts/node_modules/minipass
+  - from: ../node/node_modules/minipass
     to: node_modules/mscompress/node_modules/minipass
-  - from: ../node-ts/node_modules/minizlib
+  - from: ../node/node_modules/minizlib
     to: node_modules/mscompress/node_modules/minizlib
-  - from: ../node-ts/node_modules/yallist
+  - from: ../node/node_modules/yallist
     to: node_modules/mscompress/node_modules/yallist
 
 linux:
