@@ -30,3 +30,9 @@ archives use `MSZXBatchFile`/`MSZXBatchWriter`. See the
 ::: mscompress.mszx.MSZXBatchManifest
 
 ::: mscompress.mszx.SpectraFileEntry
+
+### Spectrum index
+
+::: mscompress.mszx.SpectrumIndex
+
+::: mscompress.mszx.QueryResult
