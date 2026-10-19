@@ -3,7 +3,7 @@
 The TypeScript surface is small and cohesive. For a generated reference
 matching the published types, run `typedoc` (see
 [Build from source](../build-from-source.md)); for a navigable view, see
-the source under `node-ts/src/`.
+the source under `node/src/`.
 
 ## Module surface
 

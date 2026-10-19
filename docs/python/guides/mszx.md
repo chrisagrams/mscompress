@@ -133,6 +133,47 @@ Members are opened on demand and released together by `close()`, so a
 1000-member archive doesn't consume 1000 file descriptors unless you touch
 every member.
 
+### Query the spectrum index
+
+Batch archives carry a [per-spectrum index](../../format/mszx.md#spectrum-index)
+— scan, MS level, RT, precursor m/z, charge, TIC, and base peak m/z for every
+spectrum in every member. `query()` reads only the index, so finding spectra
+across a 1000-run cohort opens no member:
+
+```python
+with read("cohort.mszx") as archive:
+    hits = archive.query(rt_sec=(600, 660), ms_level=2, precursor_mz=(500, 510))
+    print(len(hits))
+
+    df = hits.to_frame()        # metadata only, entry_name column first
+    for spectrum in hits.spectra():
+        ...                     # decompresses just the matching spectra
+```
+
+Each keyword is a column. A value tests equality; a `(lo, hi)` tuple tests an
+inclusive range, with `None` for an open side (`rt_sec=(600, None)`). All terms
+must match, and missing values never do. `entry` also takes a member name:
+
+```python
+archive.query(entry="runA.msz", charge=(2, 3))
+```
+
+`hits.spectra()` groups hits by member, so each member is opened once.
+`hits.to_numpy()` returns a structured array instead of a DataFrame, and
+`hits.rows` the matching row numbers.
+
+For whole columns, use the index directly — `archive.index` is a
+`SpectrumIndex` memory-mapped on first access:
+
+```python
+rt = archive.index.column("rt_sec")           # read-only numpy array
+table = archive.index.to_numpy()              # every row
+```
+
+The index is written by default. Pass `index=False` to `compress_batch()` or
+`MSZXBatchWriter` to leave it out; `archive.has_index` tells you whether an
+archive has one, and `query()` raises `ValueError` when it doesn't.
+
 ### Reading either version uniformly
 
 `MSZXBatchFile` also opens a **v1** archive, as a collection of one. Use it when

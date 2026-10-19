@@ -93,6 +93,18 @@ add_test(NAME BatchRejectTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
 )
 
+# Per-spectrum index: golden table, --no-index (and querying it errors), and
+# decompression skipping the index member.
+add_test(NAME BatchIndexTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEST_MZML_B=${TEST_DATA_DIR}/sciex_ttof6600_100.mzML
+    -DGOLDEN_TSV=${TEST_DATA_DIR}/mszx/index_golden.tsv
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_batch_index
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_index.cmake
+)
+
 # Helper macro to add simple tests
 macro(add_cli_test TEST_NAME ARGS)
     add_test(NAME ${TEST_NAME}

@@ -45,23 +45,23 @@ Test data lives in `test/data/` at the repo root and is shared by C, Python, and
 
 ### Node.js/TypeScript bindings
 ```bash
-# Build native addon + TypeScript (from node-ts/ dir)
-cd node-ts && npm run build
+# Build native addon + TypeScript (from node/ dir)
+cd node && npm run build
 
 # Build native addon only (prebuild + cmake-js)
-cd node-ts && npm run build:native
+cd node && npm run build:native
 
 # Build TypeScript only (tsc + tsc-alias)
-cd node-ts && npm run build:ts
+cd node && npm run build:ts
 
 # Debug native build
-cd node-ts && npm run build:debug
+cd node && npm run build:debug
 
 # Run all Node.js tests (59 tests, vitest)
-cd node-ts && npm test
+cd node && npm test
 
 # Run tests in watch mode
-cd node-ts && npm run test:watch
+cd node && npm run test:watch
 ```
 
 Test data lives in the repo-root `test/data/` directory, referenced via relative path (`../../test/data`) from the test fixtures.
@@ -120,7 +120,7 @@ A 512-byte header and a variable-length footer enable random access by storing b
 
 The Python build (`setup.py`) compiles all C sources + vendor libraries into a single Cython extension with architecture-specific SIMD flags for the base64 library.
 
-### Node.js/TypeScript bindings (`node-ts/`)
+### Node.js/TypeScript bindings (`node/`)
 - `src/native/*.cpp` — Node-API (NAPI v8) C++ addon wrapping the C core
 - `src/core/bindings.ts` — TypeScript interface to the native `.node` addon
 - `src/core/read.ts` — `read()` factory that auto-detects file type
@@ -151,7 +151,7 @@ These are critical for avoiding leaks and use-after-free:
 
 The project version lives in `version.txt` at the repo root — this is the single source of truth. It is maintained automatically by **release-please** (do NOT bump it by hand). All other files read from or are synced to it:
 
-- **CMake** — each `CMakeLists.txt` reads `version.txt` via `file(STRINGS ...)` to set `PROJECT_VERSION` (root, `cli/`, `node-ts/`, `node/`, `modules/python/`)
+- **CMake** — each `CMakeLists.txt` reads `version.txt` via `file(STRINGS ...)` to set `PROJECT_VERSION` (root, `cli/`, `node/`, `node/`, `modules/python/`)
 - **C code** — `cli/CMakeLists.txt` passes `VERSION` via `target_compile_definitions`
 - **Python** — `python/pyproject.toml` (`$.project.version`) and `python/mscompress/__init__.py` (`__version__`, carries an `# x-release-please-version` annotation) are updated by release-please via `release-please-config.json` `extra-files`
 - **npm** — all `package.json` files are updated by release-please `extra-files`

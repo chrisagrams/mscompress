@@ -25,7 +25,7 @@ uv run pytest test/test_mzml.py::test_mzml_open -v  # single test
 ## Node.js (vitest)
 
 ```bash
-cd node-ts
+cd node
 npm test
 npm run test:watch
 ```
