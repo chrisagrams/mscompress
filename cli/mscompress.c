@@ -107,6 +107,14 @@ static void print_usage(FILE* stream, int exit_code) {
    fprintf(stream,
            "      --list                    Print a .mszx table of contents "
            "and exit.\n");
+   fprintf(stream,
+           "      --no-index                Do not write the per-spectrum "
+           "index (written by default).\n");
+   fprintf(stream,
+           "      --query filter            With --list, print the indexed "
+           "spectra matching filter as TSV,\n"
+           "                                e.g. \"rt=600:660,ms_level=2,"
+           "precursor_mz=500:510\".\n");
    fprintf(stream, "\n");
    fprintf(stream, "  -h, --help                    Show this help message.\n");
    fprintf(stream,
@@ -310,6 +318,16 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
          arguments->continue_on_error = 1;
       } else if (strcmp(argv[i], "--list") == 0) {
          arguments->list_mode = 1;
+      } else if (strcmp(argv[i], "--no-index") == 0) {
+         arguments->index = 0;
+      } else if (strcmp(argv[i], "--index") == 0) {
+         arguments->index = 1;
+      } else if (strcmp(argv[i], "--query") == 0) {
+         if (i + 1 >= argc) {
+            fprintf(stderr, "%s\n", "Missing filter for --query.");
+            return 1;
+         }
+         arguments->query = argv[++i];
       } else if (strcmp(argv[i], "-o") == 0 ||
                  strcmp(argv[i], "--output") == 0) {
          if (i + 1 >= argc) {
@@ -432,11 +450,18 @@ int main(int argc, char* argv[]) {
    prepare_threads(&arguments);  // Populate threads variable if not set.
 
    // --list: print an .mszx table of contents (no decompression) and exit.
+   // With --query, print the matching rows of the spectrum index instead.
+   if (arguments.query && !arguments.list_mode) {
+      fprintf(stderr, "--query is used with --list.\n");
+      exit(1);
+   }
    if (arguments.list_mode) {
       if (!arguments.input_file) {
          fprintf(stderr, "--list requires a .mszx input file.\n");
          exit(1);
       }
+      if (arguments.query)
+         exit(query_mszx(arguments.input_file, arguments.query) == 0 ? 0 : 1);
       exit(list_mszx(arguments.input_file) == 0 ? 0 : 1);
    }
 
