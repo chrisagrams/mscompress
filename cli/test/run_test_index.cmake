@@ -61,6 +61,8 @@ endif()
 
 # --- Step 2: full table matches the golden fixture ---
 run_ok("${EXECUTABLE}" --list --query "entry=0:" "${IDX}")
+# Windows stdout is text mode, so printf's "\n" arrives as "\r\n".
+string(REPLACE "\r\n" "\n" RUN_OUT "${RUN_OUT}")
 file(WRITE "${TEMP_DIR}/table.tsv" "${RUN_OUT}")
 file(MD5 "${TEMP_DIR}/table.tsv" GOT)
 file(MD5 "${GOLDEN_TSV}" WANT)
