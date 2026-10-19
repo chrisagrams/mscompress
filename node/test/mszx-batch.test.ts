@@ -32,12 +32,34 @@ const TEST_MZML = path.join(TEST_DATA_DIR, "test.mzML");
 const cliAvailable = fs.existsSync(CLI);
 const describeCli = cliAvailable ? describe : describe.skip;
 
+/** Temp dirs created by the suites below, swept in afterAll. */
+const tmpDirs = new Set<string>();
+
+/** Create a tracked temp dir that afterAll will remove. */
+function makeTmpDir(prefix: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tmpDirs.add(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of tmpDirs) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    } catch {
+      // best-effort leak cleanup; on Windows a lingering mmap/handle throws EPERM,
+      // and "releases the archive so it can be deleted after close" asserts that path
+    }
+  }
+  tmpDirs.clear();
+});
+
 let tmpDir: string;
 let archivePath: string;
 
 beforeAll(() => {
   if (!cliAvailable) return;
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-batch-test-"));
+  tmpDir = makeTmpDir("mszx-batch-test-");
   const src = path.join(tmpDir, "in");
   fs.mkdirSync(src);
   fs.copyFileSync(TEST_MZML, path.join(src, "a.mzML"));
@@ -45,12 +67,6 @@ beforeAll(() => {
 
   archivePath = path.join(tmpDir, "batch.mszx");
   execFileSync(CLI, ["--batch", src, "-o", archivePath], { stdio: "pipe" });
-});
-
-afterAll(() => {
-  if (tmpDir) {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
-  }
 });
 
 describeCli("MSZXBatchFile", () => {
@@ -219,15 +235,11 @@ describe("MSZXBatchWriter", () => {
   let inDir: string;
 
   beforeAll(() => {
-    writeDir = fs.mkdtempSync(path.join(os.tmpdir(), "mszx-batch-write-"));
+    writeDir = makeTmpDir("mszx-batch-write-");
     inDir = path.join(writeDir, "in");
     fs.mkdirSync(inDir);
     fs.copyFileSync(TEST_MZML, path.join(inDir, "a.mzML"));
     fs.copyFileSync(TEST_MZML, path.join(inDir, "b.mzML"));
-  });
-
-  afterAll(() => {
-    fs.rmSync(writeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it("writes a readable archive", async () => {
