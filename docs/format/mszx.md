@@ -72,6 +72,7 @@ cohort.mszx                  (uncompressed tar)
 ├── runB__2.msz              (basename collision -> __N suffix)
 ├── annotations/
 │   └── runA.pin
+├── index.mszxi              (per-spectrum index; omitted with --no-index)
 └── manifest.json            (written LAST — sizes aren't known until then)
 ```
 
@@ -98,7 +99,15 @@ cohort.mszx                  (uncompressed tar)
       ]
     },
     { "entry": "runB.msz", "original": "runB.mzML", "size": 771204, "num_spectra": 6640 }
-  ]
+  ],
+  "index": {
+    "entry": "index.mszxi",
+    "size": 427008,
+    "format_version": 1,
+    "columns": ["entry", "spectrum_idx", "scan", "ms_level", "rt_sec",
+                "precursor_mz", "charge", "tic", "base_peak_mz"],
+    "sorted_by": ["rt_sec", "precursor_mz"]
+  }
 }
 ```
 
@@ -109,6 +118,7 @@ cohort.mszx                  (uncompressed tar)
 | `spectra_files` | array | yes | One record per MSZ member, in archive order |
 | `description` | string | no | Archive-level free-text description |
 | `extra` | object | no | Archive-level custom metadata |
+| `index` | object | no | Where the [spectrum index](#spectrum-index) lives and what it holds; absent when the archive has none |
 
 ### Spectra file record
 
@@ -127,6 +137,85 @@ against an earlier v2 revision still parses a newer archive.
 `original` records only the basename. If you batch `runA/sample.mzML` and
 `runB/sample.mzML`, the entries become `sample.msz` and `sample__2.msz` and the
 source directories are not recoverable from the archive.
+
+## Spectrum index
+
+A v2 archive can carry one extra member, `index.mszxi`: a table with one row
+per spectrum across every MSZ member, so a query like "MS2 spectra between
+600 and 660 s with a precursor near 505 m/z" can be answered without opening
+any member. Writers include it by default (`--no-index` / `index=False` turn it
+off). The manifest is unchanged at `"2.0"`; the index is an optional addition,
+and readers that predate it ignore both the member and the manifest block.
+
+### Columns
+
+Rows are ordered by (`entry`, `spectrum_idx`). Values are read from the mzML
+while it is compressed.
+
+| Column | Type | Source |
+|--------|------|--------|
+| `entry` | u32 | Position of the MSZ member among `spectra_files` (derived, not stored) |
+| `spectrum_idx` | u32 | Position of the spectrum within its member (derived, not stored) |
+| `scan` | u32 | Scan number |
+| `ms_level` | u8 | MS level |
+| `rt_sec` | f32 | Scan start time (`MS:1000016`), converted to seconds |
+| `precursor_mz` | f32 | Selected ion m/z (`MS:1000744`) |
+| `charge` | i8 | Precursor charge (`MS:1000041`) |
+| `tic` | f32 | Total ion current (`MS:1000285`) |
+| `base_peak_mz` | f32 | Base peak m/z (`MS:1000504`) |
+
+Missing values are NaN in float columns and 0 in integer ones, and **never
+match a range**. `rt_sec` and `precursor_mz` have a sorted key, so a range on
+either is a few binary searches; other columns are filtered as vectors over the
+candidate rows.
+
+### Manifest `index` block
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `entry` | string | Tar member name (`"index.mszxi"`) |
+| `size` | int | Member byte length |
+| `format_version` | int | Binary layout version of the member (currently `1`) |
+| `columns` | array | Column names, in storage order |
+| `sorted_by` | array | Columns with a sorted key |
+
+### Binary layout
+
+All fields are little-endian and every section starts on an 8-byte boundary,
+so a reader can memory-map the member and view each column as a typed array
+without parsing. Offsets are relative to the start of the member.
+
+```
+Header (32 bytes)
+  0   char[4] magic "MSZI"
+  4   u16     format version
+  6   u16     flags (0)
+  8   u64     n_rows
+  16  u32     n_entries
+  20  u32     n_columns
+  24  u32     n_sorted_keys
+  28  u32     reserved (0)
+Entry offsets       (n_entries + 1) x u64   entry e owns rows [off[e], off[e+1])
+Column directory    n_columns x {u32 id, u32 dtype, u64 offset, u64 byte_len}
+Sorted-key dir      n_sorted_keys x {u32 column id, u32 kind, u64 n_valid, u64 perm offset}
+Sections            each column, then each permutation (u32[n_valid])
+```
+
+`entry` and `spectrum_idx` are not stored: a row's entry is the last `e` with
+`off[e] <= row`, and its `spectrum_idx` is `row - off[entry]`.
+
+A sorted key is one of two kinds:
+
+- **perm** (`1`) — a permutation of the rows whose value is not NaN, ordered by
+  (value, row).
+- **runs** (`2`) — the column has no NaN and never decreases within an entry
+  (retention time, usually), so no permutation is stored; a range is searched
+  entry by entry.
+
+Readers skip column ids, dtypes, and key kinds they don't know and find every
+section through the directories, so columns can be added without bumping
+`format_version`. The full spec, including the id and dtype tables, is at the
+top of `src/mszx_index.c`.
 
 ## Annotation entry
 
@@ -179,4 +268,4 @@ either USTAR or pax.
   `MSZXBatchWriter`, `compress_batch()`
 - [Node.js MSZX guide](../node/guides/mszx.md) — `MSZXBuilder`, `createMSZX`,
   `MSZXBatchWriter`, `compressBatch()`
-- [CLI reference](../cli/reference.md) — `--batch`
+- [CLI reference](../cli/reference.md) — `--batch`, `--list --query`
