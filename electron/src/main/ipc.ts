@@ -12,12 +12,9 @@ import type {
   DecompressOptions,
   ExtractOptions,
   QCOptions,
-  QueueAddRequest,
-  QueueState,
   TitleBarOverlayColors,
 } from "../shared/ipc"
 import * as bindings from "./bindings"
-import { queue } from "./queue"
 import { getSettings, setSettings, onSettingsChange } from "./settings"
 
 const FILE_FILTERS = [
@@ -189,19 +186,4 @@ export function registerIpcHandlers(): void {
       // Window wasn't created with a titleBarOverlay — nothing to recolor.
     }
   })
-
-  // ---- MSTransfer batch queue ----
-  // Broadcast every queue-state change to all renderer windows.
-  queue.onUpdate((state: QueueState) => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.webContents.isDestroyed()) win.webContents.send(IPC.queueUpdate, state)
-    }
-  })
-
-  ipcMain.handle(IPC.queueAdd, (_event, req: QueueAddRequest) => queue.add(req))
-  ipcMain.handle(IPC.queueStart, () => queue.start())
-  ipcMain.handle(IPC.queuePause, () => queue.pause())
-  ipcMain.handle(IPC.queueClear, () => queue.clear())
-  ipcMain.handle(IPC.queueRemove, (_event, id: string) => queue.remove(id))
-  ipcMain.handle(IPC.queueGetState, () => queue.state())
 }

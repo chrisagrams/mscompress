@@ -10,8 +10,7 @@ compression toolkit. This is a ground-up rewrite of the previous vanilla-JS GUI.
 
 - **Main process** — all native/binding work. `src/main/bindings/` is the only
   place the native `mscompress` addon is imported; `ipc.ts` registers the
-  channel-whitelisted handlers; `queue.ts` is the MSTransfer batch queue;
-  `settings.ts` persists global settings.
+  channel-whitelisted handlers; `settings.ts` persists global settings.
 - **Preload** — `src/preload/index.ts` exposes a single typed `window.api` over a
   `contextBridge`. `contextIsolation: true`, `nodeIntegration: false`.
 - **Renderer** — `src/renderer/src/` (React). Talks to main **only** through
@@ -20,9 +19,9 @@ compression toolkit. This is a ground-up rewrite of the previous vanilla-JS GUI.
   cross-process types (no electron/node imports).
 
 Features: file Explorer + Inspector (real analysis), Convert (compress /
-decompress / extract with live progress + local/remote output), QC dashboard
-(TIC / BPC / RT×m/z heatmap / MS-levels / peaks from real spectra), MSTransfer
-batch queue, MSZX archive manifest + annotations viewer, and persisted settings.
+decompress / extract with live progress), QC dashboard
+(TIC / BPC / RT×m/z heatmap / MS-levels / peaks from real spectra), batch
+.mszx archiving, MSZX archive manifest + annotations viewer, and persisted settings.
 
 ## Prerequisites
 
@@ -64,4 +63,4 @@ npm run dist         # host-platform installer
 - Worker threads, default output dir, default preset and theme persist to
   `<userData>/settings.json`.
 - Native convert calls are synchronous (the binding exposes no progress
-  callback), so queue jobs run one at a time and progress is coarse.
+  callback), so single-file progress is coarse.

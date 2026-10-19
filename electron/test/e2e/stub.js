@@ -1,5 +1,5 @@
 // Deterministic `window.api` stub injected into the page before any renderer
-// script runs. Shapes mirror src/shared/ipc.ts (FileSummary, QCData, QueueState,
+// script runs. Shapes mirror src/shared/ipc.ts (FileSummary, QCData,
 // MszxManifest, AppSettings, ConvertResult). Fixture values are modeled on the
 // real repo test data in ../test/data (test.mzML has 50 spectra, etc.) but the
 // files are never actually read — this exercises UI wiring, not the C library.
@@ -208,35 +208,6 @@ export const fixtures = {
       },
     ],
   },
-  queue: {
-    running: 1,
-    paused: false,
-    maxConcurrency: 2,
-    jobs: [
-      {
-        id: "q1",
-        filePath: mzML,
-        fileName: "test.mzML",
-        kind: "mzML",
-        op: "compress",
-        status: "done",
-        progress: 100,
-        sizeBytes: 4_946_404,
-        ratio: 0.28,
-        destinationId: "local-archive",
-      },
-      {
-        id: "q2",
-        filePath: "/fixtures/sciex_ttof6600_100.mzML",
-        fileName: "sciex_ttof6600_100.mzML",
-        kind: "mzML",
-        op: "compress",
-        status: "running",
-        progress: 42,
-        sizeBytes: 909_920,
-      },
-    ],
-  },
 }
 
 /**
@@ -246,7 +217,6 @@ export const fixtures = {
  */
 export function installApiStub(fx) {
   const settingsListeners = []
-  const queueListeners = []
   let settings = { ...fx.settings }
 
   const summaryFor = (path) => {
@@ -356,19 +326,6 @@ export function installApiStub(fx) {
     onConvertProgress: () => () => {},
     onOpenAssociatedFiles: () => () => {},
     notifyRendererReady: () => {},
-    addQueueJob: () => Promise.resolve("job-stub-1"),
-    startQueue: () => Promise.resolve(),
-    pauseQueue: () => Promise.resolve(),
-    clearQueue: () => Promise.resolve(),
-    removeJob: () => Promise.resolve(),
-    getQueueState: () => Promise.resolve(JSON.parse(JSON.stringify(fx.queue))),
-    onQueueUpdate: (cb) => {
-      queueListeners.push(cb)
-      return () => {
-        const i = queueListeners.indexOf(cb)
-        if (i >= 0) queueListeners.splice(i, 1)
-      }
-    },
     getPathForFile: (file) => "/fixtures/" + (file && file.name ? file.name : "dropped"),
   }
 }

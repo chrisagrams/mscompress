@@ -28,15 +28,6 @@ export const IPC = {
   convertProgress: "convert:progress",
   // renderer -> main: update the Windows title-bar overlay colors (theme change)
   setTitleBarOverlay: "window:setTitleBarOverlay",
-  // MSTransfer batch queue
-  queueAdd: "queue:add",
-  queueStart: "queue:start",
-  queuePause: "queue:pause",
-  queueClear: "queue:clear",
-  queueRemove: "queue:remove",
-  queueGetState: "queue:getState",
-  // main -> renderer queue-state broadcast (webContents.send)
-  queueUpdate: "queue:update",
   // main -> renderer: OS handed us file paths to open (association/argv)
   openAssociatedFiles: "app:openAssociatedFiles",
   // renderer -> main: the association listener is mounted; flush buffered files.
@@ -249,72 +240,6 @@ export interface MszxBatchManifest {
  */
 export type MszxArchive = MszxManifest | MszxBatchManifest
 
-// ---- MSTransfer batch queue ------------------------------------------------
-
-export type QueueOp = "compress" | "decompress" | "extract"
-export type QueueStatus = "queued" | "running" | "done" | "error"
-
-/** A remote destination for finished outputs. */
-export interface RemoteDestination {
-  id: string
-  label: string
-  type: "local" | "ssh" | "s3"
-  /** local destinations are wired end-to-end; ssh/s3 are input-validating stubs. */
-  configured: boolean
-}
-
-/** Stub destination list (a real settings store arrives in a later task). */
-export const REMOTE_DESTINATIONS: RemoteDestination[] = [
-  {
-    id: "local-archive",
-    label: "local-archive · MScompress-Archive",
-    type: "local",
-    configured: true,
-  },
-  { id: "ssh-hpc", label: "hpc · cgrams@aurora:/flare", type: "ssh", configured: false },
-  { id: "s3-lab", label: "storage-a · s3://lab-archive", type: "s3", configured: false },
-]
-
-/** A single serializable queue job (settings are held privately in main). */
-export interface QueueJob {
-  id: string
-  filePath: string
-  fileName: string
-  kind: FileKind
-  op: QueueOp
-  status: QueueStatus
-  progress: number
-  sizeBytes: number
-  ratio?: number
-  etaSec?: number
-  /** local convert output path. */
-  outPath?: string
-  /** where the output finally landed after a remote transfer. */
-  finalPath?: string
-  destinationId?: string
-  destinationLabel?: string
-  error?: string
-}
-
-export interface QueueState {
-  jobs: QueueJob[]
-  running: number
-  paused: boolean
-  maxConcurrency: number
-}
-
-/** Request to enqueue a convert job (optionally routed to a remote dest). */
-export interface QueueAddRequest {
-  filePath: string
-  fileName?: string
-  kind: FileKind
-  op: QueueOp
-  settings: CompressOptions | DecompressOptions | ExtractOptions
-  destinationId?: string
-  remotePath?: string
-  transferMode?: "copy" | "move"
-}
-
 /** Recognized source file kinds. */
 export type FileKind = "mzML" | "msz" | "mszx"
 
@@ -469,20 +394,6 @@ export interface Api {
    * Subscribe to streamed convert progress events. Returns an unsubscribe fn.
    */
   onConvertProgress(cb: (p: ConvertProgress) => void): () => void
-  /** Enqueue a convert job on the MSTransfer batch queue. Returns its id. */
-  addQueueJob(req: QueueAddRequest): Promise<string>
-  /** Start (unpause) the queue runner. */
-  startQueue(): Promise<void>
-  /** Pause the queue (running jobs finish; no new ones start). */
-  pauseQueue(): Promise<void>
-  /** Remove all non-running jobs. */
-  clearQueue(): Promise<void>
-  /** Remove a single non-running job by id. */
-  removeJob(id: string): Promise<void>
-  /** Current queue snapshot (for initial render). */
-  getQueueState(): Promise<QueueState>
-  /** Subscribe to queue-state broadcasts. Returns an unsubscribe fn. */
-  onQueueUpdate(cb: (state: QueueState) => void): () => void
   /**
    * Subscribe to OS "open these files" pushes (double-click / Open with).
    * Returns an unsubscribe fn.

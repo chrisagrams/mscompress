@@ -3,8 +3,7 @@ import type { BrowserWindowConstructorOptions } from "electron"
 import { extname, join } from "path"
 import { fileURLToPath } from "url"
 import { registerIpcHandlers } from "./ipc"
-import { configureQueue } from "./queue"
-import { configureSettings, loadSettings, onSettingsChange } from "./settings"
+import { configureSettings, loadSettings } from "./settings"
 import { getNumThreads } from "./bindings"
 import { IPC, TITLE_BAR_OVERLAY } from "../shared/ipc"
 
@@ -159,15 +158,7 @@ if (!gotLock) {
       defaultThreads: getNumThreads(),
       defaultOutputDir: app.getPath("downloads"),
     })
-    const settings = loadSettings()
-
-    // The `local-archive` remote destination copies finished outputs here.
-    configureQueue({
-      localArchiveDir: join(app.getPath("downloads"), "MScompress-Archive"),
-      threads: settings.threads,
-    })
-    // Keep the queue's thread count in sync with settings.
-    onSettingsChange((s) => configureQueue({ threads: s.threads }))
+    loadSettings()
 
     registerIpcHandlers()
     createWindow()

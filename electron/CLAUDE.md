@@ -9,8 +9,8 @@ The legacy vanilla-JS GUI was removed. The new app is:
 ## Design source of truth
 The chosen design ("Split-Pane Workbench / IDE") already exists as a verified web mockup at:
 `/home/cgrams/mscompress-electron-mockups/workbench/` (React+TS+Tailwind v4+shadcn, mock data).
-Port that UI faithfully. Its layout: 3 panes — left rail (file Explorer + MSTransfer queue),
-center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — plus a top toolbar
+Port that UI faithfully. Its layout: 3 panes — left rail (file Explorer),
+center tabbed workspace (Convert | QC | Archive), right Inspector — plus a top toolbar
 (logo + theme toggle) and a bottom status bar (threads, mem, backend version).
 
 ## node-ts binding API (../node-ts/dist/index.d.ts)
@@ -42,18 +42,18 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
   (readMszx), `qc.ts` (computeQC), `convert.ts` (compress / decompress /
   extract / compressBatch), `worker.ts` + `convert-worker.ts` (worker-thread
   offload), `formats.ts` (shared helpers); `index.ts` re-exports the public
-  surface), `ipc.ts` (all `ipcMain.handle` handlers + broadcasts), `queue.ts`
-  (MSTransfer batch queue), `settings.ts` (persisted global settings).
+  surface), `ipc.ts` (all `ipcMain.handle` handlers + broadcasts), `settings.ts`
+  (persisted global settings).
 - **Preload** (`src/preload/index.ts`): exposes the single typed `window.api`.
 - **Shared** (`src/shared/ipc.ts`): channel whitelist (`IPC`) + all cross-process
-  types (`Api`, `FileSummary`, `QCData`, `QueueState`, `AppSettings`, …). No
+  types (`Api`, `FileSummary`, `QCData`, `AppSettings`, …). No
   electron/node imports — safe to reference from the renderer.
 - **Renderer** (`src/renderer/src/`): `App.tsx` shell, `components/` (LeftRail,
-  Inspector, ConvertTab, QCTab, ExtractQueueTab, ArchiveTab, SettingsDialog),
+  Inspector, ConvertTab, QCTab, ArchiveTab, SettingsDialog),
   `files.ts` (open-files list). Renderer reaches main only via `window.api`.
-- `bindings/`, `queue.ts`, and `settings.ts` are kept **electron-free**; electron
-  paths (userData, downloads, local-archive dir) are injected via
-  `configureSettings()` / `configureQueue()` from `index.ts`.
+- `bindings/` and `settings.ts` are kept **electron-free**; electron
+  paths (userData, downloads) are injected via `configureSettings()` from
+  `index.ts`.
 
 ## Batch .mszx (v2)
 - `readMszx` returns the `MszxArchive` union (`container: "single" | "batch"`);
@@ -68,9 +68,8 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
   Convert tab's "Batch" operation, enabled when 2+ mzML are checked.
 - The Batch op offers two output modes: "One .mszx archive" →
   `compressBatch(paths, outPath, opts)` where outPath = the Output card's
-  local directory + an archive-name field (Remote is disabled in this mode);
-  "Individual .msz files" → one queued compress job per file (the old
-  "Compress selected" behavior, with local/remote routing).
+  local directory + an archive-name field; "Individual .msz files" → one
+  `compress` per file, run sequentially into the output directory.
 - **QC on a batch archive is per-member**: `computeQC(path, { entry })` opens
   that member via `MSZXBatchFile` (member is archive-owned — close the archive,
   not the member). QCTab shows an "Archive member" dropdown for batch archives
@@ -83,8 +82,7 @@ center tabbed workspace (Convert | QC | Queue | Archive), right Inspector — pl
 
 ## Conventions that emerged
 - **Threads are global, not per-job**: they come from `settings.threads`. The
-  convert IPC handlers inject it into `RuntimeArguments`; the queue gets it via
-  `configureQueue({ threads })`. Do not add a per-job thread control.
+  convert IPC handlers inject it into `RuntimeArguments`. Do not add a per-job thread control.
 - IPC option/type additions go in `src/shared/ipc.ts`; add the channel to `IPC`,
   the method to `Api`, the handler in `ipc.ts`, and the preload wiring.
 - `bindings/` uses the real `mscompress` types (`BaseFile`, `MSZXBatchFile`,
