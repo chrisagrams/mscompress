@@ -61,13 +61,16 @@ endif()
 
 # --- Step 2: full table matches the golden fixture ---
 run_ok("${EXECUTABLE}" --list --query "entry=0:" "${IDX}")
-# Windows stdout is text mode, so printf's "\n" arrives as "\r\n".
-string(REPLACE "\r\n" "\n" RUN_OUT "${RUN_OUT}")
-file(WRITE "${TEMP_DIR}/table.tsv" "${RUN_OUT}")
-file(MD5 "${TEMP_DIR}/table.tsv" GOT)
-file(MD5 "${GOLDEN_TSV}" WANT)
+# Windows stdout is text mode, so line endings arrive with extra "\r"s;
+# drop them from both sides and compare the text.
+file(READ "${GOLDEN_TSV}" WANT)
+string(REPLACE "\r" "" GOT "${RUN_OUT}")
+string(REPLACE "\r" "" WANT "${WANT}")
 if(NOT GOT STREQUAL WANT)
-    message(FATAL_ERROR "index table differs from ${GOLDEN_TSV}:\n${RUN_OUT}")
+    string(LENGTH "${GOT}" GOT_LEN)
+    string(LENGTH "${WANT}" WANT_LEN)
+    message(FATAL_ERROR "index table differs from ${GOLDEN_TSV} "
+        "(got ${GOT_LEN} bytes, want ${WANT_LEN}):\n${GOT}")
 endif()
 
 run_ok("${EXECUTABLE}" --list --query "rt=5:8" "${IDX}")

@@ -114,6 +114,7 @@
 #define MSLEVEL 0x01
 #define SCANNUM 0x02
 #define RETTIME 0x04
+#define SPECMETA 0x08 /* fill division_t.meta (the .mszx index columns) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,6 +171,7 @@ typedef struct {
    int continue_on_error; // skip-and-report instead of fail-fast
    int list_mode;         // --list: print an .mszx table of contents
    int index;             // write the per-spectrum index (--no-index clears)
+   int spectrum_meta;     // scan_mzml fills division_t.meta (set by batch writer)
    char* query;           // --query: filter for --list (needs an index)
    char* from_file;      // --from-file manifest of input paths (or "-" for stdin)
    char** inputs;         // collected positional inputs (files/dirs/globs)
@@ -183,6 +185,16 @@ typedef struct {
    size_t file_end;  // TODO: remove this
 } data_positions_t;
 
+/* Per-spectrum metadata for the .mszx index. Missing values are NaN for
+ * floats and 0 for charge. */
+typedef struct {
+   float rt_sec;
+   float precursor_mz;
+   float tic;
+   float base_peak_mz;
+   int8_t charge;
+} spectrum_meta_t;
+
 typedef struct {
    data_positions_t* spectra;
    data_positions_t* xml;
@@ -194,6 +206,7 @@ typedef struct {
    uint32_t* scans;
    uint16_t* ms_levels;
    float* ret_times;
+   spectrum_meta_t* meta; /* only with SPECMETA, else NULL */
 
 } division_t;
 
@@ -602,10 +615,10 @@ typedef struct mszx_index_builder mszx_index_builder_t;
 mszx_index_builder_t* mszx_index_builder_new(void);
 void mszx_index_builder_free(mszx_index_builder_t* b);
 size_t mszx_index_builder_rows(const mszx_index_builder_t* b);
-/* Append one row per spectrum in `divs`, reading metadata out of the mzML
- * mapping the divisions point into. */
+/* Append one row per spectrum in `divs`. The divisions must come from a
+ * scan_mzml() run with SPECMETA, which already read the metadata. */
 int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
-                           const char* map, size_t len, divisions_t* divs);
+                           divisions_t* divs);
 /* Serialize to a malloc'd buffer. */
 void* mszx_index_builder_serialize(const mszx_index_builder_t* b,
                                    uint32_t n_entries, size_t* out_len);
