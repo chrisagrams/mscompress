@@ -250,9 +250,7 @@ export function QCTab({ path, name, kind }: { path: string; name: string; kind: 
         {memberSelector}
         <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
           <Loader2 className="size-6 animate-spin" />
-          <span className="text-xs">
-            Computing QC for {entry ?? name}…
-          </span>
+          <span className="text-xs">Computing QC for {entry ?? name}…</span>
         </div>
       </div>
     )
@@ -282,182 +280,184 @@ export function QCTab({ path, name, kind }: { path: string; name: string; kind: 
     <div>
       {memberSelector}
       <div data-testid="qc-charts" className="grid grid-cols-2 gap-3 p-4">
-      {/* TIC */}
-      <Panel
-        title="TIC Chromatogram"
-        right={<span className="mono text-[10px] text-muted-foreground">intensity · RT(min)</span>}
-      >
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={tic} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="ticFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis
-              dataKey="rt"
-              tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v) => Number(v).toFixed(2)}
-            />
-            <YAxis
-              tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              width={38}
-              tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
-            />
-            <RTooltip
-              {...chartTooltip}
-              formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "TIC"]}
-            />
-            <Area
-              type="monotone"
-              dataKey="tic"
-              stroke="var(--chart-1)"
-              strokeWidth={1.5}
-              fill="url(#ticFill)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Panel>
-
-      {/* Base peak */}
-      <Panel
-        title="Base-Peak Chromatogram"
-        right={<span className="mono text-[10px] text-muted-foreground">BPC · RT(min)</span>}
-      >
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={bpc} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="bpcFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis
-              dataKey="rt"
-              tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v) => Number(v).toFixed(2)}
-            />
-            <YAxis
-              tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              width={38}
-              tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
-            />
-            <RTooltip
-              {...chartTooltip}
-              formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "BPC"]}
-            />
-            <Area
-              type="monotone"
-              dataKey="bpc"
-              stroke="var(--chart-2)"
-              strokeWidth={1.5}
-              fill="url(#bpcFill)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Panel>
-
-      {/* Heatmap - spans full width */}
-      <Panel
-        title="RT × m/z Density Map"
-        className="col-span-2"
-        right={
-          <div className="flex items-center gap-2">
-            <span className="mono text-[10px] text-muted-foreground">low</span>
-            <div
-              className="h-2.5 w-28 rounded-sm"
-              style={{
-                background: `linear-gradient(to right, ${heatColor(0)}, ${heatColor(0.25)}, ${heatColor(0.5)}, ${heatColor(0.75)}, ${heatColor(1)})`,
-              }}
-            />
-            <span className="mono text-[10px] text-muted-foreground">high</span>
-          </div>
-        }
-      >
-        <DensityHeatmap heatmap={heatmap} />
-      </Panel>
-
-      {/* MS-level donut */}
-      <Panel title="MS-Level Distribution">
-        <div className="flex items-center gap-4">
-          <ResponsiveContainer width="55%" height={150}>
-            <PieChart>
-              <Pie
-                data={donutData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={40}
-                outerRadius={62}
-                paddingAngle={2}
-                stroke="var(--background)"
-                strokeWidth={2}
-              >
-                {donutData.map((_, i) => (
-                  <Cell key={i} fill={donutColors[i % donutColors.length]} />
-                ))}
-              </Pie>
-              <RTooltip {...chartTooltip} formatter={(v) => Number(v).toLocaleString()} />
-            </PieChart>
+        {/* TIC */}
+        <Panel
+          title="TIC Chromatogram"
+          right={
+            <span className="mono text-[10px] text-muted-foreground">intensity · RT(min)</span>
+          }
+        >
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={tic} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ticFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="rt"
+                tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => Number(v).toFixed(2)}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                width={38}
+                tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
+              />
+              <RTooltip
+                {...chartTooltip}
+                formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "TIC"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="tic"
+                stroke="var(--chart-1)"
+                strokeWidth={1.5}
+                fill="url(#ticFill)"
+              />
+            </AreaChart>
           </ResponsiveContainer>
-          <div className="flex-1 space-y-2">
-            {donutData.map((d, i) => (
-              <div key={d.name} className="flex items-center gap-2 text-xs">
-                <span
-                  className="size-2.5 rounded-sm"
-                  style={{ background: donutColors[i % donutColors.length] }}
-                />
-                <span className="text-muted-foreground">{d.name}</span>
-                <span className="mono ml-auto">{d.value.toLocaleString()}</span>
-                <span className="mono w-10 text-right text-muted-foreground">
-                  {((d.value / totalSpectra) * 100).toFixed(1)}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Panel>
+        </Panel>
 
-      {/* Peaks histogram */}
-      <Panel title="Peaks per Spectrum">
-        <ResponsiveContainer width="100%" height={150}>
-          <BarChart data={peaksPerSpectrum} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis
-              dataKey="bin"
-              tick={{ fontSize: 8, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              interval={0}
-              angle={-25}
-              textAnchor="end"
-              height={40}
-            />
-            <YAxis
-              tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              width={38}
-              allowDecimals={false}
-            />
-            <RTooltip
-              {...chartTooltip}
-              formatter={(v) => [Number(v).toLocaleString(), "spectra"]}
-            />
-            <Bar dataKey="count" fill="var(--chart-4)" radius={[2, 2, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Panel>
+        {/* Base peak */}
+        <Panel
+          title="Base-Peak Chromatogram"
+          right={<span className="mono text-[10px] text-muted-foreground">BPC · RT(min)</span>}
+        >
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={bpc} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="bpcFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="rt"
+                tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => Number(v).toFixed(2)}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                width={38}
+                tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
+              />
+              <RTooltip
+                {...chartTooltip}
+                formatter={(v) => [`${(Number(v) / 1e6).toFixed(2)} M`, "BPC"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="bpc"
+                stroke="var(--chart-2)"
+                strokeWidth={1.5}
+                fill="url(#bpcFill)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Panel>
+
+        {/* Heatmap - spans full width */}
+        <Panel
+          title="RT × m/z Density Map"
+          className="col-span-2"
+          right={
+            <div className="flex items-center gap-2">
+              <span className="mono text-[10px] text-muted-foreground">low</span>
+              <div
+                className="h-2.5 w-28 rounded-sm"
+                style={{
+                  background: `linear-gradient(to right, ${heatColor(0)}, ${heatColor(0.25)}, ${heatColor(0.5)}, ${heatColor(0.75)}, ${heatColor(1)})`,
+                }}
+              />
+              <span className="mono text-[10px] text-muted-foreground">high</span>
+            </div>
+          }
+        >
+          <DensityHeatmap heatmap={heatmap} />
+        </Panel>
+
+        {/* MS-level donut */}
+        <Panel title="MS-Level Distribution">
+          <div className="flex items-center gap-4">
+            <ResponsiveContainer width="55%" height={150}>
+              <PieChart>
+                <Pie
+                  data={donutData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={40}
+                  outerRadius={62}
+                  paddingAngle={2}
+                  stroke="var(--background)"
+                  strokeWidth={2}
+                >
+                  {donutData.map((_, i) => (
+                    <Cell key={i} fill={donutColors[i % donutColors.length]} />
+                  ))}
+                </Pie>
+                <RTooltip {...chartTooltip} formatter={(v) => Number(v).toLocaleString()} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex-1 space-y-2">
+              {donutData.map((d, i) => (
+                <div key={d.name} className="flex items-center gap-2 text-xs">
+                  <span
+                    className="size-2.5 rounded-sm"
+                    style={{ background: donutColors[i % donutColors.length] }}
+                  />
+                  <span className="text-muted-foreground">{d.name}</span>
+                  <span className="mono ml-auto">{d.value.toLocaleString()}</span>
+                  <span className="mono w-10 text-right text-muted-foreground">
+                    {((d.value / totalSpectra) * 100).toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        {/* Peaks histogram */}
+        <Panel title="Peaks per Spectrum">
+          <ResponsiveContainer width="100%" height={150}>
+            <BarChart data={peaksPerSpectrum} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="bin"
+                tick={{ fontSize: 8, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={40}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                width={38}
+                allowDecimals={false}
+              />
+              <RTooltip
+                {...chartTooltip}
+                formatter={(v) => [Number(v).toLocaleString(), "spectra"]}
+              />
+              <Bar dataKey="count" fill="var(--chart-4)" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
       </div>
     </div>
   )
