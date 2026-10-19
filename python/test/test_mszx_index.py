@@ -178,3 +178,19 @@ def test_query_without_index_raises(unindexed):
 def test_index_rejects_garbage():
     with pytest.raises(ValueError):
         SpectrumIndex(b"nope" * 16)
+
+
+def test_index_rejects_truncation(indexed):
+    with tarfile.open(indexed) as tar:
+        data = tar.extractfile("index.mszxi").read()
+    SpectrumIndex(data)
+    # Cut inside the header, the entry offsets and the column directory:
+    # a ValueError, never struct.error.
+    for cut in (16, 40, 72):
+        with pytest.raises(ValueError, match="truncated"):
+            SpectrumIndex(data[:cut])
+    # The sorted-key directory runs past the end (n_keys at byte 24).
+    bad = bytearray(data)
+    bad[24:28] = (1 << 20).to_bytes(4, "little")
+    with pytest.raises(ValueError, match="truncated"):
+        SpectrumIndex(bytes(bad))

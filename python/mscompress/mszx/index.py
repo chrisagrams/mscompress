@@ -86,41 +86,58 @@ class SpectrumIndex:
     """
 
     def __init__(self, buffer: Any) -> None:
-        data = np.frombuffer(buffer, dtype=np.uint8)
-        if len(data) < _HEADER.size:
-            raise ValueError("Spectrum index is truncated")
-        magic, version, _flags, n_rows, n_entries, n_cols, n_keys, _ = (
-            _HEADER.unpack_from(data, 0)
-        )
-        if magic != _MAGIC:
-            raise ValueError("Not a spectrum index (bad magic)")
-        if version != _FORMAT_VERSION:
-            raise ValueError(f"Unsupported spectrum index version {version}")
-
-        self._data = data
-        self._n_rows = int(n_rows)
-        self._n_entries = int(n_entries)
+        self._data = np.frombuffer(buffer, dtype=np.uint8)
+        self._n_rows = 0
+        self._n_entries = 0
+        self._offsets: np.ndarray = np.zeros(1, dtype="<u8")
         self._columns: Dict[str, np.ndarray] = {}
         # name -> perm (None for a key that never decreases within an entry)
         self._keys: Dict[str, Optional[np.ndarray]] = {}
         self._derived: Dict[str, np.ndarray] = {}
 
-        off = _HEADER.size
-        n_offsets = self._n_entries + 1
-        if off + n_offsets * 8 > len(data):
+        # Sections in on-disk order; each reader returns where the next starts.
+        n_cols, n_keys = self._read_header()
+        off = self._read_offsets(_HEADER.size)
+        off = self._read_columns(off, n_cols)
+        self._read_keys(off, n_keys)
+
+    def _require(self, offset: int, nbytes: int) -> None:
+        if offset + nbytes > len(self._data):
             raise ValueError("Spectrum index is truncated")
-        self._offsets = data[off : off + n_offsets * 8].view("<u8")
-        offsets = self._offsets
+
+    def _read_header(self) -> Tuple[int, int]:
+        """Check magic and version; return the directory sizes."""
+        self._require(0, _HEADER.size)
+        magic, version, _flags, n_rows, n_entries, n_cols, n_keys, _ = (
+            _HEADER.unpack_from(self._data, 0)
+        )
+        if magic != _MAGIC:
+            raise ValueError("Not a spectrum index (bad magic)")
+        if version != _FORMAT_VERSION:
+            raise ValueError(f"Unsupported spectrum index version {version}")
+        self._n_rows = int(n_rows)
+        self._n_entries = int(n_entries)
+        return int(n_cols), int(n_keys)
+
+    def _read_offsets(self, off: int) -> int:
+        """The first row of each entry, plus n_rows at the end."""
+        nbytes = (self._n_entries + 1) * 8
+        self._require(off, nbytes)
+        offsets = self._data[off : off + nbytes].view("<u8")
         if (
             offsets[0] != 0
             or offsets[-1] != self._n_rows
             or (np.diff(offsets.astype(np.int64)) < 0).any()
         ):
             raise ValueError("Corrupt spectrum index entry offsets")
-        off += n_offsets * 8
+        self._offsets = offsets
+        return off + nbytes
 
+    def _read_columns(self, off: int, n_cols: int) -> int:
+        """View every known stored column; skip unknown ones."""
+        self._require(off, n_cols * _COLUMN_DIR.size)
         for _ in range(n_cols):
-            col_id, dtype, col_off, nbytes = _COLUMN_DIR.unpack_from(data, off)
+            col_id, dtype, col_off, nbytes = _COLUMN_DIR.unpack_from(self._data, off)
             off += _COLUMN_DIR.size
             name = _COLUMN_NAMES.get(col_id)
             dt = _DTYPES.get(dtype)
@@ -129,9 +146,13 @@ class SpectrumIndex:
             if nbytes != self._n_rows * dt.itemsize:
                 raise ValueError(f"Corrupt spectrum index section for {name!r}")
             self._columns[name] = self._view(col_off, nbytes, dt, name)
+        return off
 
+    def _read_keys(self, off: int, n_keys: int) -> int:
+        """Register each sorted key whose column was read; skip the rest."""
+        self._require(off, n_keys * _KEY_DIR.size)
         for _ in range(n_keys):
-            col_id, kind, n_valid, perm_off = _KEY_DIR.unpack_from(data, off)
+            col_id, kind, n_valid, perm_off = _KEY_DIR.unpack_from(self._data, off)
             off += _KEY_DIR.size
             name = _COLUMN_NAMES.get(col_id)
             if name not in self._columns:
@@ -145,6 +166,7 @@ class SpectrumIndex:
                 if len(perm) and int(perm.max()) >= self._n_rows:
                     raise ValueError(f"Corrupt permutation for {name!r}")
                 self._keys[name] = perm
+        return off
 
     def _view(self, offset: int, nbytes: int, dtype: np.dtype, name: str) -> np.ndarray:
         if offset % 8 or offset + nbytes > len(self._data):
