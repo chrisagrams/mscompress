@@ -562,7 +562,8 @@ int query_mszx(char* input_path, const char* query);
 #define MSZX_INDEX_ENTRY "index.mszxi"
 #define MSZX_INDEX_FORMAT_VERSION 1
 
-/* Column ids. Never renumber: they are stored in the index. */
+/* Column ids. Never renumber: they are stored in the index. entry and
+ * spectrum_idx are derived from the entry offsets rather than stored. */
 #define MSZX_COL_ENTRY 1
 #define MSZX_COL_SPECTRUM_IDX 2
 #define MSZX_COL_SCAN 3
@@ -584,6 +585,10 @@ int query_mszx(char* input_path, const char* query);
 #define MSZX_DT_I64 8
 #define MSZX_DT_F32 9
 #define MSZX_DT_F64 10
+
+/* Sorted-key kinds. Never renumber. */
+#define MSZX_KEY_PERM 1 /* permutation of the non-NaN rows */
+#define MSZX_KEY_RUNS 2 /* never decreases within an entry; no permutation */
 
 const char* mszx_index_column_name(int id);
 /* Column id for a name or a --query alias (rt, mz, precursor, level); -1 if
