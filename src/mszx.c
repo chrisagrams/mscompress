@@ -569,7 +569,7 @@ static void print_index_cell(const mszx_index_t* idx, int column, uint32_t row) 
  *
  * Reads the index member through an mmap — no .msz member is opened. An
  * archive written without an index is indexed in memory first (slow: every
- * member is decompressed), with a hint to run --reindex.
+ * member is decompressed).
  *
  * @return 0 on success, non-zero on failure.
  */
@@ -627,7 +627,7 @@ int query_mszx(char* input_path, const char* query, Arguments* args) {
       }
    } else if (rc == 0) {
       warning("query_mszx: '%s' has no spectrum index; scanning every member "
-              "(run --reindex to add one)\n",
+              "(slow)\n",
               input_path);
       if (mszx_index_build_from_archive(fd, args, &built, &data_len) != 0)
          rc = -1;

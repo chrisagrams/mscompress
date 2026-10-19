@@ -1447,33 +1447,6 @@ int open_output_file_rw(char* path) {
    return fd;
 }
 
-/* Open an EXISTING file read-write without truncating it (for in-place
- * edits such as mszx_reindex). */
-int open_existing_file_rw(char* path) {
-   int fd = -1;
-   if (path) {
-#ifdef _WIN32
-      fd = _open(path, _O_RDWR | _O_BINARY);
-#else
-      fd = open(path, O_RDWR);
-#endif
-      if (fd < 0)
-         warning("Error opening '%s' for update. (%s)\n", path,
-                 strerror(errno));
-   }
-   return fd;
-}
-
-/* Truncate (or extend) fd to exactly `length` bytes. Returns 0 or -1. */
-int truncate_file(int fd, int64_t length) {
-   if (fd < 0 || length < 0) return -1;
-#ifdef _WIN32
-   return _chsize_s(fd, length) == 0 ? 0 : -1;
-#else
-   return ftruncate(fd, (off_t)length) == 0 ? 0 : -1;
-#endif
-}
-
 int fd_is_seekable(int fd) {
    if (fd < 0) return 0;
 #ifdef _WIN32

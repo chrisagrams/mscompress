@@ -170,7 +170,6 @@ typedef struct {
    int continue_on_error; // skip-and-report instead of fail-fast
    int list_mode;         // --list: print an .mszx table of contents
    int no_index;          // --no-index: skip the per-spectrum index
-   int reindex;           // --reindex: (re)build an archive's index in place
    char* query;           // --query: filter for --list (needs an index)
    char* from_file;      // --from-file manifest of input paths (or "-" for stdin)
    char** inputs;         // collected positional inputs (files/dirs/globs)
@@ -446,9 +445,6 @@ int open_output_file(char* path);
 /* Like open_output_file but WITHOUT O_APPEND, so lseek()+write() can overwrite
  * earlier bytes. Required by the USTAR writer's seek-back size/checksum patch. */
 int open_output_file_rw(char* path);
-/* Open an existing file read-write without truncating it. */
-int open_existing_file_rw(char* path);
-int truncate_file(int fd, int64_t length);
 /* Returns 1 if fd refers to a seekable regular file, 0 otherwise (pipe/FIFO). */
 int fd_is_seekable(int fd);
 
@@ -555,12 +551,6 @@ void batch_writer_abort(batch_writer_t* w);
 int batch_writer_set_index(batch_writer_t* w, int enabled);
 
 int compress_batch(Arguments* arguments);
-
-/* Add or rebuild the per-spectrum index of an existing batch archive, in
- * place: everything from the old index (or manifest) onward is truncated and
- * rewritten. The result is byte-identical to writing the archive with the
- * index on. Returns 0 or -1. */
-int mszx_reindex(const char* path, Arguments* args);
 
 /* Print the indexed spectra of a batch archive matching `query` (see
  * mszx_index_parse_query) as TSV. Archives without an index are scanned. */

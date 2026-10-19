@@ -93,8 +93,8 @@ add_test(NAME BatchRejectTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_batch_reject.cmake
 )
 
-# Per-spectrum index: golden table, --no-index, --reindex parity, fallback
-# scan, and decompression skipping the index member.
+# Per-spectrum index: golden table, --no-index, fallback scan, and
+# decompression skipping the index member.
 add_test(NAME BatchIndexTest
     COMMAND ${CMAKE_COMMAND}
     -DEXECUTABLE=$<TARGET_FILE:mscompress>

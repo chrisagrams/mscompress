@@ -115,9 +115,6 @@ static void print_usage(FILE* stream, int exit_code) {
            "spectra matching filter as TSV,\n"
            "                                e.g. \"rt=600:660,ms_level=2,"
            "precursor_mz=500:510\".\n");
-   fprintf(stream,
-           "      --reindex                 Add or rebuild the spectrum index "
-           "of an existing .mszx in place.\n");
    fprintf(stream, "\n");
    fprintf(stream, "  -h, --help                    Show this help message.\n");
    fprintf(stream,
@@ -325,8 +322,6 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
          arguments->no_index = 1;
       } else if (strcmp(argv[i], "--index") == 0) {
          arguments->no_index = 0;
-      } else if (strcmp(argv[i], "--reindex") == 0) {
-         arguments->reindex = 1;
       } else if (strcmp(argv[i], "--query") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing filter for --query.");
@@ -470,15 +465,6 @@ int main(int argc, char* argv[]) {
                   ? 0
                   : 1);
       exit(list_mszx(arguments.input_file) == 0 ? 0 : 1);
-   }
-
-   // --reindex: add or rebuild the spectrum index of an archive in place.
-   if (arguments.reindex) {
-      if (!arguments.input_file || arguments.n_inputs != 1) {
-         fprintf(stderr, "--reindex takes exactly one .mszx archive.\n");
-         exit(1);
-      }
-      exit(mszx_reindex(arguments.input_file, &arguments) == 0 ? 0 : 1);
    }
 
    // Batch mode: folder / glob / explicit list / --from-file -> one .mszx.
