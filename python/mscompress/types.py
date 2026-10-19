@@ -43,6 +43,10 @@ class SpectrumTransform(Protocol):
 class AnnotationFormat(Enum):
     """Supported annotation formats."""
 
+    MZTAB = "mztab"
+    # Legacy formats: read from archives written before annotations were
+    # unified on mzTab, and accepted as conversion inputs. New archives only
+    # ever store MZTAB.
     PERCOLATOR_TSV = "percolator_tsv"
     PEPXML = "pepxml"
     TSV = "tsv"

@@ -223,7 +223,9 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
             return 1;
          }
          arguments->scans =
-             (uint32_t *)string_to_array(argv[++i], &arguments->scans_length);
+             string_to_scan_array(argv[++i], &arguments->scans_length);
+         if (!arguments->scans)
+            return 1;
       } else if (strcmp(argv[i], "--ms-level") == 0) {
          if (i + 1 >= argc) {
             fprintf(stderr, "%s\n", "Missing ms level for extraction.");
@@ -381,8 +383,11 @@ static int is_batch_request(Arguments* a) {
     * The extension test matters: in the legacy `mscompress input output` form
     * the second positional is an output path, and it exists whenever the
     * command is re-run or an existing file is being overwritten. Counting
-    * bare existence here silently flipped those invocations into batch mode. */
-   if (a->n_inputs >= 2) {
+    * bare existence here silently flipped those invocations into batch mode.
+    *
+    * --extract is skipped entirely: its output is itself an .mzML, so the
+    * extension test cannot tell an existing output from a second input. */
+   if (a->n_inputs >= 2 && !a->extract_only) {
       size_t existing_mzml = 0;
       for (size_t i = 0; i < a->n_inputs; ++i) {
          struct stat st;
@@ -437,6 +442,13 @@ int main(int argc, char* argv[]) {
 
    // Batch mode: folder / glob / explicit list / --from-file -> one .mszx.
    int is_batch = is_batch_request(&arguments);
+
+   // Extraction is single-file only. Without this, the extract_only override
+   // below turns COMPRESS_BATCH into EXTRACT with no input mapped.
+   if (is_batch && arguments.extract_only) {
+      fprintf(stderr, "%s\n", "--extract takes a single input file.");
+      exit(1);
+   }
 
    // Legacy single-file forms: a second positional is the output path. Applies
    // to compress/decompress/.mszx-decompress alike (batch ignores this: all

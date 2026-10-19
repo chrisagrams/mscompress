@@ -1,8 +1,9 @@
 """parquet -> .mszx + parquet -> annotations TSV.
 
-`parquet_to_mszx` bundles the .msz produced by `parquet_to_msz` with a
-Percolator-style annotations TSV (written here as `_write_annotations_tsv`)
-into a single archive.
+`parquet_to_mszx` bundles the .msz produced by `parquet_to_msz` with the
+per-row annotations into a single archive; the annotations are stored as
+mzTab, like every other source of search results. `parquet_to_annotations_tsv`
+writes the same annotations as a tab-separated file.
 """
 
 from __future__ import annotations
@@ -11,13 +12,14 @@ import os
 import tempfile
 from os import PathLike
 from pathlib import Path
-from typing import Iterator, List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from mscompress.annotations import TSVReader
+from mscompress.annotations import PSMTable, SearchMetadata, psm_frame
 from mscompress.mszx import MSZXBuilder
 
 from mscompress.parquet.msz import parquet_to_msz
@@ -88,51 +90,12 @@ def _resolve_peptide_charge(
     return [_DEFAULT_PEPTIDE] * n, _col_or_default(batch, cmap.charge, _DEFAULT_CHARGE)
 
 
-def _batch_to_tsv_rows(
-    batch: pa.RecordBatch,
-    cmap: _ColumnMap,
-    extra_cols: Sequence[str],
-    *,
-    start_scan: int,
-) -> Iterator[str]:
-    """Yield one TSV-formatted line per row in `batch`, beginning at start_scan."""
-    peptides, charges = _resolve_peptide_charge(cmap, batch)
-    precursors = _col_or_default(batch, cmap.precursor, _DEFAULT_PRECURSOR)
-    ret_times = _col_or_default(batch, cmap.ret_time, _DEFAULT_RET_TIME)
-    scores: Optional[np.ndarray] = (
-        batch.column(cmap.score).to_numpy(zero_copy_only=False)
-        if cmap.score is not None else None
-    )
-    extras: List[np.ndarray] = [
-        batch.column(c).to_numpy(zero_copy_only=False) for c in extra_cols
-    ]
+def _annotations_frame(parquet_path: Path, *, score_column: Optional[str]) -> pd.DataFrame:
+    """One row per parquet row: scan (1-based row number), peptide, charge,
+    score, precursor, ret_time and any optional float columns.
 
-    for i in range(batch.num_rows):
-        cells = [
-            str(start_scan + i),
-            _tsv_escape(peptides[i]),
-            str(int(charges[i])),
-            repr(float(scores[i])) if scores is not None else "",
-            repr(float(precursors[i])),
-            repr(float(ret_times[i])),
-        ]
-        cells.extend(repr(float(e[i])) for e in extras)
-        yield "\t".join(cells)
-
-
-def _write_annotations_tsv(
-    parquet_path: Path,
-    tsv_path: Path,
-    *,
-    score_column: Optional[str],
-) -> int:
-    """Write a Percolator-compatible TSV beside the spectra file.
-
-    Returns the number of rows written.
-
-    `score_column=None` writes empty `score` cells (callers downstream of
-    `TSVReader` will see `score=0.0`). Pass an explicit column name to require
-    it; if absent from the schema, `_resolve_schema` raises.
+    `score_column=None` auto-picks a score column, else leaves `score` empty.
+    An explicit name that is not in the schema raises (via `_resolve_schema`).
     """
     pf = pq.ParquetFile(str(parquet_path))
     schema = pf.schema_arrow
@@ -145,7 +108,7 @@ def _write_annotations_tsv(
             f"Got schema columns: {schema.names}"
         )
 
-    # Optional float columns we still surface as TSV extras when present (and
+    # Optional float columns we still surface as extras when present (and
     # not already used as the score column).
     extra_cols = [
         c for c in _OPTIONAL_FLOAT_COLUMNS
@@ -155,17 +118,43 @@ def _write_annotations_tsv(
         cmap.peptide, cmap.charge, cmap.peptide_charge,
         cmap.precursor, cmap.ret_time, cmap.score,
     ) if c is not None] + extra_cols
-    headers = ["ScanNr", "Peptide", "Charge", "score", "precursor", "ret_time"] + extra_cols
 
-    n = 0
-    with open(tsv_path, "w", encoding="utf-8", newline="\n") as out:
-        out.write("\t".join(headers) + "\n")
-        for batch in pf.iter_batches(columns=read_cols):
-            for row in _batch_to_tsv_rows(batch, cmap, extra_cols, start_scan=n + 1):
-                out.write(row + "\n")
-                n += 1
+    frames = []
+    for batch in pf.iter_batches(columns=read_cols):
+        peptides, charges = _resolve_peptide_charge(cmap, batch)
+        frame = pd.DataFrame({
+            "peptide": [_tsv_escape(p) for p in peptides],
+            "charge": np.asarray(charges, dtype=np.int64),
+            "score": (batch.column(cmap.score).to_numpy(zero_copy_only=False).astype(float)
+                      if cmap.score is not None else np.nan),
+            "precursor": np.asarray(
+                _col_or_default(batch, cmap.precursor, _DEFAULT_PRECURSOR), dtype=float),
+            "ret_time": np.asarray(
+                _col_or_default(batch, cmap.ret_time, _DEFAULT_RET_TIME), dtype=float),
+        })
+        for c in extra_cols:
+            frame[c] = batch.column(c).to_numpy(zero_copy_only=False).astype(float)
+        frames.append(frame)
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(
+        columns=["peptide", "charge", "score", "precursor", "ret_time", *extra_cols])
+    df.insert(0, "scan", np.arange(1, len(df) + 1))
+    return df
 
-    return n
+
+def _write_annotations_tsv(
+    parquet_path: Path,
+    tsv_path: Path,
+    *,
+    score_column: Optional[str],
+) -> int:
+    """Write the annotations as a tab-separated file. Returns the row count.
+
+    `score_column=None` with no auto-resolvable score writes empty `score` cells.
+    """
+    df = _annotations_frame(parquet_path, score_column=score_column)
+    df.rename(columns={"scan": "ScanNr", "peptide": "Peptide", "charge": "Charge"}).to_csv(
+        tsv_path, sep="\t", index=False, na_rep="", lineterminator="\n")
+    return len(df)
 
 
 def parquet_to_annotations_tsv(
@@ -207,7 +196,7 @@ def parquet_to_mszx(
 
     Produces a `.mszx` containing:
       - `spectra.msz` - compressed mz/intensity/retention-time data
-      - `<source>.tsv.zst` - Percolator-style annotations (peptide/charge/score…)
+      - `<source>.mztab.zst` - annotations (peptide/charge/score…) as mzTab
       - `manifest.json`
 
     Args:
@@ -235,7 +224,6 @@ def parquet_to_mszx(
     with tempfile.TemporaryDirectory(prefix="mscompress-parquet-mszx-") as td_str:
         td = Path(td_str)
         tmp_msz = td / "spectra.msz"
-        tmp_tsv = td / (parquet_path.stem + ".tsv")
 
         msz = parquet_to_msz(
             parquet_path, tmp_msz,
@@ -245,10 +233,15 @@ def parquet_to_mszx(
         try:
             builder = MSZXBuilder(msz, source_name=parquet_path.name)
             if not is_long:
-                _write_annotations_tsv(parquet_path, tmp_tsv, score_column=score_column)
-                reader = TSVReader(tmp_tsv)
-                builder.add_annotations(
-                    reader,
+                df = _annotations_frame(parquet_path, score_column=score_column)
+                md = SearchMetadata(
+                    primary_score="score" if df["score"].notna().any() else None,
+                    source_format="parquet",
+                    source_file=parquet_path.name,
+                )
+                builder.add_psms(
+                    PSMTable(psm_frame(df), md),
+                    name=parquet_path.stem,
                     description=description or f"Annotations extracted from {parquet_path.name}",
                 )
             if description:

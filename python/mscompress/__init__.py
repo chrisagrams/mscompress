@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.0.16"  # x-release-please-version
+__version__ = "1.1.1"  # x-release-please-version
 
 
 from mscompress._core import (
@@ -68,10 +68,10 @@ from mscompress.mszx import (
 )
 
 from mscompress.annotations import (
-    # Search results types
-    PSM,
-    TSVReader,
-    PepXMLReader,
+    # Search results
+    PSMTable,
+    SearchMetadata,
+    read_psms,
 )
 
 # Optional parquet support (requires the [parquet] extra).
@@ -133,10 +133,10 @@ __all__ = [
     # MSZX convenience functions
     "create_mszx",
     "compress_batch",
-    # Search results types
-    "PSM",
-    "TSVReader",
-    "PepXMLReader",
+    # Search results
+    "PSMTable",
+    "SearchMetadata",
+    "read_psms",
 ]
 
 if _HAS_PARQUET:

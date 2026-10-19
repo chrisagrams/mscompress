@@ -354,6 +354,7 @@ void* decompress_routine(void* args) {
    int64_t xml_i = 0, mz_i = 0, inten_i = 0;
 
    int block = 0;
+   int enc_ret;
 
    long len = division->size;
 
@@ -363,7 +364,8 @@ void* decompress_routine(void* args) {
       return NULL;
    }
 
-   char* buff = malloc(len * 2);
+   size_t buff_cap = (size_t)len * 2;
+   char* buff = malloc(buff_cap);
 
    if (buff == NULL) {
       error(
@@ -423,6 +425,14 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len <= len);
+            if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
+               error("decompress_routine: Failed to grow output buffer.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
+               free(a_args);
+               return NULL;
+            }
+            db_args->ret = buff;
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -445,7 +455,6 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_mz_binary;
             a_args->src_len = curr_len;
-            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_mz_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_mz_fun;
             a_args->scale_factor = db_args->df->mz_scale_factor;
@@ -458,10 +467,11 @@ void* decompress_routine(void* args) {
                return NULL;
             }
 
-            // Call the target mz function to encode the mz block and write it to the output buffer
-            db_args->df->target_mz_fun((void*)a_args);
-
-            if (a_args->ret_code != 0) {
+            enc_ret = encode_into_buff(db_args->df->target_mz_fun, a_args,
+                                       &decmp_mz_binary, &buff, &buff_cap,
+                                       buff_off);
+            db_args->ret = buff;  // may have moved, even on failure
+            if (enc_ret) {
                error("decompress_routine: Failed to encode mz block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
@@ -487,6 +497,14 @@ void* decompress_routine(void* args) {
                break;
             }
             assert(curr_len > 0 && curr_len < len);
+            if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
+               error("decompress_routine: Failed to grow output buffer.\n");
+               dealloc_z_stream(a_args->z);
+               dealloc_z_stream_inflate(a_args->z_inflate);
+               free(a_args);
+               return NULL;
+            }
+            db_args->ret = buff;
             memcpy(buff + buff_off, decmp_xml + xml_off, curr_len);
             xml_off += curr_len;
             buff_off += curr_len;
@@ -509,7 +527,6 @@ void* decompress_routine(void* args) {
             assert(curr_len > 0 && curr_len < len);
             a_args->src = (char**)&decmp_inten_binary;
             a_args->src_len = curr_len;
-            a_args->dest = (char **)(buff + buff_off);
             a_args->src_format = db_args->df->source_inten_fmt;
             a_args->enc_fun = db_args->df->encode_source_compression_inten_fun;
             a_args->scale_factor = db_args->df->int_scale_factor;
@@ -522,10 +539,11 @@ void* decompress_routine(void* args) {
                return NULL;
             }
 
-            // Call the target intensity function to encode the intensity block and write it to the output buffer
-            db_args->df->target_inten_fun((void*)a_args);
-
-            if (a_args->ret_code != 0) {
+            enc_ret = encode_into_buff(db_args->df->target_inten_fun, a_args,
+                                       &decmp_inten_binary, &buff, &buff_cap,
+                                       buff_off);
+            db_args->ret = buff;  // may have moved, even on failure
+            if (enc_ret) {
                error("decompress_routine: Failed to encode intensity block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);

@@ -2,10 +2,15 @@ set(ZLIB_SOURCE_DIR ${VENDOR_DIR}/zlib)
 # Add a custom target to run nmake and build zlib
 # Set ZLIB_EXTRA_CFLAGS before including this file to pass additional flags.
 if(WIN32)
+    # The cloudflare fork's Makefile.msc omits HAS_SSE2, without which deflate
+    # never slides its hash tables and corrupts any input larger than ~64 KB
+    # (configure sets it on Unix). deflate.c only includes intrinsics headers
+    # under HAS_SSE42, so force-include emmintrin.h for __m128i.
     add_custom_target(
         zlib_build
-        COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc zlib.lib LOC=${ZLIB_EXTRA_CFLAGS}
+        COMMAND nmake -f ${ZLIB_SOURCE_DIR}/win32/Makefile.msc zlib.lib "LOC=-DHAS_SSE2 -FIemmintrin.h ${ZLIB_EXTRA_CFLAGS}"
         WORKING_DIRECTORY ${ZLIB_SOURCE_DIR}
+        VERBATIM
     )
 elseif(APPLE)
     # On macOS, define fdopen to prevent zlib's macro redefinition conflict

@@ -10,7 +10,8 @@ import pytest
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
-from mscompress import MSZFile, MSZXFile, TSVReader, read
+from mscompress import MSZFile, MSZXFile, read
+import pandas as pd
 from mscompress.parquet import from_parquet, to_parquet
 
 
@@ -115,7 +116,7 @@ def test_parquet_to_msz_zlib_binary(parquet_path, parquet_table, tmp_path):
 
 
 def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
-    """TSV must be readable by TSVReader and round-trip peptide/charge/score."""
+    """TSV must round-trip peptide/charge/score."""
     tsv = tmp_path / "annotations.tsv"
     from_parquet(parquet_path, tsv, score_column="max_score")
 
@@ -124,17 +125,15 @@ def test_parquet_to_annotations_tsv(parquet_path, parquet_table, tmp_path):
     max_scores = parquet_table.column("max_score").to_numpy(zero_copy_only=False)
     precursors = parquet_table.column("precursor").to_numpy(zero_copy_only=False)
 
-    reader = TSVReader(tsv)
-    psms = list(reader)
-    assert len(psms) == parquet_table.num_rows
+    df = pd.read_csv(tsv, sep="\t")
+    assert len(df) == parquet_table.num_rows
 
-    for i, psm in enumerate(psms):
-        assert psm.scan_number == i + 1
-        assert psm.peptide == peptides[i]
-        assert psm.charge == int(charges[i])
+    for i, psm in df.iterrows():
+        assert psm.ScanNr == i + 1
+        assert psm.Peptide == peptides[i]
+        assert psm.Charge == int(charges[i])
         assert math.isclose(psm.score, float(max_scores[i]), rel_tol=1e-6)
-        assert "precursor" in psm.extra
-        assert math.isclose(psm.extra["precursor"], float(precursors[i]), rel_tol=1e-6)
+        assert math.isclose(psm.precursor, float(precursors[i]), rel_tol=1e-6)
 
 
 def test_parquet_to_mszx_full(parquet_path, parquet_table, tmp_path):
@@ -148,15 +147,14 @@ def test_parquet_to_mszx_full(parquet_path, parquet_table, tmp_path):
 
     with MSZXFile.open(out) as mszx:
         assert len(mszx.spectra) == parquet_table.num_rows
-        annotations = list(mszx.annotations)
-        assert len(annotations) == parquet_table.num_rows
+        df = mszx.psms.df
+        assert len(df) == parquet_table.num_rows
 
         peptides = parquet_table.column("peptide").to_pylist()
-        # Match annotations (sorted by scan_number) to spectra by scan number.
-        ann_by_scan = {a.scan_number: a for a in annotations}
+        # Match PSMs to spectra by scan number.
+        peptide_by_scan = dict(zip(df.scan, df.peptide))
         for i, spectrum in enumerate(mszx.spectra):
-            ann = ann_by_scan[spectrum.scan]
-            assert ann.peptide == peptides[i]
+            assert peptide_by_scan[spectrum.scan] == peptides[i]
 
 
 def test_parquet_to_msz_empty_peaks(tmp_path, parquet_path):
@@ -254,13 +252,11 @@ def test_parquet_combined_peptide_charge_split(tmp_path):
     tsv = tmp_path / "ann.tsv"
     from_parquet(p, tsv)
 
-    psms = list(TSVReader(tsv))
-    assert len(psms) == 2
-    assert psms[0].peptide == "AANFVHMDTAQK"
-    assert psms[0].charge == 2
+    df = pd.read_csv(tsv, sep="\t")
+    assert len(df) == 2
     # Last underscore wins, so "PEPT_IDE_3" → ("PEPT_IDE", 3).
-    assert psms[1].peptide == "PEPT_IDE"
-    assert psms[1].charge == 3
+    assert df.Peptide.tolist() == ["AANFVHMDTAQK", "PEPT_IDE"]
+    assert df.Charge.tolist() == [2, 3]
 
 
 def test_parquet_score_column_none_writes_empty(tmp_path):
@@ -300,10 +296,10 @@ def test_parquet_score_column_auto_resolves_max_score(tmp_path, parquet_path):
     table = pq.read_table(str(parquet_path))
     expected_scores = table.column("max_score").to_numpy(zero_copy_only=False)
 
-    psms = list(TSVReader(tsv))
-    assert len(psms) == len(expected_scores)
-    for psm, expected in zip(psms, expected_scores):
-        assert math.isclose(psm.score, float(expected), rel_tol=1e-6)
+    scores = pd.read_csv(tsv, sep="\t").score
+    assert len(scores) == len(expected_scores)
+    for score, expected in zip(scores, expected_scores):
+        assert math.isclose(score, float(expected), rel_tol=1e-6)
 
 
 def test_parquet_minimal_fixture_to_mszx_full(minimal_parquet_path, minimal_parquet_table, tmp_path):
@@ -322,10 +318,10 @@ def test_parquet_minimal_fixture_to_mszx_full(minimal_parquet_path, minimal_parq
 
     with MSZXFile.open(out) as mszx:
         assert len(mszx.spectra) == n_rows
-        annotations = list(mszx.annotations)
-        assert len(annotations) == n_rows
+        df = mszx.psms.df
+        assert len(df) == n_rows
 
-        ann_by_scan = {a.scan_number: a for a in annotations}
+        ann_by_scan = {int(row.scan): row for row in df.itertuples()}
         for i, spectrum in enumerate(mszx.spectra):
             assert np.array_equal(
                 spectrum.mz.astype(np.float32),
@@ -472,7 +468,7 @@ def test_to_parquet_full_roundtrip_mszx(parquet_path, parquet_table, tmp_path):
 
     with MSZXFile.open(mszx_out) as mszx:
         assert len(mszx.spectra) == parquet_table.num_rows
-        ann_by_scan = {a.scan_number: a for a in mszx.annotations}
+        ann_by_scan = {int(row.scan): row for row in mszx.psms.df.itertuples()}
         expected_pep = parquet_table.column("peptide").to_pylist()
         for i, spectrum in enumerate(mszx.spectra):
             assert spectrum.scan == i + 1
@@ -568,15 +564,14 @@ def test_from_parquet_extension_inference_mszx(parquet_path, tmp_path):
     out = tmp_path / "out.mszx"
     from_parquet(parquet_path, out, score_column="max_score")
     with MSZXFile.open(out) as mszx:
-        assert mszx.annotations is not None
+        assert mszx.psms is not None
 
 
 def test_from_parquet_extension_inference_tsv(parquet_path, tmp_path):
     """.tsv extension dispatches to the annotations TSV writer."""
     out = tmp_path / "out.tsv"
     from_parquet(parquet_path, out, score_column="max_score")
-    psms = list(TSVReader(out))
-    assert len(psms) > 0
+    assert len(pd.read_csv(out, sep="\t")) > 0
 
 
 def test_from_parquet_case_insensitive_extension(parquet_path, tmp_path):
@@ -592,8 +587,7 @@ def test_from_parquet_explicit_output_type_overrides(parquet_path, tmp_path):
     """output_type kwarg wins over extension inference."""
     out = tmp_path / "out.unknown"
     from_parquet(parquet_path, out, output_type="tsv", score_column="max_score")
-    psms = list(TSVReader(out))
-    assert len(psms) > 0
+    assert len(pd.read_csv(out, sep="\t")) > 0
 
 
 def test_from_parquet_unknown_extension_raises(parquet_path, tmp_path):
@@ -845,7 +839,7 @@ def test_mzparquet_to_mszx_no_annotations(mzparquet_path, mzparquet_table, tmp_p
     with MSZXFile.open(out) as mszx:
         assert len(mszx.spectra) == unique_scans
         # No annotations bundle in the archive at all.
-        assert mszx.annotations is None or list(mszx.annotations) == []
+        assert mszx.psms is None and mszx.annotation_files == []
 
 
 def test_mzparquet_to_tsv_raises(mzparquet_path, tmp_path):
