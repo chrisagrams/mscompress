@@ -128,23 +128,21 @@ def test_queries_match_golden(indexed, case):
     assert [list(h) for h in hits] == case["hits"]
 
 
-def test_query_values_aliases_and_entry_names(indexed):
+def test_query_values_and_entry_names(indexed):
     with MSZXBatchFile.open(indexed) as archive:
-        by_range = archive.query(rt_sec=(5, 8)).rows
-        assert np.array_equal(archive.query(rt=(5, 8)).rows, by_range)
-
         # Scalar = equality; None = open side.
         ms2 = archive.query(ms_level=2)
         assert len(ms2) == len(archive.query(ms_level=(2, 2)))
-        assert len(archive.query(rt=(None, None))) == 150
+        assert len(archive.query(rt_sec=(None, None))) == 150
+        assert len(archive.query(rt_sec=None)) == 150  # not filtered
 
         assert np.array_equal(
             archive.query(entry="b.msz").rows, archive.query(entry=1).rows
         )
         with pytest.raises(KeyError):
             archive.query(entry="missing.msz")
-        with pytest.raises(KeyError):
-            archive.query(bogus=1)
+        with pytest.raises(TypeError):
+            archive.query(rt=(5, 8))  # no aliases: columns are keywords
 
 
 def test_missing_values_never_match(indexed):
@@ -158,7 +156,7 @@ def test_missing_values_never_match(indexed):
 
 def test_spectra_follow_rows(indexed):
     with MSZXBatchFile.open(indexed) as archive:
-        result = archive.query(rt=(5, 8))
+        result = archive.query(rt_sec=(5, 8))
         assert isinstance(result, QueryResult)
         table = result.to_numpy()
         spectra = list(result.spectra())
@@ -172,7 +170,7 @@ def test_spectra_follow_rows(indexed):
 def test_query_without_index_raises(unindexed):
     with MSZXBatchFile.open(unindexed) as archive:
         with pytest.raises(ValueError, match="no spectrum index"):
-            archive.query(rt=(0, 10))
+            archive.query(rt_sec=(0, 10))
         with pytest.raises(ValueError, match="no spectrum index"):
             archive.index
 

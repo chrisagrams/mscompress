@@ -14,9 +14,10 @@ Missing values are NaN in float columns and 0 in integer ones (``charge``,
 
 from __future__ import annotations
 
+import bisect
 import struct
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from mscompress._core import Spectrum  # ty: ignore[unresolved-import]
     from mscompress.mszx.batch import MSZXBatchFile
 
-__all__ = ["QueryResult", "SpectrumIndex"]
+__all__ = ["QueryResult", "Range", "SpectrumIndex"]
 
 _MAGIC = b"MSZI"
 _FORMAT_VERSION = 1
@@ -66,20 +67,10 @@ _DTYPES = {
     9: np.dtype("<f4"),
     10: np.dtype("<f8"),
 }
-# Short names accepted by query(), matching the CLI's --query.
-_ALIASES = {
-    "rt": "rt_sec",
-    "mz": "precursor_mz",
-    "precursor": "precursor_mz",
-    "level": "ms_level",
-}
+# A query term: a value (equality) or an inclusive (lo, hi) range, where None
+# leaves that side open.
+Range = Union[float, Tuple[Optional[float], Optional[float]]]
 
-Bound = Optional[float]
-Term = Union[float, int, str, Tuple[Bound, Bound], Sequence[Bound]]
-
-
-def _column_name(name: str) -> str:
-    return _ALIASES.get(name, name)
 
 
 class SpectrumIndex:
@@ -182,7 +173,6 @@ class SpectrumIndex:
 
     def column(self, name: str) -> np.ndarray:
         """One column as a read-only numpy array (one value per row)."""
-        name = _column_name(name)
         if name in _DERIVED:
             if name not in self._derived:
                 values = self.take(name, np.arange(self._n_rows, dtype=np.uint32))
@@ -196,7 +186,6 @@ class SpectrumIndex:
 
     def take(self, name: str, rows: npt.ArrayLike) -> np.ndarray:
         """Values of one column at ``rows``, without materializing the column."""
-        name = _column_name(name)
         rows = np.asarray(rows)
         if name in _DERIVED:
             entry = (
@@ -209,15 +198,37 @@ class SpectrumIndex:
 
     # -- queries -------------------------------------------------------------
 
-    def select(self, **terms: Term) -> npt.NDArray[np.uint32]:
-        """Rows matching every term, ascending (so grouped by entry).
+    def select(
+        self,
+        *,
+        entry: Optional[Range] = None,
+        spectrum_idx: Optional[Range] = None,
+        scan: Optional[Range] = None,
+        ms_level: Optional[Range] = None,
+        rt_sec: Optional[Range] = None,
+        precursor_mz: Optional[Range] = None,
+        charge: Optional[Range] = None,
+        tic: Optional[Range] = None,
+        base_peak_mz: Optional[Range] = None,
+    ) -> npt.NDArray[np.uint32]:
+        """Rows matching every given column, ascending (so grouped by entry).
 
-        Each term is a column name (or alias: ``rt``, ``mz``, ``precursor``,
-        ``level``) mapped to either a value (equality) or an inclusive
-        ``(lo, hi)`` range, where ``None`` leaves that side open. No terms
-        selects every row.
+        Each column takes a value (equality) or an inclusive ``(lo, hi)``
+        range, where ``None`` leaves that side open; columns left as ``None``
+        are not filtered. No terms selects every row.
         """
-        bounds = [(_column_name(k), *_bounds(k, v)) for k, v in terms.items()]
+        terms = {
+            "entry": entry,
+            "spectrum_idx": spectrum_idx,
+            "scan": scan,
+            "ms_level": ms_level,
+            "rt_sec": rt_sec,
+            "precursor_mz": precursor_mz,
+            "charge": charge,
+            "tic": tic,
+            "base_peak_mz": base_peak_mz,
+        }
+        bounds = [(k, *_bounds(v)) for k, v in terms.items() if v is not None]
         for name, _, _ in bounds:
             if name not in self._columns and name not in _DERIVED:
                 raise KeyError(f"No column {name!r} in the spectrum index")
@@ -260,8 +271,13 @@ class SpectrumIndex:
         column = self._columns[name]
         perm = self._keys[name]
         if perm is not None:
-            first = _bisect(lambda m: float(column[perm[m]]) < lo, len(perm))
-            last = _bisect(lambda m: float(column[perm[m]]) <= hi, len(perm))
+            # Search through the permutation rather than gathering
+            # column[perm]; float() keeps the comparison in float64.
+            def key(row: int) -> float:
+                return float(column[row])
+
+            first = bisect.bisect_left(perm, lo, key=key)
+            last = bisect.bisect_right(perm, hi, key=key)
             return np.sort(perm[first : max(first, last)])
 
         # The column never decreases within an entry: search each one.
@@ -288,31 +304,14 @@ class SpectrumIndex:
         return out
 
 
-def _bisect(less: Any, n: int) -> int:
-    """First position in [0, n) where ``less`` turns false."""
-    a, b = 0, n
-    while a < b:
-        m = (a + b) // 2
-        if less(m):
-            a = m + 1
-        else:
-            b = m
-    return a
-
-
-def _bounds(name: str, value: Term) -> Tuple[float, float]:
-    if isinstance(value, (tuple, list)):
-        if len(value) != 2:
-            raise ValueError(f"{name}: a range must be (lo, hi)")
+def _bounds(value: Range) -> Tuple[float, float]:
+    if isinstance(value, tuple):
         lo, hi = value
         return (
             -np.inf if lo is None else float(lo),
             np.inf if hi is None else float(hi),
         )
-    if isinstance(value, str):
-        raise TypeError(f"{name}: expected a number or a (lo, hi) range")
-    v = float(value)
-    return v, v
+    return float(value), float(value)
 
 
 class QueryResult:

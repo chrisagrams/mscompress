@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional,
 import numpy as np
 
 from mscompress._core import MSZFile  # ty: ignore[unresolved-import]
-from mscompress.mszx.index import QueryResult, SpectrumIndex
+from mscompress.mszx.index import QueryResult, Range, SpectrumIndex
 from mscompress.mszx.metadata import (
     MSZXBatchManifest,
     MSZXManifest,
@@ -256,19 +256,29 @@ class MSZXBatchFile:
             self._index = SpectrumIndex(mapped)
         return self._index
 
-    def query(self, **terms: Any) -> QueryResult:
-        """Spectra across every member matching all of ``terms``.
+    def query(
+        self,
+        *,
+        entry: Union[str, Range, None] = None,
+        spectrum_idx: Optional[Range] = None,
+        scan: Optional[Range] = None,
+        ms_level: Optional[Range] = None,
+        rt_sec: Optional[Range] = None,
+        precursor_mz: Optional[Range] = None,
+        charge: Optional[Range] = None,
+        tic: Optional[Range] = None,
+        base_peak_mz: Optional[Range] = None,
+    ) -> QueryResult:
+        """Spectra across every member matching all of the given columns.
 
-        Each keyword is an index column (``entry``, ``spectrum_idx``, ``scan``,
-        ``ms_level``, ``rt_sec``, ``precursor_mz``, ``charge``, ``tic``,
-        ``base_peak_mz``) or an alias (``rt``, ``mz``, ``precursor``,
-        ``level``). A value tests equality; an inclusive ``(lo, hi)`` tuple
-        tests a range, with ``None`` leaving a side open. ``entry`` also takes
-        a member name. Reads only the index, so no member is opened:
+        Each column takes a value (equality) or an inclusive ``(lo, hi)``
+        range, where ``None`` leaves that side open; columns left as ``None``
+        are not filtered. ``entry`` also takes a member name. Reads only the
+        index, so no member is opened:
 
         .. code-block:: python
 
-            hits = archive.query(rt=(600, 660), ms_level=2,
+            hits = archive.query(rt_sec=(600, 660), ms_level=2,
                                  precursor_mz=(500, 510))
             hits.to_frame()          # metadata only
             for spectrum in hits.spectra():
@@ -276,12 +286,23 @@ class MSZXBatchFile:
 
         Raises:
             ValueError: if the archive has no index.
-            KeyError: for an unknown column or member name.
+            KeyError: for an unknown member name.
         """
         index = self.index
-        if isinstance(terms.get("entry"), str):
-            terms["entry"] = self.names.index(self._entry_for(terms["entry"]).entry)
-        return QueryResult(self, index, index.select(**terms))
+        if isinstance(entry, str):
+            entry = self.names.index(self._entry_for(entry).entry)
+        rows = index.select(
+            entry=entry,
+            spectrum_idx=spectrum_idx,
+            scan=scan,
+            ms_level=ms_level,
+            rt_sec=rt_sec,
+            precursor_mz=precursor_mz,
+            charge=charge,
+            tic=tic,
+            base_peak_mz=base_peak_mz,
+        )
+        return QueryResult(self, index, rows)
 
     # -- annotations -------------------------------------------------------
 
