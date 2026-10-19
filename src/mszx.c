@@ -552,8 +552,8 @@ static void print_index_cell(const mszx_index_t* idx, int column, uint32_t row) 
          if (v != v) printf("NA"); else printf("%.7g", v);
          break;
       case MSZX_COL_PRECURSOR_MZ:
-      case MSZX_COL_BASE_PEAK_MZ:
-         if (v != v) printf("NA"); else printf("%.17g", v);
+      case MSZX_COL_BASE_PEAK_MZ: /* f32: 9 digits round-trip */
+         if (v != v) printf("NA"); else printf("%.9g", v);
          break;
       case MSZX_COL_CHARGE:
       case MSZX_COL_MS_LEVEL:
