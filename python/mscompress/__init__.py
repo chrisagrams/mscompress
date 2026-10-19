@@ -62,6 +62,8 @@ from mscompress.mszx import (
     MSZXBatchManifest,
     SpectraFileEntry,
     AnnotationEntry,
+    QueryResult,
+    SpectrumIndex,
     # Convenience functions
     create_mszx,
     compress_batch,
@@ -130,6 +132,8 @@ __all__ = [
     "MSZXBatchManifest",
     "SpectraFileEntry",
     "AnnotationEntry",
+    "QueryResult",
+    "SpectrumIndex",
     # MSZX convenience functions
     "create_mszx",
     "compress_batch",

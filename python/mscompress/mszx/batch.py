@@ -25,7 +25,10 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
+import numpy as np
+
 from mscompress._core import MSZFile  # ty: ignore[unresolved-import]
+from mscompress.mszx.index import QueryResult, Range, SpectrumIndex
 from mscompress.mszx.metadata import (
     MSZXBatchManifest,
     MSZXManifest,
@@ -102,6 +105,7 @@ class MSZXBatchFile:
         self._archive_path = Path(path)
         self._manifest = manifest
         self._open_members: Dict[str, MSZFile] = {}
+        self._index: Optional[SpectrumIndex] = None
         self._closed = False
 
     @classmethod
@@ -208,6 +212,98 @@ class MSZXBatchFile:
             f"single .spectra; use archive[0].spectra (or iterate the archive)"
         )
 
+    # -- spectrum index ----------------------------------------------------
+
+    @property
+    def has_index(self) -> bool:
+        """Whether the archive carries a per-spectrum index.
+
+        Archives written with ``index=False`` (or by an older mscompress) have
+        none, and :meth:`query` is unavailable on them.
+        """
+        return self._manifest.index is not None
+
+    @property
+    def index(self) -> SpectrumIndex:
+        """The per-spectrum index, memory-mapped on first access.
+
+        Raises:
+            ValueError: if the archive has no index.
+        """
+        self._check_open()
+        if self._index is None:
+            info = self._manifest.index
+            if info is None:
+                raise ValueError(
+                    f"{self._archive_path.name} has no spectrum index (it was "
+                    f"written with index=False or by an older mscompress)"
+                )
+            with tarfile.open(self._archive_path, "r") as tar:
+                try:
+                    member = tar.getmember(info.entry)
+                except KeyError:
+                    raise ValueError(
+                        f"Spectrum index {info.entry!r} listed in the manifest "
+                        f"is missing from the archive"
+                    ) from None
+            mapped = np.memmap(
+                self._archive_path,
+                dtype=np.uint8,
+                mode="r",
+                offset=member.offset_data,
+                shape=(member.size,),
+            )
+            self._index = SpectrumIndex(mapped)
+        return self._index
+
+    def query(
+        self,
+        *,
+        entry: Union[str, Range, None] = None,
+        spectrum_idx: Optional[Range] = None,
+        scan: Optional[Range] = None,
+        ms_level: Optional[Range] = None,
+        rt_sec: Optional[Range] = None,
+        precursor_mz: Optional[Range] = None,
+        charge: Optional[Range] = None,
+        tic: Optional[Range] = None,
+        base_peak_mz: Optional[Range] = None,
+    ) -> QueryResult:
+        """Spectra across every member matching all of the given columns.
+
+        Each column takes a value (equality) or an inclusive ``(lo, hi)``
+        range, where ``None`` leaves that side open; columns left as ``None``
+        are not filtered. ``entry`` also takes a member name. Reads only the
+        index, so no member is opened:
+
+        .. code-block:: python
+
+            hits = archive.query(rt_sec=(600, 660), ms_level=2,
+                                 precursor_mz=(500, 510))
+            hits.to_frame()          # metadata only
+            for spectrum in hits.spectra():
+                ...
+
+        Raises:
+            ValueError: if the archive has no index.
+            KeyError: for an unknown member name.
+        """
+        index = self.index
+        if isinstance(entry, str):
+            entry = self.names.index(self._entry_for(entry).entry)
+        rows = index.select(
+            entry=entry,
+            spectrum_idx=spectrum_idx,
+            scan=scan,
+            ms_level=ms_level,
+            rt_sec=rt_sec,
+            precursor_mz=precursor_mz,
+            charge=charge,
+            tic=tic,
+            base_peak_mz=base_peak_mz,
+        )
+        return QueryResult(self, index, rows)
+
     # -- annotations -------------------------------------------------------
 
     def get_annotation(self, key: Union[int, str], filename: str) -> bytes:
@@ -280,6 +376,7 @@ class MSZXBatchFile:
             except Exception as exc:  # pragma: no cover - defensive
                 warnings.warn(f"Error closing archive member: {exc}", stacklevel=2)
         self._open_members.clear()
+        self._index = None  # releases the memory map once results are dropped
         self._closed = True
 
     @property
@@ -350,6 +447,7 @@ def compress_batch(
     description: Optional[str] = None,
     extra: Optional[Dict[str, Any]] = None,
     on_progress: Optional[Any] = None,
+    index: bool = True,
     **compress_args: Any,
 ) -> Path:
     """Compress many mzML into one v2 .mszx archive.
@@ -362,6 +460,8 @@ def compress_batch(
         extra: Archive-level metadata dict, embedded in the manifest.
         on_progress: Optional ``callable(index, total, path)`` invoked before
             each entry is compressed.
+        index: Write the per-spectrum index that :meth:`MSZXBatchFile.query`
+            reads. On by default.
         **compress_args: Forwarded to :class:`RuntimeArguments` (``threads``,
             ``blocksize``, ``mz_lossy``, ``int_lossy``, ...).
 
@@ -381,7 +481,7 @@ def compress_batch(
         raise ValueError("No input mzML files matched; nothing to do.")
 
     out_path = Path(output)
-    writer = MSZXBatchWriter(out_path, **compress_args)
+    writer = MSZXBatchWriter(out_path, index=index, **compress_args)
     try:
         if description is not None:
             writer.set_description(description)

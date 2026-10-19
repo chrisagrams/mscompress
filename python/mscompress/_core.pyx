@@ -2605,6 +2605,8 @@ cdef class MSZXBatchWriter:
 
     Parameters:
     path (Union[str, bytes, PathLike]): Output .mszx path.
+    index (bool): Write the per-spectrum index (index.mszxi) that
+        `MSZXBatchFile.query()` reads. On by default.
     **kwargs: Compression settings forwarded to RuntimeArguments (threads,
         blocksize, mz_lossy, int_lossy, mz_scale_factor, int_scale_factor,
         target_xml_format, target_mz_format, target_inten_format,
@@ -2626,7 +2628,7 @@ cdef class MSZXBatchWriter:
         self._writer = NULL
         self._finished = False
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path, index=True, **kwargs):
         self._path = os.fspath(path)
         if isinstance(self._path, str):
             path_bytes = self._path.encode("utf-8")
@@ -2646,6 +2648,8 @@ cdef class MSZXBatchWriter:
                 f"Could not open .mszx archive for writing: {os.fsdecode(path_bytes)} "
                 f"(the output must be a seekable regular file, not a pipe)"
             )
+        if not index:
+            _batch_writer_set_index(self._writer, 0)
 
     def __dealloc__(self):
         # An un-finished writer left to the GC would otherwise leak the fd and

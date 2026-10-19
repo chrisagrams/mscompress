@@ -627,11 +627,15 @@ class MSZXBatchWriter:
     `with` block via an exception calls `abort()`, removing the partial file.
     """
 
-    def __init__(self, path: Union[str, bytes, PathLike], **kwargs: Any) -> None:
+    def __init__(
+        self, path: Union[str, bytes, PathLike], index: bool = True, **kwargs: Any
+    ) -> None:
         """Open an archive for writing.
 
         Args:
             path: Output .mszx path. Must be a seekable regular file.
+            index: Write the per-spectrum index (index.mszxi) that
+                `MSZXBatchFile.query()` reads. On by default.
             **kwargs: Compression settings forwarded to RuntimeArguments
                 (threads, blocksize, mz_lossy, int_lossy, mz_scale_factor,
                 int_scale_factor, target_xml_format, target_mz_format,
