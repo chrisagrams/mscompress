@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Union
 
 import numpy as np
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -57,7 +58,7 @@ def _select_psms(psms, mode: _MultiPSM):
     if not psms:
         return [None]
     if mode == "best":
-        return [max(psms, key=lambda p: p.score)]
+        return [max(psms, key=lambda p: -math.inf if pd.isna(p["score"]) else p["score"])]
     if mode == "first":
         return [psms[0]]
     if mode == "all":
@@ -132,8 +133,8 @@ def to_parquet(
         f = input
 
     try:
-        psm_reader = f.annotations if isinstance(f, MSZXFile) else None
-        has_annotations = psm_reader is not None
+        psm_table = f.psms if isinstance(f, MSZXFile) else None
+        has_annotations = psm_table is not None
         rt_unit = _detect_ret_time_unit(f)
         rt_scale = (1.0 / 60.0) if rt_unit == "minute" else 1.0
         schema = _build_parquet_schema(has_annotations)
@@ -151,8 +152,8 @@ def to_parquet(
                 in_arr = np.asarray(spectrum.intensity, dtype=np.float32)
                 n_peaks = int(len(mz_arr))
 
-                if psm_reader is not None:
-                    rows = _select_psms(psm_reader.get_by_scan(spectrum.scan), multi_psm)
+                if psm_table is not None:
+                    rows = _select_psms(psm_table.records_for_scan(spectrum.scan), multi_psm)
                 else:
                     rows = [None]
 
@@ -172,11 +173,13 @@ def to_parquet(
                             cols["score"].append(None)
                             cols["q_value"].append(None)
                         else:
-                            cols["peptide"].append(psm.peptide)
-                            cols["peptide_charge"].append(f"{psm.peptide}_{psm.charge}")
-                            cols["score"].append(float(psm.score))
+                            cols["peptide"].append(psm["peptide"])
+                            cols["peptide_charge"].append(f"{psm['peptide']}_{psm['charge']}")
+                            cols["score"].append(
+                                None if pd.isna(psm["score"]) else float(psm["score"])
+                            )
                             cols["q_value"].append(
-                                float(psm.q_value) if psm.q_value is not None else None
+                                None if pd.isna(psm["q_value"]) else float(psm["q_value"])
                             )
                     n_buffered += 1
                     if n_buffered >= row_group_size:

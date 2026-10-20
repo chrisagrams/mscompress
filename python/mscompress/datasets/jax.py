@@ -21,8 +21,7 @@ inside a jitted function.
 """
 import mscompress
 from mscompress.mszx import MSZXFile
-from mscompress.annotations.psms import BasePSMReader
-from mscompress.types import AnnotationFormat
+from mscompress.annotations import PSMTable
 from typing import Union, Optional, List, Dict, Any, Sequence, Tuple, cast
 from typing_extensions import TypeAlias
 from pathlib import Path
@@ -31,25 +30,21 @@ import numpy.typing as npt
 
 
 FloatArray: TypeAlias = npt.NDArray[np.floating]
-AnnotationsDict: TypeAlias = Dict[AnnotationFormat, List[Any]]
+PSMRecords: TypeAlias = List[Dict[str, Any]]
 BatchItem: TypeAlias = Union[
     Tuple[FloatArray, FloatArray],
-    Tuple[FloatArray, FloatArray, AnnotationsDict],
+    Tuple[FloatArray, FloatArray, PSMRecords],
 ]
 
 
 class MSCompressJaxDatasetMember:
-    def __init__(self, path: Union[str, Path], load_annotations: Optional[List[AnnotationFormat]] = None):
+    def __init__(self, path: Union[str, Path], load_psms: bool = False):
         self._path = Path(path)
         self._handle = mscompress.read(str(self._path))
-        self._load_annotations: List[AnnotationFormat] = load_annotations or []
-        self._annotation_readers: Dict[AnnotationFormat, List[BasePSMReader]] = {}
-
-        if isinstance(self._handle, MSZXFile) and self._load_annotations:
-            for annotation_format in self._load_annotations:
-                readers = self._handle.get_annotation_readers_by_format(annotation_format)
-                if readers:
-                    self._annotation_readers[annotation_format] = readers
+        self._psm_tables: List[PSMTable] = (
+            list(self._handle.psm_tables.values())
+            if load_psms and isinstance(self._handle, MSZXFile) else []
+        )
 
     @property
     def path(self):
@@ -65,18 +60,12 @@ class MSCompressJaxDatasetMember:
         mz = spectrum.mz
         intensity = spectrum.intensity
 
-        if self._annotation_readers:
-            annotations_dict: AnnotationsDict = {}
-            scan_number = spectrum.scan
-
-            for annotation_format, readers in self._annotation_readers.items():
-                format_psms: List[Any] = []
-                for reader in readers:
-                    psms = reader.get_by_scan(scan_number)
-                    format_psms.extend(psms)
-                annotations_dict[annotation_format] = format_psms
-
-            return (mz, intensity, annotations_dict)
+        if self._psm_tables:
+            scan = spectrum.scan
+            psms: PSMRecords = [
+                row for table in self._psm_tables for row in table.records_for_scan(scan)
+            ]
+            return (mz, intensity, psms)
 
         return (mz, intensity)
 
@@ -91,25 +80,25 @@ class MSCompressJaxDataset:
     def __init__(
             self,
             path: Union[str, Path],
-            load_annotations: Optional[List[AnnotationFormat]] = None
+            load_psms: bool = False
         ):
         """
         Args:
             path: Path to a msz, mszx, or mzML file, or a directory containing such files.
-            load_annotations: List of annotation formats to load from MSZX files.
-                Only applicable for MSZX files. Annotations will be returned in __getitem__ if present.
+            load_psms: Return each spectrum's PSMs (MSZX only) as a third item:
+                a list of row dicts from the stored PSM tables.
         """
         self._path = Path(path)
-        self._load_annotations: List[AnnotationFormat] = load_annotations or []
+        self._load_psms = load_psms
 
         self.members: Dict[str, MSCompressJaxDatasetMember] = {}
         if self._path.is_dir():
             for file in self._path.iterdir():
                 if file.suffix.lower() in {'.msz', '.mszx', '.mzml'}:
-                    member = MSCompressJaxDatasetMember(file, load_annotations=self._load_annotations)
+                    member = MSCompressJaxDatasetMember(file, load_psms=self._load_psms)
                     self.members[file.name] = member
         elif self._path.suffix.lower() in {'.msz', '.mszx', '.mzml'}:
-            member = MSCompressJaxDatasetMember(self._path, load_annotations=self._load_annotations)
+            member = MSCompressJaxDatasetMember(self._path, load_psms=self._load_psms)
             self.members[self._path.name] = member
         else:
             raise ValueError("Provided path is neither a valid file nor a directory containing valid files.")
@@ -162,13 +151,13 @@ def list_collate(batch: Sequence[BatchItem]) -> Tuple:
     has_annotations = len(batch[0]) == 3
     mzs: List[FloatArray] = []
     intensities: List[FloatArray] = []
-    annotations: List[AnnotationsDict] = []
+    annotations: List[PSMRecords] = []
 
     for item in batch:
         mzs.append(item[0])
         intensities.append(item[1])
         if len(item) == 3:
-            annotations.append(cast(AnnotationsDict, item[2]))  # ty: ignore[index-out-of-bounds]
+            annotations.append(cast(PSMRecords, item[2]))  # ty: ignore[index-out-of-bounds]
 
     if has_annotations:
         return (mzs, intensities, annotations)
@@ -209,13 +198,13 @@ def pad_collate(
     mz_out = np.full((batch_size, max_len), pad_value, dtype=mz_dtype)
     intensity_out = np.full((batch_size, max_len), pad_value, dtype=intensity_dtype)
     mask_out = np.zeros((batch_size, max_len), dtype=np.bool_) if return_mask else None
-    annotations: List[AnnotationsDict] = []
+    annotations: List[PSMRecords] = []
 
     for i, item in enumerate(batch):
         mz = item[0]
         intensity = item[1]
         if len(item) == 3:
-            annotations.append(cast(AnnotationsDict, item[2]))  # ty: ignore[index-out-of-bounds]
+            annotations.append(cast(PSMRecords, item[2]))  # ty: ignore[index-out-of-bounds]
         n = mz.shape[0]
         mz_out[i, :n] = mz
         intensity_out[i, :n] = intensity

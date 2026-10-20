@@ -61,19 +61,6 @@
                 }
             ]
         },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Debug N-API Module",
-            "program": "${workspaceFolder}/node/test.js",
-            "preLaunchTask": "Build N-API Module",
-            "cwd": "${workspaceFolder}/node",
-            "runtimeExecutable": "node",
-            "runtimeArgs": ["--napi-modules"],
-            "windows": {
-              "runtimeExecutable": "node.exe"
-            }
-          },
           {
             "name": "(gdb) Attach",
             "type": "cppdbg",

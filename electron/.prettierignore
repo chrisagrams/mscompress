@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+out/
+dist/
+release/
+build/
+
+# Generated / vendored assets
+assets/
+
+# Lockfiles & logs
+package-lock.json
+*.log

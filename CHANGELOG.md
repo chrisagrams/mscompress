@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/chrisagrams/mscompress/compare/v1.1.1...v1.2.0) (2026-10-19)
+
+
+### Features
+
+* **electron:** rewrite the desktop app (Electron + Vite + React + TS) ([#193](https://github.com/chrisagrams/mscompress/issues/193)) ([de227b8](https://github.com/chrisagrams/mscompress/commit/de227b894e6828ddf7b21e17ede65857c0390587))
+* per-spectrum index for batch .mszx archives (C core + CLI) ([#222](https://github.com/chrisagrams/mscompress/issues/222)) ([6607eb1](https://github.com/chrisagrams/mscompress/commit/6607eb18f2f77ff4202acb709fa890a807ddda6d))
+* **python:** query the per-spectrum index of batch .mszx archives ([#223](https://github.com/chrisagrams/mscompress/issues/223)) ([54b1b46](https://github.com/chrisagrams/mscompress/commit/54b1b462a4960858e1774303210386c00edd07a6))
+
+
+### Code Refactoring
+
+* **python:** unify search results on a pandas PSMTable stored as mzTab ([cdb0d22](https://github.com/chrisagrams/mscompress/commit/cdb0d226e40e40cad867aa4a729dc2849d88de00))
+* remove legacy node/ addon and rename node-ts/ to node/ ([#209](https://github.com/chrisagrams/mscompress/issues/209)) ([ba6cd13](https://github.com/chrisagrams/mscompress/commit/ba6cd135396a57c1ab164aae0818d69fce238418))
+
 ## [1.1.1](https://github.com/chrisagrams/mscompress/compare/v1.1.0...v1.1.1) (2026-10-06)
 
 

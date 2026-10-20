@@ -21,8 +21,7 @@ from typing import Union, Optional, List, Dict, Any
 
 import mscompress
 from mscompress.mszx import MSZXFile
-from mscompress.annotations.psms import BasePSMReader
-from mscompress.types import AnnotationFormat
+from mscompress.annotations import PSMTable
 
 try:
     import torch
@@ -35,18 +34,19 @@ except ImportError as e:
 _SUFFIXES = {".msz", ".mszx", ".mzml"}
 
 
-def _spectrum_to_tuple(spectrum, readers):
+def _psm_tables(handle, load_psms: bool) -> List[PSMTable]:
+    if load_psms and isinstance(handle, MSZXFile):
+        return list(handle.psm_tables.values())
+    return []
+
+
+def _spectrum_to_tuple(spectrum, tables: List[PSMTable]):
     mz = torch.from_numpy(spectrum.mz)
     intensity = torch.from_numpy(spectrum.intensity)
-    if readers:
-        annotations_dict: Dict[Any, Any] = {}
-        scan_number = spectrum.scan
-        for annotation_format, reader_list in readers.items():
-            format_psms = []
-            for reader in reader_list:
-                format_psms.extend(reader.get_by_scan(scan_number))
-            annotations_dict[annotation_format] = format_psms
-        return (mz, intensity, annotations_dict)
+    if tables:
+        scan = spectrum.scan
+        psms = [row for table in tables for row in table.records_for_scan(scan)]
+        return (mz, intensity, psms)
     return (mz, intensity)
 
 
@@ -57,15 +57,15 @@ class MSCompressDatasetMember:
     def __init__(
         self,
         path: Union[str, Path],
-        load_annotations: Optional[List[AnnotationFormat]] = None,
+        load_psms: bool = False,
         cache=None,
     ):
         self._path = Path(path)
-        self._load_annotations: List[AnnotationFormat] = load_annotations or []
+        self._load_psms = load_psms
         self._cache = cache  # None | 0 | int byte-budget | BlockCache (shared)
         self._pid = None
         self._handle = None
-        self._annotation_readers: Dict[AnnotationFormat, List[BasePSMReader]] = {}
+        self._psm_tables: List[PSMTable] = []
         self._count: Optional[int] = None
 
     @property
@@ -85,12 +85,7 @@ class MSCompressDatasetMember:
             # New process (forked worker) or first use: open a fresh handle.
             self._pid = pid
             self._handle = mscompress.read(str(self._path), cache=self._resolve_cache())
-            self._annotation_readers = {}
-            if isinstance(self._handle, MSZXFile) and self._load_annotations:
-                for annotation_format in self._load_annotations:
-                    readers = self._handle.get_annotation_readers_by_format(annotation_format)
-                    if readers:
-                        self._annotation_readers[annotation_format] = readers
+            self._psm_tables = _psm_tables(self._handle, self._load_psms)
         return self._handle
 
     def __len__(self) -> int:
@@ -100,7 +95,7 @@ class MSCompressDatasetMember:
 
     def __getitem__(self, index):
         handle = self._ensure_open()
-        return _spectrum_to_tuple(handle.spectra[index], self._annotation_readers)
+        return _spectrum_to_tuple(handle.spectra[index], self._psm_tables)
 
     def close(self):
         if self._handle is not None:
@@ -109,14 +104,14 @@ class MSCompressDatasetMember:
             except Exception:
                 pass
             self._handle = None
-            self._annotation_readers = {}
+            self._psm_tables = []
 
 
 class MSCompressDataset(Dataset):
     def __init__(
         self,
         path: Union[str, Path],
-        load_annotations: Optional[List[AnnotationFormat]] = None,
+        load_psms: bool = False,
         cache_bytes: Optional[int] = None,
         max_open_files: Optional[int] = None,
     ):
@@ -124,7 +119,8 @@ class MSCompressDataset(Dataset):
 
         Args:
             path: A .msz/.mszx/.mzML file, or a directory of such files.
-            load_annotations: Annotation formats to surface (MSZX only).
+            load_psms: Return each spectrum's PSMs (MSZX only) as a third
+                item: a list of row dicts from the stored PSM tables.
             cache_bytes: Per-worker decompressed-block cache budget, shared
                 across all shards a worker opens. ``None`` (default) uses the
                 mscompress process-default BlockCache; ``0`` disables bounding
@@ -135,7 +131,7 @@ class MSCompressDataset(Dataset):
                 keeps open at once (LRU-evicted). ``None`` keeps all open.
         """
         self._path = Path(path)
-        self._load_annotations: List[AnnotationFormat] = load_annotations or []
+        self._load_psms = load_psms
         self._cache_bytes = cache_bytes
         self._max_open_files = max_open_files
 
@@ -158,7 +154,7 @@ class MSCompressDataset(Dataset):
         # Lightweight members (lazy, no open handle) keyed by filename, kept for
         # backward compatibility / introspection. The hot path does not use them.
         self.members: Dict[str, MSCompressDatasetMember] = {
-            f.name: MSCompressDatasetMember(f, load_annotations=self._load_annotations)
+            f.name: MSCompressDatasetMember(f, load_psms=self._load_psms)
             for f in files
         }
 
@@ -179,7 +175,7 @@ class MSCompressDataset(Dataset):
         self._proc_cache = None
         self._handles: "Dict[int, Any]" = {}
         self._handle_order: List[int] = []
-        self._readers: Dict[int, Dict[AnnotationFormat, List[BasePSMReader]]] = {}
+        self._tables: Dict[int, List[PSMTable]] = {}
 
     @property
     def path(self):
@@ -204,7 +200,7 @@ class MSCompressDataset(Dataset):
         self._proc_cache = self._make_cache()
         self._handles = {}
         self._handle_order = []
-        self._readers = {}
+        self._tables = {}
 
     def _get_handle(self, file_index: int):
         if self._proc_pid != os.getpid():
@@ -218,21 +214,15 @@ class MSCompressDataset(Dataset):
             return handle
 
         handle = mscompress.read(str(self._files[file_index]), cache=self._proc_cache)
-        readers: Dict[AnnotationFormat, List[BasePSMReader]] = {}
-        if isinstance(handle, MSZXFile) and self._load_annotations:
-            for annotation_format in self._load_annotations:
-                rs = handle.get_annotation_readers_by_format(annotation_format)
-                if rs:
-                    readers[annotation_format] = rs
 
         self._handles[file_index] = handle
-        self._readers[file_index] = readers
+        self._tables[file_index] = _psm_tables(handle, self._load_psms)
         self._handle_order.append(file_index)
 
         if self._max_open_files and len(self._handles) > self._max_open_files:
             evict = self._handle_order.pop(0)
             old = self._handles.pop(evict, None)
-            self._readers.pop(evict, None)
+            self._tables.pop(evict, None)
             if old is not None:
                 try:
                     old._cleanup()
@@ -251,4 +241,4 @@ class MSCompressDataset(Dataset):
         file_index = bisect.bisect_right(self._offsets, index) - 1
         local_index = index - self._offsets[file_index]
         handle = self._get_handle(file_index)
-        return _spectrum_to_tuple(handle.spectra[local_index], self._readers[file_index])
+        return _spectrum_to_tuple(handle.spectra[local_index], self._tables[file_index])

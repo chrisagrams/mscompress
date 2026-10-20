@@ -1,11 +1,11 @@
 """
 Convert a peptide-level parquet to MSZX, then iterate it via a PyTorch
-DataLoader with annotations.
+DataLoader with PSMs.
 
 What this shows:
   1. parquet -> .mszx using mscompress.parquet.from_parquet
   2. open the .mszx with MSCompressDataset (PyTorch Dataset)
-  3. load Percolator TSV annotations alongside each spectrum
+  3. load the stored PSMs alongside each spectrum
   4. iterate a DataLoader with a custom collate_fn (peak counts vary per
      spectrum, so default stacking won't work)
 
@@ -27,7 +27,6 @@ from torch.utils.data import DataLoader
 
 from mscompress.datasets.torch import MSCompressDataset
 from mscompress.parquet import from_parquet
-from mscompress.types import AnnotationFormat
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -41,7 +40,7 @@ def collate_variable_length(batch):
     Returns three lists, one element per sample:
       - mz tensors (1-D, variable length)
       - intensity tensors (1-D, variable length)
-      - annotations dicts (AnnotationFormat -> list[PSM])
+      - PSM lists (row dicts from the archive's PSM table)
     """
     mzs, intensities, anns = [], [], []
     for item in batch:
@@ -49,7 +48,7 @@ def collate_variable_length(batch):
             mz, inten, ann = item
         else:
             mz, inten = item
-            ann = {}
+            ann = []
         mzs.append(mz)
         intensities.append(inten)
         anns.append(ann)
@@ -88,10 +87,10 @@ def main() -> int:
         )
         print(f"  archive size: {mszx_path.stat().st_size:,} bytes")
 
-        # Step 2: open via the PyTorch Dataset, request Percolator annotations
+        # Step 2: open via the PyTorch Dataset, requesting PSMs
         dataset = MSCompressDataset(
             mszx_path,
-            load_annotations=[AnnotationFormat.PERCOLATOR_TSV],
+            load_psms=True,
         )
         print(f"  spectra in dataset: {len(dataset)}")
 
@@ -111,10 +110,10 @@ def main() -> int:
                 break
             print(f"\nbatch {batch_idx}:")
             for i, (mz, inten, ann) in enumerate(zip(mzs, intensities, anns)):
-                psms = ann.get(AnnotationFormat.PERCOLATOR_TSV, [])
-                peptide = psms[0].peptide if psms else "<no PSM>"
-                charge = psms[0].charge if psms else "?"
-                score = f"{psms[0].score:.3f}" if psms else "?"
+                psms = ann
+                peptide = psms[0]["peptide"] if psms else "<no PSM>"
+                charge = psms[0]["charge"] if psms else "?"
+                score = f"{psms[0]['score']:.3f}" if psms else "?"
                 print(
                     f"  [{i}] peaks={len(mz):4d}  "
                     f"mz_range=[{mz.min():.4f}, {mz.max():.4f}]  "
