@@ -172,7 +172,7 @@ Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — 
 
 `.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_dispatch` (from release-please, or manually to re-publish a tag with `publish=true` + `release_tag`):
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
-2. **build-python** — cibuildwheel for CPython 3.10–3.14 + pytest
+2. **build-python** — cibuildwheel for CPython 3.11–3.14 + pytest
 3. **build-node** — prebuild + cmake-js compile + vitest on Linux/macOS/Windows (x64, arm64)
 4. **publish-python** — PyPI publish (gated on `inputs.publish`)
 5. **publish-node** — npm publish (gated on `inputs.publish`; uploads prebuilds to GitHub Release)
