@@ -126,7 +126,7 @@ nav:
       - Compressing files: python/guides/compressing.md
       - Extracting subsets: python/guides/extracting.md
       - MSZX archives: python/guides/mszx.md
-      - Annotation readers: python/guides/annotations.md
+      - Search results: python/guides/annotations.md
       - Croissant metadata: python/guides/metadata.md
       - Parquet I/O: python/guides/parquet.md
       - ML dataset adapters: python/guides/ml-datasets.md

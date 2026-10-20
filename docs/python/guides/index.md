@@ -9,7 +9,7 @@ Task-oriented recipes. For full API surfaces, see the
   blocksize
 - [Extracting subsets](extracting.md) — index/scan/MS-level filters
 - [MSZX archives](mszx.md) — `MSZXBuilder`, `MSZXFile`, `create_mszx`
-- [Annotation readers](annotations.md) — pepXML, Percolator TSV
+- [Search results](annotations.md) — pepXML, Percolator, mzTab
 - [Croissant metadata](metadata.md) — ML-ready dataset metadata
 - [Parquet I/O](parquet.md) — `from_parquet`, `to_parquet`
 - [ML dataset adapters](ml-datasets.md) — PyTorch, JAX/grain
