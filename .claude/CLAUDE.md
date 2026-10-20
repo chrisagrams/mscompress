@@ -170,6 +170,8 @@ Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — 
 
 `.github/workflows/release-please.yml` maintains the release PR on push to `dev`, and on push to `main` tags any promoted release PR and starts `build.yml` as a separate run (`gh workflow run build.yml -f publish=true -f release_tag=<tag>`; `GITHUB_TOKEN` is allowed to trigger `workflow_dispatch`).
 
+release-please itself authenticates as a GitHub App (`actions/create-github-app-token`; repo variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`; the App needs Contents, Pull requests and Workflows read/write). `GITHUB_TOKEN` is not enough: the tag goes on the release commit on `dev`, and if a workflow change reached `main` after that commit, GitHub requires the Workflows permission to create a release there. `GITHUB_TOKEN` can never have it, so the call fails with 403 "Resource not accessible by integration".
+
 `.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_dispatch` (from release-please, or manually to re-publish a tag with `publish=true` + `release_tag`):
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
 2. **build-python** — cibuildwheel for CPython 3.11–3.14 + pytest

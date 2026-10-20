@@ -23,13 +23,25 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # The default GITHUB_TOKEN is sufficient: we do NOT rely on the created tag
-      # to trigger build.yml (GITHUB_TOKEN-created tags don't trigger workflows).
-      # Instead the job below dispatches build.yml explicitly.
+      # Use a GitHub App token, not GITHUB_TOKEN. The release is tagged at the
+      # release commit on dev, and if a workflow change has been promoted to
+      # main since then, that commit's .github/workflows/ differs from the
+      # default branch. Creating a release there requires the Workflows
+      # permission, which GITHUB_TOKEN can never have (fails with 403 "Resource
+      # not accessible by integration"). build.yml is still started by the job
+      # below via workflow_dispatch, not by the tag push.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           # Release PRs always live on dev, so both phases look at dev's PRs.
           target-branch: dev
           # Only tag/release from main (once the release PR has been promoted).
