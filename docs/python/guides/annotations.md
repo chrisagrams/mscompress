@@ -1,205 +1,149 @@
-# Annotation readers
+# Search results
 
-`mscompress.annotations` reads peptide-spectrum match (PSM) files produced
-by common search and rescoring tools and normalizes them into a single
-`PSM` dataclass. Every reader exposes the same interface — iteration,
-indexing, and scan-number lookup — so downstream code never has to branch
-on the source format.
-
-The package handles two concerns:
-
-- **Readers** parse a PSM file into `PSM` objects. `TSVReader`
-  (Percolator `.pin` / `.tsv`) and `PepXMLReader` (pepXML) are the concrete
-  implementations; `PSMReader` is a factory that picks one for you.
-- **Annotation files** (`PathAnnotationFile`, `MSZXAnnotationFile`) abstract
-  *where* the bytes come from — a file on disk, or a member inside an MSZX
-  archive — with transparent zstd decompression.
+`mscompress.annotations` reads peptide-spectrum matches (PSMs) produced by
+common search and rescoring tools into a single `PSMTable`: a pandas
+DataFrame with a fixed set of core columns, plus the `SearchMetadata` of the
+search that produced them. Downstream code works with the same columns
+whatever the source format.
 
 See the [API reference](../reference/annotations.md) for full signatures.
 
-## Auto-detecting the format
+## Reading any format
 
-`PSMReader` is a factory: it inspects the filename, then the file contents
-if the extension is ambiguous, and returns the appropriate concrete reader.
+`read_psms` detects the format from the file name, then from its contents,
+and reads it with default options:
 
 ```python
-from mscompress.annotations import PSMReader
+from mscompress.annotations import read_psms
 
-with PSMReader("results.pin") as reader:        # Percolator TSV
-    for psm in reader:
-        print(psm.scan_number, psm.peptide, psm.score)
-
-with PSMReader("search.pep.xml") as reader:     # pepXML
-    for psm in reader:
-        ...
+table = read_psms("results.pepXML")
+print(table)                             # PSMTable(1234 PSMs from MSFragger)
+confident = table.df[table.df.q_value < 0.01]
 ```
 
-Detection rules:
+| Format | Class | Extensions | Sniffed by |
+|--------|-------|------------|------------|
+| mzTab 1.0 | `MzTab` | `.mztab` | `MTD` / `COM` lines, or a `PSH` header |
+| pepXML | `PepXML` | `.pepxml`, `.pep.xml` | `<msms_pipeline_analysis>` / `<spectrum_query>` |
+| Percolator output / `.pin` | `Percolator` | `.pin`, `.tsv` | first column `PSMId` / `SpecId` |
 
-| Extension | Resolved format |
-|-----------|-----------------|
-| `.pin`, `.tsv` | Percolator TSV (`TSVReader`) |
-| `.pepxml`, `.pep.xml` | pepXML (`PepXMLReader`) |
-| `.xml`, unknown | content sniffed (`pepXML` / `spectrum_query` → pepXML; `SpecId` / `PSMId` / `ScanNr` → Percolator) |
-
-A trailing `.zst` is stripped before detection, so `results.pin.zst`
-resolves to Percolator TSV and is decompressed transparently. When the
-format still cannot be determined, pass it explicitly with the
-`AnnotationFormat` enum:
+A trailing `.zst` is ignored for detection and the file is decompressed
+transparently, so `results.pin.zst` reads as Percolator. `read_psms` also
+accepts the file's contents as `bytes`. To skip detection, pass the format:
 
 ```python
 from mscompress.types import AnnotationFormat
 
-with PSMReader("results.dat", format=AnnotationFormat.PERCOLATOR_TSV) as reader:
-    ...
+table = read_psms("results.dat", format=AnnotationFormat.PERCOLATOR_TSV)
 ```
 
-## Using a specific reader
+## Using a specific format
 
-If you already know the format, construct the reader directly. The concrete
-readers accept format-specific options that the factory does not surface.
+Format-specific options are constructor arguments; `read()` takes a path or
+bytes:
 
 ```python
-from mscompress.annotations import TSVReader, PepXMLReader
+from mscompress.annotations import PepXML, Percolator
 
-# Percolator: customize the decoy-protein prefix
-with TSVReader("results.pin", decoy_prefix="rev_") as reader:
-    targets = [p for p in reader if p.is_target]
-
-# pepXML: keep only rank-1 hits (the default), or widen the cutoff
-with PepXMLReader("search.pep.xml", min_rank=1) as reader:
-    ...
+table = PepXML(max_rank=2).read("search.pep.xml")
+table = Percolator(decoy_prefix="rev_").read("results.pin")
 ```
 
-Reader options:
-
-| Reader | Option | Default | Purpose |
+| Format | Option | Default | Purpose |
 |--------|--------|---------|---------|
-| `TSVReader` | `decoy_prefix` | `"DECOY_"` | Protein-name prefix marking decoys (used only when no `Label` column is present) |
-| `PepXMLReader` | `min_rank` | `1` | Include only hits with `rank <= min_rank` |
-| `PepXMLReader` | `decoy_prefix` | `"DECOY_"` | Decoy protein prefix |
+| `PepXML` | `max_rank` | `1` | Keep hits with `hit_rank <= max_rank` |
+| `PepXML` | `decoy_prefix` | file's `decoy_prefix` parameter, else `"DECOY_"` | Protein prefix marking decoys |
+| `Percolator` | `decoy_prefix` | `"DECOY_"` | Protein prefix marking decoys (used only when there is no `Label` column) |
 
-## The reader interface
+## The PSM table
 
-All readers share the `BasePSMReader` interface. Parsing is lazy and cached:
-the file is read on first access (iteration, `len()`, indexing, or any
-lookup), then served from memory thereafter.
+`table.df` has these core columns first, in this order (`PSM_COLUMNS`, with
+dtypes in `PSM_SCHEMA`):
 
-```python
-with PSMReader("results.pin") as reader:
-    n = len(reader)                       # parse + count
-    first = reader[0]                     # index
-    page = reader[10:20]                  # slice -> list[PSM]
-    for psm in reader:                    # iterate
-        ...
+| Column | dtype | Notes |
+|--------|-------|-------|
+| `scan` | Int64 | Scan number the PSM was identified in; joins to `Spectrum.scan` |
+| `peptide` | string | Bare amino-acid sequence |
+| `modifications` | string | mzTab notation, e.g. `1-UNIMOD:35,5-UNIMOD:4` |
+| `charge` | Int64 | Precursor charge |
+| `score` | float64 | Primary score, named by `metadata.primary_score` |
+| `q_value` | float64 | |
+| `pep` | float64 | Posterior error probability |
+| `retention_time` | float64 | Seconds |
+| `precursor_mz` | float64 | Observed |
+| `calc_mz` | float64 | Theoretical |
+| `proteins` | object | List of protein accessions |
+| `pre` / `post` | string | Residues before / after the peptide |
+| `is_decoy` | bool | |
 
-    scans = reader.scan_numbers           # unique scan numbers with PSMs
-    hits = reader.get_by_scan(1234)       # list[PSM] for a scan (may be empty)
-    best = reader.get_best_by_scan(1234)  # highest-scoring PSM, or None
-    present = reader.has_scan(1234)        # bool
-    all_psms = reader.psms                # list[PSM]
-```
+Each format adds its own columns after these — e.g. pepXML adds `rank`,
+`modified_peptide`, `mass_diff`, ion counts and one column per
+`search_score`; Percolator keeps every feature column. Core columns a format
+doesn't provide are NA.
 
-`get_by_scan` returns *every* PSM for a scan (a scan may have multiple
-candidate peptides); `get_best_by_scan` collapses them to the maximum
-`score`.
-
-## The `PSM` dataclass
-
-Each reader emits `PSM` instances. The first four fields are always
-populated; the rest are optional and default to `None` (or sensible
-defaults) when the source format does not provide them.
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `scan_number` | int | Joins to `Spectrum.scan` |
-| `peptide` | str | Sequence, modifications stripped (flanking residues like `K.PEPTIDE.R` removed) |
-| `charge` | int | Precursor charge |
-| `score` | float | Primary search/scoring metric |
-| `proteins` | list[str] | Mapped protein accessions |
-| `spectrum_index` | int \| None | Zero-based spectrum index, if known |
-| `q_value` | float \| None | FDR-controlled q-value (Percolator) |
-| `pep` | float \| None | Posterior error probability |
-| `retention_time` | float \| None | Seconds |
-| `precursor_mz` | float \| None | m/z |
-| `precursor_mass` | float \| None | Neutral mass |
-| `mass_diff` | float \| None | Observed − calculated mass |
-| `modified_peptide` | str \| None | Sequence with modification notation |
-| `num_matched_ions` | int \| None | Matched fragment ions |
-| `num_total_ions` | int \| None | Theoretical fragment ions |
-| `rank` | int | Hit rank (1 = best); defaults to `1` |
-| `is_decoy` | bool | Decoy flag; `is_target` is the inverse |
-| `extra` | dict | Format-specific columns kept verbatim |
-
-Columns a reader does not map to a named field are preserved in `extra` —
-for Percolator TSV, that includes every numeric feature column, so
-engine-specific scores remain accessible:
+Look PSMs up by scan:
 
 ```python
-psm.extra["deltCn"]        # Percolator feature
-psm.extra.get("hyperscore")
+table.scans                    # scan numbers with at least one PSM, ascending
+table.has_scan(1234)           # bool
+table.for_scan(1234)           # DataFrame of that scan's PSMs (may be empty)
+table.records_for_scan(1234)   # list of row dicts (fast in per-spectrum loops)
+subset = table.filter_scans([1234, 1235])   # new PSMTable
 ```
 
-## Reading annotations bundled in MSZX
+`table.metadata` is a `SearchMetadata` (software and version, primary score
+name, fixed and variable `ModificationSpec`s, source format and file).
 
-MSZX archives can carry one or more annotation files alongside the spectra.
-Open the archive with `MSZXFile.open` (or the generic `read`) and access the
-bundled readers through the archive — no manual extraction or decompression
-needed.
+## Writing mzTab
+
+MSZX archives store search results as mzTab. `MzTab().write` serializes a
+table, metadata included, and returns the document (optionally writing it to
+a file); `MzTab().read` reads it back:
+
+```python
+from mscompress.annotations import MzTab
+
+MzTab().write(table, "results.mztab")
+same = MzTab().read("results.mztab")
+```
+
+`MzTab` reads the layout `write` produces; mzTab from other tools is not
+supported.
+
+## Search results in MSZX
+
+`MSZXBuilder.add_psms` (and `create_mszx(psms=[...])`) accepts a `PSMTable`
+or a path to any supported file and stores it as mzTab. When reading an
+archive, the stored tables are parsed on open:
 
 ```python
 from mscompress.mszx import MSZXFile
 
 with MSZXFile.open("run.mszx") as archive:
-    reader = archive.annotations          # primary reader, or None
-    if reader is not None:
-        for psm in reader:
-            ...
+    table = archive.psms                 # first PSMTable, or None
+    archive.psm_tables                   # {member name: PSMTable}
+    table = archive.get_psms("results.pepXML.mztab.zst")
 ```
-
-When an archive bundles several annotation files, address them by name or
-by format:
-
-```python
-with MSZXFile.open("run.mszx") as archive:
-    archive.annotation_files                       # list of manifest entries
-    archive.annotation_readers                     # {filename: reader}
-
-    pin = archive.get_annotation_reader("results.pin.zst")
-    pepxmls = archive.get_annotation_readers_by_format("pepxml")
-```
-
-`archive.annotations` returns the primary reader (the first bundled
-annotation), or `None` for archives that contain only spectra.
 
 ## Joining PSMs to spectra
 
-The common pattern is to index PSMs by scan number, then look each spectrum
-up as you iterate:
+Look each spectrum's PSMs up by scan as you iterate:
 
 ```python
 with MSZXFile.open("run.mszx") as archive:
-    psms_by_scan = {
-        psm.scan_number: psm
-        for psm in archive.annotations
-    }
+    table = archive.psms
     for s in archive.spectra:
-        psm = psms_by_scan.get(s.scan)
-        if psm and psm.q_value is not None and psm.q_value < 0.01:
-            ...
+        for psm in table.records_for_scan(s.scan):
+            if psm["q_value"] < 0.01:
+                ...
 ```
 
-If a scan can have multiple PSMs and you only want the best, build the index
-with `get_best_by_scan` instead:
+To keep only the best PSM per scan, reduce the DataFrame first:
 
 ```python
-reader = archive.annotations
-best_by_scan = {
-    scan: reader.get_best_by_scan(scan)
-    for scan in reader.scan_numbers
-}
+df = table.df
+best = df.loc[df.groupby("scan")["score"].idxmax()]
 ```
 
-For larger archives where a full in-memory index is undesirable, build the
-join lazily — see the [ML dataset adapters](ml-datasets.md) for grain-style
-streaming joins.
+For streaming joins over larger archives, see the
+[ML dataset adapters](ml-datasets.md).

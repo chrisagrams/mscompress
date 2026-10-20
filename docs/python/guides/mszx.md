@@ -6,37 +6,37 @@ self-describing archive.
 ## Build
 
 ```python
-from mscompress import MSZFile, MSZXBuilder
+from mscompress import MSZXBuilder, read
 
-with MSZFile("spectra.msz") as msz:
+with read("spectra.msz") as msz:
     (
-        MSZXBuilder()
-            .set_spectra(msz)
+        MSZXBuilder(msz)
             .set_description("DDA run #42")
-            .set_join_key("scan_number")
-            .add_annotation("percolator", "results.pin", format="percolator_pin")
-            .add_annotation("comet", "search.pep.xml", format="pepxml")
-            .set_extra(instrument="Orbitrap Eclipse")
+            .add_psms("results.pin", description="Percolator")
+            .add_psms("search.pep.xml", description="Comet")
+            .set_extra("instrument", "Orbitrap Eclipse")
             .save("run42.mszx")
     )
 ```
 
+`add_psms` takes a `PSMTable` or a pepXML / Percolator / mzTab file (see
+[Search results](annotations.md)) and stores it as mzTab, zstd-compressed by
+default (`MSZXBuilder(msz, compression=False)` to store it plain). The member
+is named after the source file — `results.pin` becomes `results.pin.mztab.zst`;
+pass `name=` to choose another.
+
 ## Or use the convenience function
 
 ```python
-from mscompress import create_mszx
+from mscompress import create_mszx, read
 
-create_mszx(
-    spectra="spectra.msz",
-    output="run42.mszx",
-    annotations=[
-        ("percolator", "results.pin", "percolator_pin"),
-        ("comet", "search.pep.xml", "pepxml"),
-    ],
-    description="DDA run #42",
-    join_key="scan_number",
-    extra={"instrument": "Orbitrap Eclipse"},
-)
+with read("spectra.msz") as msz:
+    create_mszx(
+        msz,
+        "run42.mszx",
+        psms=["results.pin", "search.pep.xml"],
+        description="DDA run #42",
+    )
 ```
 
 ## Read
@@ -44,7 +44,7 @@ create_mszx(
 ```python
 from mscompress import MSZXFile
 
-with MSZXFile("run42.mszx") as archive:
+with MSZXFile.open("run42.mszx") as archive:
     print(archive.manifest.description)
     print(archive.manifest.num_spectra)
 
@@ -52,12 +52,15 @@ with MSZXFile("run42.mszx") as archive:
     for s in archive.spectra:
         ...
 
-    # Iterate annotations
-    for entry in archive.manifest.annotations:
-        reader = archive.open_annotation(entry.name)
-        for psm in reader:
-            print(psm.scan_number, psm.peptide, psm.score)
+    # Search results, parsed on open
+    table = archive.psms                          # first PSMTable, or None
+    for name, table in archive.psm_tables.items():
+        print(name, table.metadata.software, len(table))
+        print(table.df[["scan", "peptide", "score"]].head())
 ```
+
+See [Search results](annotations.md#joining-psms-to-spectra) for joining PSMs
+to spectra.
 
 ## Batch archives — many runs in one file
 
@@ -86,7 +89,7 @@ compress_batch(
 )
 ```
 
-### Incremental control, with annotations
+### Incremental control, with search results
 
 ```python
 from mscompress import MSZXBatchWriter
@@ -94,18 +97,18 @@ from mscompress import MSZXBatchWriter
 with MSZXBatchWriter("cohort.mszx", threads=8) as writer:
     for path in mzml_paths:
         idx = writer.add(path)                      # -> entry index
-        writer.add_annotation(
-            idx, pin_bytes, f"annotations/{path.stem}.pin",
-            format="percolator_tsv", num_records=4021,
-        )
-        writer.set_join_key(idx, "scan_number")
+        member = writer.add_psms(idx, path.with_suffix(".pin"))
+        # -> "<stem>.pin.mztab.zst"
 ```
 
 Leaving the `with` block via an exception calls `abort()`, so a partial archive
 is never left behind. `add()` also accepts an already-open `MZMLFile`, reusing
 its mapping rather than re-opening the file.
 
-Annotation payloads are stored as given — compress them yourself and pass
+`add_psms` takes a `PSMTable` or a pepXML / Percolator / mzTab file and stores
+it as mzTab, zstd-compressed unless `compressed=False`. To attach some other
+file verbatim, use `writer.add_annotation(idx, data, filename, format=...)`;
+those payloads are stored as given — compress them yourself and pass
 `compressed=True` if you want them zstd-compressed.
 
 ### Read a batch archive
@@ -124,7 +127,8 @@ with read("cohort.mszx") as archive:          # -> MSZXBatchFile
         print(len(member.spectra))
 
     first = archive[0]                        # or archive["runA.msz"]
-    psms = archive.get_annotation(0, "annotations/runA.pin")
+    psms = archive.get_psms(0, "runA.pin.mztab.zst")   # -> PSMTable
+    raw = archive.get_annotation(0, "runA.pin.mztab.zst")  # bytes, as stored
 
     archive.decompress("out/")                # every member -> out/*.mzML
 ```
