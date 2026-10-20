@@ -1,13 +1,31 @@
 # `mscompress.annotations`
 
-Peptide-spectrum match (PSM) readers.
+Search results (peptide-spectrum matches), read into a `PSMTable`.
 
-## Data class
+## Reading
 
-::: mscompress.annotations.PSM
+::: mscompress.annotations.read_psms
 
-## Readers
+::: mscompress.annotations.detect_format
 
-::: mscompress.annotations.TSVReader
+## PSM table
 
-::: mscompress.annotations.PepXMLReader
+::: mscompress.annotations.PSMTable
+
+::: mscompress.annotations.psm_frame
+
+## Search metadata
+
+::: mscompress.annotations.SearchMetadata
+
+::: mscompress.annotations.ModificationSpec
+
+## Formats
+
+::: mscompress.annotations.SearchResultsFormat
+
+::: mscompress.annotations.MzTab
+
+::: mscompress.annotations.PepXML
+
+::: mscompress.annotations.Percolator
