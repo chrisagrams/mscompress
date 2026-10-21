@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/chrisagrams/mscompress/compare/v1.2.0...v1.2.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **cli:** treat trailing .mszx positional as batch output ([#225](https://github.com/chrisagrams/mscompress/issues/225)) ([#239](https://github.com/chrisagrams/mscompress/issues/239)) ([1b98c6f](https://github.com/chrisagrams/mscompress/commit/1b98c6f828f84869d5a010c55da2fb34b57b00ee))
+
 ## [1.2.0](https://github.com/chrisagrams/mscompress/compare/v1.1.1...v1.2.0) (2026-10-19)
 
 
