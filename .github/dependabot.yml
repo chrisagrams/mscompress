@@ -1,0 +1,105 @@
+# Dependabot version updates.
+#
+# PRs target dev (the integration branch); the repo default branch is main.
+# PRs into dev are squash-merged with the PR title as the commit message, so
+# every update uses a Conventional Commits prefix accepted by pr-title.yml.
+# chore/ci types are hidden in the changelog and do not trigger a release.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Root package.json (husky git hooks only)
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: npm
+    directory: /node
+    target-branch: dev
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      node-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+      node-prod:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /electron
+    target-branch: dev
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      electron-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+      electron-prod:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: uv
+    directory: /python
+    target-branch: dev
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      python:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /docs
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: docs
+      include: scope
+    groups:
+      docs:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # Vendored C libraries (zstd, lz4, zlib, base64, c-blosc2)
+  - package-ecosystem: gitsubmodule
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+      include: scope

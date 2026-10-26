@@ -153,8 +153,8 @@ The project version lives in `version.txt` at the repo root — this is the sing
 
 - **CMake** — each `CMakeLists.txt` reads `version.txt` via `file(STRINGS ...)` to set `PROJECT_VERSION` (root, `cli/`, `node/`, `node/`, `modules/python/`)
 - **C code** — `cli/CMakeLists.txt` passes `VERSION` via `target_compile_definitions`
-- **Python** — `python/pyproject.toml` (`$.project.version`) and `python/mscompress/__init__.py` (`__version__`, carries an `# x-release-please-version` annotation) are updated by release-please via `release-please-config.json` `extra-files`
-- **npm** — all `package.json` files are updated by release-please `extra-files`
+- **Python** — `python/pyproject.toml` (`$.project.version`), the `mscompress` entry in `python/uv.lock`, and `python/mscompress/__init__.py` (`__version__`, carries an `# x-release-please-version` annotation) are updated by release-please via `release-please-config.json` `extra-files`
+- **npm** — `node/` and `electron/` `package.json` and `package-lock.json` (`$.version` and `$.packages[""].version`) are updated by release-please `extra-files`
 
 Releases are automated in two phases following the `dev` → `stage` → `main` promotion flow:
 1. On push to `dev`, `.github/workflows/release-please.yml` opens/updates a **release PR targeting `dev`** (bumping `version.txt`, the package files, and `CHANGELOG.md`). Merging it into `dev` does **not** tag anything; the PR is left labeled `autorelease: pending`.
