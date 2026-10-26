@@ -573,9 +573,22 @@ static void free_manifest_rec(manifest_rec_t* r) {
 /* ---------------- default output path ---------------- */
 
 static char* default_output_path(Arguments* a, strlist_t* inputs) {
-   /* Single directory input -> "<dirbase>.mszx"; else "batch.mszx". */
-   if (a->n_inputs == 1 && is_directory(a->inputs[0])) {
-      const char* db = base_name(a->inputs[0]);
+   /* Single directory input -> "<dirbase>.mszx"; else "batch.mszx". Only
+    * positionals that resolve count, so a missing path (skipped with a
+    * warning) does not change the default name. */
+   const char* dir = NULL;
+   size_t n_live = 0;
+   for (size_t i = 0; i < a->n_inputs; ++i) {
+      const char* tok = a->inputs[i];
+      if (has_glob_meta(tok) || is_regular_file(tok)) {
+         n_live++;
+      } else if (is_directory(tok)) {
+         n_live++;
+         dir = tok;
+      }
+   }
+   if (n_live == 1 && dir) {
+      const char* db = base_name(dir);
       size_t dl = strlen(db);
       /* strip a trailing slash's effect already handled by base_name */
       char* out = malloc(dl + 6);

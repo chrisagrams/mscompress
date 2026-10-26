@@ -364,13 +364,13 @@ static int parse_arguments(int argc, char* argv[], Arguments* arguments) {
  * `mscompress input output` must NOT be treated as batch. The key disambiguator
  * is that a batch needs 2+ *existing* input files, whereas in `input output`
  * the second positional is an output path that does not exist yet. */
-/* Case-insensitive ".mzML" test, mirroring batch.c's input filter. */
-static int has_mzml_extension(const char* path) {
+/* Case-insensitive extension test; `want` is lowercase, including the dot. */
+static int has_extension(const char* path, const char* want) {
    size_t pl = strlen(path);
-   if (pl < 5) return 0;
-   const char* ext = path + pl - 5;
-   const char* want = ".mzml";
-   for (size_t i = 0; i < 5; ++i) {
+   size_t wl = strlen(want);
+   if (pl <= wl) return 0;
+   const char* ext = path + pl - wl;
+   for (size_t i = 0; i < wl; ++i) {
       char c = ext[i];
       if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
       if (c != want[i]) return 0;
@@ -378,14 +378,29 @@ static int has_mzml_extension(const char* path) {
    return 1;
 }
 
+/* Case-insensitive ".mzML" test, mirroring batch.c's input filter. */
+static int has_mzml_extension(const char* path) {
+   return has_extension(path, ".mzml");
+}
+
+/* `mscompress <inputs...> out.mszx`: without -o, a trailing .mszx positional
+ * is the archive to write, not an input (matching the legacy `input output`
+ * form). An .mszx is never a valid batch input, so this holds whether or not
+ * it exists yet; otherwise a re-run would feed the old archive back in. */
+static void take_positional_mszx_output(Arguments* a) {
+   if (a->output_file || a->n_inputs == 0) return;
+   if (a->n_inputs < 2 && !a->from_file) return;
+   if (!has_extension(a->inputs[a->n_inputs - 1], ".mszx")) return;
+   a->output_file = a->inputs[a->n_inputs - 1];
+   a->n_inputs--;
+   if (a->n_inputs == 0) a->input_file = NULL;
+}
+
 static int is_batch_request(Arguments* a) {
    if (a->batch || a->from_file) return 1;
 
    /* -o something.mszx forces archive output (single- or multi-input). */
-   if (a->output_file) {
-      size_t ol = strlen(a->output_file);
-      if (ol > 5 && strcmp(a->output_file + ol - 5, ".mszx") == 0) return 1;
-   }
+   if (a->output_file && has_extension(a->output_file, ".mszx")) return 1;
 
    /* Any directory or quoted-glob positional => batch. */
    for (size_t i = 0; i < a->n_inputs; ++i) {
@@ -466,6 +481,7 @@ int main(int argc, char* argv[]) {
    }
 
    // Batch mode: folder / glob / explicit list / --from-file -> one .mszx.
+   take_positional_mszx_output(&arguments);
    int is_batch = is_batch_request(&arguments);
 
    // Extraction is single-file only. Without this, the extract_only override
@@ -476,8 +492,8 @@ int main(int argc, char* argv[]) {
    }
 
    // Legacy single-file forms: a second positional is the output path. Applies
-   // to compress/decompress/.mszx-decompress alike (batch ignores this: all
-   // positionals are inputs there).
+   // to compress/decompress/.mszx-decompress alike (batch ignores this: a
+   // trailing .mszx output was already taken above, the rest are inputs).
    if (!is_batch) {
       if (arguments.output_file == NULL && arguments.n_inputs >= 2)
          arguments.output_file = arguments.inputs[1];
@@ -502,8 +518,8 @@ int main(int argc, char* argv[]) {
 
    // Open file descriptors and mmap.
    if (is_batch) {
-      // All positionals (+ --from-file) are inputs; output comes from -o or a
-      // default computed in compress_batch. Streams straight into the archive;
+      // All positionals (+ --from-file) are inputs; output comes from -o, a
+      // trailing .mszx positional, or a default computed in compress_batch. Streams straight into the archive;
       // no prepare_fds / input mmap here.
       operation = COMPRESS_BATCH;
    } else if (is_mszx) {
