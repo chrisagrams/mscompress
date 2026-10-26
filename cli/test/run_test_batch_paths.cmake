@@ -12,6 +12,12 @@
 #      existing output must stay single-file (it used to segfault).
 #   6. --extract with a batch-style input (a directory) must be rejected with
 #      an error, not crash.
+#   7. A trailing .mszx positional is the output, not a (missing) input, with
+#      or without --batch, case-insensitively, and for a single mzML input.
+#      It used to be skipped as "not found" and ./batch.mszx written instead.
+#   8. Re-running onto that now-existing .mszx must not feed it back in.
+#   9. A missing positional must not change the default name: `<dir> <typo>`
+#      still defaults to <dirbase>.mszx.
 #
 # Expected variables: EXECUTABLE, TEST_MZML, TEMP_DIR
 
@@ -161,6 +167,83 @@ if(NOT DR EQUAL 1)
 endif()
 if(NOT DE MATCHES "single input file")
     message(FATAL_ERROR "expected a 'single input file' rejection, got: ${DE}")
+endif()
+
+# --- 7: trailing .mszx positional is the output (issue #225) ---
+file(MAKE_DIRECTORY "${TEMP_DIR}/cwd")
+set(POS "${TEMP_DIR}/pos.mszx")
+foreach(FORM batch inferred upper single)
+    if(FORM STREQUAL "batch")
+        set(ARGS --batch "${TEMP_DIR}/tree/runA" "${POS}")
+        set(WANT "${POS}")
+    elseif(FORM STREQUAL "inferred")
+        set(WANT "${TEMP_DIR}/pos_inferred.mszx")
+        set(ARGS "${TEMP_DIR}/tree/runA" "${WANT}")
+    elseif(FORM STREQUAL "upper")
+        set(WANT "${TEMP_DIR}/pos_upper.MSZX")
+        set(ARGS --batch "${TEMP_DIR}/tree/runA" "${WANT}")
+    else()
+        set(WANT "${TEMP_DIR}/pos_single.mszx")
+        set(ARGS "${TEMP_DIR}/tree/runA/sample.mzML" "${WANT}")
+    endif()
+    execute_process(
+        COMMAND "${EXECUTABLE}" ${ARGS}
+        WORKING_DIRECTORY "${TEMP_DIR}/cwd"
+        RESULT_VARIABLE PR OUTPUT_VARIABLE PO ERROR_VARIABLE PE)
+    if(NOT PR EQUAL 0)
+        message(STATUS "out: ${PO}\nerr: ${PE}")
+        message(FATAL_ERROR "positional .mszx (${FORM}) failed (${PR})")
+    endif()
+    if(NOT EXISTS "${WANT}")
+        message(FATAL_ERROR "positional .mszx (${FORM}) not written to ${WANT}")
+    endif()
+    if(EXISTS "${TEMP_DIR}/cwd/batch.mszx")
+        message(FATAL_ERROR
+            "positional .mszx (${FORM}) ignored; wrote ./batch.mszx instead")
+    endif()
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar tf "${WANT}"
+        RESULT_VARIABLE PTR OUTPUT_VARIABLE PTOUT)
+    if(NOT PTR EQUAL 0 OR NOT PTOUT MATCHES "manifest\\.json")
+        message(FATAL_ERROR "positional .mszx (${FORM}) is not a valid archive")
+    endif()
+endforeach()
+
+# --- 8: re-running onto the existing .mszx must not ingest it ---
+execute_process(
+    COMMAND "${EXECUTABLE}" --batch "${TEMP_DIR}/tree/runA" "${POS}"
+    WORKING_DIRECTORY "${TEMP_DIR}/cwd"
+    RESULT_VARIABLE RR OUTPUT_VARIABLE RO ERROR_VARIABLE RE)
+if(NOT RR EQUAL 0)
+    message(STATUS "out: ${RO}\nerr: ${RE}")
+    message(FATAL_ERROR "re-run onto an existing .mszx failed (${RR})")
+endif()
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E tar tf "${POS}"
+    RESULT_VARIABLE RTR OUTPUT_VARIABLE RTOUT)
+if(NOT RTR EQUAL 0)
+    message(FATAL_ERROR "re-run produced an invalid tar")
+endif()
+if(RTOUT MATCHES "pos" OR RTOUT MATCHES "sample__2")
+    message(FATAL_ERROR "re-run fed the old archive back in: ${RTOUT}")
+endif()
+
+# --- 9: a missing positional does not change the default output name ---
+execute_process(
+    COMMAND "${EXECUTABLE}" --batch "${TEMP_DIR}/tree/runA"
+            "${TEMP_DIR}/no_such_dir"
+    WORKING_DIRECTORY "${TEMP_DIR}/cwd"
+    RESULT_VARIABLE MR OUTPUT_VARIABLE MO ERROR_VARIABLE ME)
+if(NOT MR EQUAL 0)
+    message(STATUS "out: ${MO}\nerr: ${ME}")
+    message(FATAL_ERROR "batch with a missing positional failed (${MR})")
+endif()
+if(NOT EXISTS "${TEMP_DIR}/cwd/runA.mszx")
+    message(FATAL_ERROR "missing positional changed the default name "
+                        "(expected runA.mszx)")
+endif()
+if(EXISTS "${TEMP_DIR}/cwd/batch.mszx")
+    message(FATAL_ERROR "missing positional fell back to batch.mszx")
 endif()
 
 file(REMOVE_RECURSE "${TEMP_DIR}")
