@@ -347,7 +347,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./node
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Build prebuild (Unix)
         if: matrix.platform != 'windows'
@@ -493,7 +493,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./node
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Build TypeScript
         working-directory: ./node
@@ -523,7 +523,7 @@ jobs:
 
       - name: Install node dependencies
         working-directory: ./node
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Build node TypeScript
         working-directory: ./node
@@ -531,7 +531,7 @@ jobs:
 
       - name: Install Electron app dependencies
         working-directory: ./electron
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       # --ignore-scripts skips puppeteer's postinstall, so fetch its browser here.
       - name: Install Puppeteer browser
@@ -630,7 +630,7 @@ jobs:
       # that first: the .node addon is bundled into the app via extraResources.
       - name: Install node dependencies
         working-directory: ./node
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Build node native addon (Unix)
         if: matrix.platform != 'windows'
@@ -649,7 +649,7 @@ jobs:
       # Build + package the Electron app (electron-vite -> electron-builder).
       - name: Install Electron app dependencies
         working-directory: ./electron
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Typecheck + build (electron-vite)
         working-directory: ./electron
