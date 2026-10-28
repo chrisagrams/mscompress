@@ -1,5 +1,5 @@
 # Build stage
-FROM alpine:3.20 AS build
+FROM alpine:3.24 AS build
 RUN apk add --no-cache git cmake build-base
 WORKDIR /app
 COPY version.txt ./version.txt
