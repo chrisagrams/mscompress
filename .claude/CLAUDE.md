@@ -162,7 +162,7 @@ Releases are automated in two phases following the `dev` → `stage` → `main` 
 
 Merge methods are enforced by repository rulesets: PRs into `dev` are **squash-only** (the commit message is the PR title, body blank), and PRs into `stage`/`main` are **merge-commit-only**. Because the PR title becomes the commit release-please parses, `.github/workflows/pr-title.yml` requires PR titles into `dev` to be Conventional Commits (allowed types mirror `changelog-sections`; use `feat!:` for breaking changes).
 
-Only one release can be in flight: while a merged release PR is still pending (not yet on `main`), release-please will not open a new release PR on `dev`. The tag points at the release commit on `dev`, which is in `main`'s history as long as promotions use merge commits (not squash). Hotfixes made directly on `stage`/`main` must be merged back into `dev` to be picked up. Bump sizing: `feat:` → minor; `fix:`/`perf:`/`refactor:` → patch; `feat!:`/`BREAKING CHANGE` → major (the patch-triggering set is configured in `release-please-config.json` `changelog-sections`).
+Only one release can be in flight: while a merged release PR is still pending (not yet on `main`), release-please will not open a new release PR on `dev`. The tag points at the release commit on `dev`, which is in `main`'s history as long as promotions use merge commits (not squash). Hotfixes made directly on `stage`/`main` must be merged back into `dev` to be picked up. Bump sizing: `feat:` → minor; `fix:`/`perf:`/`refactor:`/`deps:` → patch; `feat!:`/`BREAKING CHANGE` → major (the patch-triggering set is configured in `release-please-config.json` `changelog-sections`).
 
 Never hardcode a version string in `src/mscompress.h` or any CMakeLists.txt — it comes from `version.txt`.
 
