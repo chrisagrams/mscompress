@@ -28,7 +28,7 @@
     "cmake-js": "^7.3.0",
     "prebuild": "^13.0.0",
     "eslint": "^10.13.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-prettier": "^10.1.8",
     "node-addon-api": "^8.0.0",
     "prettier": "^3.4.0",
     "tsc-alias": "^1.8.10",
