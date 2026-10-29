@@ -98,6 +98,7 @@ plugins:
               - "!^_"
 
 extra:
+  generator: false
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/chrisagrams/mscompress
