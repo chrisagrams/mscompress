@@ -71,7 +71,7 @@ cohort.mszx                  (uncompressed tar)
 ├── runB.msz
 ├── runB__2.msz              (basename collision -> __N suffix)
 ├── annotations/
-│   └── runA.pin
+│   └── runA.mztab.zst
 ├── index.mszxi              (per-spectrum index; omitted with --no-index)
 └── manifest.json            (written LAST — sizes aren't known until then)
 ```
@@ -86,22 +86,26 @@ cohort.mszx                  (uncompressed tar)
     {
       "entry": "runA.msz",
       "original": "runA.mzML",
+      "offset": 512,
       "size": 964881,
       "num_spectra": 8213,
       "join_key": "scan_number",
       "annotations": [
         {
-          "filename": "annotations/runA.pin",
-          "format": "percolator_tsv",
+          "filename": "annotations/runA.mztab.zst",
+          "format": "mztab",
           "compressed": true,
+          "offset": 966144,
+          "size": 88211,
           "num_records": 4021
         }
       ]
     },
-    { "entry": "runB.msz", "original": "runB.mzML", "size": 771204, "num_spectra": 6640 }
+    { "entry": "runB.msz", "original": "runB.mzML", "offset": 1055232, "size": 771204, "num_spectra": 6640 }
   ],
   "index": {
     "entry": "index.mszxi",
+    "offset": 1827328,
     "size": 427008,
     "format_version": 1,
     "columns": ["entry", "spectrum_idx", "scan", "ms_level", "rt_sec",
@@ -126,6 +130,7 @@ cohort.mszx                  (uncompressed tar)
 |-------|------|----------|---------|
 | `entry` | string | yes | Tar member name of the MSZ payload |
 | `original` | string | yes | **Basename** of the source mzML |
+| `offset` | int | no | Absolute byte offset of the payload from the start of the archive; see [Remote reads](#remote-reads) |
 | `size` | int | yes | Payload byte length, matching the tar header |
 | `num_spectra` | int | no | Spectrum count — lets a reader list an archive without opening any member |
 | `join_key` | string | no | Column to join this entry's annotations against its spectra |
@@ -174,6 +179,7 @@ candidate rows.
 | Field | Type | Purpose |
 |-------|------|---------|
 | `entry` | string | Tar member name (`"index.mszxi"`) |
+| `offset` | int | Absolute byte offset of the payload (optional) |
 | `size` | int | Member byte length |
 | `format_version` | int | Binary layout version of the member (currently `1`) |
 | `columns` | array | Column names, in storage order |
@@ -224,10 +230,39 @@ Used by both versions.
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `filename` | string | yes | Path inside the archive |
-| `format` | string | yes | `percolator_tsv`, `pepxml`, `tsv`, or another reader-supported format |
+| `format` | string | yes | `mztab` (the only format new archives store); legacy archives may carry `percolator_tsv`, `pepxml`, or `tsv` |
 | `compressed` | bool | yes | Payload is zstd-compressed |
+| `offset` | int | no | v2 only: absolute byte offset of the payload |
+| `size` | int | no | v2 only: payload byte length |
 | `description` | string | no | Free-text description |
 | `num_records` | int | no | Record/PSM count |
+
+## Remote reads
+
+Every member of a v2 archive records `offset`, the absolute byte position of
+its payload, next to its `size`. The member's tar header sits at
+`offset - 512`. With the manifest in hand, any member is one HTTP range
+request (`bytes=offset..offset+size-1`), with no walk over the tar headers.
+
+The manifest is always the last member, and the archive ends
+`[manifest header][manifest payload, padded to 512][1024 zero bytes]`. To find
+it remotely:
+
+1. `HEAD` the archive for its length, then range-read the last 64 KiB.
+2. Strip the trailing 1024 zero bytes. Scan backwards over 512-aligned blocks
+   for a valid USTAR header named `manifest.json` and check its checksum. If the
+   manifest is larger than the window, read further back; the header's `size`
+   field gives the exact amount.
+3. Parse the manifest. Each member is now one range request.
+
+That is two requests to reach any member, however many members the archive has.
+
+Readers should **validate before trusting** an offset: if the header at
+`offset - 512` doesn't name the expected `entry` / `filename`, fall back to
+walking the headers. `offset` is optional and is omitted rather than null, so
+archives written before it was added still read. v1 archives never carry it:
+their manifest is the first member, so its own length would shift every offset
+after it.
 
 ## Version negotiation
 

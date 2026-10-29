@@ -1418,12 +1418,18 @@ int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size) {
    return tar_write_zeros(fd, pad);
 }
 
-int tar_add_file(int fd, const char* name, const void* data, size_t len) {
+int tar_add_file(int fd, const char* name, const void* data, size_t len,
+                 int64_t* payload_off) {
    if (fd < 0 || !name) return -1;
    char hdr[TAR_BLOCK_SIZE];
    if (tar_build_header(hdr, name, (uint64_t)len) != 0) {
       error("tar_add_file: entry name too long for USTAR: %s\n", name);
       return -1;
+   }
+   if (payload_off) {
+      int64_t header_off = get_offset(fd);
+      if (header_off < 0) return -1;
+      *payload_off = header_off + TAR_BLOCK_SIZE;
    }
    if (write_to_file(fd, hdr, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
       return -1;
