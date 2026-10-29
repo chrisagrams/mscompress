@@ -9,6 +9,7 @@ docs_dir: docs
 
 theme:
   name: material
+  variant: classic
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

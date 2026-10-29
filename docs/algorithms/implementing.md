@@ -150,7 +150,7 @@ Add a page under `docs/algorithms/catalog/` describing:
 - Lossless vs lossy character and expected precision
 - When this algorithm is the right choice
 
-Then link it from `docs/algorithms/catalog/index.md` and the mkdocs nav.
+Then link it from `docs/algorithms/catalog/index.md` and the `nav` in `mkdocs.yml`.
 
 ## Worked example
 
