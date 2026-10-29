@@ -141,6 +141,9 @@ class SpectraFileEntry:
         original: Basename of the source mzML. Only the basename is recorded,
             so the source directory is not recoverable from the archive.
         size: Payload size in bytes, matching the tar header.
+        offset: Absolute byte offset of the payload from the start of the
+            archive (its tar header is 512 bytes earlier), or ``None`` when
+            the writer omitted it.
         num_spectra: Spectrum count, or ``None`` when the writer omitted it
             (archives produced before this field was added).
         join_key: Column used to join annotations to spectra.
@@ -150,6 +153,7 @@ class SpectraFileEntry:
     entry: str
     original: str = ""
     size: int = 0
+    offset: Optional[int] = None
     num_spectra: Optional[int] = None
     join_key: str = "scan_number"
     annotations: List[AnnotationEntry] = field(default_factory=list)
@@ -158,8 +162,10 @@ class SpectraFileEntry:
         data: Dict[str, Any] = {
             "entry": self.entry,
             "original": self.original,
-            "size": self.size,
         }
+        if self.offset is not None:
+            data["offset"] = self.offset
+        data["size"] = self.size
         if self.num_spectra is not None:
             data["num_spectra"] = self.num_spectra
         if self.join_key:
@@ -174,6 +180,7 @@ class SpectraFileEntry:
             entry=data["entry"],
             original=data.get("original", ""),
             size=data.get("size", 0),
+            offset=data.get("offset"),
             num_spectra=data.get("num_spectra"),
             join_key=data.get("join_key", "scan_number"),
             annotations=[
@@ -190,6 +197,8 @@ class IndexInfo:
     Attributes:
         entry: Tar member name of the index (``"index.mszxi"``).
         size: Member size in bytes.
+        offset: Absolute byte offset of the member payload, or ``None`` when
+            the writer omitted it.
         format_version: Binary layout version of the index member.
         columns: Column names, in storage order.
         sorted_by: Columns with a sorted key (fast range queries).
@@ -197,24 +206,27 @@ class IndexInfo:
 
     entry: str = "index.mszxi"
     size: int = 0
+    offset: Optional[int] = None
     format_version: int = 1
     columns: List[str] = field(default_factory=list)
     sorted_by: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "entry": self.entry,
-            "size": self.size,
-            "format_version": self.format_version,
-            "columns": list(self.columns),
-            "sorted_by": list(self.sorted_by),
-        }
+        data: Dict[str, Any] = {"entry": self.entry}
+        if self.offset is not None:
+            data["offset"] = self.offset
+        data["size"] = self.size
+        data["format_version"] = self.format_version
+        data["columns"] = list(self.columns)
+        data["sorted_by"] = list(self.sorted_by)
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> IndexInfo:
         return cls(
             entry=data.get("entry", "index.mszxi"),
             size=data.get("size", 0),
+            offset=data.get("offset"),
             format_version=data.get("format_version", 1),
             columns=list(data.get("columns", [])),
             sorted_by=list(data.get("sorted_by", [])),

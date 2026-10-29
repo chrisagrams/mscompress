@@ -1111,11 +1111,16 @@ cdef class MSZFile(BaseFile):
         if self._inten_binary_block_lens != NULL:
             _lru_remove_queue_blocks(lru, self._inten_binary_block_lens)
 
-    def _init_from_archive(self, bytes mszx_path, bytes entry_name):
+    def _init_from_archive(self, bytes mszx_path, bytes entry_name,
+                           offset=None, size=None):
         """
         Populate this instance's BaseFile + MSZFile state from an MSZX
         archive entry. Used by both MSZFile.from_mszx and MSZXFile.open
         to share the offset-mmap construction path.
+
+        When ``offset`` and ``size`` are both given, they locate the entry's
+        payload directly and the tar headers are not walked. The caller is
+        responsible for having validated them.
         """
         if not os.path.exists(mszx_path):
             raise FileNotFoundError(f"File not found: {os.fsdecode(mszx_path)}")
@@ -1126,7 +1131,10 @@ cdef class MSZFile(BaseFile):
 
         cdef int64_t off = 0
         cdef size_t sz = 0
-        if _find_tar_entry(fd, entry_name, &off, &sz) != 0:
+        if offset is not None and size is not None:
+            off = offset
+            sz = size
+        elif _find_tar_entry(fd, entry_name, &off, &sz) != 0:
             _close_file(fd)
             raise ValueError(
                 f"Entry '{os.fsdecode(entry_name)}' not found in archive "
@@ -1176,7 +1184,7 @@ cdef class MSZFile(BaseFile):
         _set_decompress_runtime_variables(self._df, self._footer)
 
     @classmethod
-    def from_mszx(cls, bytes mszx_path, bytes entry_name):
+    def from_mszx(cls, bytes mszx_path, bytes entry_name, offset=None, size=None):
         """
         Open an MSZ file embedded inside an MSZX (tar) archive without
         extracting it to disk. Mmap's the archive at the entry's byte
@@ -1188,9 +1196,15 @@ cdef class MSZFile(BaseFile):
             Path to the .mszx archive.
         entry_name : bytes
             Name of the MSZ entry within the archive (e.g. b"spectra.msz").
+        offset : int, optional
+            Byte offset of the entry's payload, as recorded in a v2 manifest.
+            With ``size``, skips walking the tar headers to find the entry.
+            Not validated here; pass only a checked offset.
+        size : int, optional
+            Payload size in bytes. Used only together with ``offset``.
         """
         cdef MSZFile self = cls.__new__(cls)
-        self._init_from_archive(mszx_path, entry_name)
+        self._init_from_archive(mszx_path, entry_name, offset, size)
         return self
 
     def __reduce__(self):
