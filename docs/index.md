@@ -64,3 +64,15 @@ annotations and a JSON manifest.
 - [Algorithm catalog](algorithms/catalog/index.md) — registered transforms
 - [Implementing a new algorithm](algorithms/implementing.md)
 - [Contributing](contributing/index.md)
+
+## For LLMs and coding agents
+
+These docs are also published as Markdown, which models read far more
+reliably than HTML:
+
+- [`llms.txt`](https://chrisagrams.github.io/mscompress/llms.txt) — index of
+  every page, following the [llms.txt](https://llmstxt.org/) convention
+- [`llms-full.txt`](https://chrisagrams.github.io/mscompress/llms-full.txt) —
+  the entire site concatenated into one file
+- Per-page Markdown — append `index.md` to any page URL, e.g.
+  [`getting-started/installation/index.md`](https://chrisagrams.github.io/mscompress/getting-started/installation/index.md)
