@@ -25,6 +25,12 @@ on:
 jobs:
   build-cli:
     name: Build CLI - ${{ matrix.platform }} ${{ matrix.arch }}
+    # docs: PRs only need the mkdocs build (docs.yml); skip the full suite.
+    if: &not-docs-pr >-
+      github.event_name != 'pull_request' || !(
+        startsWith(github.event.pull_request.title, 'docs:') ||
+        startsWith(github.event.pull_request.title, 'docs(') ||
+        startsWith(github.event.pull_request.title, 'docs!:'))
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
@@ -169,6 +175,7 @@ jobs:
   # artifact uploads.
   asan-leak-cli:
     name: ASan/LSan CLI (linux x86_64)
+    if: *not-docs-pr
     runs-on: ubuntu-latest
 
     steps:
@@ -205,6 +212,7 @@ jobs:
 
   build-python:
     name: Build Python - ${{ matrix.runner }} ${{ matrix.cibw_arch }}
+    if: *not-docs-pr
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -301,6 +309,7 @@ jobs:
 
   build-node:
     name: Build Node - ${{ matrix.platform }} ${{ matrix.arch }}
+    if: *not-docs-pr
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -407,6 +416,7 @@ jobs:
 
   build-docker:
     name: Build Docker Image
+    if: *not-docs-pr
     runs-on: ubuntu-latest
 
     steps:
@@ -508,6 +518,7 @@ jobs:
   # the native addon; node dist is still built because typecheck resolves it.
   test-electron:
     name: Test Electron GUI
+    if: *not-docs-pr
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
