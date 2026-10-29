@@ -14,13 +14,17 @@ export interface AnnotationEntry {
   /** Filename of the annotation file within the archive */
   filename: string;
   /** Format of the annotation file */
-  format: "percolator_tsv" | "pepxml" | "tsv";
+  format: "mztab" | "percolator_tsv" | "pepxml" | "tsv";
   /** Whether the file is compressed with zstd */
   compressed: boolean;
   /** Optional human-readable description */
   description?: string;
   /** Number of records/PSMs in the file */
   num_records?: number;
+  /** v2 only: absolute byte offset of the member payload */
+  offset?: number;
+  /** v2 only: payload size in bytes */
+  size?: number;
 }
 
 /**
@@ -193,6 +197,11 @@ export interface SpectraFileEntryData {
   original?: string;
   /** Payload size in bytes, matching the tar header */
   size?: number;
+  /**
+   * Absolute byte offset of the payload from the start of the archive (its
+   * tar header is 512 bytes earlier); absent in archives written before it
+   */
+  offset?: number;
   /** Spectrum count; absent in archives written before this field existed */
   num_spectra?: number;
   /** Column used to join annotations to spectra */
@@ -238,6 +247,7 @@ export class MSZXBatchManifest {
       entry: e.entry,
       original: e.original ?? "",
       size: e.size ?? 0,
+      ...(e.offset !== undefined && { offset: e.offset }),
       num_spectra: e.num_spectra,
       join_key: e.join_key ?? "scan_number",
       annotations: e.annotations ?? [],

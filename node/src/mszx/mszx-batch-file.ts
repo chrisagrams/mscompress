@@ -13,6 +13,10 @@
  * MSZ at its byte offset inside the tar. Nothing is extracted to a temp dir,
  * and only `manifest.json` is ever read into memory — a batch archive can hold
  * gigabytes of payload that must never be buffered.
+ *
+ * A v2 manifest records each member's payload `offset`, so neither finding the
+ * manifest (the last member) nor opening a member walks the tar headers; both
+ * fall back to the walk when the archive doesn't match.
  */
 
 import * as fs from "node:fs";
@@ -27,14 +31,143 @@ import {
   type SpectraFileEntryData,
 } from "@/mszx/mszx-manifest.js";
 
+const TAR_BLOCK = 512;
+/** First window read from the archive's end when locating the manifest. */
+const MANIFEST_TAIL = 64 * 1024;
+/** Give up on the end scan (and walk the headers) past this much. */
+const MANIFEST_SCAN_MAX = 16 * 1024 * 1024;
+
+/** A validated USTAR header: its full member name and payload size. */
+interface UstarHeader {
+  name: string;
+  size: number;
+}
+
+/** Parse a 512-byte USTAR header, or null if it isn't a valid one. */
+function parseUstarHeader(block: Buffer): UstarHeader | null {
+  if (block.length !== TAR_BLOCK) return null;
+  if (block.toString("latin1", 257, 262) !== "ustar") return null;
+  const octal = (start: number, len: number): number => {
+    const text = block.toString("latin1", start, start + len).replace(/[\0 ]+$/, "");
+    return /^[0-7]+$/.test(text) ? parseInt(text, 8) : NaN;
+  };
+  let sum = 0;
+  for (let i = 0; i < TAR_BLOCK; i++) {
+    sum += i >= 148 && i < 156 ? 0x20 : block[i];
+  }
+  if (octal(148, 8) !== sum) return null;
+  const size = octal(124, 12);
+  if (Number.isNaN(size)) return null;
+  const cstr = (start: number, len: number): string => {
+    const nul = block.indexOf(0, start);
+    const end = nul === -1 || nul > start + len ? start + len : nul;
+    return block.toString("utf-8", start, end);
+  };
+  const name = cstr(0, 100);
+  const prefix = cstr(345, 155);
+  return { name: prefix ? `${prefix}/${name}` : name, size };
+}
+
+function readAt(fd: number, position: number, length: number): Buffer {
+  const buf = Buffer.alloc(length);
+  const n = fs.readSync(fd, buf, 0, length, position);
+  return n === length ? buf : buf.subarray(0, n);
+}
+
+function roundUpToBlock(n: number): number {
+  return Math.ceil(n / TAR_BLOCK) * TAR_BLOCK;
+}
+
+/**
+ * A member's payload span from its manifest record, trusted only if the USTAR
+ * header 512 bytes before `offset` is valid, names `name`, and records `size`.
+ * Returns null when the record has no offset or the check fails; the caller
+ * then walks the tar headers instead.
+ */
+function checkedSpan(
+  filePath: string,
+  name: string,
+  offset: number | undefined,
+  size: number | undefined
+): { offset: number; size: number } | null {
+  if (offset === undefined || size === undefined || offset < TAR_BLOCK) {
+    return null;
+  }
+  let fd: number;
+  try {
+    fd = fs.openSync(filePath, "r");
+  } catch {
+    return null;
+  }
+  try {
+    const header = parseUstarHeader(readAt(fd, offset - TAR_BLOCK, TAR_BLOCK));
+    if (header?.name !== name || header.size !== size) return null;
+    if (offset + size > fs.fstatSync(fd).size) return null;
+    return { offset, size };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * Locate `manifest.json` without walking the tar headers.
+ *
+ * A v1 archive stores it first, so block 0 is checked directly. A v2 archive
+ * stores it last, ending `[header][payload, padded][>= 1024 zero bytes]`, so
+ * blocks are scanned backwards from the end for its header, reading a growing
+ * window. Returns undefined if neither layout matches.
+ *
+ * @internal Exported for tests.
+ */
+export function findManifestJSON(filePath: string): string | undefined {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const total = fs.fstatSync(fd).size;
+    if (total < 3 * TAR_BLOCK || total % TAR_BLOCK !== 0) return undefined;
+
+    const first = parseUstarHeader(readAt(fd, 0, TAR_BLOCK));
+    if (first?.name === "manifest.json") {
+      if (TAR_BLOCK + first.size > total) return undefined;
+      return readAt(fd, TAR_BLOCK, first.size).toString("utf-8");
+    }
+
+    let windowLen = Math.min(total, MANIFEST_TAIL);
+    for (;;) {
+      const start = total - windowLen;
+      const window = readAt(fd, start, windowLen);
+      // Skip the trailing end-of-archive zero blocks.
+      let pos = windowLen - TAR_BLOCK;
+      while (pos >= 0 && window.subarray(pos, pos + TAR_BLOCK).every((b) => b === 0)) {
+        pos -= TAR_BLOCK;
+      }
+      const zerosFrom = start + pos + TAR_BLOCK;
+      for (; pos >= 0; pos -= TAR_BLOCK) {
+        const header = parseUstarHeader(window.subarray(pos, pos + TAR_BLOCK));
+        if (header?.name !== "manifest.json") continue;
+        const payload = start + pos + TAR_BLOCK;
+        const dataEnd = payload + roundUpToBlock(header.size);
+        if (dataEnd < zerosFrom || total - dataEnd < 2 * TAR_BLOCK) return undefined;
+        return window.toString("utf-8", pos + TAR_BLOCK, pos + TAR_BLOCK + header.size);
+      }
+      if (windowLen >= total || windowLen >= MANIFEST_SCAN_MAX) return undefined;
+      windowLen = Math.min(total, windowLen * 4, MANIFEST_SCAN_MAX);
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /**
  * Read `manifest.json` out of an .mszx without buffering the payloads.
  *
- * `onReadEntry` fires for every member, so entries other than the manifest are
- * drained and discarded rather than accumulated.
+ * The manifest is located directly where the layout allows (see
+ * {@link findManifestJSON}). Otherwise every member is walked; `onReadEntry`
+ * fires for each, so entries other than the manifest are drained and
+ * discarded rather than accumulated.
  */
 export function readArchiveManifestJSON(filePath: string): string {
-  let manifest: string | undefined;
+  let manifest = findManifestJSON(filePath);
+  if (manifest !== undefined) return manifest;
   tar.list({
     file: filePath,
     sync: true,
@@ -196,7 +329,13 @@ export class MSZXBatchFile {
     const entry = this.entryFor(key);
     let member = this.openMembers.get(entry.entry);
     if (!member) {
-      member = MSZFile.fromMszx(this.archivePath, entry.entry);
+      const span = checkedSpan(
+        this.archivePath,
+        entry.entry,
+        entry.offset,
+        entry.size
+      );
+      member = MSZFile.fromMszx(this.archivePath, entry.entry, span ?? undefined);
       this.openMembers.set(entry.entry, member);
     }
     return member;
