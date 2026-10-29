@@ -367,11 +367,14 @@ typedef struct {
    char* format;   /* reader-supported format tag, e.g. "percolator_tsv" */
    int compressed; /* payload is zstd-compressed (the caller did it) */
    int64_t num_records; /* < 0 = omit */
+   uint64_t offset;     /* absolute byte offset of the member payload */
+   uint64_t size;       /* payload size in bytes */
 } manifest_ann_t;
 
 typedef struct {
    char* entry;
    char* original;
+   uint64_t offset; /* absolute byte offset of the member payload */
    uint64_t size;
    int64_t num_spectra; /* < 0 = omit */
    char* join_key;      /* NULL = omit */
@@ -451,12 +454,15 @@ static void jb_kv_str(jbuf_t* j, const char* key, const char* value) {
 }
 
 /* Append the manifest's optional `index` block (without a leading comma). */
-static void jb_index_block(jbuf_t* j, uint64_t index_size) {
+static void jb_index_block(jbuf_t* j, uint64_t index_offset,
+                           uint64_t index_size) {
    const char** names;
    size_t n;
 
    jb_puts(j, "\"index\": {");
    jb_kv_str(j, "entry", MSZX_INDEX_ENTRY);
+   jb_puts(j, ", \"offset\": ");
+   jb_i64(j, (int64_t)index_offset);
    jb_puts(j, ", \"size\": ");
    jb_i64(j, (int64_t)index_size);
    jb_puts(j, ", \"format_version\": ");
@@ -483,10 +489,14 @@ static void jb_index_block(jbuf_t* j, uint64_t index_size) {
  * Optional fields are omitted entirely rather than emitted as null, so a
  * reader written against the original v2 schema still parses the result.
  * `index_size` < 0 means the archive has no index member; the optional
- * `index` block is then omitted, and readers use the index only if present. */
+ * `index` block is then omitted, and readers use the index only if present.
+ * Every member records `offset`, the absolute byte position of its payload
+ * (its tar header is 512 bytes earlier), so a reader holding the manifest can
+ * fetch any member with one range read instead of walking the tar headers. */
 static char* build_manifest(manifest_rec_t* recs, size_t n,
                             const char* description, const char* extra_json,
-                            int64_t index_size, size_t* out_len) {
+                            int64_t index_offset, int64_t index_size,
+                            size_t* out_len) {
    jbuf_t j = {0};
    jb_reserve(&j, 1024);
    if (j.oom) return NULL;
@@ -512,6 +522,8 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
       jb_kv_str(&j, "entry", r->entry);
       jb_puts(&j, ", ");
       jb_kv_str(&j, "original", r->original);
+      jb_puts(&j, ", \"offset\": ");
+      jb_i64(&j, (int64_t)r->offset);
       jb_puts(&j, ", \"size\": ");
       jb_i64(&j, (int64_t)r->size);
       if (r->num_spectra >= 0) {
@@ -532,6 +544,10 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
             jb_kv_str(&j, "format", a->format);
             jb_puts(&j, ", \"compressed\": ");
             jb_puts(&j, a->compressed ? "true" : "false");
+            jb_puts(&j, ", \"offset\": ");
+            jb_i64(&j, (int64_t)a->offset);
+            jb_puts(&j, ", \"size\": ");
+            jb_i64(&j, (int64_t)a->size);
             if (a->num_records >= 0) {
                jb_puts(&j, ", \"num_records\": ");
                jb_i64(&j, a->num_records);
@@ -547,7 +563,7 @@ static char* build_manifest(manifest_rec_t* recs, size_t n,
    jb_puts(&j, "  ]");
    if (index_size >= 0) {
       jb_puts(&j, ",\n  ");
-      jb_index_block(&j, (uint64_t)index_size);
+      jb_index_block(&j, (uint64_t)index_offset, (uint64_t)index_size);
    }
    jb_puts(&j, "\n}\n");
 
@@ -776,6 +792,7 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
    }
    r->entry = name; /* ownership transferred */
    r->original = strdup(base_name(label));
+   r->offset = (uint64_t)payload_start;
    r->size = payload_bytes;
    r->num_spectra = num_spectra;
    if (!r->original) {
@@ -809,7 +826,8 @@ int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
    }
 
    /* Known size up front, so this is a plain single-shot tar member. */
-   if (tar_add_file(w->out_fd, archive_name, data, len) != 0) {
+   int64_t payload_off = 0;
+   if (tar_add_file(w->out_fd, archive_name, data, len, &payload_off) != 0) {
       error("batch: failed to write annotation '%s'\n", archive_name);
       w->poisoned = 1;
       return -1;
@@ -821,6 +839,8 @@ int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
    a->format = strdup(format);
    a->compressed = compressed ? 1 : 0;
    a->num_records = num_records;
+   a->offset = (uint64_t)payload_off;
+   a->size = (uint64_t)len;
    if (!a->filename || !a->format) {
       free(a->filename);
       free(a->format);
@@ -890,12 +910,14 @@ int batch_writer_finish(batch_writer_t* w) {
    }
 
    int rc = 0;
+   int64_t index_offset = -1;
    int64_t index_size = -1;
    if (w->index) {
       size_t ilen = 0;
       void* ibuf = mszx_index_builder_serialize(w->index, (uint32_t)w->n_recs,
                                                 &ilen);
-      if (!ibuf || tar_add_file(w->out_fd, MSZX_INDEX_ENTRY, ibuf, ilen)) {
+      if (!ibuf || tar_add_file(w->out_fd, MSZX_INDEX_ENTRY, ibuf, ilen,
+                                &index_offset)) {
          error("batch: failed to write %s\n", MSZX_INDEX_ENTRY);
          rc = -1;
       }
@@ -907,12 +929,13 @@ int batch_writer_finish(batch_writer_t* w) {
    char* manifest =
        rc ? NULL
           : build_manifest(w->recs, w->n_recs, w->description, w->extra_json,
-                           index_size, &mlen);
+                           index_offset, index_size, &mlen);
 
    /* manifest.json is written LAST: entry sizes are only known once each
     * payload has streamed out. */
    if (rc == 0 &&
-       (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen))) {
+       (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen,
+                                 NULL))) {
       error("batch: failed to write manifest.json\n");
       rc = -1;
    }

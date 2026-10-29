@@ -471,8 +471,11 @@ int tar_begin_entry(int fd, const char* name, tar_entry_t* w);
 /* Patch w's size field + checksum, rewrite the 512B header in place, then write
  * the payload's zero padding to the next 512B boundary. */
 int tar_end_entry(int fd, tar_entry_t* w, uint64_t payload_size);
-/* Append a whole, known-size regular-file entry (header + data + padding). */
-int tar_add_file(int fd, const char* name, const void* data, size_t len);
+/* Append a whole, known-size regular-file entry (header + data + padding).
+ * If payload_off is non-NULL, it receives the absolute byte offset of the
+ * entry's payload (its header starts 512 bytes earlier). */
+int tar_add_file(int fd, const char* name, const void* data, size_t len,
+                 int64_t* payload_off);
 /* Write the two trailing zero blocks (end-of-archive marker). */
 int tar_finish(int fd);
 int is_mzml(void* input_map, size_t input_length);
