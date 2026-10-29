@@ -42,9 +42,18 @@ export class MSZFile extends BaseFile {
    *
    * @param archivePath - Path to the .mszx file.
    * @param entryName - MSZ entry name inside the archive (e.g. "spectra.msz").
+   * @param span - Payload offset and size from a v2 manifest. Skips walking
+   *               the tar headers; not validated here, so pass only a checked
+   *               span.
    */
-  static fromMszx(archivePath: string, entryName: string): MSZFile {
-    const handle = native.openMszFromArchive(archivePath, entryName);
+  static fromMszx(
+    archivePath: string,
+    entryName: string,
+    span?: { offset: number; size: number }
+  ): MSZFile {
+    const handle = span
+      ? native.openMszFromArchive(archivePath, entryName, span.offset, span.size)
+      : native.openMszFromArchive(archivePath, entryName);
     return new MSZFile({ handle, path: archivePath });
   }
 

@@ -19,10 +19,14 @@ Napi::Value OpenMszFromArchive(const Napi::CallbackInfo& info) {
 
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
         Napi::TypeError::New(env,
-            "openMszFromArchive: (archivePath: string, entryName: string) expected"
+            "openMszFromArchive: (archivePath: string, entryName: string, "
+            "offset?: number, size?: number) expected"
         ).ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    // Optional payload span from the manifest. The caller validates it; with
+    // it the tar headers are not walked.
+    bool haveSpan = info.Length() >= 4 && info[2].IsNumber() && info[3].IsNumber();
 
     std::string archivePath = info[0].As<Napi::String>().Utf8Value();
     std::string entryName = info[1].As<Napi::String>().Utf8Value();
@@ -36,7 +40,10 @@ Napi::Value OpenMszFromArchive(const Napi::CallbackInfo& info) {
 
     int64_t offset = 0;
     size_t size = 0;
-    if (find_tar_entry(fd, entryName.c_str(), &offset, &size) != 0) {
+    if (haveSpan) {
+        offset = info[2].As<Napi::Number>().Int64Value();
+        size = static_cast<size_t>(info[3].As<Napi::Number>().Int64Value());
+    } else if (find_tar_entry(fd, entryName.c_str(), &offset, &size) != 0) {
         close_file(fd);
         Napi::Error::New(env,
             "openMszFromArchive: entry '" + entryName +

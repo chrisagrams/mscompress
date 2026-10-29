@@ -159,8 +159,14 @@ export interface NativeBindings {
   zstdDecompress(data: Buffer): Buffer;
 
   // MSZX archive helpers — open the embedded MSZ payload at its offset
-  // inside a .mszx tar without extracting to a temp file.
-  openMszFromArchive(archivePath: string, entryName: string): NativeFileHandle;
+  // inside a .mszx tar without extracting to a temp file. `offset`/`size`
+  // (both or neither) locate the payload directly, skipping the tar walk.
+  openMszFromArchive(
+    archivePath: string,
+    entryName: string,
+    offset?: number,
+    size?: number
+  ): NativeFileHandle;
 
   /** Stateful writer for a v2 ("batch") .mszx archive. */
   BatchWriter: NativeBatchWriterConstructor;
