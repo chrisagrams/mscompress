@@ -9,6 +9,7 @@ docs_dir: docs
 
 theme:
   name: material
+  variant: classic
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -97,6 +98,7 @@ plugins:
               - "!^_"
 
 extra:
+  generator: false
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/chrisagrams/mscompress
