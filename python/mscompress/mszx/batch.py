@@ -23,7 +23,17 @@ import os
 import tarfile
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 
@@ -45,6 +55,35 @@ __all__ = [
     "read_archive_manifest",
     "resolve_mzml_inputs",
 ]
+
+
+_TAR_BLOCK = 512
+
+
+def _checked_span(
+    path: Union[str, Path], name: str, offset: Optional[int], size: Optional[int]
+) -> Optional[Tuple[int, int]]:
+    """``(offset, size)`` of a member's payload from its manifest record.
+
+    The manifest offset is trusted only if the USTAR header 512 bytes before
+    it is valid, names ``name``, and records ``size``. Returns ``None`` when
+    the record has no offset or the check fails; the caller then walks the
+    tar headers instead.
+    """
+    if offset is None or size is None or offset < _TAR_BLOCK:
+        return None
+    try:
+        with open(path, "rb") as f:
+            f.seek(offset - _TAR_BLOCK)
+            header = f.read(_TAR_BLOCK)
+            f.seek(0, os.SEEK_END)
+            archive_len = f.tell()
+        info = tarfile.TarInfo.frombuf(header, "utf-8", "surrogateescape")
+    except (OSError, tarfile.HeaderError):
+        return None
+    if info.name != name or info.size != size or offset + size > archive_len:
+        return None
+    return offset, size
 
 
 def read_archive_manifest(path: Union[str, Path]) -> MSZXBatchManifest:
@@ -185,8 +224,15 @@ class MSZXBatchFile:
         entry = self._entry_for(key)
         member = self._open_members.get(entry.entry)
         if member is None:
+            span = _checked_span(
+                self._archive_path, entry.entry, entry.offset, entry.size
+            )
+            offset, size = span if span else (None, None)
             member = MSZFile.from_mszx(
-                str(self._archive_path).encode(), entry.entry.encode()
+                str(self._archive_path).encode(),
+                entry.entry.encode(),
+                offset,
+                size,
             )
             self._open_members[entry.entry] = member
         return member
@@ -238,20 +284,25 @@ class MSZXBatchFile:
                     f"{self._archive_path.name} has no spectrum index (it was "
                     f"written with index=False or by an older mscompress)"
                 )
-            with tarfile.open(self._archive_path, "r") as tar:
-                try:
-                    member = tar.getmember(info.entry)
-                except KeyError:
-                    raise ValueError(
-                        f"Spectrum index {info.entry!r} listed in the manifest "
-                        f"is missing from the archive"
-                    ) from None
+            span = _checked_span(
+                self._archive_path, info.entry, info.offset, info.size
+            )
+            if span is None:
+                with tarfile.open(self._archive_path, "r") as tar:
+                    try:
+                        member = tar.getmember(info.entry)
+                    except KeyError:
+                        raise ValueError(
+                            f"Spectrum index {info.entry!r} listed in the "
+                            f"manifest is missing from the archive"
+                        ) from None
+                span = (member.offset_data, member.size)
             mapped = np.memmap(
                 self._archive_path,
                 dtype=np.uint8,
                 mode="r",
-                offset=member.offset_data,
-                shape=(member.size,),
+                offset=span[0],
+                shape=(span[1],),
             )
             self._index = SpectrumIndex(mapped)
         return self._index
@@ -321,6 +372,11 @@ class MSZXBatchFile:
                 f"Annotation {filename!r} is not attached to entry "
                 f"{entry.entry!r}"
             )
+        span = _checked_span(self._archive_path, filename, ann.offset, ann.size)
+        if span is not None:
+            with open(self._archive_path, "rb") as f:
+                f.seek(span[0])
+                return f.read(span[1])
         with tarfile.open(self._archive_path, "r") as tar:
             try:
                 member = tar.getmember(filename)

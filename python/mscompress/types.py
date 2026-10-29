@@ -61,6 +61,10 @@ class AnnotationEntry:
     compressed: bool
     description: Optional[str] = None
     num_records: Optional[int] = None
+    # v2 only: absolute byte offset and length of the member payload, so a
+    # reader can range-read it without walking the tar headers.
+    offset: Optional[int] = None
+    size: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -69,6 +73,10 @@ class AnnotationEntry:
             "format": self.format.value,
             "compressed": self.compressed,
         }
+        if self.offset is not None:
+            data["offset"] = self.offset
+        if self.size is not None:
+            data["size"] = self.size
         if self.description is not None:
             data["description"] = self.description
         if self.num_records is not None:
@@ -84,4 +92,6 @@ class AnnotationEntry:
             compressed=data.get("compressed", False),
             description=data.get("description"),
             num_records=data.get("num_records"),
+            offset=data.get("offset"),
+            size=data.get("size"),
         )
