@@ -25,7 +25,7 @@
     "@types/node": "^26.6.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "cmake-js": "^7.3.0",
+    "cmake-js": "^8.0.0",
     "prebuild": "^13.0.0",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
