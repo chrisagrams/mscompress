@@ -362,3 +362,83 @@ def test_read_still_prefers_msxzfile_for_v1(mszx_file_path):
         assert isinstance(archive, mscompress.MSZXFile)
     finally:
         archive.close()
+
+
+# --------------------------------------------------------------------------
+# Raw member extraction
+# --------------------------------------------------------------------------
+
+
+def _member_bytes(archive_path, name):
+    with tarfile.open(archive_path, "r") as tar:
+        return tar.extractfile(name).read()
+
+
+def test_extract_msz_copies_raw_member_bytes(two_mzml, tmp_path):
+    out = mscompress.compress_batch(two_mzml, tmp_path / "x.mszx")
+    with MSZXBatchFile.open(out) as archive:
+        by_index = archive.extract_msz(1, tmp_path / "by_index.msz")
+        by_name = archive.extract_msz("a.msz", str(tmp_path / "by_name.msz"))
+        # Streaming the payload must not open (mmap) the member.
+        assert archive._open_members == {}
+
+    assert by_index.read_bytes() == _member_bytes(out, "b.msz")
+    assert by_name.read_bytes() == _member_bytes(out, "a.msz")
+    msz = mscompress.read(str(by_name))
+    assert len(msz.spectra) == 50
+
+
+def test_extract_msz_into_a_directory_uses_the_entry_name(two_mzml, tmp_path):
+    out = mscompress.compress_batch(two_mzml, tmp_path / "x.mszx")
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    with MSZXBatchFile.open(out) as archive:
+        written = archive.extract_msz(0, dest)
+    assert written == dest / "a.msz"
+    assert written.read_bytes() == _member_bytes(out, "a.msz")
+
+
+def test_extract_msz_from_a_v1_archive(mszx_file_path, tmp_path):
+    with MSZXBatchFile.open(mszx_file_path) as archive:
+        written = archive.extract_msz(0, tmp_path / "v1.msz")
+    assert written.read_bytes() == _member_bytes(mszx_file_path, "temp.msz")
+    assert len(mscompress.read(str(written)).spectra) == 100
+
+
+def test_extract_msz_unknown_key_raises(two_mzml, tmp_path):
+    out = mscompress.compress_batch(two_mzml, tmp_path / "x.mszx")
+    with MSZXBatchFile.open(out) as archive:
+        with pytest.raises(KeyError):
+            archive.extract_msz("nope.msz", tmp_path / "n.msz")
+        with pytest.raises(IndexError):
+            archive.extract_msz(5, tmp_path / "n.msz")
+
+
+def test_extract_msz_missing_or_irregular_member_raises(two_mzml, tmp_path):
+    out = mscompress.compress_batch(two_mzml, tmp_path / "x.mszx")
+    with MSZXBatchFile.open(out) as archive:
+        archive.manifest.spectra_files[0].entry = "ghost.msz"
+        with pytest.raises(ValueError, match="missing from the archive"):
+            archive.extract_msz(0, tmp_path / "g.msz")
+
+    # An archive whose manifest points at a directory member.
+    bad = tmp_path / "bad.mszx"
+    with tarfile.open(out, "r") as src, tarfile.open(bad, "w") as dst:
+        for member in src.getmembers():
+            if member.name == "a.msz":
+                info = tarfile.TarInfo("a.msz")
+                info.type = tarfile.DIRTYPE
+                dst.addfile(info)
+            else:
+                dst.addfile(member, src.extractfile(member))
+    with MSZXBatchFile.open(bad) as archive:
+        with pytest.raises(ValueError, match="not a regular file"):
+            archive.extract_msz(0, tmp_path / "d.msz")
+
+
+def test_extract_msz_after_close_raises(two_mzml, tmp_path):
+    out = mscompress.compress_batch(two_mzml, tmp_path / "x.mszx")
+    archive = MSZXBatchFile.open(out)
+    archive.close()
+    with pytest.raises(ValueError, match="closed"):
+        archive.extract_msz(0, tmp_path / "c.msz")

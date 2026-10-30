@@ -8,25 +8,28 @@ on:
       - 'mkdocs.yml'
       - 'python/mscompress/**'
       - '.github/workflows/docs.yml'
+  # Validate the site builds on every PR into dev (build only, no deploy).
+  # Not path-filtered so docs: PRs, which skip build.yml, always get a check.
+  pull_request:
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Allow one concurrent deployment, cancelling in-progress runs.
+# PR builds are grouped per-PR so they never cancel a Pages deployment.
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -34,18 +37,23 @@ jobs:
         run: pip install -r docs/requirements.txt
 
       - name: Build site
-        run: mkdocs build --strict
+        run: zensical build --strict
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
           path: site
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

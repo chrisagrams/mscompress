@@ -20,6 +20,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import shutil
 import tarfile
 import warnings
 from pathlib import Path
@@ -339,6 +340,50 @@ class MSZXBatchFile:
         from mscompress.annotations import MzTab
 
         return MzTab().read(self.get_annotation(key, filename))
+
+    # -- raw member output -------------------------------------------------
+
+    def extract_msz(self, key: Union[int, str], dst: Union[str, Path]) -> Path:
+        """Copy the raw ``.msz`` payload of member `key` to `dst`.
+
+        The bytes are streamed out of the tar as stored — nothing is
+        decompressed or read wholly into memory. Works the same for a v1
+        archive (one member) as for a v2 batch archive. If `dst` is an existing
+        directory, the payload is written to ``<dst>/<entry name>``.
+
+        Returns:
+            The path written.
+
+        Raises:
+            IndexError, KeyError: for an unknown member, as :meth:`get`.
+            ValueError: if the manifest entry is missing from the archive or
+                is not a regular file.
+        """
+        self._check_open()
+        entry = self._entry_for(key)
+        target = Path(dst)
+        if target.is_dir():
+            target = target / Path(entry.entry).name
+
+        with tarfile.open(self._archive_path, "r") as tar:
+            try:
+                member = tar.getmember(entry.entry)
+            except KeyError:
+                raise ValueError(
+                    f"Spectra entry {entry.entry!r} listed in the manifest is "
+                    f"missing from the archive"
+                ) from None
+            if not member.isfile():
+                raise ValueError(
+                    f"Spectra entry {entry.entry!r} is not a regular file in "
+                    f"the archive"
+                )
+            handle = tar.extractfile(member)
+            if handle is None:
+                raise ValueError(f"Could not read spectra entry {entry.entry!r}")
+            with handle, target.open("wb") as out:
+                shutil.copyfileobj(handle, out)
+        return target
 
     # -- bulk output -------------------------------------------------------
 
