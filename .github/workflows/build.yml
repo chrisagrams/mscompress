@@ -25,6 +25,12 @@ on:
 jobs:
   build-cli:
     name: Build CLI - ${{ matrix.platform }} ${{ matrix.arch }}
+    # docs: PRs only need the mkdocs build (docs.yml); skip the full suite.
+    if: &not-docs-pr >-
+      github.event_name != 'pull_request' || !(
+        startsWith(github.event.pull_request.title, 'docs:') ||
+        startsWith(github.event.pull_request.title, 'docs(') ||
+        startsWith(github.event.pull_request.title, 'docs!:'))
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
@@ -50,7 +56,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
@@ -114,14 +120,14 @@ jobs:
       
       - name: Upload CLI artifact (Unix)
         if: matrix.platform != 'windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./cli/mscompress
       
       - name: Upload CLI artifact (Windows)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: mscompress-cli-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -169,11 +175,12 @@ jobs:
   # artifact uploads.
   asan-leak-cli:
     name: ASan/LSan CLI (linux x86_64)
+    if: *not-docs-pr
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
@@ -205,6 +212,7 @@ jobs:
 
   build-python:
     name: Build Python - ${{ matrix.runner }} ${{ matrix.cibw_arch }}
+    if: *not-docs-pr
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -234,13 +242,13 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -254,7 +262,7 @@ jobs:
         run: python vendor/generate_config.py
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.4
+        uses: pypa/cibuildwheel@v4.2
         env:
           CIBW_BUILD: ${{ (inputs.publish || github.ref == 'refs/heads/stage') && matrix.cibw_build_full || 'cp312-*' }}
           CIBW_SKIP: "*-musllinux_*"
@@ -292,7 +300,7 @@ jobs:
           fi
 
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: python-package-${{ matrix.os_name }}-${{ matrix.cibw_arch }}
           path: |
@@ -301,6 +309,7 @@ jobs:
 
   build-node:
     name: Build Node - ${{ matrix.platform }} ${{ matrix.arch }}
+    if: *not-docs-pr
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -321,13 +330,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -338,7 +347,7 @@ jobs:
           msbuild-architecture: x64
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -368,7 +377,7 @@ jobs:
         run: npm test
 
       - name: Upload prebuild artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: prebuild-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./node/prebuilds/*.tar.gz
@@ -386,7 +395,7 @@ jobs:
     
     steps:
       - name: Download all Python artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: python-package-*
           merge-multiple: true
@@ -407,11 +416,12 @@ jobs:
 
   build-docker:
     name: Build Docker Image
+    if: *not-docs-pr
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
@@ -469,18 +479,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
       - name: Download all prebuild artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: prebuild-*
           path: ./node/prebuilds
@@ -508,16 +518,17 @@ jobs:
   # the native addon; node dist is still built because typecheck resolves it.
   test-electron:
     name: Test Electron GUI
+    if: *not-docs-pr
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -593,13 +604,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -610,7 +621,7 @@ jobs:
           msbuild-architecture: x64
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -669,7 +680,7 @@ jobs:
 
       - name: Upload unpacked Electron app
         if: ${{ !inputs.publish }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: electron-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./electron/release/${{ matrix.unpacked }}

@@ -9,6 +9,7 @@ docs_dir: docs
 
 theme:
   name: material
+  variant: classic
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -95,8 +96,42 @@ plugins:
             merge_init_into_class: true
             filters:
               - "!^_"
+  # Must come after mkdocstrings so API reference pages are rendered first.
+  # Emits /llms.txt (index), /llms-full.txt (all pages concatenated), and a
+  # Markdown copy of every listed page next to its HTML (e.g. /cli/index.md).
+  # Globs keep new pages included automatically; mkdocs sorts index.md first.
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: |
+        mscompress defines the `.msz` format, a random-access compressed
+        container for mzML mass spectrometry data, and `.mszx`, a tar archive
+        bundling an MSZ file with search-result annotations and a JSON
+        manifest. It ships a C library, a CLI, Python (Cython) bindings, and
+        Node.js/TypeScript (N-API) bindings. Every page below is available as
+        Markdown; `llms-full.txt` contains all of them in one file.
+      sections:
+        Getting started:
+          - index.md
+          - getting-started/*.md
+        Python:
+          - python/*.md
+        Node.js / TypeScript:
+          - node/*.md
+        CLI:
+          - cli/*.md
+        Architecture:
+          - architecture/*.md
+        Algorithms:
+          - algorithms/*.md
+        Format reference:
+          - format/*.md
+        Contributing:
+          - contributing/*.md
+        Reference:
+          - reference/*.md
 
 extra:
+  generator: false
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/chrisagrams/mscompress

@@ -7,6 +7,7 @@
     { "type": "fix", "section": "Bug Fixes" },
     { "type": "perf", "section": "Performance Improvements" },
     { "type": "refactor", "section": "Code Refactoring" },
+    { "type": "deps", "section": "Dependencies" },
     { "type": "revert", "section": "Reverts" },
     { "type": "docs", "section": "Documentation", "hidden": true },
     { "type": "test", "section": "Tests", "hidden": true },

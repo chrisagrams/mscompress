@@ -130,6 +130,7 @@ with read("cohort.mszx") as archive:          # -> MSZXBatchFile
     psms = archive.get_psms(0, "runA.pin.mztab.zst")   # -> PSMTable
     raw = archive.get_annotation(0, "runA.pin.mztab.zst")  # bytes, as stored
 
+    archive.extract_msz(0, "runA.msz")        # raw .msz bytes, not decompressed
     archive.decompress("out/")                # every member -> out/*.mzML
 ```
 

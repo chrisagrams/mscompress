@@ -1,6 +1,6 @@
 {
   "name": "mscompress",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Multi-threaded lossless/lossy compression library for Mass Spectrometry data",
   "type": "module",
   "main": "dist/index.js",
@@ -22,18 +22,18 @@
     "directory": "node"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "cmake-js": "^7.3.0",
+    "cmake-js": "^8.0.0",
     "prebuild": "^13.0.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
     "node-addon-api": "^8.0.0",
     "prettier": "^3.4.0",
     "tsc-alias": "^1.8.10",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^5.0.5"
   },
   "scripts": {
     "install": "prebuild-install -r napi",
