@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.2](https://github.com/chrisagrams/mscompress/compare/v1.2.1...v1.2.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **python:** add MSZXBatchFile.extract_msz() to copy a member's raw .msz bytes ([#278](https://github.com/chrisagrams/mscompress/issues/278)) ([930b303](https://github.com/chrisagrams/mscompress/commit/930b30348f92615ad5bc8f1e593b1d3f9cd7c1c0))
+
+
+### Dependencies
+
+* bump alpine from 3.20 to 3.24 ([#250](https://github.com/chrisagrams/mscompress/issues/250)) ([c54c666](https://github.com/chrisagrams/mscompress/commit/c54c6669e4380462b46f1cc7268d0aa551c20e57))
+* bump pandas from 2.3.3 to 3.1.0 in /python ([acedcd6](https://github.com/chrisagrams/mscompress/commit/acedcd6f3f9e2c95d605c549f5176041bd129b91))
+* bump pyarrow from 24.0.0 to 26.0.0 in /python ([#264](https://github.com/chrisagrams/mscompress/issues/264)) ([f921069](https://github.com/chrisagrams/mscompress/commit/f921069607df5460573162450ee2d08e766d2b6c))
+* bump the python group in /python with 5 updates ([281ff02](https://github.com/chrisagrams/mscompress/commit/281ff02ff5481834e7bf71ac9982dbc50b4f2dcd))
+* bump vendor/base64 from `9e8ed65` to `e4cc438` ([#249](https://github.com/chrisagrams/mscompress/issues/249)) ([bbbc695](https://github.com/chrisagrams/mscompress/commit/bbbc69573ca02396260c8b56b334674e598a9fb1))
+* bump vendor/c-blosc2 from `b17d0c3` to `ef92678` ([#247](https://github.com/chrisagrams/mscompress/issues/247)) ([8df4a3e](https://github.com/chrisagrams/mscompress/commit/8df4a3e3d799e1b6c5bae7e7e577f7860dfca316))
+* bump vendor/lz4 from `a3be311` to `2c92108` ([#246](https://github.com/chrisagrams/mscompress/issues/246)) ([cafa708](https://github.com/chrisagrams/mscompress/commit/cafa708a7b8946c3869a73b335f16fa8c25f4708))
+* bump vendor/zlib from `1252e25` to `3944b7d` ([#251](https://github.com/chrisagrams/mscompress/issues/251)) ([25311a8](https://github.com/chrisagrams/mscompress/commit/25311a87d7f459f95402bc45b55c8fea705501e9))
+* bump vendor/zstd from `d462f69` to `49cf517` ([#248](https://github.com/chrisagrams/mscompress/issues/248)) ([f7794e6](https://github.com/chrisagrams/mscompress/commit/f7794e6ecb593a630cc9b3588278514347d1ffda))
+
 ## [1.2.1](https://github.com/chrisagrams/mscompress/compare/v1.2.0...v1.2.1) (2026-10-21)
 
 
