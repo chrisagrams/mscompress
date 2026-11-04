@@ -22,7 +22,7 @@ ZSTD_CCtx* alloc_cctx() {
    ZSTD_CCtx* cctx;
    cctx = ZSTD_createCCtx();
    if (cctx == NULL)
-      error("alloc_cctx: ZSTD Context failed.\n");
+      MSZ_ERROR("alloc_cctx: ZSTD Context failed.\n");
    return cctx;
 }
 
@@ -48,7 +48,7 @@ void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len) {
    }
 
    if (buff_len == NULL) {
-      error("alloc_zstd_cbuff: buff_len is NULL.\n");
+      MSZ_ERROR("alloc_zstd_cbuff: buff_len is NULL.\n");
       return NULL;
    }
 
@@ -61,7 +61,7 @@ void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len) {
    void* r = malloc(bound);
 
    if (r == NULL) {
-      error("alloc_zstd_cbuff: malloc() error.\n");
+      MSZ_ERROR("alloc_zstd_cbuff: malloc() error.\n");
       return NULL;
    }
 
@@ -92,23 +92,23 @@ void* alloc_zstd_cbuff(size_t src_len, size_t* buff_len) {
 void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
                     size_t* out_len, int compression_level) {
    if (cctx == NULL) {
-      error("zstd_compress: cctx is NULL.\n");
+      MSZ_ERROR("zstd_compress: cctx is NULL.\n");
       return NULL;
    }
    if (src_buff == NULL) {
-      error("zstd_compress: src_buff is NULL.\n");
+      MSZ_ERROR("zstd_compress: src_buff is NULL.\n");
       return NULL;
    }
    if (src_len < 0) {
-      error("zstd_compress: invalid src_len for compression.\n");
+      MSZ_ERROR("zstd_compress: invalid src_len for compression.\n");
       return NULL;
    }
    if (out_len == NULL) {
-      error("zstd_compress: out_len is NULL.\n");
+      MSZ_ERROR("zstd_compress: out_len is NULL.\n");
       return NULL;
    }
    if (compression_level < 1 || compression_level > 22) {
-      error("zstd_compress: invalid compression_level.\n");
+      MSZ_ERROR("zstd_compress: invalid compression_level.\n");
       return NULL;
    }
 
@@ -123,7 +123,7 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
    out_buff = alloc_zstd_cbuff(src_len, &buff_len);
 
    if (out_buff == NULL) {
-      error("zstd_compress: alloc_zstd_cbuff failed.\n");
+      MSZ_ERROR("zstd_compress: alloc_zstd_cbuff failed.\n");
       return NULL;
    }
 
@@ -131,7 +131,7 @@ void* zstd_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
                                 compression_level);
 
    if (!*out_len) {
-      error("zstd_compress: ZSTD_compressCCtx failed.\n");
+      MSZ_ERROR("zstd_compress: ZSTD_compressCCtx failed.\n");
       free(out_buff);
       return NULL;
    }
@@ -161,19 +161,19 @@ void* lz4_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
    int compressed_data_size;
 
    if (src_buff == NULL) {
-      warning("lz4_compress: src_buff is null.\n");
+      MSZ_WARN("lz4_compress: src_buff is null.\n");
       return NULL;
    }
    if (src_len < 0) {
-      warning("lz4_compress: src_len < 0.\n");
+      MSZ_WARN("lz4_compress: src_len < 0.\n");
       return NULL;
    }
    if (out_len == NULL) {
-      warning("lz4_compress: out_len is null.\n");
+      MSZ_WARN("lz4_compress: out_len is null.\n");
       return NULL;
    }
    if (compression_level < 1 || compression_level > 12) {
-      warning("lz4_compress: compression_level out of bounds.\n");
+      MSZ_WARN("lz4_compress: compression_level out of bounds.\n");
       return NULL;
    }
 
@@ -186,7 +186,7 @@ void* lz4_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
    out_buff = malloc(max_compressed_size);
 
    if (out_buff == NULL) {
-      warning("lz4_compress: error in malloc().\n");
+      MSZ_WARN("lz4_compress: error in malloc().\n");
       return NULL;
    }
 
@@ -196,7 +196,7 @@ void* lz4_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
       *out_len = compressed_data_size;
       return out_buff;
    } else {
-      warning("lz4_compress: error in LZ4_compress_default\n");
+      MSZ_WARN("lz4_compress: error in LZ4_compress_default\n");
       free(out_buff);
       return NULL;
    }
@@ -222,7 +222,7 @@ void* no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
    *out_len = src_len;
    void* out_buff = malloc(src_len);
    if (out_buff == NULL) {
-      warning("no_compress: error in malloc()\n");
+      MSZ_WARN("no_compress: error in malloc()\n");
       return NULL;
    }
    memcpy(out_buff, src_buff, src_len);
@@ -234,7 +234,7 @@ void* no_compress(ZSTD_CCtx* cctx, void* src_buff, size_t src_len,
  * @param data_block Data block struct to append to.
  * @param mem Desired contents to append.
  * @param buff_len Length of contents to append.
- * @return 1 on success. Calls `error()` and aborts on `NULL` pointer or `memcpy` failure.
+ * @return 1 on success. Calls `MSZ_ERROR()` and aborts on `NULL` pointer or `memcpy` failure.
  * @note The data block is grown by `REALLOC_FACTOR` if there is not enough space.
  */
 int append_mem(data_block_t* data_block, char* mem, size_t buff_len)
@@ -247,11 +247,11 @@ int append_mem(data_block_t* data_block, char* mem, size_t buff_len)
 
    if (data_block->mem + data_block->size == NULL ||
        mem == NULL)  // Check for NULL pointers
-      error("append_mem: NULL pointer passed to append_mem.\n");
+      MSZ_ERROR("append_mem: NULL pointer passed to append_mem.\n");
 
    if (memcpy(data_block->mem + data_block->size, mem, buff_len) ==
        NULL)  // Copy memory
-      error("append_mem: Failed to append memory.\n");
+      MSZ_ERROR("append_mem: Failed to append memory.\n");
 
    data_block->size += buff_len;  // Update size of data block
 
@@ -282,7 +282,7 @@ compress_args_t* alloc_compress_args(char* input_map, data_positions_t* dp,
    r = malloc(sizeof(compress_args_t));
 
    if (r == NULL) {
-      error("alloc_compress_args: malloc() error.\n");
+      MSZ_ERROR("alloc_compress_args: malloc() error.\n");
       return NULL;
    }
 
@@ -349,7 +349,7 @@ void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
       if (shuffle_elem > 1 &&
           shuffle_block_records((*curr_block)->mem, (*curr_block)->size,
                                 shuffle_elem) != 0) {
-         error("cmp_routine: byte shuffle failed.\n");
+         MSZ_ERROR("cmp_routine: byte shuffle failed.\n");
          return;
       }
 
@@ -358,7 +358,7 @@ void cmp_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
 
       cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
 
-      // print("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n",
+      // MSZ_INFO("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n",
       // cmp_buff->populated, (*curr_block)->size, cmp_len,
       // (double)(*curr_block)->size/cmp_len);
 
@@ -404,14 +404,14 @@ int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
    size_t cmp_len = 0;
 
    if (!(*curr_block)) {
-      error("cmp_flush: curr_block is NULL. This should not happen.\n");
+      MSZ_ERROR("cmp_flush: curr_block is NULL. This should not happen.\n");
       return -1;
    }
 
    if (shuffle_elem > 1 &&
        shuffle_block_records((*curr_block)->mem, (*curr_block)->size,
                              shuffle_elem) != 0) {
-      error("cmp_flush: byte shuffle failed.\n");
+      MSZ_ERROR("cmp_flush: byte shuffle failed.\n");
       return -1;
    }
 
@@ -420,11 +420,11 @@ int cmp_flush(compression_fun compression_fun, ZSTD_CCtx* czstd,
 
    cmp_block = alloc_cmp_block(cmp, cmp_len, (*curr_block)->size);
    if (cmp_block == NULL) {
-      error("cmp_flush: Failed to allocate cmp_block.\n");
+      MSZ_ERROR("cmp_flush: Failed to allocate cmp_block.\n");
       return -1;
    }
 
-   // print("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n",
+   // MSZ_INFO("\t||  [Block %05d]       %011ld       %011ld   %05.02f%%  ||\n",
    // cmp_buff->populated, (*curr_block)->size, cmp_len,
    // (double)(*curr_block)->size/cmp_len);
 
@@ -450,7 +450,7 @@ int write_cmp_blk(cmp_block_t* blk, int fd)
    rv = write_to_file(fd, blk->mem, blk->size);
 
    if (rv != blk->size) {
-      error("write_cmp_blk: Did not write all bytes to disk.\n");
+      MSZ_ERROR("write_cmp_blk: Did not write all bytes to disk.\n");
       return -1;
    }
 
@@ -492,7 +492,7 @@ size_t cmp_dump(cmp_blk_queue_t* cmp_buff, block_len_queue_t* blk_len_queue,
       }
       end = get_time();
 
-      print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size,
+      MSZ_INFO("\tWrote %ld bytes to disk (%1.2fmb/s)\n", front->size,
             ((double)front->size / 1000000) / (end - start));
 
       total_written += front->size;
@@ -564,7 +564,7 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
    // df->decode_source_compression_fun(input, len, &binary_buff, &binary_len);
 
    if (a_args == NULL)
-      error("cmp_binary_routine: Failed to allocate algo_args.\n");
+      MSZ_ERROR("cmp_binary_routine: Failed to allocate algo_args.\n");
 
    a_args->src = &input;
    a_args->src_len = len;
@@ -572,14 +572,14 @@ void cmp_binary_routine(compression_fun compression_fun, ZSTD_CCtx* czstd,
    a_args->dest_len = &binary_len;
 
    if (a_args->algo_fun == NULL) {
-      error("cmp_binary_routine: algo_fun is NULL, cannot compress binary block.\n");
+      MSZ_ERROR("cmp_binary_routine: algo_fun is NULL, cannot compress binary block.\n");
       return;
    }
 
    a_args->algo_fun((void*)a_args);
 
    if (binary_buff == NULL)
-      error("cmp_binary_routine: binary_buff is NULL\n");
+      MSZ_ERROR("cmp_binary_routine: binary_buff is NULL\n");
 
    cmp_routine(compression_fun, czstd, df->zstd_compression_level, cmp_buff,
                curr_block, binary_buff, binary_len, tot_size, tot_cmp,
@@ -625,7 +625,7 @@ void* compress_routine(void* args)
    compress_args_t* cb_args = (compress_args_t*)args;
    algo_args* a_args = malloc(sizeof(algo_args));
    if (a_args == NULL) {
-      error("compress_routine: Failed to allocate algo_args.\n");
+      MSZ_ERROR("compress_routine: Failed to allocate algo_args.\n");
       return NULL;
    }
 
@@ -634,7 +634,7 @@ void* compress_routine(void* args)
                                               // to intermediately store data.
 
    if (a_args->tmp == NULL) {
-      error("compress_routine: Failed to allocate data_block.\n");
+      MSZ_ERROR("compress_routine: Failed to allocate data_block.\n");
       free(a_args);
       return NULL;
    }
@@ -643,7 +643,7 @@ void* compress_routine(void* args)
        alloc_z_stream();  // Allocate a z_stream to intermediately store data.
 
    if (a_args->z == NULL) {
-      error("compress_routine: Failed to allocate z_stream.\n");
+      MSZ_ERROR("compress_routine: Failed to allocate z_stream.\n");
       dealloc_data_block(a_args->tmp);
       free(a_args);
       return NULL;
@@ -655,7 +655,7 @@ void* compress_routine(void* args)
                                   // block).
 
    if (a_args->z_inflate == NULL) {
-      error("compress_routine: Failed to allocate inflate z_stream.\n");
+      MSZ_ERROR("compress_routine: Failed to allocate inflate z_stream.\n");
       dealloc_z_stream(a_args->z);
       dealloc_data_block(a_args->tmp);
       free(a_args);
@@ -665,7 +665,7 @@ void* compress_routine(void* args)
    a_args->ret_code = 0;  // Initialize return code to 0 (success).
 
    if (cb_args == NULL)
-      error("compress_routine: Invalid compress_args_t\n");
+      MSZ_ERROR("compress_routine: Invalid compress_args_t\n");
 
    if (cb_args->dp->total_spec == 0) {
       dealloc_cctx(czstd);
@@ -710,17 +710,19 @@ void* compress_routine(void* args)
    } else if (cb_args->mode == _xml_)
       a_args->dec_fun = NULL;
    else
-      error("compress_routine: Invalid mode. Mode: %d\n", cb_args->mode);
+      MSZ_ERROR("compress_routine: Invalid mode. Mode: %d\n", cb_args->mode);
 
    for (; i < cb_args->dp->total_spec; i++) {
       if (cb_args->dp->end_positions[i] < cb_args->dp->start_positions[i])
-         error("compress_routine: Invalid data position. Start: %ld End: %ld\n",
+         MSZ_ERROR("compress_routine: Invalid data position. Start: %" PRIu64
+               " End: %" PRIu64 "\n",
                cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
 
       len = cb_args->dp->end_positions[i] - cb_args->dp->start_positions[i];
 
       if (len < 0)
-         error("compress_routine: Invalid data position. Start: %ld End: %ld\n",
+         MSZ_ERROR("compress_routine: Invalid data position. Start: %" PRIu64
+               " End: %" PRIu64 "\n",
                cb_args->dp->start_positions[i], cb_args->dp->end_positions[i]);
 
       char* map = cb_args->input_map + cb_args->dp->start_positions[i];
@@ -736,7 +738,7 @@ void* compress_routine(void* args)
              cmp_buff, &curr_block, &tot_size, &tot_cmp,
              a_args->shuffle_elem); /* Flush remainder datablocks */
 
-   print(
+   MSZ_INFO(
        "\tThread %03d: Input size: %ld bytes. Compressed size: %ld bytes. "
        "(%1.2f%%)\n",
        tid, tot_size, tot_cmp, (double)tot_size / tot_cmp);
@@ -805,7 +807,7 @@ block_len_queue_t* compress_parallel(char* input_map, data_positions_t** ddp,
       compress_args_t* i_args = alloc_compress_args(
           input_map, ddp[i], df, comp_fun, cmp_blk_size, blocksize, mode);
       if (i_args == NULL) {
-         error("compress_parallel: Failed to allocate compress_args_t.\n");
+         MSZ_ERROR("compress_parallel: Failed to allocate compress_args_t.\n");
          return NULL;
       }
       args[i] = i_args;
@@ -909,7 +911,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    if (set_compress_runtime_variables(
            arguments, df)) {  // Set compression variables (e.g. compression
                               // level, compression function, etc.)
-      error("compress_mzml: Failed to set compression runtime variables.\n");
+      MSZ_ERROR("compress_mzml: Failed to set compression runtime variables.\n");
       free(footer);
       free(xml_divisions);
       free(mz_divisions);
@@ -935,9 +937,9 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    output_pos += write_header(output_fd, df, blocksize,
                               "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
-   print("\nDecoding and compression...\n");
+   MSZ_INFO("\nDecoding and compression...\n");
 
-   print("\t===XML===\n");
+   MSZ_INFO("\t===XML===\n");
    footer->xml_pos = output_pos;
    xml_block_lens = compress_parallel(
        (char*)input_map, xml_divisions, df, df->xml_compression_fun, blocksize,
@@ -946,14 +948,14 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    output_pos += stream_bytes;
    free(xml_divisions);
    if (xml_block_lens == NULL) {
-      error("compress_mzml: Failed to compress XML stream.\n");
+      MSZ_ERROR("compress_mzml: Failed to compress XML stream.\n");
       free(footer);
       free(mz_divisions);
       free(inten_divisions);
       return -1;
    }
 
-   print("\t===m/z binary===\n");
+   MSZ_INFO("\t===m/z binary===\n");
    footer->mz_binary_pos = output_pos;
    mz_binary_block_lens = compress_parallel(
        (char*)input_map, mz_divisions, df, df->mz_compression_fun, blocksize,
@@ -962,14 +964,14 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    output_pos += stream_bytes;
    free(mz_divisions);
    if (mz_binary_block_lens == NULL) {
-      error("compress_mzml: Failed to compress m/z binary stream.\n");
+      MSZ_ERROR("compress_mzml: Failed to compress m/z binary stream.\n");
       dealloc_block_len_queue(xml_block_lens);
       free(footer);
       free(inten_divisions);
       return -1;
    }
 
-   print("\t===int binary===\n");
+   MSZ_INFO("\t===int binary===\n");
    footer->inten_binary_pos = output_pos;
    inten_binary_block_lens = compress_parallel(
        (char*)input_map, inten_divisions, df, df->inten_compression_fun,
@@ -978,7 +980,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    output_pos += stream_bytes;
    free(inten_divisions);
    if (inten_binary_block_lens == NULL) {
-      error("compress_mzml: Failed to compress intensity binary stream.\n");
+      MSZ_ERROR("compress_mzml: Failed to compress intensity binary stream.\n");
       dealloc_block_len_queue(xml_block_lens);
       dealloc_block_len_queue(mz_binary_block_lens);
       free(footer);
@@ -1012,7 +1014,7 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
 
    end = get_time();
 
-   print("Decoding and compression time: %1.4fs\n", end - start);
+   MSZ_INFO("Decoding and compression time: %1.4fs\n", end - start);
 
    return 0;
 }
@@ -1032,7 +1034,7 @@ compression_fun set_compress_fun(int accession) {
       case _no_comp_:
          return no_compress;
       default:
-         error("Compression type not supported.");
+         MSZ_ERROR("Compression type not supported.");
          return NULL;
    }
 }
@@ -1046,7 +1048,7 @@ compression_fun set_compress_fun(int accession) {
  */
 int get_compress_type(char* arg) {
    if (arg == NULL) {
-      error("Compression type not specified.");
+      MSZ_ERROR("Compression type not specified.");
       return -1;
    }
    if (strcmp(arg, "zstd") == 0 || strcmp(arg, "ZSTD") == 0)

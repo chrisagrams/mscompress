@@ -236,11 +236,21 @@ cdef extern from "../src/mscompress.h":
 
     int _validate_args "validate_args"(Arguments* args, char* err_buf, size_t err_buf_size)
 
-    # Error/warning callback functions
-    ctypedef void (*error_callback_t)(const char* message)
-    ctypedef void (*warning_callback_t)(const char* message)
-    
-    void _set_error_callback "set_error_callback"(error_callback_t callback)
-    void _set_warning_callback "set_warning_callback"(warning_callback_t callback)
-    void _reset_error_callback "reset_error_callback"()
-    void _reset_warning_callback "reset_warning_callback"()
+    # Logging
+    ctypedef enum msz_log_level_t:
+        MSZ_LOG_DEBUG
+        MSZ_LOG_INFO
+        MSZ_LOG_WARN
+        MSZ_LOG_ERROR
+
+    ctypedef struct msz_log_record_t:
+        msz_log_level_t level
+        const char* file
+        int line
+        const char* func
+        const char* message
+
+    ctypedef void (*msz_log_handler_t)(const msz_log_record_t* rec, void* user)
+
+    void _msz_default_log_handler "msz_default_log_handler"(const msz_log_record_t* rec, void* user)
+    void _msz_set_log_handler "msz_set_log_handler"(msz_log_handler_t handler, void* user)

@@ -24,7 +24,7 @@ void algo_decode_lossless(void* args)
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_lossless: src is NULL");
+      MSZ_ERROR("algo_decode_lossless: src is NULL");
       a_args->ret_code = -1;
       return;
    }
@@ -57,7 +57,7 @@ void algo_encode_lossless(void* args)
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_lossless: args is NULL");
+      MSZ_ERROR("algo_encode_lossless: args is NULL");
       a_args->ret_code = -1;
       return;
    }

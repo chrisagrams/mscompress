@@ -34,21 +34,18 @@ def _install_mscompress_warning_formatter():
     warnings.formatwarning = _mscompress_formatwarning
 
 _install_mscompress_warning_formatter()
-# `with gil` is required because these callbacks may be invoked from C code
+# `with gil` is required because the handler may be invoked from C code
 # running without the GIL (e.g., streaming methods release the GIL for I/O).
-cdef void _python_error_handler(const char* message) noexcept with gil:
-    """Callback function to handle C errors in Python"""
-    msg = message.decode('utf-8') if isinstance(message, bytes) else message
+cdef void _python_log_handler(const msz_log_record_t* rec, void* user) noexcept with gil:
+    """Route C log records into Python: errors and warnings become RuntimeWarnings."""
+    if rec.level < MSZ_LOG_WARN:
+        _msz_default_log_handler(rec, user)
+        return
+    msg = rec.message.decode('utf-8', errors='replace')
     warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
 
-cdef void _python_warning_handler(const char* message) noexcept with gil:
-    """Callback function to handle C warnings in Python"""
-    msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
-
-# Initialize callbacks when module is imported
-_set_error_callback(_python_error_handler)
-_set_warning_callback(_python_warning_handler)
+# Install the handler when the module is imported
+_msz_set_log_handler(_python_log_handler, NULL)
 
 
 # ---------------------------------------------------------------------------
@@ -660,7 +657,7 @@ cdef class MZMLFile(BaseFile):
         cdef divisions_t* divisions = self._divisions
         cdef int fd = self.output_fd
         # Release the GIL so worker threads can re-enter Python via the
-        # error/warning callbacks (declared `with gil`). Without this, a worker
+        # log handler (declared `with gil`). Without this, a worker
         # that hits a base64 decode failure (or any other warning path) blocks
         # in PyGILState_Ensure while the main thread is parked in pthread_join,
         # producing an unrecoverable deadlock.
@@ -1259,7 +1256,7 @@ cdef class MSZFile(BaseFile):
         cdef Arguments* args = self._arguments.get_ptr()
         cdef int fd = self.output_fd
         # Release the GIL so worker threads can re-enter Python via the
-        # error/warning callbacks. See MZMLFile.compress for the deadlock
+        # log handler. See MZMLFile.compress for the deadlock
         # this avoids.
         with nogil:
             rv = _decompress_msz(mapping, filesize, args, fd)
