@@ -262,20 +262,6 @@ cdef _require_msz_version(void* mapping, long filesize):
         )
 
 
-cdef divisions_t* _read_divisions_checked(void* mapping, footer_t* footer, long filesize) except NULL:
-    """Read the division index, bounded by the start of the footer.
-
-    The C reader checks every stored length against the end of the division
-    section, so a corrupt index raises here instead of reading out of bounds.
-    """
-    cdef divisions_t* divisions = _read_divisions(
-        mapping, footer.divisions_t_pos, filesize - <long>sizeof(footer_t),
-        footer.n_divisions)
-    if divisions == NULL:
-        raise _c_error("Corrupt MSZ file: invalid division index")
-    return divisions
-
-
 cdef BlockCache _coerce_cache(object cache):
     """Resolve a user-supplied ``cache=`` argument to a BlockCache instance.
 
@@ -1091,7 +1077,9 @@ cdef class MSZFile(BaseFile):
         _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
-        self._divisions = _read_divisions_checked(self._mapping, self._footer, self.filesize)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self.filesize - <long>sizeof(footer_t), self._footer.n_divisions)
+        if self._divisions == NULL:
+            raise _c_error("Corrupt MSZ file: invalid division index")
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
@@ -1246,7 +1234,9 @@ cdef class MSZFile(BaseFile):
         _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
-        self._divisions = _read_divisions_checked(self._mapping, self._footer, self.filesize)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self.filesize - <long>sizeof(footer_t), self._footer.n_divisions)
+        if self._divisions == NULL:
+            raise _c_error("Corrupt MSZ file: invalid division index")
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
