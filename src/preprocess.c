@@ -1499,15 +1499,26 @@ size_t write_uint16_arr(uint16_t* arr, uint32_t len, int fd) {
 }
 
 /**
- * @brief Checks that `count` elements of `elem_size` bytes starting at
- *        `position` end at or before `end`, without overflowing.
- * @return 1 if the span fits, 0 otherwise.
+ * @brief Claims the next `count` elements of `elem_size` bytes from a
+ *        memory-mapped buffer, bounded by `end`.
+ * @param input_map Pointer to the memory-mapped input file.
+ * @param position Pointer to the current read offset; advanced past the
+ *        claimed bytes on success, unchanged on failure.
+ * @param end Offset the bytes must not extend past.
+ * @return Pointer into the mmap'd region, or `NULL` if the bytes do not fit
+ *         before `end`.
+ *
+ * Requires `0 <= *position <= end`. `read_divisions()` checks this once on
+ * entry and every successful call preserves it, so the overflow-safe
+ * comparison below is the only bounds check the division readers need.
  */
-static int span_fits(long position, long end, uint64_t count,
-                     size_t elem_size) {
-   if (position < 0 || position > end)
-      return 0;
-   return count <= (uint64_t)(end - position) / elem_size;
+static const uint8_t* take(const void* input_map, long* position, long end,
+                           uint64_t count, size_t elem_size) {
+   if (count > (uint64_t)(end - *position) / elem_size)
+      return NULL;
+   const uint8_t* p = (const uint8_t*)input_map + *position;
+   *position += (long)(count * elem_size);
+   return p;
 }
 
 /**
@@ -1522,23 +1533,27 @@ static int span_fits(long position, long end, uint64_t count,
  *       mmap'd region and must not be freed independently.
  * @warning The caller must free the returned struct wrapper with `free()`.
  */
-data_positions_t* read_dp(void* input_map, long* position, long end) {
+static data_positions_t* read_dp(void* input_map, long* position, long end) {
+   long start = *position;
    uint64_t total_spec;
+   const uint8_t *hdr, *starts, *ends;
 
-   if (!span_fits(*position, end, 1, sizeof(uint64_t))) {
+   if ((hdr = take(input_map, position, end, 1, sizeof(uint64_t))) == NULL) {
       MSZ_ERROR("read_dp: position table header at %ld runs past %ld.\n",
-                *position, end);
+                start, end);
       return NULL;
    }
-   memcpy(&total_spec, (uint8_t*)input_map + *position, sizeof(uint64_t));
+   memcpy(&total_spec, hdr, sizeof(uint64_t));
 
    /* total_spec start offsets followed by total_spec end offsets. */
    if (total_spec > INT_MAX ||
-       !span_fits(*position + (long)sizeof(uint64_t), end, 2 * total_spec,
-                  sizeof(uint64_t))) {
+       (starts = take(input_map, position, end, total_spec,
+                      sizeof(uint64_t))) == NULL ||
+       (ends = take(input_map, position, end, total_spec,
+                    sizeof(uint64_t))) == NULL) {
       MSZ_ERROR("read_dp: position table at %ld claims %" PRIu64
                 " spectra, which do not fit before %ld.\n",
-                *position, total_spec, end);
+                start, total_spec, end);
       return NULL;
    }
 
@@ -1547,86 +1562,60 @@ data_positions_t* read_dp(void* input_map, long* position, long end) {
       MSZ_ERROR("read_dp: malloc failed.\n");
       return NULL;
    }
-
    r->total_spec = (int)total_spec;
-   *position += sizeof(uint64_t);
-
-   // Read start positions
-   r->start_positions = (uint64_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint64_t) * r->total_spec;
-
-   // Read end positions
-   r->end_positions = (uint64_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint64_t) * r->total_spec;
+   r->start_positions = (uint64_t*)starts;
+   r->end_positions = (uint64_t*)ends;
 
    return r;
 }
 
 /**
- * @brief Reads a `uint32_t` length prefix and checks that `len` elements of
- *        `elem_size` bytes follow it before `end`.
- * @return 0 on success (with `*position` advanced past the prefix), -1 if the
- *         prefix or the array would run past `end`.
- */
-static int read_arr_len(void* input_map, long* position, long end,
-                        size_t elem_size, uint32_t* len) {
-   if (!span_fits(*position, end, 1, sizeof(uint32_t)))
-      return -1;
-   memcpy(len, (uint8_t*)input_map + *position, sizeof(uint32_t));
-   if (!span_fits(*position + (long)sizeof(uint32_t), end, *len, elem_size))
-      return -1;
-   *position += sizeof(uint32_t);
-   return 0;
-}
-
-/**
- * @brief Reads a length-prefixed `uint32_t` array from a memory-mapped buffer.
+ * @brief Reads a `uint32_t` length prefix followed by that many elements of
+ *        `elem_size` bytes from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
  * @param end Offset the array must not extend past.
+ * @param elem_size Size of one array element in bytes.
  * @param len Receives the number of elements.
  * @return Pointer into the mmap'd region containing the array data, or `NULL`
- *         if the array does not fit before `end`.
+ *         if the prefix or the array does not fit before `end`.
  *
  * @note The returned pointer references mmap'd memory and must not be freed.
  */
-uint32_t* read_uint32_arr(void* input_map, long* position, long end,
-                          uint32_t* len) {
-   if (read_arr_len(input_map, position, end, sizeof(uint32_t), len) != 0) {
-      MSZ_ERROR("read_uint32_arr: array at %ld runs past %ld.\n", *position,
-                end);
+static const uint8_t* read_prefixed_arr(void* input_map, long* position,
+                                        long end, size_t elem_size,
+                                        uint32_t* len) {
+   const uint8_t* p = take(input_map, position, end, 1, sizeof(uint32_t));
+   if (p == NULL)
       return NULL;
-   }
-
-   uint32_t* arr = (uint32_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint32_t) * (*len);
-
-   return arr;
+   memcpy(len, p, sizeof(uint32_t));
+   return take(input_map, position, end, *len, elem_size);
 }
 
 /**
- * @brief Reads a length-prefixed `uint16_t` array from a memory-mapped buffer.
- * @param input_map Pointer to the memory-mapped input file.
- * @param position Pointer to the current read offset; advanced past the read data on return.
- * @param end Offset the array must not extend past.
- * @param len Receives the number of elements.
- * @return Pointer into the mmap'd region containing the array data, or `NULL`
- *         if the array does not fit before `end`.
- *
- * @note The returned pointer references mmap'd memory and must not be freed.
+ * @brief Reads a length-prefixed `uint32_t` array; see `read_prefixed_arr()`.
  */
-uint16_t* read_uint16_arr(void* input_map, long* position, long end,
-                          uint32_t* len) {
-   if (read_arr_len(input_map, position, end, sizeof(uint16_t), len) != 0) {
-      MSZ_ERROR("read_uint16_arr: array at %ld runs past %ld.\n", *position,
-                end);
-      return NULL;
-   }
+static uint32_t* read_uint32_arr(void* input_map, long* position, long end,
+                                 uint32_t* len) {
+   long start = *position;
+   const uint8_t* arr =
+       read_prefixed_arr(input_map, position, end, sizeof(uint32_t), len);
+   if (arr == NULL)
+      MSZ_ERROR("read_uint32_arr: array at %ld runs past %ld.\n", start, end);
+   return (uint32_t*)arr;
+}
 
-   uint16_t* arr = (uint16_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint16_t) * (*len);
-
-   return arr;
+/**
+ * @brief Reads a length-prefixed `uint16_t` array; see `read_prefixed_arr()`.
+ */
+static uint16_t* read_uint16_arr(void* input_map, long* position, long end,
+                                 uint32_t* len) {
+   long start = *position;
+   const uint8_t* arr =
+       read_prefixed_arr(input_map, position, end, sizeof(uint16_t), len);
+   if (arr == NULL)
+      MSZ_ERROR("read_uint16_arr: array at %ld runs past %ld.\n", start, end);
+   return (uint16_t*)arr;
 }
 
 /**
@@ -1711,13 +1700,13 @@ division_t* read_division(void* input_map, long* position, long end) {
        (r->inten = read_dp(input_map, position, end)) == NULL)
       goto fail;
 
-   if (!span_fits(*position, end, 1, sizeof(uint64_t))) {
+   const uint8_t* size_p = take(input_map, position, end, 1, sizeof(uint64_t));
+   if (size_p == NULL) {
       MSZ_ERROR("read_division: division size at %ld runs past %ld.\n",
                 *position, end);
       goto fail;
    }
-   memcpy(&r->size, (uint8_t*)input_map + *position, sizeof(uint64_t));
-   *position += sizeof(uint64_t);
+   memcpy(&r->size, size_p, sizeof(uint64_t));
 
    if ((r->scans = read_uint32_arr(input_map, position, end, &n_scans)) ==
            NULL ||
