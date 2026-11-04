@@ -240,13 +240,13 @@ int determine_division(divisions_t* divisions, long target) {
       division_t* curr = divisions->divisions[i];
 
       if (!curr) {
-         warning("determine_division: curr division is NULL.\n");
+         MSZ_WARN("determine_division: curr division is NULL.\n");
          return -1;
       }
       data_positions_t* spectra = curr->spectra;
 
       if (!spectra) {
-         warning("determine_division: spectra is NULL.\n");
+         MSZ_WARN("determine_division: spectra is NULL.\n");
          // return -1;
       } else {
          sum += spectra->total_spec;
@@ -414,7 +414,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
    }
 
    if (!found) {
-      error("extract_spectrum_start_xml: Could not find division for spectrum.\n");
+      MSZ_ERROR("extract_spectrum_start_xml: Could not find division for spectrum.\n");
       return NULL;
    }
 
@@ -426,7 +426,7 @@ char* extract_spectrum_start_xml(char* input_map, ZSTD_DCtx* dctx,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       if (decmp_xml == NULL) {
-         error("extract_spectrum_start_xml: Failed to decompress XML block.\n");
+         MSZ_ERROR("extract_spectrum_start_xml: Failed to decompress XML block.\n");
          return NULL;
       }
       xml_blk_len->cache = decmp_xml;
@@ -508,7 +508,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
    }
 
    if (!found) {
-      error("extract_spectrum_inner_xml: Could not find division for spectrum.\n");
+      MSZ_ERROR("extract_spectrum_inner_xml: Could not find division for spectrum.\n");
       return NULL;
    }
 
@@ -520,7 +520,7 @@ char* extract_spectrum_inner_xml(char* input_map, ZSTD_DCtx* dctx,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       if (decmp_xml == NULL) {
-         error("extract_spectrum_inner_xml: Failed to decompress XML block.\n");
+         MSZ_ERROR("extract_spectrum_inner_xml: Failed to decompress XML block.\n");
          return NULL;
       }
       xml_blk_len->cache = decmp_xml;
@@ -602,7 +602,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
    }
 
    if (!found) {
-      error("extract_spectrum_last_xml: Could not find division for spectrum.\n");
+      MSZ_ERROR("extract_spectrum_last_xml: Could not find division for spectrum.\n");
       return NULL;
    }
 
@@ -614,7 +614,7 @@ char* extract_spectrum_last_xml(char* input_map, ZSTD_DCtx* dctx,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       if (decmp_xml == NULL) {
-         error("extract_spectrum_last_xml: Failed to decompress XML block.\n");
+         MSZ_ERROR("extract_spectrum_last_xml: Failed to decompress XML block.\n");
          return NULL;
       }
       xml_blk_len->cache = decmp_xml;
@@ -650,11 +650,11 @@ static char* extract_no_encode_from_cache(block_len_t* blk,
                                           data_positions_t* dp, long index,
                                           size_t* out_len) {
    if (!blk || !blk->cache || !dp) {
-      error("extract_no_encode_from_cache: NULL block/cache/dp");
+      MSZ_ERROR("extract_no_encode_from_cache: NULL block/cache/dp");
       return NULL;
    }
    if (index < 0 || (uint64_t)index >= dp->total_spec) {
-      error("extract_no_encode_from_cache: index %ld out of range [0, %lu)",
+      MSZ_ERROR("extract_no_encode_from_cache: index %ld out of range [0, %lu)",
             index, (unsigned long)dp->total_spec);
       return NULL;
    }
@@ -672,7 +672,7 @@ static char* extract_no_encode_from_cache(block_len_t* blk,
    if (!blk->cache_spec_lens) {
       size_t* lens = malloc(dp->total_spec * sizeof(size_t));
       if (!lens) {
-         error("extract_no_encode_from_cache: malloc(lens, %lu) failed",
+         MSZ_ERROR("extract_no_encode_from_cache: malloc(lens, %lu) failed",
                (unsigned long)(dp->total_spec * sizeof(size_t)));
          return NULL;
       }
@@ -708,7 +708,7 @@ static char* extract_no_encode_from_cache(block_len_t* blk,
 
    char* res = malloc(len);
    if (!res) {
-      error("extract_no_encode_from_cache: malloc(%lu) failed",
+      MSZ_ERROR("extract_no_encode_from_cache: malloc(%lu) failed",
             (unsigned long)len);
       return NULL;
    }
@@ -751,7 +751,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    // Allocate memory for algo_args
    algo_args* a_args = malloc(sizeof(algo_args));
    if (!a_args) {
-      error("encode_binary_block: Failed to allocate algo_args.\n");
+      MSZ_ERROR("encode_binary_block: Failed to allocate algo_args.\n");
       return 1;
    }
 
@@ -770,7 +770,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    if (buff_cap == 0) buff_cap = 1;
    char* buff = malloc(buff_cap);
    if (!buff) {
-      error(
+      MSZ_ERROR(
           "encode_binary_block: Failed to allocate buffer for encoded data.\n");
       free(a_args);
       return 1;
@@ -780,7 +780,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    // spectrum.
    size_t* res_lens = malloc(total_spec * sizeof(size_t));
    if (!res_lens) {
-      error("encode_binary_block: Failed to allocate res_lens array.\n");
+      MSZ_ERROR("encode_binary_block: Failed to allocate res_lens array.\n");
       free(a_args);
       free(buff);
       return 1;
@@ -790,7 +790,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    // Initialize the z_stream for encoding
    a_args->z = alloc_z_stream();
    if (!a_args->z) {
-      error("encode_binary_block: Failed to allocate z_stream.\n");
+      MSZ_ERROR("encode_binary_block: Failed to allocate z_stream.\n");
       free(a_args);
       free(buff);
       free(res_lens);
@@ -801,7 +801,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
    // block).
    a_args->z_inflate = alloc_z_stream_inflate();
    if (!a_args->z_inflate) {
-      error("encode_binary_block: Failed to allocate inflate z_stream.\n");
+      MSZ_ERROR("encode_binary_block: Failed to allocate inflate z_stream.\n");
       dealloc_z_stream(a_args->z);
       free(a_args);
       free(buff);
@@ -831,7 +831,7 @@ int encode_binary_block(block_len_t* blk, data_positions_t* curr_dp,
       // grows buff and retries when the output does not fit.
       if (encode_into_buff(target_fun, a_args, &decmp_binary, &buff, &buff_cap,
                            buff_off)) {
-         error(
+         MSZ_ERROR(
              "encode_binary_block: Failed to encode binary block for spectrum "
              "%d.\n",
              i);
@@ -954,7 +954,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    }
 
    if (division_index >= divisions->n_divisions) {
-      error("extract_spectrum_mz: Could not find division for spectrum index %ld.\n", index);
+      MSZ_ERROR("extract_spectrum_mz: Could not find division for spectrum index %ld.\n", index);
       return NULL;
    }
 
@@ -967,7 +967,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       decmp_mz = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                     mz_blk_offset, mz_blk_len);
       if (decmp_mz == NULL) {
-         error("extract_spectrum_mz: Failed to decompress mz block.\n");
+         MSZ_ERROR("extract_spectrum_mz: Failed to decompress mz block.\n");
          return NULL;
       }
       /* Undo the byte shuffle before the block enters the cache, so every
@@ -975,7 +975,7 @@ char* extract_spectrum_mz(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
       if (df->mz_shuffle_elem > 1 &&
           unshuffle_block_records(decmp_mz, mz_blk_len->original_size,
                                   df->mz_shuffle_elem) != 0) {
-         error("extract_spectrum_mz: Failed to reverse m/z byte shuffle.\n");
+         MSZ_ERROR("extract_spectrum_mz: Failed to reverse m/z byte shuffle.\n");
          free(decmp_mz);
          return NULL;
       }
@@ -1067,7 +1067,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
    }
 
    if (division_index >= divisions->n_divisions) {
-      error("extract_spectrum_inten: Could not find division for spectrum index %ld.\n", index);
+      MSZ_ERROR("extract_spectrum_inten: Could not find division for spectrum index %ld.\n", index);
       return NULL;
    }
 
@@ -1081,7 +1081,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
           (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                              inten_blk_offset, inten_blk_len);
       if (decmp_inten == NULL) {
-         error(
+         MSZ_ERROR(
              "extract_spectrum_inten: Failed to decompress intensity block.\n");
          return NULL;
       }
@@ -1090,7 +1090,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
       if (df->inten_shuffle_elem > 1 &&
           unshuffle_block_records(decmp_inten, inten_blk_len->original_size,
                                   df->inten_shuffle_elem) != 0) {
-         error(
+         MSZ_ERROR(
              "extract_spectrum_inten: Failed to reverse intensity byte "
              "shuffle.\n");
          free(decmp_inten);
@@ -1112,7 +1112,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
           inten_blk_len, inten, df->source_inten_fmt, _no_encode_,
           no_encode_no_header, df->int_scale_factor, df->target_inten_fun);
       if (ret != 0) {
-         error("extract_spectrum_inten: Failed to encode intensity block.\n");
+         MSZ_ERROR("extract_spectrum_inten: Failed to encode intensity block.\n");
          return NULL;
       }
       res = extract_from_encoded_block(inten_blk_len, inten_off, out_len);
@@ -1124,7 +1124,7 @@ char* extract_spectrum_inten(char* input_map, ZSTD_DCtx* dctx,
                                  df->encode_source_compression_inten_fun,
                                  df->int_scale_factor, df->target_inten_fun);
    if (ret != 0) {
-      error("extract_spectrum_inten: Failed to encode intensity block.\n");
+      MSZ_ERROR("extract_spectrum_inten: Failed to encode intensity block.\n");
       return NULL;
    }
 
@@ -1197,7 +1197,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                            divisions, index, &mz_len, TRUE, lru);
 
    if (spectrum_mz == NULL) {
-      error(
+      MSZ_ERROR(
           "extract_spectra: Failed to extract m/z values for spectrum index "
           "%ld.\n",
           index);
@@ -1214,7 +1214,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
        spectrum_end, &inner_xml_len, lru);
 
    if (spectrum_inner_xml == NULL) {
-      error(
+      MSZ_ERROR(
           "extract_spectra: Failed to extract inner XML for spectrum index "
           "%ld.\n",
           index);
@@ -1232,7 +1232,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
                               inten_pos, divisions, index, &inten_len, TRUE,
                               lru);
    if (spectrum_inten == NULL) {
-      error(
+      MSZ_ERROR(
           "extract_spectra: Failed to extract intensity values for spectrum "
           "index %ld.\n",
           index);
@@ -1249,7 +1249,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
        input_map, dctx, df, xml_block_lens, xml_pos, divisions, spectrum_start,
        spectrum_end, &last_xml_len, lru);
    if (spectrum_last_xml == NULL) {
-      error(
+      MSZ_ERROR(
           "extract_spectra: Failed to extract last XML for spectrum index "
           "%ld.\n",
           index);
@@ -1261,7 +1261,7 @@ char* extract_spectra(char* input_map, ZSTD_DCtx* dctx, data_format_t* df,
    *out_len += last_xml_len;
    free(spectrum_last_xml);
 
-   print("Extracted spectrum index %ld\n", index);
+   MSZ_INFO("Extracted spectrum index %ld\n", index);
    return res;
 }
 
@@ -1298,7 +1298,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    ZSTD_DCtx* dctx = alloc_dctx();
 
    if (dctx == NULL)
-      error("decompress_routine: ZSTD Context failed.\n");
+      MSZ_ERROR("decompress_routine: ZSTD Context failed.\n");
 
    df = get_header_df(input_map);
 
@@ -1324,7 +1324,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    set_decompress_runtime_variables(df, msz_footer);
 
    if (n_divisions == 0) {
-      warning("No divisions found in file, aborting...\n");
+      MSZ_WARN("No divisions found in file, aborting...\n");
       return;
    }
 
@@ -1343,7 +1343,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       if (decmp_xml == NULL) {
-         error("extract_msz: Failed to decompress XML block for mzML header.\n");
+         MSZ_ERROR("extract_msz: Failed to decompress XML block for mzML header.\n");
          return;
       }
       xml_blk_len->cache = decmp_xml;
@@ -1389,7 +1389,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
       decmp_xml = (char*)decmp_block(df->xml_decompression_fun, dctx, input_map,
                                      xml_blk_offset, xml_blk_len);
       if (decmp_xml == NULL) {
-         error("extract_msz: Failed to decompress XML block for mzML footer.\n");
+         MSZ_ERROR("extract_msz: Failed to decompress XML block for mzML footer.\n");
          return;
       }
       xml_blk_len->cache = decmp_xml;
@@ -1397,7 +1397,7 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
       decmp_xml = xml_blk_len->cache;
    }
    char* mzml_footer = extract_mzml_footer(decmp_xml, divisions, &footer_len);
-   // print("%s\n", mzml_footer);
+   // MSZ_INFO("%s\n", mzml_footer);
    write_to_file(output_fd, mzml_footer, footer_len);
    free(mzml_footer);
 

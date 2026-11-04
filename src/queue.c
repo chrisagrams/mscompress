@@ -420,16 +420,16 @@ size_t dump_block_len_queue(block_len_queue_t* queue, int fd) {
  * @return A pointer to a newly allocated `block_len_queue_t` containing the parsed nodes.
  *
  * @note The caller is responsible for freeing the returned queue via `dealloc_block_len_queue()`.
- * @warning Calls `error()` and may terminate if `input_map` is `NULL` or offsets are negative.
+ * @warning Calls `MSZ_ERROR()` and may terminate if `input_map` is `NULL` or offsets are negative.
  */
 block_len_queue_t* read_block_len_queue(void* input_map, long offset,
                                         long end) {
    if (input_map == NULL)
-      error("read_block_len_queue: input_map is NULL");
+      MSZ_ERROR("read_block_len_queue: input_map is NULL");
    if (offset < 0)
-      error("read_block_len_queue: offset is negative");
+      MSZ_ERROR("read_block_len_queue: offset is negative");
    if (end < 0)
-      error("read_block_len_queue: end is negative");
+      MSZ_ERROR("read_block_len_queue: end is negative");
    block_len_queue_t* r;
    long diff;
    int factor;

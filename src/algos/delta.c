@@ -32,13 +32,13 @@ void algo_decode_delta16_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta16_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_delta16_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_delta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -63,7 +63,7 @@ void algo_decode_delta16_transform_32f(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta16_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_delta16_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -125,13 +125,13 @@ void algo_decode_delta16_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta16_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_delta16_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_delta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -157,7 +157,7 @@ void algo_decode_delta16_transform_64d(void* args) {
                            // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta16_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_delta16_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -177,7 +177,7 @@ void algo_decode_delta16_transform_64d(void* args) {
    for (int i = 1; i < len; i++) {
       diff = f[i] - f[i - 1];
       if (diff * a_args->scale_factor > UINT16_MAX) {
-         // print("algo_decode_delta16_transform_64d: CLIPPING. diff: %0.4f,
+         // MSZ_INFO("algo_decode_delta16_transform_64d: CLIPPING. diff: %0.4f,
          // scale_factor*diff: %0.4f\n", diff, diff*a_args->scale_factor);
          uint_diff = UINT16_MAX;
       } else
@@ -225,13 +225,13 @@ void algo_decode_delta24_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta24_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_delta24_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_delta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -257,7 +257,7 @@ void algo_decode_delta24_transform_32f(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta24_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_delta24_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -328,13 +328,13 @@ void algo_decode_delta24_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta24_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_delta24_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_delta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -360,7 +360,7 @@ void algo_decode_delta24_transform_64d(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta24_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_delta24_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -428,13 +428,13 @@ void algo_decode_delta32_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta32_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_delta32_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_delta32_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta32_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -460,7 +460,7 @@ void algo_decode_delta32_transform_32f(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta32_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_delta32_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -517,13 +517,13 @@ void algo_decode_delta32_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_delta32_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_delta32_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_delta32_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_delta32_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -549,7 +549,7 @@ void algo_decode_delta32_transform_64d(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_delta32_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_delta32_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -609,13 +609,13 @@ void algo_encode_delta16_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -624,7 +624,7 @@ void algo_encode_delta16_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -641,7 +641,7 @@ void algo_encode_delta16_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -681,13 +681,13 @@ void algo_encode_delta16_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -696,7 +696,7 @@ void algo_encode_delta16_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -713,7 +713,7 @@ void algo_encode_delta16_transform_64d(void* args) {
    double* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -753,13 +753,13 @@ void algo_encode_delta24_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -768,7 +768,7 @@ void algo_encode_delta24_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -785,7 +785,7 @@ void algo_encode_delta24_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -837,13 +837,13 @@ void algo_encode_delta24_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -852,7 +852,7 @@ void algo_encode_delta24_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -869,7 +869,7 @@ void algo_encode_delta24_transform_64d(void* args) {
    double* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -921,13 +921,13 @@ void algo_encode_delta32_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -936,7 +936,7 @@ void algo_encode_delta32_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -953,7 +953,7 @@ void algo_encode_delta32_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -993,13 +993,13 @@ void algo_encode_delta32_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_delta_transform: args is NULL");
+      MSZ_ERROR("algo_encode_delta_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_delta_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -1008,7 +1008,7 @@ void algo_encode_delta32_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_delta_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_delta_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -1025,7 +1025,7 @@ void algo_encode_delta32_transform_64d(void* args) {
    double* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_delta_transform: malloc failed");
+      MSZ_ERROR("algo_encode_delta_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }

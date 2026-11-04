@@ -23,6 +23,7 @@ from mscompress._core import (
     get_num_threads,
     get_filesize,
     list_algorithms,
+    MSCompressError,
 )
 
 from mscompress.utils import read
@@ -104,6 +105,7 @@ __all__ = [
     "get_num_threads",
     "get_filesize",
     "list_algorithms",
+    "MSCompressError",
     "__version__",
     # Utility functions
     "read",

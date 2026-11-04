@@ -202,7 +202,7 @@ int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
       if (!div || !div->spectra) continue;
       int n = div->spectra->total_spec;
       if (n > 0 && !div->meta) {
-         error("mszx index: divisions were scanned without SPECMETA\n");
+         MSZ_ERROR("mszx index: divisions were scanned without SPECMETA\n");
          return -1;
       }
       for (int j = 0; j < n; ++j) {
@@ -214,7 +214,7 @@ int mszx_index_builder_add(mszx_index_builder_t* b, uint32_t entry,
             b->cap = nc;
          }
          if (b->n >= UINT32_MAX) {
-            error("mszx index: more than %u spectra are not supported\n",
+            MSZ_ERROR("mszx index: more than %u spectra are not supported\n",
                   UINT32_MAX);
             return -1;
          }
@@ -298,7 +298,7 @@ void* mszx_index_builder_serialize(const mszx_index_builder_t* b,
    for (size_t i = 0; i < n; ++i) {
       if (rows[i].entry >= n_entries ||
           (i > 0 && rows[i].entry < rows[i - 1].entry)) {
-         error("mszx index: rows are not grouped by entry\n");
+         MSZ_ERROR("mszx index: rows are not grouped by entry\n");
          return NULL;
       }
    }
@@ -435,11 +435,11 @@ static int is_derived(int column) {
 mszx_index_t* mszx_index_open(const void* data, size_t len) {
    const char* p = (const char*)data;
    if (!p || len < IDX_HEADER_SIZE || memcmp(p, IDX_MAGIC, 4) != 0) {
-      warning("mszx index: bad magic\n");
+      MSZ_WARN("mszx index: bad magic\n");
       return NULL;
    }
    if (get_u16(p + 4) != MSZX_INDEX_FORMAT_VERSION) {
-      warning("mszx index: unsupported format version %u\n", get_u16(p + 4));
+      MSZ_WARN("mszx index: unsupported format version %u\n", get_u16(p + 4));
       return NULL;
    }
    uint64_t n_rows = get_u64(p + 8);
@@ -450,7 +450,7 @@ mszx_index_t* mszx_index_open(const void* data, size_t len) {
    uint64_t dir_bytes = entries_bytes + (uint64_t)n_cols * IDX_COLDIR_SIZE +
                         (uint64_t)n_keys * IDX_KEYDIR_SIZE;
    if (n_rows > UINT32_MAX || !range_ok(len, IDX_HEADER_SIZE, dir_bytes)) {
-      warning("mszx index: corrupt header\n");
+      MSZ_WARN("mszx index: corrupt header\n");
       return NULL;
    }
 
@@ -459,7 +459,7 @@ mszx_index_t* mszx_index_open(const void* data, size_t len) {
    for (uint32_t e = 0; ok && e < n_entries; ++e)
       ok = offsets[e] <= offsets[e + 1];
    if (!ok) {
-      warning("mszx index: corrupt entry offsets\n");
+      MSZ_WARN("mszx index: corrupt entry offsets\n");
       return NULL;
    }
 
@@ -481,7 +481,7 @@ mszx_index_t* mszx_index_open(const void* data, size_t len) {
       if (id >= MAX_COLUMN_ID || is_derived((int)id) || es == 0)
          continue; /* unknown: skip */
       if (bytes != n_rows * es || !range_ok(len, off, bytes) || off % 8) {
-         warning("mszx index: corrupt column %u\n", id);
+         MSZ_WARN("mszx index: corrupt column %u\n", id);
          free(idx);
          return NULL;
       }
@@ -503,14 +503,14 @@ mszx_index_t* mszx_index_open(const void* data, size_t len) {
       if (kind != MSZX_KEY_PERM) continue;
       if (n_valid > n_rows || !range_ok(len, perm_off, n_valid * 4) ||
           perm_off % 8) {
-         warning("mszx index: corrupt sorted key %u\n", id);
+         MSZ_WARN("mszx index: corrupt sorted key %u\n", id);
          free(idx);
          return NULL;
       }
       const uint32_t* perm = (const uint32_t*)(p + perm_off);
       for (uint64_t i = 0; i < n_valid; ++i) {
          if (perm[i] >= n_rows) {
-            warning("mszx index: corrupt permutation for key %u\n", id);
+            MSZ_WARN("mszx index: corrupt permutation for key %u\n", id);
             free(idx);
             return NULL;
          }
@@ -684,7 +684,7 @@ int mszx_index_query(const mszx_index_t* idx, const mszx_index_term_t* terms,
    if (!idx || !out_rows || !out_n || (n_terms && !terms)) return -1;
    for (size_t t = 0; t < n_terms; ++t) {
       if (!mszx_index_has_column(idx, terms[t].column)) {
-         warning("mszx index: no column %d in this index\n", terms[t].column);
+         MSZ_WARN("mszx index: no column %d in this index\n", terms[t].column);
          return -1;
       }
    }
@@ -768,7 +768,7 @@ int mszx_index_parse_query(const char* text, mszx_index_term_t** out_terms,
 
       char* eq = strchr(tok, '=');
       if (!eq) {
-         error("--query: expected key=value, got '%s'\n", tok);
+         MSZ_ERROR("--query: expected key=value, got '%s'\n", tok);
          rc = -1;
          break;
       }
@@ -780,7 +780,7 @@ int mszx_index_parse_query(const char* text, mszx_index_term_t** out_terms,
 
       int col = mszx_index_column_id(key);
       if (col < 0) {
-         error("--query: unknown column '%s'\n", key);
+         MSZ_ERROR("--query: unknown column '%s'\n", key);
          rc = -1;
          break;
       }
@@ -803,7 +803,7 @@ int mszx_index_parse_query(const char* text, mszx_index_term_t** out_terms,
          if (e == val || *e) rc = -1;
       }
       if (rc != 0) {
-         error("--query: bad value for '%s'\n", key);
+         MSZ_ERROR("--query: bad value for '%s'\n", key);
          break;
       }
 

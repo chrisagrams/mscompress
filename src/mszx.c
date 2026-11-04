@@ -290,16 +290,16 @@ static int decompress_msz_entry(int fd, mszx_entry_t* msz, const char* out_path,
    size_t pad = 0, map_length = 0;
    void* base = get_mapping_range(fd, msz->offset, msz->size, &pad, &map_length);
    if (!base) {
-      warning("decompress_mszx: failed to mmap entry '%s'\n", msz->name);
+      MSZ_WARN("decompress_mszx: failed to mmap entry '%s'\n", msz->name);
       return -1;
    }
    int out_fd = open_output_file((char*)out_path);
    if (out_fd < 0) {
-      warning("decompress_mszx: could not open output '%s'\n", out_path);
+      MSZ_WARN("decompress_mszx: could not open output '%s'\n", out_path);
       remove_mapping(base, map_length);
       return -1;
    }
-   print("\tDecompressing %s -> %s\n", msz->name, out_path);
+   MSZ_INFO("\tDecompressing %s -> %s\n", msz->name, out_path);
    int rc = decompress_msz((char*)base + pad, msz->size, arguments, out_fd);
    close_file(out_fd);
    remove_mapping(base, map_length);
@@ -328,21 +328,21 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
    if (!input_path || !output_dir || !arguments) return -1;
 
    if (ensure_dir(output_dir) != 0) {
-      warning("decompress_mszx: could not create output directory '%s'\n",
+      MSZ_WARN("decompress_mszx: could not create output directory '%s'\n",
               output_dir);
       return -1;
    }
 
    int fd = open_input_file(input_path);
    if (fd < 0) {
-      warning("decompress_mszx: could not open '%s'\n", input_path);
+      MSZ_WARN("decompress_mszx: could not open '%s'\n", input_path);
       return -1;
    }
 
    mszx_entry_t* entries = NULL;
    size_t n_entries = 0;
    if (mszx_list_entries(fd, &entries, &n_entries) != 0) {
-      warning("decompress_mszx: '%s' is not a valid USTAR archive\n",
+      MSZ_WARN("decompress_mszx: '%s' is not a valid USTAR archive\n",
               input_path);
       close_file(fd);
       return -1;
@@ -357,7 +357,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
          if (mbuf) {
             int major = manifest_version_major(mbuf);
             if (major > MSZX_MANIFEST_MAX_MAJOR) {
-               error("decompress_mszx: '%s' was written by a newer mscompress "
+               MSZ_ERROR("decompress_mszx: '%s' was written by a newer mscompress "
                      "(manifest version %d > %d); please upgrade.\n",
                      input_path, major, MSZX_MANIFEST_MAX_MAJOR);
                free(mbuf);
@@ -382,7 +382,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
       }
    }
    if (msz_count == 0) {
-      warning("decompress_mszx: no .msz entry found in '%s'\n", input_path);
+      MSZ_WARN("decompress_mszx: no .msz entry found in '%s'\n", input_path);
       mszx_free_entries(entries, n_entries);
       close_file(fd);
       return -1;
@@ -403,7 +403,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
       rc = decompress_msz_entry(fd, msz, mzml_path, arguments);
       free(mzml_path);
       if (rc != 0) {
-         warning("decompress_mszx: decompress_msz failed\n");
+         MSZ_WARN("decompress_mszx: decompress_msz failed\n");
          mszx_free_entries(entries, n_entries);
          close_file(fd);
          return -1;
@@ -417,7 +417,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
          rc = decompress_msz_entry(fd, &entries[i], out_path, arguments);
          free(out_path);
          if (rc != 0) {
-            warning("decompress_mszx: failed to expand entry '%s'\n",
+            MSZ_WARN("decompress_mszx: failed to expand entry '%s'\n",
                     entries[i].name);
             break;
          }
@@ -456,7 +456,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
       free(out_name);
       if (!out_path) { rc = -1; break; }
 
-      print("\tExtracting %s -> %s\n", entry_name, out_path);
+      MSZ_INFO("\tExtracting %s -> %s\n", entry_name, out_path);
 
       int copy_rc = is_zst
                         ? copy_entry_zstd(fd, entries[i].offset,
@@ -464,7 +464,7 @@ int decompress_mszx(char* input_path, char* output_dir, Arguments* arguments) {
                         : copy_entry_raw(fd, entries[i].offset,
                                          entries[i].size, out_path);
       if (copy_rc != 0) {
-         warning("decompress_mszx: failed to extract '%s'\n", entry_name);
+         MSZ_WARN("decompress_mszx: failed to extract '%s'\n", entry_name);
          free(out_path);
          rc = -1;
          break;
@@ -490,14 +490,14 @@ int list_mszx(char* input_path) {
 
    int fd = open_input_file(input_path);
    if (fd < 0) {
-      warning("list_mszx: could not open '%s'\n", input_path);
+      MSZ_WARN("list_mszx: could not open '%s'\n", input_path);
       return -1;
    }
 
    mszx_entry_t* entries = NULL;
    size_t n_entries = 0;
    if (mszx_list_entries(fd, &entries, &n_entries) != 0) {
-      warning("list_mszx: '%s' is not a valid USTAR archive\n", input_path);
+      MSZ_WARN("list_mszx: '%s' is not a valid USTAR archive\n", input_path);
       close_file(fd);
       return -1;
    }
@@ -581,7 +581,7 @@ int query_mszx(char* input_path, const char* query) {
 
    int fd = open_input_file(input_path);
    if (fd < 0) {
-      warning("query_mszx: could not open '%s'\n", input_path);
+      MSZ_WARN("query_mszx: could not open '%s'\n", input_path);
       free(terms);
       return -1;
    }
@@ -589,7 +589,7 @@ int query_mszx(char* input_path, const char* query) {
    mszx_entry_t* entries = NULL;
    size_t n_entries = 0;
    if (mszx_list_entries(fd, &entries, &n_entries) != 0) {
-      warning("query_mszx: '%s' is not a valid USTAR archive\n", input_path);
+      MSZ_WARN("query_mszx: '%s' is not a valid USTAR archive\n", input_path);
       free(terms);
       close_file(fd);
       return -1;
@@ -617,14 +617,14 @@ int query_mszx(char* input_path, const char* query) {
       map_base = get_mapping_range(fd, index_entry->offset, index_entry->size,
                                    &pad, &map_length);
       if (!map_base) {
-         warning("query_mszx: cannot map %s\n", MSZX_INDEX_ENTRY);
+         MSZ_WARN("query_mszx: cannot map %s\n", MSZX_INDEX_ENTRY);
          rc = -1;
       } else {
          data = (char*)map_base + pad;
          data_len = index_entry->size;
       }
    } else if (rc == 0) {
-      error("query_mszx: '%s' has no spectrum index (it was written with "
+      MSZ_ERROR("query_mszx: '%s' has no spectrum index (it was written with "
             "--no-index or by an older mscompress)\n",
             input_path);
       rc = -1;
@@ -654,7 +654,7 @@ int query_mszx(char* input_path, const char* query) {
          }
          printf("\n");
       }
-      print("%zu matching spectra\n", n_rows);
+      MSZ_INFO("%zu matching spectra\n", n_rows);
    }
 
    free(rows);

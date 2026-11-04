@@ -115,7 +115,7 @@ int remove_mapping(void* addr, size_t length) {
  */
 int remove_file(char* path) {
    if (!path) {
-      warning("remove_file: Path is NULL\n;");
+      MSZ_WARN("remove_file: Path is NULL\n;");
       return 1;
    }
 
@@ -160,7 +160,7 @@ size_t get_filesize(char* path) {
  */
 size_t write_to_file(int fd, char* buff, size_t n) {
    if (fd < 0)
-      error("write_to_file: invalid file descriptor.\n");
+      MSZ_ERROR("write_to_file: invalid file descriptor.\n");
 
    ssize_t rv;
 
@@ -171,7 +171,7 @@ size_t write_to_file(int fd, char* buff, size_t n) {
 #endif
 
    if (rv < 0)
-      error(
+      MSZ_ERROR(
           "Error in writing %ld bytes to file descriptor %d. Attempted to "
           "write %s",
           n, fd, buff);
@@ -189,7 +189,7 @@ size_t write_to_file(int fd, char* buff, size_t n) {
  */
 size_t read_from_file(int fd, void* buff, size_t n) {
    if (fd < 0)
-      error("read_from_file: invalid file descriptor.\n");
+      MSZ_ERROR("read_from_file: invalid file descriptor.\n");
 
    ssize_t rv;
    size_t total_read = 0;
@@ -203,11 +203,11 @@ size_t read_from_file(int fd, void* buff, size_t n) {
 #endif
 
       if (rv < 0) {
-         error("Error in reading %ld bytes from file descriptor %d.",
+         MSZ_ERROR("Error in reading %ld bytes from file descriptor %d.",
                n - total_read, fd);
       } else if (rv == 0) {
          // End of file reached before reading the required number of bytes.
-         warning("End of file reached\n");
+         MSZ_WARN("End of file reached\n");
          break;
       } else {
          total_read += rv;
@@ -248,7 +248,7 @@ int64_t get_offset(int fd) {
 char* serialize_df(data_format_t* df) {
    char* r = calloc(1, DATA_FORMAT_T_SIZE);
    if (r == NULL)
-      error("serialize_df: malloc failed.\n");
+      MSZ_ERROR("serialize_df: malloc failed.\n");
 
    size_t offset = 0;
 
@@ -299,7 +299,7 @@ data_format_t* deserialize_df(char* buff) {
     * has run would otherwise act on whatever happened to be on the heap. */
    data_format_t* r = calloc(1, sizeof(data_format_t));
    if (r == NULL)
-      error("deserialize_df: calloc failed.\n");
+      MSZ_ERROR("deserialize_df: calloc failed.\n");
 
    size_t offset = 0;
 
@@ -474,14 +474,14 @@ footer_t* read_footer(void* input_map, long filesize) {
    footer_t* footer;
 
    if (filesize <= 0) {
-      warning("read_footer: Filesize <= 0.\n");
+      MSZ_WARN("read_footer: Filesize <= 0.\n");
       return NULL;
    }
 
    footer = (footer_t*)((char*)input_map + filesize - sizeof(footer_t));
 
    if (footer->magic_tag != MAGIC_TAG) {
-      error("read_footer: invalid magic tag.\n");
+      MSZ_ERROR("read_footer: invalid magic tag.\n");
       return NULL;
    }
 
@@ -551,7 +551,7 @@ int msz_require_version(void* input_map, long filesize) {
    if (msz_read_version(input_map, filesize, &major, &minor) == 0)
       return 0;
 
-   error("file is msz version %d.%d; this build supports %s-%s.\n", major,
+   MSZ_ERROR("file is msz version %d.%d; this build supports %s-%s.\n", major,
          minor, MIN_SUPPORT, MAX_SUPPORT);
 
    return 1;
@@ -567,7 +567,7 @@ int msz_require_version(void* input_map, long filesize) {
  */
 void print_footer_csv(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
-      warning("print_footer_csv: footer is NULL.\n");
+      MSZ_WARN("print_footer_csv: footer is NULL.\n");
       return;
    }
 
@@ -600,7 +600,7 @@ void print_footer_csv(footer_t* footer, int msz_major, int msz_minor) {
 
 void print_footer_json(footer_t* footer, int msz_major, int msz_minor) {
    if (!footer) {
-      warning("print_footer_json: footer is NULL.\n");
+      MSZ_WARN("print_footer_json: footer is NULL.\n");
       return;
    }
 
@@ -703,14 +703,14 @@ int is_mzml(void* input_map, size_t input_length) {
  */
 int determine_filetype(void* input_map, size_t input_length) {
    if (is_mzml(input_map, input_length)) {
-      print("\t.mzML file detected.\n");
+      MSZ_INFO("\t.mzML file detected.\n");
       return COMPRESS;
    } else if (is_msz(input_map, input_length)) {
-      print("\t.msz file detected.\n");
+      MSZ_INFO("\t.msz file detected.\n");
       return DECOMPRESS;
    } else {
-      // warning("Invalid input file.\n");
-      print("\tExternal file detected.\n");
+      // MSZ_WARN("Invalid input file.\n");
+      MSZ_INFO("\tExternal file detected.\n");
       return EXTERNAL;
    }
    return -1;
@@ -732,16 +732,16 @@ int determine_filetype(void* input_map, size_t input_length) {
  */
 char* change_extension(char* input, char* extension) {
    if (input == NULL)
-      error("change_extension: input is NULL.\n");
+      MSZ_ERROR("change_extension: input is NULL.\n");
    if (extension == NULL)
-      error("change_extension: extension is NULL.\n");
+      MSZ_ERROR("change_extension: extension is NULL.\n");
 
    char* x;
    char* r;
 
    r = malloc(sizeof(char) * (strlen(input) + 1));
    if (r == NULL)
-      error("change_extension: malloc failed.\n");
+      MSZ_ERROR("change_extension: malloc failed.\n");
 
    strcpy(r, input);
    x = strrchr(r, '.');
@@ -765,16 +765,16 @@ char* change_extension(char* input, char* extension) {
  */
 char* append_extension(char* input, char* extension) {
    if (input == NULL)
-      error("change_extension: input is NULL.\n");
+      MSZ_ERROR("change_extension: input is NULL.\n");
    if (extension == NULL)
-      error("change_extension: extension is NULL.\n");
+      MSZ_ERROR("change_extension: extension is NULL.\n");
 
    char* x;
    char* r;
 
    r = malloc(sizeof(char) * (strlen(input) + strlen(".msz")));
    if (r == NULL)
-      error("change_extension: malloc failed.\n");
+      MSZ_ERROR("change_extension: malloc failed.\n");
 
    strcpy(r, input);
    x = strrchr(r, '\0');
@@ -799,7 +799,7 @@ char* append_extension(char* input, char* extension) {
  */
 char* strip_or_append_extension(char* input) {
    if (input == NULL)
-      error("strip_or_append_extension: input is NULL.\n");
+      MSZ_ERROR("strip_or_append_extension: input is NULL.\n");
 
    char* r;
    char* x;
@@ -808,7 +808,7 @@ char* strip_or_append_extension(char* input) {
    // input length plus the longest suffix we may write (".mzML") and the NUL.
    r = malloc(sizeof(char) * (strlen(input) + sizeof(".mzML")));
    if (r == NULL)
-      error("strip_or_append_extension: malloc failed.\n");
+      MSZ_ERROR("strip_or_append_extension: malloc failed.\n");
 
    strcpy(r, input);
    x = strrchr(r, '.');
@@ -840,7 +840,7 @@ int open_output_file(char* path) {
       fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0666);
 #endif
       if (fd < 0)
-         warning("Error in opening output file descriptor. (%s)\n",
+         MSZ_WARN("Error in opening output file descriptor. (%s)\n",
                  strerror(errno));
    }
 
@@ -911,10 +911,10 @@ int open_input_file(char* input_path) {
 #endif
 
       if (input_fd < 0)
-         warning("Error in opening input file descriptor. (%s)\n",
+         MSZ_WARN("Error in opening input file descriptor. (%s)\n",
                  strerror(errno));
    } else {
-      warning("No input file specified.\n");
+      MSZ_WARN("No input file specified.\n");
    }
    return input_fd;
 }
@@ -956,14 +956,14 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
    input_fd = open_input_file(input_path);
 
    if (input_fd < 0) {
-      error("Failed to open input file: %s\n", input_path);
+      MSZ_ERROR("Failed to open input file: %s\n", input_path);
       return -1;
    }
 
    if (debug_output) {
       fds[2] =
           open(debug_output, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0666);
-      print("\tDEBUG OUTPUT: %s\n", debug_output);
+      MSZ_INFO("\tDEBUG OUTPUT: %s\n", debug_output);
    }
 
    fds[0] = input_fd;
@@ -971,13 +971,13 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
    *input_filesize = get_filesize(input_path);
 
    if (*input_map == NULL) {
-      error("Failed to map input file: %s\n", input_path);
+      MSZ_ERROR("Failed to map input file: %s\n", input_path);
       close_file(input_fd);
       return -1;
    }
 
    if (*input_filesize <= 0) {
-      error("Invalid input file size: %s\n", input_path);
+      MSZ_ERROR("Invalid input file size: %s\n", input_path);
       close_file(input_fd);
       return -1;
    }
@@ -985,7 +985,7 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
    type = determine_filetype(*input_map, *input_filesize);
 
    if (type != COMPRESS && type != DECOMPRESS && type != EXTERNAL)
-      error("Cannot determine file type.\n");
+      MSZ_ERROR("Cannot determine file type.\n");
 
    if (*output_path) {
       output_fd = open_output_file(*output_path);
@@ -1003,7 +1003,7 @@ int prepare_fds(char* input_path, char** output_path, char* debug_output,
    output_fd = open_output_file(*output_path);
 
    if (output_fd < 0)
-      error("Error in opening output file descriptor. (%s)\n", strerror(errno));
+      MSZ_ERROR("Error in opening output file descriptor. (%s)\n", strerror(errno));
 
    fds[1] = output_fd;
 
@@ -1390,7 +1390,7 @@ static int tar_write_zeros(int fd, size_t n) {
 int tar_begin_entry(int fd, const char* name, tar_entry_t* w) {
    if (fd < 0 || !name || !w) return -1;
    if (tar_build_header(w->header, name, 0) != 0) {
-      error("tar_begin_entry: entry name too long for USTAR: %s\n", name);
+      MSZ_ERROR("tar_begin_entry: entry name too long for USTAR: %s\n", name);
       return -1;
    }
    w->header_off = get_offset(fd);
@@ -1422,7 +1422,7 @@ int tar_add_file(int fd, const char* name, const void* data, size_t len) {
    if (fd < 0 || !name) return -1;
    char hdr[TAR_BLOCK_SIZE];
    if (tar_build_header(hdr, name, (uint64_t)len) != 0) {
-      error("tar_add_file: entry name too long for USTAR: %s\n", name);
+      MSZ_ERROR("tar_add_file: entry name too long for USTAR: %s\n", name);
       return -1;
    }
    if (write_to_file(fd, hdr, TAR_BLOCK_SIZE) != (size_t)TAR_BLOCK_SIZE)
@@ -1446,7 +1446,7 @@ int open_output_file_rw(char* path) {
       fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 #endif
       if (fd < 0)
-         warning("Error opening output archive (rw). (%s)\n", strerror(errno));
+         MSZ_WARN("Error opening output archive (rw). (%s)\n", strerror(errno));
    }
    return fd;
 }

@@ -34,21 +34,80 @@ def _install_mscompress_warning_formatter():
     warnings.formatwarning = _mscompress_formatwarning
 
 _install_mscompress_warning_formatter()
-# `with gil` is required because these callbacks may be invoked from C code
+
+
+class MSCompressError(RuntimeError):
+    """An operation failed and the mscompress C core reported why.
+
+    ``str(err)`` carries the first C error message; ``messages`` holds every
+    C error logged during the failed call, oldest first.
+    """
+
+    def __init__(self, message, messages=()):
+        super().__init__(message)
+        self.messages = list(messages)
+
+
+MSCompressError.__module__ = "mscompress"
+
+
+# C ERROR records not yet reported, oldest first. The log handler appends
+# (holding the GIL); _c_error() turns them into an exception when a call
+# fails, and _warn_c_errors() reports them as warnings when it succeeds.
+cdef list _pending_c_errors = []
+cdef int _MAX_PENDING_C_ERRORS = 64
+
+
+cdef list _take_c_errors():
+    global _pending_c_errors
+    msgs = _pending_c_errors
+    _pending_c_errors = []
+    return msgs
+
+
+cdef object _c_error(str context):
+    """Build the exception for a failed C call, carrying the C message if one was logged."""
+    msgs = _take_c_errors()
+    if not msgs:
+        return MSCompressError(f"{context}.")
+    return MSCompressError(f"{context}: {msgs[0]}", msgs)
+
+
+cdef object _c_error_cause():
+    """The pending C errors as an MSCompressError to chain onto another exception, or None."""
+    msgs = _take_c_errors()
+    if not msgs:
+        return None
+    return MSCompressError(msgs[0], msgs)
+
+
+cdef void _warn_c_errors():
+    """Report C errors from a call that still succeeded as RuntimeWarnings."""
+    for msg in _take_c_errors():
+        warnings.warn(msg, RuntimeWarning, stacklevel=3)
+
+
+# `with gil` is required because the handler may be invoked from C code
 # running without the GIL (e.g., streaming methods release the GIL for I/O).
-cdef void _python_error_handler(const char* message) noexcept with gil:
-    """Callback function to handle C errors in Python"""
-    msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+cdef void _python_log_handler(const msz_log_record_t* rec, void* user) noexcept with gil:
+    """Route C log records into Python.
 
-cdef void _python_warning_handler(const char* message) noexcept with gil:
-    """Callback function to handle C warnings in Python"""
-    msg = message.decode('utf-8') if isinstance(message, bytes) else message
-    warnings.warn(msg.strip(), RuntimeWarning, stacklevel=2)
+    Errors are queued for the calling operation to raise (or warn about, if it
+    succeeds anyway); warnings become RuntimeWarnings; info/debug fall through
+    to the default stdout handler.
+    """
+    if rec.level < MSZ_LOG_WARN:
+        _msz_default_log_handler(rec, user)
+        return
+    msg = rec.message.decode('utf-8', errors='replace').strip()
+    if rec.level == MSZ_LOG_ERROR:
+        if len(_pending_c_errors) < _MAX_PENDING_C_ERRORS:
+            _pending_c_errors.append(msg)
+        return
+    warnings.warn(msg, RuntimeWarning, stacklevel=2)
 
-# Initialize callbacks when module is imported
-_set_error_callback(_python_error_handler)
-_set_warning_callback(_python_warning_handler)
+# Install the handler when the module is imported
+_msz_set_log_handler(_python_log_handler, NULL)
 
 
 # ---------------------------------------------------------------------------
@@ -593,12 +652,13 @@ cdef class MZMLFile(BaseFile):
              raise RuntimeError("File mapping is NULL. Filesize might be 0.")
         self._df = _pattern_detect(<char*> self._mapping)
         if self._df is NULL:
-             raise RuntimeError("pattern_detect returned NULL. Failed to detect mzML pattern.")
+             raise _c_error("Failed to detect mzML pattern")
         
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
         if self._positions is NULL:
-             raise RuntimeError("scan_mzml returned NULL. The file might be empty or invalid.")
+             raise _c_error("Failed to scan mzML; the file might be empty or invalid")
         _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
+        _warn_c_errors()
 
     @staticmethod
     def _reopen(path: bytes):
@@ -660,7 +720,7 @@ cdef class MZMLFile(BaseFile):
         cdef divisions_t* divisions = self._divisions
         cdef int fd = self.output_fd
         # Release the GIL so worker threads can re-enter Python via the
-        # error/warning callbacks (declared `with gil`). Without this, a worker
+        # log handler (declared `with gil`). Without this, a worker
         # that hits a base64 decode failure (or any other warning path) blocks
         # in PyGILState_Ensure while the main thread is parked in pthread_join,
         # producing an unrecoverable deadlock.
@@ -670,7 +730,8 @@ cdef class MZMLFile(BaseFile):
         _close_file(self.output_fd)
         self.output_fd = -1
         if rv != 0:
-            raise RuntimeError("Compression failed: write error during compression.")
+            raise _c_error("Compression failed")
+        _warn_c_errors()
         return MSZFile(output.encode('utf-8'))
 
     def _compress_to_fd(self, int write_fd):
@@ -688,7 +749,8 @@ cdef class MZMLFile(BaseFile):
             rv = _compress_mzml(mapping, filesize, args, df, divisions, write_fd)
             _flush(write_fd)
         if rv != 0:
-            raise RuntimeError("Compression failed: write error during compression.")
+            raise _c_error("Compression failed")
+        _warn_c_errors()
 
     def compress_stream(self, chunk_size: int = 1_048_576) -> Iterator[bytes]:
         """Compress this mzML file and yield the MSZ output as byte chunks.
@@ -826,6 +888,7 @@ cdef class MZMLFile(BaseFile):
                 write_fd
             )
             _flush(write_fd)
+        _warn_c_errors()
 
     def extract_stream(
         self,
@@ -877,6 +940,7 @@ cdef class MZMLFile(BaseFile):
         mapping_ptr += start
 
         self._df.decode_source_compression_mz_fun(self._z_inflate, mapping_ptr, end - start, &dest, &out_len, tmp)
+        _warn_c_errors()
         decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
@@ -929,6 +993,7 @@ cdef class MZMLFile(BaseFile):
         mapping_ptr += start
 
         self._df.decode_source_compression_inten_fun(self._z_inflate, mapping_ptr, end - start, &dest, &out_len, tmp)
+        _warn_c_errors()
         decode_output = dest  # Save pointer to decode function's allocation
 
         dest += ZLIB_SIZE_OFFSET # Skip zlib header
@@ -1020,6 +1085,7 @@ cdef class MSZFile(BaseFile):
         self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
         self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
         _set_decompress_runtime_variables(self._df, self._footer)
+        _warn_c_errors()
 
     cdef block_lru_t* _lru_ptr(self):
         """The shared LRU pointer for extract calls, or NULL if bounding is
@@ -1174,6 +1240,7 @@ cdef class MSZFile(BaseFile):
         self._mz_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.mz_binary_blk_pos, self._footer.inten_binary_blk_pos)
         self._inten_binary_block_lens = _read_block_len_queue(self._mapping, self._footer.inten_binary_blk_pos, self._footer.divisions_t_pos)
         _set_decompress_runtime_variables(self._df, self._footer)
+        _warn_c_errors()
 
     @classmethod
     def from_mszx(cls, bytes mszx_path, bytes entry_name):
@@ -1259,7 +1326,7 @@ cdef class MSZFile(BaseFile):
         cdef Arguments* args = self._arguments.get_ptr()
         cdef int fd = self.output_fd
         # Release the GIL so worker threads can re-enter Python via the
-        # error/warning callbacks. See MZMLFile.compress for the deadlock
+        # log handler. See MZMLFile.compress for the deadlock
         # this avoids.
         with nogil:
             rv = _decompress_msz(mapping, filesize, args, fd)
@@ -1267,7 +1334,8 @@ cdef class MSZFile(BaseFile):
         _close_file(self.output_fd)
         self.output_fd = -1
         if rv != 0:
-            raise RuntimeError("Decompression failed: error during decompression.")
+            raise _c_error("Decompression failed")
+        _warn_c_errors()
         return MZMLFile(output.encode('utf-8'))
 
     def _decompress_to_fd(self, int write_fd):
@@ -1281,7 +1349,8 @@ cdef class MSZFile(BaseFile):
             rv = _decompress_msz(mapping, filesize, args, write_fd)
             _flush(write_fd)
         if rv != 0:
-            raise RuntimeError("Decompression failed: error during decompression.")
+            raise _c_error("Decompression failed")
+        _warn_c_errors()
 
     def decompress_stream(self, chunk_size: int = 1_048_576) -> Iterator[bytes]:
         """Decompress this MSZ file and yield the mzML output as byte chunks.
@@ -1421,6 +1490,7 @@ cdef class MSZFile(BaseFile):
                 write_fd
             )
             _flush(write_fd)
+        _warn_c_errors()
 
     def extract_stream(
         self,
@@ -1464,7 +1534,8 @@ cdef class MSZFile(BaseFile):
         res = _extract_spectrum_mz(<char*> self._mapping, self._dctx, self._df, self._mz_binary_block_lens, self._footer.mz_binary_pos, self._divisions, index, &out_len, FALSE, self._lru_ptr())
 
         if res == NULL:
-            raise ValueError(f"Failed to extract m/z binary for index {index}")
+            raise ValueError(f"Failed to extract m/z binary for index {index}") from _c_error_cause()
+        _warn_c_errors()
 
         try:
             if self._df.source_mz_fmt == _64d_:
@@ -1503,7 +1574,8 @@ cdef class MSZFile(BaseFile):
         res = _extract_spectrum_inten(<char*> self._mapping, self._dctx, self._df, self._inten_binary_block_lens, self._footer.inten_binary_pos, self._divisions, index, &out_len, FALSE, self._lru_ptr())
 
         if res == NULL:
-            raise ValueError(f"Failed to extract intensity binary for index {index}")
+            raise ValueError(f"Failed to extract intensity binary for index {index}") from _c_error_cause()
+        _warn_c_errors()
 
         try:
             if self._df.source_inten_fmt == _64d_:
@@ -1552,7 +1624,8 @@ cdef class MSZFile(BaseFile):
         )
 
         if res == NULL:
-            raise ValueError(f"Failed to extract XML for index {index}")
+            raise ValueError(f"Failed to extract XML for index {index}") from _c_error_cause()
+        _warn_c_errors()
 
         try:
             result_str = res.decode('utf-8')
@@ -1600,13 +1673,13 @@ cdef class MSZFile(BaseFile):
                                              self._mapping, xml_blk_offset, xml_blk_len)
             
             if decmp_xml == NULL:
-                raise RuntimeError("Failed to decompress XML block for mzML header.")
+                raise _c_error("Failed to decompress XML block for mzML header")
             
             # Extract the header from decompressed XML
             header_data = _extract_mzml_header(decmp_xml, first_division, &header_len)
             
             if header_data == NULL:
-                raise RuntimeError("Failed to extract mzML header.")
+                raise _c_error("Failed to extract mzML header")
             
             # Convert to Python string
             header_str = header_data[:header_len].decode('utf-8', errors='replace')
@@ -2186,7 +2259,7 @@ cdef class BaseFile:
             header_data = _extract_mzml_header(<char*>self._mapping, first_division, &header_len)
             
             if header_data == NULL:
-                raise RuntimeError("Failed to extract mzML header.")
+                raise _c_error("Failed to extract mzML header")
             
             # Convert to Python bytes then string
             header_bytes = header_data[:header_len]
@@ -2730,7 +2803,8 @@ cdef class MSZXBatchWriter:
             raise ValueError(
                 f"Could not add {os.fsdecode(src_bytes)!r} to the archive "
                 f"(not an mzML file, or compression failed)"
-            )
+            ) from _c_error_cause()
+        _warn_c_errors()
 
         self._entries.append(os.fsdecode(src_bytes))
         return idx
