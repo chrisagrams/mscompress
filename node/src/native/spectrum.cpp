@@ -38,7 +38,7 @@ Napi::Value GetMzBinaryMzml(const Napi::CallbackInfo& info) {
     size_t out_len = 0;
     data_block_t* tmp = alloc_data_block(static_cast<size_t>(blocksize));
 
-    df->decode_source_compression_mz_fun(handle->GetZStream(), mapping_ptr, src_len, &dest, &out_len, tmp);
+    df->decode_source_compression_mz_fun(handle->GetInflateStream(), mapping_ptr, src_len, &dest, &out_len, tmp);
 
     if (dest == nullptr) {
         dealloc_data_block(tmp);
@@ -105,7 +105,7 @@ Napi::Value GetIntenBinaryMzml(const Napi::CallbackInfo& info) {
     size_t out_len = 0;
     data_block_t* tmp = alloc_data_block(static_cast<size_t>(blocksize));
 
-    df->decode_source_compression_inten_fun(handle->GetZStream(), mapping_ptr, src_len, &dest, &out_len, tmp);
+    df->decode_source_compression_inten_fun(handle->GetInflateStream(), mapping_ptr, src_len, &dest, &out_len, tmp);
 
     if (dest == nullptr) {
         dealloc_data_block(tmp);
