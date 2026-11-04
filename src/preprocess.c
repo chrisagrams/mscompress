@@ -16,6 +16,8 @@
 
 #include <assert.h>
 #include <ctype.h>  // for isspace
+#include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -1497,69 +1499,123 @@ size_t write_uint16_arr(uint16_t* arr, uint32_t len, int fd) {
 }
 
 /**
+ * @brief Claims the next `count` elements of `elem_size` bytes from a
+ *        memory-mapped buffer, bounded by `end`.
+ * @param input_map Pointer to the memory-mapped input file.
+ * @param position Pointer to the current read offset; advanced past the
+ *        claimed bytes on success, unchanged on failure.
+ * @param end Offset the bytes must not extend past.
+ * @return Pointer into the mmap'd region, or `NULL` if the bytes do not fit
+ *         before `end`.
+ *
+ * Requires `0 <= *position <= end`. `read_divisions()` checks this once on
+ * entry and every successful call preserves it, so the overflow-safe
+ * comparison below is the only bounds check the division readers need.
+ */
+static const uint8_t* take(const void* input_map, long* position, long end,
+                           uint64_t count, size_t elem_size) {
+   if (count > (uint64_t)(end - *position) / elem_size)
+      return NULL;
+   const uint8_t* p = (const uint8_t*)input_map + *position;
+   *position += (long)(count * elem_size);
+   return p;
+}
+
+/**
  * @brief Deserializes a `data_positions_t` struct from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer to a newly allocated `data_positions_t`, or `NULL` on allocation failure.
+ * @param end Offset the data must not extend past (the start of the footer).
+ * @return Pointer to a newly allocated `data_positions_t`, or `NULL` on allocation
+ *         failure or if the stored count does not fit before `end`.
  *
  * @note The returned struct's start_positions and end_positions point directly into the
  *       mmap'd region and must not be freed independently.
  * @warning The caller must free the returned struct wrapper with `free()`.
  */
-data_positions_t* read_dp(void* input_map, long* position) {
-   data_positions_t* r = malloc(sizeof(data_positions_t));
-   if (r == NULL)
+static data_positions_t* read_dp(void* input_map, long* position, long end) {
+   long start = *position;
+   uint64_t total_spec;
+   const uint8_t *hdr, *starts, *ends;
+
+   if ((hdr = take(input_map, position, end, 1, sizeof(uint64_t))) == NULL) {
+      MSZ_ERROR("read_dp: position table header at %ld runs past %ld.\n",
+                start, end);
       return NULL;
+   }
+   memcpy(&total_spec, hdr, sizeof(uint64_t));
 
-   // Read total_spec
-   r->total_spec = *((uint64_t*)((uint8_t*)input_map + *position));
-   *position += sizeof(uint64_t);
+   /* total_spec start offsets followed by total_spec end offsets. */
+   if (total_spec > INT_MAX ||
+       (starts = take(input_map, position, end, total_spec,
+                      sizeof(uint64_t))) == NULL ||
+       (ends = take(input_map, position, end, total_spec,
+                    sizeof(uint64_t))) == NULL) {
+      MSZ_ERROR("read_dp: position table at %ld claims %" PRIu64
+                " spectra, which do not fit before %ld.\n",
+                start, total_spec, end);
+      return NULL;
+   }
 
-   // Read start positions
-   r->start_positions = (uint64_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint64_t) * r->total_spec;
-
-   // Read end positions
-   r->end_positions = (uint64_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint64_t) * r->total_spec;
+   data_positions_t* r = malloc(sizeof(data_positions_t));
+   if (r == NULL) {
+      MSZ_ERROR("read_dp: malloc failed.\n");
+      return NULL;
+   }
+   r->total_spec = (int)total_spec;
+   r->start_positions = (uint64_t*)starts;
+   r->end_positions = (uint64_t*)ends;
 
    return r;
 }
 
 /**
- * @brief Reads a length-prefixed `uint32_t` array from a memory-mapped buffer.
+ * @brief Reads a `uint32_t` length prefix followed by that many elements of
+ *        `elem_size` bytes from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer into the mmap'd region containing the array data.
+ * @param end Offset the array must not extend past.
+ * @param elem_size Size of one array element in bytes.
+ * @param len Receives the number of elements.
+ * @return Pointer into the mmap'd region containing the array data, or `NULL`
+ *         if the prefix or the array does not fit before `end`.
  *
  * @note The returned pointer references mmap'd memory and must not be freed.
  */
-uint32_t* read_uint32_arr(void* input_map, long* position) {
-   uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
-   *position += sizeof(uint32_t);
-
-   uint32_t* arr = (uint32_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint32_t) * len;
-
-   return arr;
+static const uint8_t* read_prefixed_arr(void* input_map, long* position,
+                                        long end, size_t elem_size,
+                                        uint32_t* len) {
+   const uint8_t* p = take(input_map, position, end, 1, sizeof(uint32_t));
+   if (p == NULL)
+      return NULL;
+   memcpy(len, p, sizeof(uint32_t));
+   return take(input_map, position, end, *len, elem_size);
 }
 
 /**
- * @brief Reads a length-prefixed `uint16_t` array from a memory-mapped buffer.
- * @param input_map Pointer to the memory-mapped input file.
- * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer into the mmap'd region containing the array data.
- *
- * @note The returned pointer references mmap'd memory and must not be freed.
+ * @brief Reads a length-prefixed `uint32_t` array; see `read_prefixed_arr()`.
  */
-uint16_t* read_uint16_arr(void* input_map, long* position) {
-   uint32_t len = *((uint32_t*)((uint8_t*)input_map + *position));
-   *position += sizeof(uint32_t);
+static uint32_t* read_uint32_arr(void* input_map, long* position, long end,
+                                 uint32_t* len) {
+   long start = *position;
+   const uint8_t* arr =
+       read_prefixed_arr(input_map, position, end, sizeof(uint32_t), len);
+   if (arr == NULL)
+      MSZ_ERROR("read_uint32_arr: array at %ld runs past %ld.\n", start, end);
+   return (uint32_t*)arr;
+}
 
-   uint16_t* arr = (uint16_t*)((uint8_t*)input_map + *position);
-   *position += sizeof(uint16_t) * len;
-
-   return arr;
+/**
+ * @brief Reads a length-prefixed `uint16_t` array; see `read_prefixed_arr()`.
+ */
+static uint16_t* read_uint16_arr(void* input_map, long* position, long end,
+                                 uint32_t* len) {
+   long start = *position;
+   const uint8_t* arr =
+       read_prefixed_arr(input_map, position, end, sizeof(uint16_t), len);
+   if (arr == NULL)
+      MSZ_ERROR("read_uint16_arr: array at %ld runs past %ld.\n", start, end);
+   return (uint16_t*)arr;
 }
 
 /**
@@ -1614,57 +1670,120 @@ size_t write_divisions(divisions_t* divisions, int fd) {
  * @brief Deserializes a single `division_t` from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position Pointer to the current read offset; advanced past the read data on return.
- * @return Pointer to a newly allocated `division_t`, or `NULL` on allocation failure.
+ * @param end Offset the division must not extend past (the start of the footer).
+ * @return Pointer to a newly allocated `division_t`, or `NULL` on allocation
+ *         failure or if the stored division is truncated or inconsistent.
+ *
+ * Every length stored in the division is checked against `end` before it is
+ * used, and the per-spectrum tables must agree: the spectra, m/z and
+ * intensity position tables and the scan / MS-level arrays all hold one entry
+ * per spectrum. (The XML table does not: it holds the XML around each
+ * spectrum's binary arrays, plus the document tail in the last division.)
  *
  * @note The internal arrays (scans, ms_levels, position arrays) point into the mmap'd region.
  * @warning Free with `dealloc_read_division()` to avoid freeing mmap'd data.
  */
-division_t* read_division(void* input_map, long* position) {
+division_t* read_division(void* input_map, long* position, long end) {
    division_t* r;
+   uint32_t n_scans = 0;
+   uint32_t n_ms_levels = 0;
 
-   r = malloc(sizeof(division_t));
-   if (r == NULL)
+   r = calloc(1, sizeof(division_t));
+   if (r == NULL) {
+      MSZ_ERROR("read_division: calloc failed.\n");
       return NULL;
+   }
 
-   r->spectra = read_dp(input_map, position);
-   r->xml = read_dp(input_map, position);
-   r->mz = read_dp(input_map, position);
-   r->inten = read_dp(input_map, position);
-   r->size = *((uint64_t*)((uint8_t*)input_map + *position));
-   *position += sizeof(uint64_t);
+   if ((r->spectra = read_dp(input_map, position, end)) == NULL ||
+       (r->xml = read_dp(input_map, position, end)) == NULL ||
+       (r->mz = read_dp(input_map, position, end)) == NULL ||
+       (r->inten = read_dp(input_map, position, end)) == NULL)
+      goto fail;
 
-   r->scans = read_uint32_arr(input_map, position);
-   r->ms_levels = read_uint16_arr(input_map, position);
+   const uint8_t* size_p = take(input_map, position, end, 1, sizeof(uint64_t));
+   if (size_p == NULL) {
+      MSZ_ERROR("read_division: division size at %ld runs past %ld.\n",
+                *position, end);
+      goto fail;
+   }
+   memcpy(&r->size, size_p, sizeof(uint64_t));
+
+   if ((r->scans = read_uint32_arr(input_map, position, end, &n_scans)) ==
+           NULL ||
+       (r->ms_levels =
+            read_uint16_arr(input_map, position, end, &n_ms_levels)) == NULL)
+      goto fail;
+
+   if (r->spectra->total_spec != r->mz->total_spec ||
+       r->inten->total_spec != r->mz->total_spec ||
+       n_scans != (uint32_t)r->mz->total_spec ||
+       n_ms_levels != (uint32_t)r->mz->total_spec) {
+      MSZ_ERROR("read_division: inconsistent spectrum counts (spectra %d, "
+                "m/z %d, intensity %d, scans %u, MS levels %u).\n",
+                r->spectra->total_spec, r->mz->total_spec,
+                r->inten->total_spec, n_scans, n_ms_levels);
+      goto fail;
+   }
 
    r->ret_times = NULL;
    r->meta = NULL;
 
    return r;
+
+fail:
+   dealloc_read_division(r);
+   return NULL;
 }
 
 /**
  * @brief Deserializes all divisions from a memory-mapped buffer.
  * @param input_map Pointer to the memory-mapped input file.
  * @param position The byte offset where division data begins.
+ * @param end Offset the division data must not extend past: the start of the
+ *            footer, i.e. `filesize - sizeof(footer_t)`.
  * @param n_divisions Number of divisions to read.
- * @return Pointer to a newly allocated `divisions_t`, or `NULL` on allocation failure.
+ * @return Pointer to a newly allocated `divisions_t`, or `NULL` on allocation
+ *         failure or if the stored divisions are truncated or inconsistent
+ *         (the reason is logged with `MSZ_ERROR`).
  *
  * @warning Free with `dealloc_read_divisions()` to avoid freeing mmap'd data.
  */
-divisions_t* read_divisions(void* input_map, long position, int n_divisions) {
+divisions_t* read_divisions(void* input_map, long position, long end,
+                            int n_divisions) {
    divisions_t* r;
 
+   if (n_divisions <= 0) {
+      MSZ_ERROR("read_divisions: invalid division count %d.\n", n_divisions);
+      return NULL;
+   }
+   if (position < 0 || position > end) {
+      MSZ_ERROR("read_divisions: division data at %ld is outside [0, %ld].\n",
+                position, end);
+      return NULL;
+   }
+
    r = malloc(sizeof(divisions_t));
-   if (r == NULL)
+   if (r == NULL) {
+      MSZ_ERROR("read_divisions: malloc failed.\n");
       return NULL;
-   r->divisions = malloc(sizeof(division_t*) * n_divisions);
-   if (r->divisions == NULL)
+   }
+   r->divisions = calloc((size_t)n_divisions, sizeof(division_t*));
+   if (r->divisions == NULL) {
+      MSZ_ERROR("read_divisions: malloc failed.\n");
+      free(r);
       return NULL;
-
-   for (int i = 0; i < n_divisions; i++)
-      r->divisions[i] = read_division(input_map, &position);
-
+   }
    r->n_divisions = n_divisions;
+
+   for (int i = 0; i < n_divisions; i++) {
+      r->divisions[i] = read_division(input_map, &position, end);
+      if (r->divisions[i] == NULL) {
+         MSZ_ERROR("read_divisions: division %d of %d is corrupt.\n", i,
+                   n_divisions);
+         dealloc_read_divisions(r);
+         return NULL;
+      }
+   }
 
    return r;
 }
@@ -2699,8 +2818,21 @@ int parse_footer(footer_t** footer, void* input_map, long input_filesize,
 
    *n_divisions = (*footer)->n_divisions;
 
-   *divisions =
-       read_divisions(input_map, (*footer)->divisions_t_pos, *n_divisions);
+   *divisions = read_divisions(input_map, (long)(*footer)->divisions_t_pos,
+                               input_filesize - (long)sizeof(footer_t),
+                               *n_divisions);
+
+   /* read_divisions() reports the reason. */
+   if (*divisions == NULL) {
+      dealloc_block_len_queue(*xml_block_lens);
+      dealloc_block_len_queue(*mz_binary_block_lens);
+      dealloc_block_len_queue(*inten_binary_block_lens);
+      *xml_block_lens = NULL;
+      *mz_binary_block_lens = NULL;
+      *inten_binary_block_lens = NULL;
+      *n_divisions = 0;
+      return 1;
+   }
 
    return 0;
 }

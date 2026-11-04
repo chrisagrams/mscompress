@@ -1077,7 +1077,9 @@ cdef class MSZFile(BaseFile):
         _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
-        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self.filesize - <long>sizeof(footer_t), self._footer.n_divisions)
+        if self._divisions == NULL:
+            raise _c_error("Corrupt MSZ file: invalid division index")
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
@@ -1232,7 +1234,9 @@ cdef class MSZFile(BaseFile):
         _require_msz_version(self._mapping, self.filesize)
         self._df = _get_header_df(self._mapping)
         self._footer = _read_footer(self._mapping, self.filesize)
-        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
+        self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self.filesize - <long>sizeof(footer_t), self._footer.n_divisions)
+        if self._divisions == NULL:
+            raise _c_error("Corrupt MSZ file: invalid division index")
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
