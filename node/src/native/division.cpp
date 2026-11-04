@@ -66,7 +66,13 @@ Napi::Value ReadMszDivisions(const Napi::CallbackInfo& info) {
     handle->SetFooter(footer);
 
     // Read divisions from footer
-    divisions_t* divisions = read_divisions(handle->GetMapping(), footer->divisions_t_pos, footer->n_divisions);
+    // Bounded by the start of the footer, so a corrupt division index fails
+    // here instead of reading past the mapping.
+    divisions_t* divisions = read_divisions(
+        handle->GetMapping(),
+        static_cast<long>(footer->divisions_t_pos),
+        static_cast<long>(handle->GetFilesize() - sizeof(footer_t)),
+        footer->n_divisions);
     if (divisions == nullptr) {
         Napi::Error::New(env, "readMszDivisions: failed to read divisions").ThrowAsJavaScriptException();
         return env.Null();

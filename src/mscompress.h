@@ -691,7 +691,8 @@ void dealloc_divisions(divisions_t* divisions);
 void dealloc_read_division(division_t* div);
 void dealloc_read_divisions(divisions_t* divisions);
 size_t write_divisions(divisions_t* divisions, int fd);
-divisions_t* read_divisions(void* input_map, long position, int n_divisions);
+divisions_t* read_divisions(void* input_map, long position, long end,
+                            int n_divisions);
 division_t* flatten_divisions(divisions_t* divisions);
 divisions_t* create_divisions(division_t* div, long n_divisions);
 long determine_n_divisions(long filesize, long blocksize);
