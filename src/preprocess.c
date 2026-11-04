@@ -38,6 +38,8 @@ static void* memmem(const void* haystack, size_t hay_len, const void* needle,
 }
 #endif
 
+#include "../vendor/zlib/zlib.h"
+#include "libbase64.h"
 #include "mscompress.h"
 #include "yxml.h"
 
@@ -71,7 +73,9 @@ yxml_t* alloc_yxml() {
  * @warning Calls `MSZ_ERROR()` and aborts on `malloc` failure.
  */
 data_format_t* alloc_df() {
-   data_format_t* df = malloc(sizeof(data_format_t));
+   /* calloc so fields that pattern_detect() never sees (e.g. a missing
+      compression accession) are reliably 0 instead of garbage. */
+   data_format_t* df = calloc(1, sizeof(data_format_t));
 
    if (df == NULL)
       MSZ_ERROR("alloc_df: malloc failure.\n");
@@ -397,6 +401,184 @@ int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
    return 0;
 }
 
+/* Maximum number of spectra infer_source_compression() will inspect before
+   giving up (spectra with empty binary arrays are skipped). */
+#define INFER_MAX_SPECTRA 10
+
+/* Verdicts for a single binary array in infer_source_compression(). */
+#define INFER_UNKNOWN 0
+#define INFER_ZLIB 1
+#define INFER_NO_COMP 2
+#define INFER_AMBIGUOUS 3
+
+/**
+ * @brief Find a byte string within the half-open range [start, end).
+ * @return Pointer to the first match, or NULL if not found.
+ */
+static char* find_in_range(char* start, char* end, const char* needle) {
+   if (start == NULL || end == NULL || end <= start)
+      return NULL;
+   return (char*)memmem(start, (size_t)(end - start), needle, strlen(needle));
+}
+
+/**
+ * @brief Parse a non-negative integer XML attribute (e.g. `defaultArrayLength`)
+ *        from within an element's opening tag.
+ * @param tag_start Pointer to the '<' of the opening tag.
+ * @param tag_end Pointer to the closing '>' of the opening tag.
+ * @param attr Attribute name followed by `="`, e.g. `"defaultArrayLength=\""`.
+ * @return The parsed value, or -1 if the attribute is absent.
+ */
+static long parse_tag_attr_long(char* tag_start, char* tag_end, const char* attr) {
+   char* a = find_in_range(tag_start, tag_end, attr);
+   if (a == NULL)
+      return -1;
+   /* Require whitespace before the attribute name so e.g. "arrayLength" does
+      not match inside "defaultArrayLength". */
+   if (a == tag_start || !isspace((unsigned char)a[-1]))
+      return -1;
+   return strtol(a + strlen(attr), NULL, 10);
+}
+
+/**
+ * @brief Element size in bytes of a binary array, determined from the data type
+ *        accession inside a <binaryDataArray> before its <binary> element.
+ * @return 2, 4 or 8 on success; 0 if no known data type accession is present.
+ */
+static size_t bda_element_size(char* bda_start, char* binary_start) {
+   if (find_in_range(bda_start, binary_start, "MS:1000523") ||
+       find_in_range(bda_start, binary_start, "MS:1000522"))
+      return 8;
+   if (find_in_range(bda_start, binary_start, "MS:1000521") ||
+       find_in_range(bda_start, binary_start, "MS:1000519"))
+      return 4;
+   if (find_in_range(bda_start, binary_start, "MS:1000520"))
+      return 2;
+   return 0;
+}
+
+/**
+ * @brief Classify a single base64 binary array as zlib-compressed or
+ *        uncompressed by comparing decoded sizes to the expected array size.
+ * @param b64 Pointer to the base64 text.
+ * @param b64_len Length of the base64 text.
+ * @param expected Expected raw (uncompressed) size in bytes.
+ * @return One of INFER_ZLIB, INFER_NO_COMP, INFER_AMBIGUOUS, INFER_UNKNOWN.
+ */
+static int classify_binary_array(char* b64, size_t b64_len, size_t expected) {
+   unsigned char* decoded = malloc(b64_len + 4);
+   unsigned char* inflated = NULL;
+   size_t n = 0;
+   int zlib_ok = 0, raw_ok = 0;
+
+   if (decoded == NULL)
+      return INFER_UNKNOWN;
+
+   if (base64_decode(b64, b64_len, (char*)decoded, &n, 0) != 1) {
+      free(decoded);
+      return INFER_UNKNOWN;
+   }
+
+   raw_ok = (n == expected);
+
+   /* RFC 1950 header: CM == 8 (deflate) and (CMF*256 + FLG) % 31 == 0. */
+   if (n >= 2 && (decoded[0] & 0x0F) == 8 &&
+       ((decoded[0] << 8) | decoded[1]) % 31 == 0) {
+      /* One spare byte so trailing data beyond `expected` is detected. */
+      inflated = malloc(expected + 1);
+      if (inflated != NULL) {
+         uLongf dest_len = (uLongf)(expected + 1);
+         if (uncompress(inflated, &dest_len, decoded, (uLong)n) == Z_OK &&
+             dest_len == expected)
+            zlib_ok = 1;
+         free(inflated);
+      }
+   }
+
+   free(decoded);
+
+   if (zlib_ok && raw_ok)
+      return INFER_AMBIGUOUS;
+   if (zlib_ok)
+      return INFER_ZLIB;
+   if (raw_ok)
+      return INFER_NO_COMP;
+   return INFER_UNKNOWN;
+}
+
+/**
+ * @brief Infer the source compression (zlib vs. none) of an mzML file whose
+ *        binaryDataArrays lack a compression accession (MS:1000574 /
+ *        MS:1000576).
+ *
+ * Inspects the binary arrays of the first spectrum that has non-empty arrays
+ * (up to INFER_MAX_SPECTRA spectra). Each array is base64-decoded and
+ * compared against `arrayLength × element size`: an exact match means no
+ * compression, and a valid zlib stream that inflates to exactly that size
+ * means zlib. All inspected arrays must agree.
+ *
+ * @param input_map Pointer to the start of the (null-terminated) mzML contents.
+ * @return `_zlib_` or `_no_comp_` on success, 0 if the compression could not
+ *         be determined with certainty.
+ */
+int infer_source_compression(char* input_map) {
+   char* spec = input_map;
+   int checked_spectra = 0;
+
+   while (checked_spectra < INFER_MAX_SPECTRA &&
+          (spec = strstr(spec, "<spectrum ")) != NULL) {
+      char* spec_tag_end = strchr(spec, '>');
+      char* spec_end = strstr(spec, "</spectrum>");
+      if (spec_tag_end == NULL || spec_end == NULL)
+         break;
+
+      long default_len =
+          parse_tag_attr_long(spec, spec_tag_end, "defaultArrayLength=\"");
+      checked_spectra++;
+
+      int verdict = INFER_UNKNOWN, n_arrays = 0;
+      char* bda = spec_tag_end;
+
+      while ((bda = find_in_range(bda, spec_end, "<binaryDataArray")) != NULL) {
+         char* bda_tag_end = find_in_range(bda, spec_end, ">");
+         char* bin = find_in_range(bda, spec_end, "<binary>");
+         char* bin_end = find_in_range(bda, spec_end, "</binary>");
+         if (bda_tag_end == NULL || bin == NULL || bin_end == NULL ||
+             bin_end < bin)
+            break;
+         bin += strlen("<binary>");
+
+         /* A per-array arrayLength overrides the spectrum's defaultArrayLength. */
+         long len = parse_tag_attr_long(bda, bda_tag_end, "arrayLength=\"");
+         if (len < 0)
+            len = default_len;
+         size_t elem = bda_element_size(bda, bin);
+
+         bda = bin_end;
+
+         if (len <= 0 || elem == 0 || bin_end == bin)
+            continue; /* Nothing to learn from this array. */
+
+         int v = classify_binary_array(bin, (size_t)(bin_end - bin),
+                                       (size_t)len * elem);
+         n_arrays++;
+
+         if (v == INFER_UNKNOWN || v == INFER_AMBIGUOUS)
+            return 0;
+         if (verdict != INFER_UNKNOWN && verdict != v)
+            return 0; /* Arrays disagree (mixed compression unsupported). */
+         verdict = v;
+      }
+
+      if (n_arrays > 0)
+         return verdict == INFER_ZLIB ? _zlib_ : _no_comp_;
+
+      spec = spec_end;
+   }
+
+   return 0;
+}
+
 /**
  * @brief Detect the data type and encoding within a .mzML file.
  *
@@ -413,6 +595,7 @@ int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
  */
 data_format_t* pattern_detect(char* input_map)
 {
+   char* map_start = input_map;
    data_format_t* df = alloc_df();
 
    yxml_t* xml = alloc_yxml();
@@ -477,6 +660,25 @@ data_format_t* pattern_detect(char* input_map)
             } else if (in_cvParam && attrcur) {
                if (map_to_df(parse_acc_to_int(attrbuf), &current_type, &pending_fmt, df)) {
                   free(xml);
+                  if (df->source_compression == 0) {
+                     /* No MS:1000574 / MS:1000576 seen; infer it from the
+                        binary data of the first non-empty spectrum. */
+                     df->source_compression =
+                         infer_source_compression(map_start);
+                     if (df->source_compression == 0) {
+                        MSZ_ERROR("pattern_detect: binary data arrays have no "
+                              "compression accession (MS:1000574 or "
+                              "MS:1000576) and the compression could not be "
+                              "inferred from the data.\n");
+                        free(df);
+                        return NULL;
+                     }
+                     MSZ_WARN("pattern_detect: no compression accession "
+                             "found; inferred %s from spectrum data.\n",
+                             df->source_compression == _zlib_
+                                 ? "zlib compression (MS:1000574)"
+                                 : "no compression (MS:1000576)");
+                  }
                   return df;
                }
                attrcur = NULL;

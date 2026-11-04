@@ -667,6 +667,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
                                            divisions_t* divisions,
                                            long* indicies_length);
 data_format_t* pattern_detect(char* input_map);
+int infer_source_compression(char* input_map);
 void get_encoded_lengths(char* input_map, data_positions_t* dp);
 long encodedLength_sum(data_positions_t* dp);
 data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize,
