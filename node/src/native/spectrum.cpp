@@ -34,6 +34,11 @@ Napi::Value GetMzBinaryMzml(const Napi::CallbackInfo& info) {
     char* mapping_ptr = static_cast<char*>(handle->GetMapping()) + start;
     size_t src_len = end - start;
 
+    if (df->decode_source_compression_mz_fun == nullptr) {
+        Napi::Error::New(env, "getMzBinaryMzml: no decode function set for this file's source compression").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
     char* dest = nullptr;
     size_t out_len = 0;
     data_block_t* tmp = alloc_data_block(static_cast<size_t>(blocksize));
@@ -100,6 +105,11 @@ Napi::Value GetIntenBinaryMzml(const Napi::CallbackInfo& info) {
 
     char* mapping_ptr = static_cast<char*>(handle->GetMapping()) + start;
     size_t src_len = end - start;
+
+    if (df->decode_source_compression_inten_fun == nullptr) {
+        Napi::Error::New(env, "getIntenBinaryMzml: no decode function set for this file's source compression").ThrowAsJavaScriptException();
+        return env.Null();
+    }
 
     char* dest = nullptr;
     size_t out_len = 0;

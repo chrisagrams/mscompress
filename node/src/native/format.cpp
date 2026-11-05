@@ -1,3 +1,4 @@
+#include <string>
 #include "types.h"
 
 extern "C" {
@@ -63,9 +64,17 @@ Napi::Value SetCompressRuntimeVars(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
 
-    set_compress_runtime_variables(args, handle->GetDataFormat());
+    int rc = set_compress_runtime_variables(args, handle->GetDataFormat());
 
     delete args;
+
+    if (rc != 0) {
+        data_format_t* df = handle->GetDataFormat();
+        Napi::Error::New(env,
+            "setCompressRuntimeVars: failed to configure decoding for this mzML file (source compression " +
+            std::to_string(df->source_compression) + ", m/z format " + std::to_string(df->source_mz_fmt) +
+            ", intensity format " + std::to_string(df->source_inten_fmt) + ")").ThrowAsJavaScriptException();
+    }
     return env.Undefined();
 }
 

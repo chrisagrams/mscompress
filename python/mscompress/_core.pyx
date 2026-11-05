@@ -657,7 +657,12 @@ cdef class MZMLFile(BaseFile):
         self._positions = _scan_mzml(<char*> self._mapping, self._df, self.filesize, 7) # 7 = MSLEVEL|SCANNUM|RETTIME
         if self._positions is NULL:
              raise _c_error("Failed to scan mzML; the file might be empty or invalid")
-        _set_compress_runtime_variables(self._arguments.get_ptr(), self._df)
+        if _set_compress_runtime_variables(self._arguments.get_ptr(), self._df) != 0:
+             raise _c_error(
+                 "Failed to configure decoding for this mzML file "
+                 f"(source compression {self._df.source_compression}, "
+                 f"m/z format {self._df.source_mz_fmt}, "
+                 f"intensity format {self._df.source_inten_fmt})")
         _warn_c_errors()
 
     @staticmethod
@@ -925,13 +930,17 @@ cdef class MZMLFile(BaseFile):
         cdef char* dest = NULL
         cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
-        cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
+        cdef data_block_t* tmp = NULL
         cdef char* mapping_ptr
         cdef size_t start, end
         cdef np.ndarray[np.float64_t, ndim=1] mz_array_64
         cdef np.ndarray[np.float32_t, ndim=1] mz_array_32
         cdef double* double_ptr
         cdef float* float_ptr
+
+        if self._df.decode_source_compression_mz_fun == NULL:
+            raise RuntimeError("No decode function set for this file's source compression.")
+        tmp = _alloc_data_block(self._arguments.blocksize)
 
         start = self._positions.mz.start_positions[index]
         end = self._positions.mz.end_positions[index]
@@ -978,13 +987,17 @@ cdef class MZMLFile(BaseFile):
         cdef char* dest = NULL
         cdef char* decode_output = NULL  # Track decode function's allocation
         cdef size_t out_len = 0
-        cdef data_block_t* tmp = _alloc_data_block(self._arguments.blocksize)
+        cdef data_block_t* tmp = NULL
         cdef char* mapping_ptr
         cdef size_t start, end
         cdef np.ndarray[np.float64_t, ndim=1] inten_array_64
         cdef np.ndarray[np.float32_t, ndim=1] inten_array_32
         cdef double* double_ptr
         cdef float* float_ptr
+
+        if self._df.decode_source_compression_inten_fun == NULL:
+            raise RuntimeError("No decode function set for this file's source compression.")
+        tmp = _alloc_data_block(self._arguments.blocksize)
 
         start = self._positions.inten.start_positions[index]
         end = self._positions.inten.end_positions[index]
