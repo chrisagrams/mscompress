@@ -5,13 +5,13 @@
  * MS:1000576 (no compression), source_compression used to be left
  * uninitialized. The decode function pointers ended up NULL and reading a
  * spectrum segfaulted. The compression is now inferred from the first
- * non-empty spectrum, and an error is thrown when it cannot be determined.
+ * non-empty spectrum: zlib if its arrays are complete zlib streams, otherwise
+ * no compression.
  *
  * Fixtures in test/data/no_compression_term/ are derived from
  * nonindexed_test.mzML (1 spectrum, 1407 peaks, 64-bit m/z and intensity):
- *   - none.mzML:      uncompressed data, term removed
- *   - zlib.mzML:      zlib-compressed data, term removed
- *   - uncertain.mzML: defaultArrayLength does not match the data
+ *   - none.mzML: uncompressed data, term removed
+ *   - zlib.mzML: zlib-compressed data, term removed
  */
 
 import fs from "node:fs";
@@ -67,11 +67,5 @@ describe("mzML without a compression accession", () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
-  });
-
-  it("throws instead of crashing when compression cannot be inferred", () => {
-    expect(() => open(path.join(NO_COMPRESSION_TERM_DIR, "uncertain.mzML"))).toThrow(
-      /failed to detect data format/,
-    );
   });
 });

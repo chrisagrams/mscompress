@@ -5,16 +5,14 @@ When a binaryDataArray has neither MS:1000574 (zlib compression) nor
 MS:1000576 (no compression), source_compression used to be left
 uninitialized. The decode function pointers ended up NULL and reading a
 spectrum segfaulted. The compression is now inferred from the first
-non-empty spectrum, and an error is raised when it cannot be determined.
+non-empty spectrum: zlib if its arrays are complete zlib streams, otherwise
+no compression.
 
 Fixtures live in test/data/no_compression_term/ (a subdirectory so that
-directory-wide dataset tests don't pick up the deliberately unreadable one)
-and are derived from nonindexed_test.mzML (1 spectrum, 1407 peaks, 64-bit
-m/z and intensity):
-  - none.mzML:      uncompressed data, term removed
-  - zlib.mzML:      zlib-compressed data, term removed
-  - uncertain.mzML: defaultArrayLength does not match the data, so
-                    inference must fail
+directory-wide dataset tests don't pick them up) and are derived from
+nonindexed_test.mzML (1 spectrum, 1407 peaks, 64-bit m/z and intensity):
+  - none.mzML: uncompressed data, term removed
+  - zlib.mzML: zlib-compressed data, term removed
 """
 
 import numpy as np
@@ -60,8 +58,3 @@ def test_compress_inferred(fixture_dir, tmp_path, name):
     out = tmp_path / "out.msz"
     mzml.compress(str(out))
     assert out.stat().st_size > 0
-
-
-def test_uncertain_compression_raises(fixture_dir):
-    with pytest.raises(RuntimeError, match="pattern_detect"):
-        read(f"{fixture_dir}/uncertain.mzML")

@@ -215,17 +215,6 @@ add_test(NAME CompressInferZlib
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
-# Array length does not match the decoded data, so the compression cannot be
-# inferred: must fail with an error rather than crash.
-add_test(NAME CompressInferUncertainFails
-    COMMAND ${CMAKE_COMMAND}
-    -DEXECUTABLE=$<TARGET_FILE:mscompress>
-    -DINPUT_FILE=${TEST_DATA_DIR}/no_compression_term/uncertain.mzML
-    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_infer_uncertain
-    "-DEXPECTED_PATTERN=could not be inferred"
-    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_expect_fail.cmake
-)
-
 # --extract with --extract-scans / --extract-indices on mzML and msz input -
 # regression test for GitHub issue #195 (only the first ceil(N/2) scans were
 # extracted; extracting an mzML's final spectrum crashed).
