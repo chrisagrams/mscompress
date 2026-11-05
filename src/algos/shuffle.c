@@ -48,7 +48,7 @@ int shuffle_bytes(const void* src, void* dst, size_t len, int elem_size) {
    }
 
    if (len % (size_t)elem_size != 0) {
-      error("shuffle_bytes: length %zu is not a multiple of element size %d.\n",
+      MSZ_ERROR("shuffle_bytes: length %zu is not a multiple of element size %d.\n",
             len, elem_size);
       return 1;
    }
@@ -91,7 +91,7 @@ int unshuffle_bytes(const void* src, void* dst, size_t len, int elem_size) {
    }
 
    if (len % (size_t)elem_size != 0) {
-      error("unshuffle_bytes: length %zu is not a multiple of element size %d.\n",
+      MSZ_ERROR("unshuffle_bytes: length %zu is not a multiple of element size %d.\n",
             len, elem_size);
       return 1;
    }
@@ -148,7 +148,7 @@ static int block_payload_total(const void* block, size_t block_len,
       size_t plen = (size_t)payload_len;
 
       if (off + ZLIB_SIZE_OFFSET + plen > block_len) {
-         error(
+         MSZ_ERROR(
              "block_payload_total: record at offset %zu claims %zu payload "
              "bytes, past the end of a %zu byte block.\n",
              off, plen, block_len);
@@ -210,7 +210,7 @@ static int block_transform(void* block, size_t block_len, int elem_size,
    uint8_t* packed = (uint8_t*)malloc(total * 2);
 
    if (packed == NULL) {
-      error("block_transform: malloc error.\n");
+      MSZ_ERROR("block_transform: malloc error.\n");
       return 1;
    }
 

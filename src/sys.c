@@ -21,8 +21,6 @@
 
 #include "mscompress.h"
 
-int verbose = 0;
-
 /**
  * @brief Returns the number of available CPU threads on the current system.
  * @return The number of available processors/threads.
@@ -63,14 +61,14 @@ int get_num_threads() {
 
 //     np = get_num_threads();
 
-//     print("\t%d usable processors detected.\n", np);
+//     MSZ_INFO("\t%d usable processors detected.\n", np);
 
 //     if(args_threads == 0)
 //       *n_threads = np;
 //     else
 //       *n_threads = args_threads;
 
-//     print("\tUsing %d threads.\n", *n_threads);
+//     MSZ_INFO("\tUsing %d threads.\n", *n_threads);
 // }
 
 /**
@@ -83,12 +81,12 @@ void prepare_threads(Arguments* args) {
 
    np = get_num_threads();
 
-   print("\t%d usable processors detected.\n", np);
+   MSZ_INFO("\t%d usable processors detected.\n", np);
 
    if (args->threads == 0)
       args->threads = np;
 
-   print("\tUsing %d threads.\n", args->threads);
+   MSZ_INFO("\tUsing %d threads.\n", args->threads);
 }
 
 /**
@@ -132,100 +130,74 @@ double get_time() {
 #endif
 }
 
-/* Global callback pointers for custom error/warning handling */
-static error_callback_t custom_error_callback = NULL;
-static warning_callback_t custom_warning_callback = NULL;
+/* Logging state. Set once at startup (CLI) or module import (bindings) and
+   only read afterwards, so worker threads log without locking. */
+static msz_log_handler_t log_handler = msz_default_log_handler;
+static void* log_handler_user = NULL;
+static volatile int log_level = MSZ_LOG_WARN;
 
 /**
- * @brief Verbose-mode printf wrapper. Only prints when the global verbose flag is set.
- * @param format The printf-style format string.
- * @param ... Variable arguments matching the format string.
- * @return The number of characters printed, or -1 if not in verbose mode.
+ * @brief Default log handler. INFO/DEBUG go to stdout, WARN/ERROR to stderr,
+ *        written verbatim (messages carry their own newlines).
+ * @param rec The log record to write.
+ * @param user Unused.
  */
-int print(const char* format, ...)
+void msz_default_log_handler(const msz_log_record_t* rec, void* user)
 {
-   int ret = -1;
-   if (verbose) {
-      va_list args;
-      va_start(args, format);
-      ret = vprintf(format, args);
-      va_end(args);
-   }
-   return ret;
+   (void)user;
+   fputs(rec->message, rec->level >= MSZ_LOG_WARN ? stderr : stdout);
 }
 
 /**
- * @brief Prints an error message to stderr or invokes a custom error callback.
+ * @brief Registers the handler that receives every log record at or above the
+ *        current log level.
+ * @param handler The handler to invoke, or `NULL` to restore the default.
+ * @param user Opaque pointer passed back to the handler on every call.
+ */
+void msz_set_log_handler(msz_log_handler_t handler, void* user)
+{
+   log_handler = handler != NULL ? handler : msz_default_log_handler;
+   log_handler_user = handler != NULL ? user : NULL;
+}
+
+/**
+ * @brief Sets the minimum level that reaches the log handler. Defaults to
+ *        `MSZ_LOG_WARN`; the CLI's `-v` lowers it to `MSZ_LOG_INFO`.
+ * @param level The minimum level to emit.
+ */
+void msz_set_log_level(msz_log_level_t level) { log_level = level; }
+
+/**
+ * @brief Returns the current minimum log level.
+ * @return The minimum level that reaches the log handler.
+ */
+msz_log_level_t msz_get_log_level(void) { return (msz_log_level_t)log_level; }
+
+/**
+ * @brief Formats a message and passes it to the log handler. Use through the
+ *        `MSZ_ERROR`/`MSZ_WARN`/`MSZ_INFO`/`MSZ_DEBUG` macros, which fill in
+ *        the call site.
+ * @param level Severity of the record.
+ * @param file Source file of the call site.
+ * @param line Source line of the call site.
+ * @param func Function name of the call site.
  * @param format The printf-style format string.
  * @param ... Variable arguments matching the format string.
- * @return Always returns 0.
  */
-int error(const char* format, ...) {
+void msz_log(msz_log_level_t level, const char* file, int line,
+             const char* func, const char* format, ...)
+{
+   if ((int)level < log_level)
+      return;
+
+   char buffer[4096];
    va_list args;
    va_start(args, format);
-   
-   if (custom_error_callback != NULL) {
-      char buffer[4096];
-      vsnprintf(buffer, sizeof(buffer), format, args);
-      custom_error_callback(buffer);
-   } else {
-      vfprintf(stderr, format, args);
-   }
-   
+   vsnprintf(buffer, sizeof(buffer), format, args);
    va_end(args);
-   return 0;
-}
 
-/**
- * @brief Prints a warning message to stderr or invokes a custom warning callback.
- * @param format The printf-style format string.
- * @param ... Variable arguments matching the format string.
- * @return Always returns 0.
- */
-int warning(const char* format, ...) {
-   va_list args;
-   va_start(args, format);
-   
-   if (custom_warning_callback != NULL) {
-      char buffer[4096];
-      vsnprintf(buffer, sizeof(buffer), format, args);
-      custom_warning_callback(buffer);
-   } else {
-      vfprintf(stderr, format, args);
-   }
-   
-   va_end(args);
-   return 0;
-}
-
-/**
- * @brief Registers a custom error callback to replace stderr output.
- * @param callback The callback function to invoke on error, or `NULL` to disable.
- */
-void set_error_callback(error_callback_t callback) {
-   custom_error_callback = callback;
-}
-
-/**
- * @brief Registers a custom warning callback to replace stderr output.
- * @param callback The callback function to invoke on warning, or `NULL` to disable.
- */
-void set_warning_callback(warning_callback_t callback) {
-   custom_warning_callback = callback;
-}
-
-/**
- * @brief Resets the error callback to the default (stderr output).
- */
-void reset_error_callback(void) {
-   custom_error_callback = NULL;
-}
-
-/**
- * @brief Resets the warning callback to the default (stderr output).
- */
-void reset_warning_callback(void) {
-   custom_warning_callback = NULL;
+   msz_log_record_t rec = {level, file, line, func, buffer};
+   log_handler(&rec, log_handler_user);
 }
 
 /**

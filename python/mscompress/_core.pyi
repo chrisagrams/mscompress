@@ -9,6 +9,11 @@ import numpy.typing as npt
 from .annotations import PSMTable
 from .types import AlgorithmInfo, SpectrumTransform
 
+class MSCompressError(RuntimeError):
+    """An operation failed and the mscompress C core reported why."""
+    messages: list[str]
+    def __init__(self, message: str, messages: Any = ()) -> None: ...
+
 class RuntimeArguments:
     """Runtime configuration arguments for compression/decompression operations."""
 

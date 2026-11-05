@@ -33,13 +33,13 @@ void algo_decode_vdelta16_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_vdelta16_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_vdelta16_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -65,7 +65,7 @@ void algo_decode_vdelta16_transform_32f(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_vdelta16_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_vdelta16_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -142,13 +142,13 @@ void algo_decode_vdelta16_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_vdelta16_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_vdelta16_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -174,7 +174,7 @@ void algo_decode_vdelta16_transform_64d(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_vdelta16_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_vdelta16_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -251,13 +251,13 @@ void algo_decode_vdelta24_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_vdelta24_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_vdelta24_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -283,7 +283,7 @@ void algo_decode_vdelta24_transform_32f(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_vdelta24_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_vdelta24_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -369,13 +369,13 @@ void algo_decode_vdelta24_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_vdelta24_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_vdelta24_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -401,7 +401,7 @@ void algo_decode_vdelta24_transform_64d(void* args) {
                               // header and first value
 
    if (res == NULL) {
-      error("algo_decode_vdelta24_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_vdelta24_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -488,13 +488,13 @@ void algo_encode_vdelta16_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vdelta16_transform_32f: args is NULL");
+      MSZ_ERROR("algo_encode_vdelta16_transform_32f: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vdelta16_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -503,7 +503,7 @@ void algo_encode_vdelta16_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vdelta16_transform_32f: len is <= 0");
+      MSZ_ERROR("algo_encode_vdelta16_transform_32f: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -525,7 +525,7 @@ void algo_encode_vdelta16_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_vdelta16_transform_32f: malloc failed");
+      MSZ_ERROR("algo_encode_vdelta16_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -565,13 +565,13 @@ void algo_encode_vdelta16_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vdelta16_transform_64d: args is NULL");
+      MSZ_ERROR("algo_encode_vdelta16_transform_64d: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vdelta16_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -581,7 +581,7 @@ void algo_encode_vdelta16_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vdelta16_transform_64d: len is <= 0");
+      MSZ_ERROR("algo_encode_vdelta16_transform_64d: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -603,7 +603,7 @@ void algo_encode_vdelta16_transform_64d(void* args) {
    double* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_vdelta16_transform_64d: malloc failed");
+      MSZ_ERROR("algo_encode_vdelta16_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -644,13 +644,13 @@ void algo_encode_vdelta24_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vdelta24_transform_32f: args is NULL");
+      MSZ_ERROR("algo_encode_vdelta24_transform_32f: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vdelta24_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -659,7 +659,7 @@ void algo_encode_vdelta24_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vdelta24_transform_32f: len is <= 0");
+      MSZ_ERROR("algo_encode_vdelta24_transform_32f: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -681,7 +681,7 @@ void algo_encode_vdelta24_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_vdelta24_transform_32f: malloc failed");
+      MSZ_ERROR("algo_encode_vdelta24_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -732,13 +732,13 @@ void algo_encode_vdelta24_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vdelta24_transform_64d: args is NULL");
+      MSZ_ERROR("algo_encode_vdelta24_transform_64d: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vdelta24_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -747,7 +747,7 @@ void algo_encode_vdelta24_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vdelta24_transform_64d: len is <= 0");
+      MSZ_ERROR("algo_encode_vdelta24_transform_64d: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -769,7 +769,7 @@ void algo_encode_vdelta24_transform_64d(void* args) {
    double* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_vdelta24_transform_64d: malloc failed");
+      MSZ_ERROR("algo_encode_vdelta24_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }

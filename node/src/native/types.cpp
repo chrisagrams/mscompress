@@ -294,7 +294,7 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
         filetype_ = determine_filetype(mapping_, filesize_);
         if (filetype_ == DECOMPRESS && !CheckMszVersion(env, mapping_, filesize_))
             return;
-        z_ = alloc_z_stream();
+        z_inflate_ = alloc_z_stream_inflate();
         return;
     }
 
@@ -333,7 +333,7 @@ FileHandle::FileHandle(const Napi::CallbackInfo& info)
     filetype_ = determine_filetype(mapping_, filesize_);
     if (filetype_ == DECOMPRESS && !CheckMszVersion(env, mapping_, filesize_))
         return;
-    z_ = alloc_z_stream();
+    z_inflate_ = alloc_z_stream_inflate();
 }
 
 FileHandle::~FileHandle() {
@@ -383,10 +383,10 @@ void FileHandle::Cleanup() {
         df_ = nullptr;
     }
 
-    // Free z_stream
-    if (z_) {
-        dealloc_z_stream(z_);
-        z_ = nullptr;
+    // Free inflate z_stream
+    if (z_inflate_) {
+        dealloc_z_stream_inflate(z_inflate_);
+        z_inflate_ = nullptr;
     }
 
     // footer_ points to mmap memory in MSZ path, don't free

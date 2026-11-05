@@ -31,13 +31,13 @@ void algo_decode_log_2_transform_32f(void* args)
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_log_2_transform_32f: src is NULL");
+      MSZ_ERROR("algo_decode_log_2_transform_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_log_2_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_log_2_transform_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -61,7 +61,7 @@ void algo_decode_log_2_transform_32f(void* args)
    res = calloc(1, res_len);  // Allocate space for result and leave room for header
 
    if (res == NULL) {
-      error("algo_decode_log_2_transform_32f: malloc failed");
+      MSZ_ERROR("algo_decode_log_2_transform_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -109,13 +109,13 @@ void algo_decode_log_2_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_log_2_transform_64d: src is NULL");
+      MSZ_ERROR("algo_decode_log_2_transform_64d: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_log_2_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_log_2_transform_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -140,7 +140,7 @@ void algo_decode_log_2_transform_64d(void* args) {
            uint16_t));  // Allocate space for result and leave room for header
 
    if (res == NULL) {
-      error("algo_decode_log_2_transform_64d: malloc failed");
+      MSZ_ERROR("algo_decode_log_2_transform_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -189,13 +189,13 @@ void algo_encode_log_2_transform_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_log_2_transform: args is NULL");
+      MSZ_ERROR("algo_encode_log_2_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_log_2_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_log_2_transform: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -204,7 +204,7 @@ void algo_encode_log_2_transform_32f(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_log_2_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_log_2_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -217,7 +217,7 @@ void algo_encode_log_2_transform_32f(void* args) {
    float* res = malloc(res_len);
 
    if (res == NULL) {
-      error("algo_encode_log_2_transform: malloc failed");
+      MSZ_ERROR("algo_encode_log_2_transform: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -255,13 +255,13 @@ void algo_encode_log_2_transform_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_log_2_transform: args is NULL");
+      MSZ_ERROR("algo_encode_log_2_transform: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_log_2_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_log_2_transform: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -270,7 +270,7 @@ void algo_encode_log_2_transform_64d(void* args) {
    uint16_t len = *(uint16_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_log_2_transform: len is <= 0");
+      MSZ_ERROR("algo_encode_log_2_transform: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -282,7 +282,7 @@ void algo_encode_log_2_transform_64d(void* args) {
    size_t res_len = len * sizeof(double);
    double* res = malloc(res_len);
    if (res == NULL)
-      error("algo_encode_log_2_transform: malloc failed");
+      MSZ_ERROR("algo_encode_log_2_transform: malloc failed");
    // Perform log2 transform
    for (size_t i = 0; i < len; i++)
       res[i] = (double)exp2((double)arr[i] / a_args->scale_factor) - 1;
