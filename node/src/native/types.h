@@ -71,7 +71,10 @@ public:
     ZSTD_DCtx* GetDctx() const { return dctx_; }
     void SetDctx(ZSTD_DCtx* d) { dctx_ = d; }
 
-    z_stream* GetZStream() const { return z_; }
+    // Inflate-initialized stream for decoding mzML zlib arrays.
+    // zlib_decompress() inflateReset()s it per block, so it must never be a
+    // deflate stream (from alloc_z_stream()).
+    z_stream* GetInflateStream() const { return z_inflate_; }
 
     // Is file still open?
     bool IsOpen() const { return fd_ >= 0 && mapping_ != nullptr; }
@@ -102,7 +105,7 @@ private:
     block_len_queue_t* mz_block_lens_ = nullptr;
     block_len_queue_t* inten_block_lens_ = nullptr;
     ZSTD_DCtx* dctx_ = nullptr;
-    z_stream* z_ = nullptr;
+    z_stream* z_inflate_ = nullptr;
     bool mmap_backed_divisions_ = false;
 };
 
