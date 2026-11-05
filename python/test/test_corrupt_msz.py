@@ -21,8 +21,10 @@ def truncated_msz_path(msz_file_path, tmp_path):
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_read_truncated_msz_raises(truncated_msz_path):
-    with pytest.raises(ValueError, match="footer is missing or corrupt"):
+    with pytest.raises(ValueError, match="footer is missing or corrupt") as exc_info:
         read(truncated_msz_path)
+    # The C-side reason is chained as the cause rather than left queued.
+    assert "invalid magic tag" in str(exc_info.value.__cause__)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")

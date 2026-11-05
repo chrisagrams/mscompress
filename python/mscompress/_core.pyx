@@ -1082,11 +1082,11 @@ cdef class MSZFile(BaseFile):
             raise ValueError(
                 "Invalid .msz file: footer is missing or corrupt "
                 "(the file may be truncated)."
-            )
+            ) from _c_error_cause()
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
         if self._divisions == NULL:
             self._cleanup()
-            raise MemoryError("Failed to allocate .msz divisions.")
+            raise MemoryError("Failed to allocate .msz divisions.") from _c_error_cause()
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
@@ -1246,11 +1246,11 @@ cdef class MSZFile(BaseFile):
             raise ValueError(
                 "Invalid .msz file: footer is missing or corrupt "
                 "(the file may be truncated)."
-            )
+            ) from _c_error_cause()
         self._divisions = _read_divisions(self._mapping, self._footer.divisions_t_pos, self._footer.n_divisions)
         if self._divisions == NULL:
             self._cleanup()
-            raise MemoryError("Failed to allocate .msz divisions.")
+            raise MemoryError("Failed to allocate .msz divisions.") from _c_error_cause()
         self._positions = NULL  # built lazily via _ensure_positions()
         self._build_offsets()
         self._dctx = _alloc_dctx()
