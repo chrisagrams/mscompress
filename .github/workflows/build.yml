@@ -210,13 +210,8 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:symbolize=1
         run: ctest --output-on-failure
 
-  # Data-race gate: builds the CLI with ThreadSanitizer and runs the full ctest
-  # suite under it. The compress/decompress pipelines are multi-threaded, and TSan
-  # reports races deterministically from the memory-access pattern, so it catches
-  # them independently of the runner's CPU architecture (e.g. races that only
-  # surface as rare crashes on weakly-ordered arm64). TSan cannot be combined with
-  # ASan in one binary, hence a separate job rather than extra flags on
-  # asan-leak-cli. Built with clang for its newer TSan runtime.
+  # ThreadSanitizer build of the CLI; fails on any data race. Separate from
+  # asan-leak-cli because TSan and ASan can't share a binary.
   tsan-cli:
     name: TSan CLI (linux x86_64)
     if: *not-docs-pr
