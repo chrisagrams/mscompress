@@ -242,9 +242,7 @@ jobs:
         working-directory: ./cli
         run: nm build-tsan/mscompress | grep -q __tsan
 
-      # Ubuntu 24.04 runners default to high ASLR entropy (vm.mmap_rnd_bits=32),
-      # which places mappings where older TSan runtimes don't expect them and
-      # aborts with "FATAL: ThreadSanitizer: unexpected memory mapping".
+      # TSan doesn't support the runner's default ASLR entropy.
       - name: Lower ASLR entropy for TSan
         run: sudo sysctl vm.mmap_rnd_bits=28
 
