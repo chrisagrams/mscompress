@@ -210,6 +210,55 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:symbolize=1
         run: ctest --output-on-failure
 
+  # Data-race gate: builds the CLI with ThreadSanitizer and runs the full ctest
+  # suite under it. The compress/decompress pipelines are multi-threaded, and TSan
+  # reports races deterministically from the memory-access pattern, so it catches
+  # them independently of the runner's CPU architecture (e.g. races that only
+  # surface as rare crashes on weakly-ordered arm64). TSan cannot be combined with
+  # ASan in one binary, hence a separate job rather than extra flags on
+  # asan-leak-cli. Built with clang for its newer TSan runtime.
+  tsan-cli:
+    name: TSan CLI (linux x86_64)
+    if: *not-docs-pr
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+          submodules: recursive
+
+      - name: Configure CMake (TSan)
+        working-directory: ./cli
+        run: >
+          cmake -S . -B build-tsan
+          -DCMAKE_C_COMPILER=clang
+          -DENABLE_DEBUG_SYMBOLS=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g -O1"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Build CLI (TSan)
+        working-directory: ./cli
+        run: cmake --build build-tsan -j
+
+      - name: Verify sanitizer instrumentation
+        working-directory: ./cli
+        run: nm build-tsan/mscompress | grep -q __tsan
+
+      # Ubuntu 24.04 runners default to high ASLR entropy (vm.mmap_rnd_bits=32),
+      # which places mappings where older TSan runtimes don't expect them and
+      # aborts with "FATAL: ThreadSanitizer: unexpected memory mapping".
+      - name: Lower ASLR entropy for TSan
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Run CTest under ThreadSanitizer
+        working-directory: ./cli/build-tsan
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:symbolize=1
+        run: ctest --output-on-failure
+
   check-uv-lock:
     name: Check uv.lock is up to date
     if: *not-docs-pr
