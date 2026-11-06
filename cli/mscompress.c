@@ -609,7 +609,7 @@ int main(int argc, char* argv[]) {
                              &(arguments.blocksize), &arguments, &df,
                              &divisions);
 
-         extract_mzml(input_map, divisions, local_fds[1]);
+         extract_mzml(input_map, divisions, df, local_fds[1]);
          break;
       };
       case EXTRACT_MSZ: {

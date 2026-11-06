@@ -17,6 +17,17 @@ import mscompress
 from mscompress.mszx.batch import MSZXBatchFile
 from mscompress.mszx.metadata import MSZXBatchManifest
 
+
+def mzml_body(data: bytes) -> bytes:
+    """Content up to and including </mzML>.
+
+    Decompression rebuilds the indexedmzML index that follows it, so a round
+    trip matches the source byte-for-byte only up to there unless the source's
+    own index was correct (test.mzML's is not: it was cut from a larger file).
+    """
+    end = data.rfind(b"</mzML>")
+    return data if end == -1 else data[: end + len(b"</mzML>")]
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLI = REPO_ROOT / "cli" / "mscompress"
 TEST_MZML = REPO_ROOT / "test" / "data" / "test.mzML"
@@ -110,13 +121,13 @@ def test_missing_entry_raises(batch_archive):
 
 @requires_cli
 def test_decompress_round_trips_every_member(batch_archive, tmp_path):
-    original = TEST_MZML.read_bytes()
+    original = mzml_body(TEST_MZML.read_bytes())
     with MSZXBatchFile.open(batch_archive) as archive:
         written = archive.decompress(tmp_path / "out")
 
     assert [p.name for p in written] == ["a.mzML", "b.mzML"]
     for path in written:
-        assert path.read_bytes() == original
+        assert mzml_body(path.read_bytes()) == original
 
 
 @requires_cli
@@ -200,8 +211,8 @@ def test_round_trip_matches_the_original_mzml(two_mzml, tmp_path):
     out = mscompress.compress_batch(two_mzml, tmp_path / "rt.mszx")
     with MSZXBatchFile.open(out) as archive:
         written = archive.decompress(tmp_path / "out")
-    original = TEST_MZML.read_bytes()
-    assert all(p.read_bytes() == original for p in written)
+    original = mzml_body(TEST_MZML.read_bytes())
+    assert all(mzml_body(p.read_bytes()) == original for p in written)
 
 
 def test_writer_records_description_and_extra(two_mzml, tmp_path):

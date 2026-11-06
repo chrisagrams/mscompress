@@ -10,6 +10,8 @@
 #
 # Expected variables: EXECUTABLE, TEST_MZML, TEMP_DIR
 
+include("${CMAKE_CURRENT_LIST_DIR}/mzml_body.cmake")
+
 if(NOT EXISTS "${EXECUTABLE}")
     message(FATAL_ERROR "Executable not found: ${EXECUTABLE}")
 endif()
@@ -92,12 +94,12 @@ if(NOT R EQUAL 0)
     message(FATAL_ERROR "batch decompress failed (${R})")
 endif()
 
-file(MD5 "${TEST_MZML}" ORIG_MD5)
+mzml_body_md5("${TEST_MZML}" ORIG_MD5)
 foreach(NAME "a.mzML" "b.mzML")
     if(NOT EXISTS "${OUT_DIR}/${NAME}")
         message(FATAL_ERROR "recovered file missing: ${NAME}")
     endif()
-    file(MD5 "${OUT_DIR}/${NAME}" GOT_MD5)
+    mzml_body_md5("${OUT_DIR}/${NAME}" GOT_MD5)
     message(STATUS "${NAME}: original=${ORIG_MD5} recovered=${GOT_MD5}")
     if(NOT "${GOT_MD5}" STREQUAL "${ORIG_MD5}")
         message(FATAL_ERROR "round-trip mismatch for ${NAME}")

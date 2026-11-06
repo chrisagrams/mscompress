@@ -51,6 +51,10 @@
 #define BLOCKSIZE_OFFSET 176
 #define MD5_OFFSET 184
 #define MD5_SIZE 32
+/* uint32 in the header's reserved (zeroed) bytes: MSZ_INDEX_REBUILD when an
+ * mzML index section sits just before the footer (see mzml_index.c). Older
+ * readers ignore it and write the stored indexedmzML tail as before. */
+#define MZML_INDEX_FLAG_OFFSET 216
 #define HEADER_SIZE 512
 
 #define DEBUG 0
@@ -407,6 +411,12 @@ typedef struct {
     * shuffle flag plus the source data type on decompress. */
    int mz_shuffle_elem;
    int inten_shuffle_elem;
+
+   /* indexedmzML tail information (runtime only, not part of the serialized
+    * header). Set by scan_mzml() on compress and by mzml_index_read_section()
+    * on decompress; NULL when the file has no index to rebuild. Freed by
+    * dealloc_df(). */
+   struct mzml_index_info_t* index_info;
 
 } data_format_t;
 
@@ -788,8 +798,63 @@ void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
 
 // char* encode_binary(char** src, int compression_method, size_t* out_len);
 
+/* mzml_index.c */
+
+#define MSZ_INDEX_REBUILD 0x1 /* wrapper tail dropped; rebuild on decompress */
+
+typedef struct mzml_index_info_t {
+   uint32_t flags;          /* MSZ_INDEX_REBUILD */
+   uint64_t tail_len;       /* stored bytes after </mzML> (the source tail) */
+   uint64_t n_chrom;        /* number of <chromatogram> elements */
+   uint64_t* chrom_offsets; /* source offset of each "<chromatogram", ascending */
+   char* checksum;          /* source <fileChecksum> value, or NULL */
+   size_t checksum_len;
+} mzml_index_info_t;
+
+/* Collects <offset> entries for a regenerated <indexList>. */
+typedef struct {
+   char* spec;
+   size_t spec_len, spec_cap;
+   uint64_t n_spec;
+   char* chrom;
+   size_t chrom_len, chrom_cap;
+   uint64_t n_chrom;
+   size_t next_chrom; /* next entry of mzml_index_info_t.chrom_offsets to place */
+} mzml_index_builder_t;
+
+#define MZML_INDEX_SPECTRUM 0
+#define MZML_INDEX_CHROMATOGRAM 1
+
+mzml_index_info_t* scan_mzml_tail(const char* input_map, uint64_t from,
+                                  uint64_t end, uint64_t* cut);
+void dealloc_mzml_index_info(mzml_index_info_t* info);
+size_t mzml_index_write_section(mzml_index_info_t* info, uint64_t section_pos,
+                                int fd);
+mzml_index_info_t* mzml_index_read_section(void* input_map, long filesize);
+int mzml_index_rebuild(data_format_t* df);
+int mzml_index_load(void* input_map, long filesize, data_format_t* df);
+int mzml_index_trim_tail(const mzml_index_info_t* info, const char* buff,
+                         size_t* len);
+mzml_index_builder_t* alloc_mzml_index_builder(void);
+void dealloc_mzml_index_builder(mzml_index_builder_t* b);
+int mzml_index_add(mzml_index_builder_t* b, int kind, const char* tag,
+                   size_t avail, uint64_t offset);
+int mzml_index_add_division(mzml_index_builder_t* b,
+                            const mzml_index_info_t* info,
+                            const division_t* div, const int64_t* xml_out,
+                            const char* buff, size_t buff_len, uint64_t base);
+int mzml_index_add_chromatograms(mzml_index_builder_t* b,
+                                 const mzml_index_info_t* info,
+                                 uint64_t src_start, uint64_t src_end,
+                                 const char* buff, size_t buff_len,
+                                 uint64_t base);
+size_t mzml_index_write_tail(mzml_index_builder_t* b,
+                             const mzml_index_info_t* info, uint64_t written,
+                             int fd);
+
 /* extract.c */
-void extract_mzml(char* input_map, divisions_t* divisions, int output_fd);
+void extract_mzml(char* input_map, divisions_t* divisions, data_format_t* df,
+                  int output_fd);
 void extract_msz(char* input_map, size_t input_filesize, long* indicies,
                  long indicies_length, uint32_t* scans, long scans_length,
                  uint16_t ms_level, int output_fd);
@@ -892,6 +957,10 @@ typedef struct {
 
    char* ret;
    size_t ret_len;
+
+   /* When rebuilding the mzML index: output offset (within `ret`) at which
+    * each of the division's XML segments was written. NULL otherwise. */
+   int64_t* xml_out;
 
 } decompress_args_t;
 

@@ -15,6 +15,17 @@ import pytest
 from mscompress import read
 
 
+def mzml_body(data: bytes) -> bytes:
+    """Content up to and including </mzML>.
+
+    Decompression rebuilds the indexedmzML index that follows it, so a round
+    trip matches the source byte-for-byte only up to there unless the source's
+    own index was correct (test.mzML's is not: it was cut from a larger file).
+    """
+    end = data.rfind(b"</mzML>")
+    return data if end == -1 else data[: end + len(b"</mzML>")]
+
+
 def _describe_difference(expected: bytes, actual: bytes) -> str:
     """First divergence plus surrounding context, as a pytest failure message."""
     if len(expected) != len(actual):
@@ -62,7 +73,8 @@ def test_roundtrip_decompresses_byte_identically(mzml_file_path, tmp_path):
 
     Paired with the test above: if the committed archive fails while this one
     passes, compression and decompression are consistent with each other but
-    disagree with the reference bytes.
+    disagree with the reference bytes. Compared up to </mzML>: an archive
+    written by this build rebuilds the index after it (see mzml_body).
     """
     msz_path = tmp_path / "roundtrip.msz"
     restored_path = tmp_path / "roundtrip.mzML"
@@ -73,7 +85,8 @@ def test_roundtrip_decompresses_byte_identically(mzml_file_path, tmp_path):
     with read(msz_path) as msz:
         msz.decompress(restored_path)
 
-    if not filecmp.cmp(mzml_file_path, restored_path, shallow=False):
-        with open(mzml_file_path, "rb") as f:
-            expected = f.read()
-        pytest.fail(_describe_difference(expected, restored_path.read_bytes()))
+    with open(mzml_file_path, "rb") as f:
+        expected = mzml_body(f.read())
+    actual = mzml_body(restored_path.read_bytes())
+    if expected != actual:
+        pytest.fail(_describe_difference(expected, actual))

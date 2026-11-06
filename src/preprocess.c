@@ -99,8 +99,10 @@ data_format_t* alloc_df() {
  * TODO: return value for error handling?
  */
 void dealloc_df(data_format_t* df) {
-   if (df)
+   if (df) {
+      dealloc_mzml_index_info(df->index_info);
       free(df);
+   }
    else
       MSZ_ERROR("dealloc_df: df is NULL.\n");
 }
@@ -1015,6 +1017,17 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
       df->source_total_spec =
           spec_curr;  // Reset source_total_spec to the value actually found.
    }
+   /* An indexedmzML wrapper tail is rebuilt on decompression (see
+    * mzml_index.c). It is still stored, so older readers keep working. */
+   {
+      uint64_t tail_from =
+          spec_curr > 0 ? spectra_dp->end_positions[spec_curr - 1] : 0;
+      uint64_t cut = (uint64_t)end;
+      dealloc_mzml_index_info(df->index_info);
+      df->index_info =
+          scan_mzml_tail(input_map, tail_from, (uint64_t)end, &cut);
+   }
+
    // xml base case
    xml_dp->end_positions[xml_curr] = end;
    xml_curr++;
@@ -1165,6 +1178,19 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
    mz_dp = alloc_dp(n * 2);
    inten_dp = alloc_dp(n * 2);
 
+   /* One spectra/scan/ms-level entry per mz entry (placeholders included), so
+    * entry k describes the spectrum written with mz entry k - the layout
+    * create_divisions() and the index rebuild expect. */
+   spectra_dp = alloc_dp(n * 2);
+   uint32_t* scans = calloc(n * 2 + 1, sizeof(uint32_t));
+   uint16_t* ms_levels = calloc(n * 2 + 1, sizeof(uint16_t));
+   if (spectra_dp == NULL || scans == NULL || ms_levels == NULL) {
+      MSZ_ERROR("extract_n_spectra: failed to allocate spectra positions.\n");
+      return NULL;
+   }
+   spectra_dp->start_positions[0] = 0;
+   spectra_dp->end_positions[0] = 0;
+
    // base case
    // Copy over xml from start to first spectra
 
@@ -1187,6 +1213,15 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
 
    for (long i = 0; i < n; i++) {
       long index = indicies[i];
+
+      spectra_dp->start_positions[mz_curr] = div->spectra->start_positions[index];
+      spectra_dp->end_positions[mz_curr] = div->spectra->end_positions[index];
+      if (div->scans)
+         scans[mz_curr] = div->scans[index];
+      if (div->ms_levels)
+         ms_levels[mz_curr] = div->ms_levels[index];
+      spectra_dp->start_positions[mz_curr + 1] = 0;
+      spectra_dp->end_positions[mz_curr + 1] = 0;
 
       // Copy over xml from index start till mz start
       xml_dp->start_positions[xml_curr] = div->spectra->start_positions[index];
@@ -1255,11 +1290,15 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
    new_div->size +=
        xml_dp->end_positions[xml_curr] - xml_dp->start_positions[xml_curr];
    xml_curr++;
+   /* xml_dp was sized for the worst case; only xml_curr entries are set. */
+   xml_dp->total_spec = xml_curr;
 
-   new_div->spectra = div->spectra;
+   new_div->spectra = spectra_dp;
    new_div->xml = xml_dp;
    new_div->mz = mz_dp;
    new_div->inten = inten_dp;
+   new_div->scans = scans;
+   new_div->ms_levels = ms_levels;
 
    return new_div;
 }
@@ -2533,13 +2572,12 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
  * @param n Number of indices.
  * @return The extracted division (see `extract_n_spectra()`).
  *
- * @note The extracted division shares `whole->spectra`, so ownership of it is
- *       handed over rather than freed; everything else in `whole` is freed.
+ * @note The extracted division owns copies of everything it needs, so `whole`
+ *       is freed.
  */
 static division_t* extract_from_whole_file(division_t* whole, long* indices,
                                            long n) {
    division_t* div = extract_n_spectra(whole, indices, n);
-   whole->spectra = NULL;
    dealloc_division(whole);
    return div;
 }

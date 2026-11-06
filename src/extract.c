@@ -102,9 +102,16 @@ char* update_spectrum_list_count(char* header, size_t header_len,
  * @brief Reconstructs and writes a complete mzML file from its divided streams.
  * @param input_map The memory-mapped input buffer containing the original data.
  * @param divisions The divisions containing XML, m/z, and intensity position mappings.
+ * @param df The source data format; when df->index_info asks for it, a fresh
+ *           indexedmzML index is written after </mzML>.
  * @param output_fd The file descriptor to write the reconstructed mzML output to.
  */
-void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
+void extract_mzml(char* input_map, divisions_t* divisions, data_format_t* df,
+                  int output_fd) {
+   int rebuild = mzml_index_rebuild(df);
+   mzml_index_builder_t* index = rebuild ? alloc_mzml_index_builder() : NULL;
+   uint64_t written = 0;
+
    for (int i = 0; i < divisions->n_divisions; i++) {
       division_t* division = divisions->divisions[i];
 
@@ -114,6 +121,9 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
 
       char* buff = malloc(division->size);
 
+      int64_t* xml_out =
+          index ? calloc(division->xml->total_spec + 1, sizeof(int64_t)) : NULL;
+
       long len = 0;
 
       long out_len = 0;
@@ -122,6 +132,8 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
 
       while (j <= total_spec) {
          // XML
+         if (xml_out)
+            xml_out[xml_i] = out_len;
          len = division->xml->end_positions[xml_i] -
                division->xml->start_positions[xml_i];
          memcpy(buff + out_len,
@@ -138,6 +150,8 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
          mz_i++;
 
          // XML
+         if (xml_out)
+            xml_out[xml_i] = out_len;
          len = division->xml->end_positions[xml_i] -
                division->xml->start_positions[xml_i];
          memcpy(buff + out_len,
@@ -157,6 +171,8 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       }
 
       // end case
+      if (xml_out)
+         xml_out[xml_i] = out_len;
       len = division->xml->end_positions[xml_i] -
             division->xml->start_positions[xml_i];
       memcpy(buff + out_len, input_map + division->xml->start_positions[xml_i],
@@ -164,8 +180,31 @@ void extract_mzml(char* input_map, divisions_t* divisions, int output_fd) {
       out_len += len;
       xml_i++;
 
+      if (index && i == divisions->n_divisions - 1) {
+         size_t trimmed = (size_t)out_len;
+         if (mzml_index_trim_tail(df->index_info, buff, &trimmed) == 0) {
+            out_len = (long)trimmed;
+         } else {
+            MSZ_WARN("extract_mzml: index tail not found; writing it "
+                     "unchanged.\n");
+            dealloc_mzml_index_builder(index);
+            index = NULL;
+         }
+      }
+      if (index && xml_out &&
+          mzml_index_add_division(index, df->index_info, division, xml_out,
+                                  buff, out_len, written) != 0)
+         MSZ_WARN("extract_mzml: some elements could not be indexed.\n");
+      free(xml_out);
+
       write_to_file(output_fd, buff, out_len);
+      written += out_len;
       free(buff);
+   }
+
+   if (index) {
+      mzml_index_write_tail(index, df->index_info, written, output_fd);
+      dealloc_mzml_index_builder(index);
    }
    return;
 }
@@ -1328,6 +1367,14 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
       return;
    }
 
+   /* Files flagged with an mzML index section get an index of the extracted
+    * spectra instead of the stored one. */
+   if (mzml_index_load(input_map, (long)input_filesize, df) != 0)
+      return;
+   mzml_index_builder_t* index =
+       mzml_index_rebuild(df) ? alloc_mzml_index_builder() : NULL;
+   uint64_t written = 0;
+
    block_len_t *xml_blk_len, *mz_binary_blk_len, *inten_binary_blk_len;
    long xml_blk_offset, mz_blk_offset, inten_blk_offset;
    size_t buff_off = 0;
@@ -1359,10 +1406,12 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
        mzml_header, header_len, indicies_length, &updated_header_len);
    if (updated_header) {
       write_to_file(output_fd, updated_header, updated_header_len);
+      written += updated_header_len;
       free(updated_header);
    } else {
       // Fallback: write original header
       write_to_file(output_fd, mzml_header, header_len);
+      written += header_len;
    }
    free(mzml_header);
 
@@ -1375,7 +1424,13 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
           msz_footer->mz_binary_pos, msz_footer->inten_binary_pos,
           msz_footer->mz_fmt, msz_footer->inten_fmt, divisions, indicies[i],
           &spectra_len, NULL);
+      if (index && spectrum &&
+          mzml_index_add(index, MZML_INDEX_SPECTRUM, spectrum, spectra_len,
+                         written) != 0)
+         MSZ_WARN("extract_msz: spectrum %ld could not be indexed.\n",
+                  indicies[i]);
       write_to_file(output_fd, spectrum, spectra_len);
+      written += spectra_len;
       free(spectrum);
    }
 
@@ -1398,8 +1453,35 @@ void extract_msz(char* input_map, size_t input_filesize, long* indicies,
    }
    char* mzml_footer = extract_mzml_footer(decmp_xml, divisions, &footer_len);
    // MSZ_INFO("%s\n", mzml_footer);
+   if (index && mzml_index_trim_tail(df->index_info, mzml_footer,
+                                     &footer_len) != 0) {
+      MSZ_WARN("extract_msz: stored index tail not found; writing it "
+               "unchanged.\n");
+      dealloc_mzml_index_builder(index);
+      index = NULL;
+   }
+   if (index) {
+      /* The footer is the source XML from the end of the last spectrum. */
+      uint64_t footer_src = 0;
+      for (int d = 0; d < divisions->n_divisions; d++) {
+         data_positions_t* sp = divisions->divisions[d]->spectra;
+         if (sp->total_spec > 0 &&
+             sp->end_positions[sp->total_spec - 1] > footer_src)
+            footer_src = sp->end_positions[sp->total_spec - 1];
+      }
+      if (mzml_index_add_chromatograms(index, df->index_info, footer_src,
+                                       footer_src + footer_len, mzml_footer,
+                                       footer_len, written) != 0)
+         MSZ_WARN("extract_msz: some chromatograms could not be indexed.\n");
+   }
    write_to_file(output_fd, mzml_footer, footer_len);
+   written += footer_len;
    free(mzml_footer);
+
+   if (index) {
+      mzml_index_write_tail(index, df->index_info, written, output_fd);
+      dealloc_mzml_index_builder(index);
+   }
 
    // Free indicies if allocated by ms_level or scan mapping
    if (ms_level != 0 || scans_length > 0) {
@@ -1440,6 +1522,17 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
           map_scan_to_index(scans, scans_length, division, 0, &indicies_length);
    }
 
+   size_t last_spec_end =
+       division->spectra->end_positions[division->spectra->total_spec - 1];
+
+   /* An indexedmzML index would list spectra that are not written: drop the
+    * source tail after </mzML> and write an index of the output instead. */
+   uint64_t cut = input_filesize;
+   mzml_index_info_t* tail =
+       scan_mzml_tail(input_map, last_spec_end, input_filesize, &cut);
+   mzml_index_builder_t* index = tail ? alloc_mzml_index_builder() : NULL;
+   uint64_t written = 0;
+
    // Write header with updated spectrumList count
    size_t header_len = division->spectra->start_positions[0];
    size_t updated_header_len = 0;
@@ -1447,10 +1540,12 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
        input_map, header_len, indicies_length, &updated_header_len);
    if (updated_header) {
       write_to_file(output_fd, updated_header, updated_header_len);
+      written += updated_header_len;
       free(updated_header);
    } else {
       // Fallback: write original header
       write_to_file(output_fd, input_map, header_len);
+      written += header_len;
    }
 
    // Write spectra
@@ -1459,15 +1554,32 @@ void extract_mzml_filtered(char* input_map, size_t input_filesize,
       size_t start = division->spectra->start_positions[idx];
       size_t end = division->spectra->end_positions[idx];
       size_t len = end - start;
+      if (index && mzml_index_add(index, MZML_INDEX_SPECTRUM,
+                                  input_map + start, len, written) != 0)
+         MSZ_WARN("extract_mzml_filtered: spectrum %ld could not be "
+                  "indexed.\n", idx);
       write_to_file(output_fd, input_map + start, len);
+      written += len;
       write_to_file(output_fd, "\n", 1);
+      written += 1;
    }
 
    // Write footer
-   size_t last_spec_end =
-       division->spectra->end_positions[division->spectra->total_spec - 1];
-   size_t footer_len = input_filesize - last_spec_end;
+   size_t footer_len = (size_t)cut - last_spec_end;
+   if (index &&
+       mzml_index_add_chromatograms(index, tail, last_spec_end, cut,
+                                    input_map + last_spec_end, footer_len,
+                                    written) != 0)
+      MSZ_WARN("extract_mzml_filtered: some chromatograms could not be "
+               "indexed.\n");
    write_to_file(output_fd, input_map + last_spec_end, footer_len);
+   written += footer_len;
+
+   if (index) {
+      mzml_index_write_tail(index, tail, written, output_fd);
+      dealloc_mzml_index_builder(index);
+   }
+   dealloc_mzml_index_info(tail);
 
    // Cleanup allocated indices if necessary
    if (ms_level != 0 || scans_length > 0) {
