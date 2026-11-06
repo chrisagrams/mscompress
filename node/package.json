@@ -37,8 +37,8 @@
   },
   "scripts": {
     "install": "prebuild-install -r napi",
-    "build": "npm run build:ts",
-    "build:native": "prebuild -r napi --target 8 --backend cmake-js",
+    "build": "npm run build:native && npm run build:ts",
+    "build:native": "cmake-js compile",
     "build:ts": "tsc && tsc-alias",
     "build:debug": "cmake-js compile --debug",
     "clean": "rm -rf build dist",

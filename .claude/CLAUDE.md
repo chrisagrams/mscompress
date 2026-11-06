@@ -48,7 +48,7 @@ Test data lives in `test/data/` at the repo root and is shared by C, Python, and
 # Build native addon + TypeScript (from node/ dir)
 cd node && npm run build
 
-# Build native addon only (prebuild + cmake-js)
+# Build native addon only (cmake-js)
 cd node && npm run build:native
 
 # Build TypeScript only (tsc + tsc-alias)
