@@ -242,10 +242,6 @@ jobs:
         working-directory: ./cli
         run: nm build-tsan/mscompress | grep -q __tsan
 
-      # TSan doesn't support the runner's default ASLR entropy.
-      - name: Lower ASLR entropy for TSan
-        run: sudo sysctl vm.mmap_rnd_bits=28
-
       - name: Run CTest under ThreadSanitizer
         working-directory: ./cli/build-tsan
         env:
