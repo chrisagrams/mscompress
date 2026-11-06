@@ -210,6 +210,24 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:symbolize=1
         run: ctest --output-on-failure
 
+  check-uv-lock:
+    name: Check uv.lock is up to date
+    if: *not-docs-pr
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Verify lockfile matches pyproject.toml
+        working-directory: python
+        run: uv lock --check
+
   build-python:
     name: Build Python - ${{ matrix.runner }} ${{ matrix.cibw_arch }}
     if: *not-docs-pr
