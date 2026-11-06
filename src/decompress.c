@@ -223,6 +223,7 @@ decompress_args_t* alloc_decompress_args(
 
    r->ret = NULL;
    r->ret_len = 0;
+   r->xml_out = NULL;
 
    return r;
 }
@@ -241,6 +242,7 @@ void dealloc_decompress_args(decompress_args_t* args) {
          dealloc_block_len(args->mz_binary_blk);
       if (args->inten_binary_blk)
          dealloc_block_len(args->inten_binary_blk);
+      free(args->xml_out);
       free(args);
    }
 }
@@ -417,6 +419,8 @@ void* decompress_routine(void* args) {
                block = -1;
                break;
             }
+            if (db_args->xml_out != NULL)
+               db_args->xml_out[xml_i] = buff_off;
             curr_len =
                 curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
             if (curr_len == 0) {
@@ -489,6 +493,8 @@ void* decompress_routine(void* args) {
                block = -1;
                break;
             }
+            if (db_args->xml_out != NULL)
+               db_args->xml_out[xml_i] = buff_off;
             curr_len =
                 curr_dp->end_positions[xml_i] - curr_dp->start_positions[xml_i];
             if (curr_len == 0) {
@@ -619,6 +625,18 @@ int decompress_msz(char* input_map, size_t input_filesize,
       return -1;
    }
 
+   /* Files flagged with an mzML index section get a rebuilt index instead of
+    * the stored (stale) one. */
+   if (mzml_index_load(input_map, input_filesize, df) != 0)
+      return -1;
+   int rebuild = mzml_index_rebuild(df);
+   mzml_index_builder_t* index = rebuild ? alloc_mzml_index_builder() : NULL;
+   if (rebuild && index == NULL) {
+      MSZ_ERROR("decompress_msz: Failed to allocate index builder.\n");
+      return -1;
+   }
+   uint64_t written = 0;
+
    decompress_args_t** args =
        malloc(sizeof(decompress_args_t*) * divisions->n_divisions);
 
@@ -652,6 +670,15 @@ int decompress_msz(char* input_map, size_t input_filesize,
           divisions->divisions[i], footer_xml_off + msz_footer->xml_pos,
           footer_mz_bin_off + msz_footer->mz_binary_pos,
           footer_inten_bin_off + msz_footer->inten_binary_pos);
+
+      if (rebuild && divisions->divisions[i]->xml->total_spec > 0) {
+         args[i]->xml_out = calloc(divisions->divisions[i]->xml->total_spec,
+                                   sizeof(int64_t));
+         if (args[i]->xml_out == NULL) {
+            MSZ_ERROR("decompress_msz: Failed to allocate index offsets.\n");
+            return -1;
+         }
+      }
 
       if (xml_blk != NULL)
          footer_xml_off += xml_blk->compressed_size;
@@ -700,9 +727,25 @@ int decompress_msz(char* input_map, size_t input_filesize,
             MSZ_ERROR("decompress_msz: Decompression failed for division %d.\n", i);
             return -1;
          }
+         /* The last division ends with the stored source tail: drop it. */
+         if (rebuild && i == divisions->n_divisions - 1 &&
+             mzml_index_trim_tail(df->index_info, args[i]->ret,
+                                  &args[i]->ret_len) != 0) {
+            MSZ_WARN("decompress_msz: stored index tail not found; writing "
+                     "it unchanged.\n");
+            rebuild = 0;
+         }
+         if (rebuild && mzml_index_add_division(
+                            index, df->index_info, args[i]->division,
+                            args[i]->xml_out, args[i]->ret, args[i]->ret_len,
+                            written) != 0)
+            MSZ_WARN("decompress_msz: some elements of division %d could not "
+                     "be indexed.\n", i);
+
          start = get_time();
          write_to_file(fd, args[i]->ret, args[i]->ret_len);
          stop = get_time();
+         written += args[i]->ret_len;
 
          MSZ_INFO("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len,
                (float)args[i]->ret_len / (stop - start) / 1024 / 1024);
@@ -713,6 +756,10 @@ int decompress_msz(char* input_map, size_t input_filesize,
       divisions_left -= threads;
       divisions_used += threads;
    }
+
+   if (rebuild)
+      mzml_index_write_tail(index, df->index_info, written, fd);
+   dealloc_mzml_index_builder(index);
 
    free(args);
    free(ptid);

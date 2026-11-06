@@ -227,6 +227,17 @@ add_test(NAME ExtractTest
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_extract.cmake
 )
 
+# indexedmzML index rebuilt on decompression/extraction - GitHub issue #301.
+add_test(NAME IndexRebuildTest
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DTEST_MZML=${TEST_DATA_DIR}/test.mzML
+    -DTEST_ZLIB_MZML=${TEST_DATA_DIR}/test_zlib_indexed.mzML
+    -DTEST_NONINDEXED=${TEST_DATA_DIR}/nonindexed_test.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_mzml_index
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_mzml_index.cmake
+)
+
 # Verbose mode test
 add_test(NAME VerboseOutputTest
     COMMAND ${CMAKE_COMMAND}

@@ -13,6 +13,7 @@ The on-disk MSZ file. All multi-byte values are little-endian.
             m/z block-length metadata
             Intensity block-length metadata
             Divisions table
+            mzML index section            (optional, see below)
 -88         Footer (88 bytes)
 ```
 
@@ -92,6 +93,37 @@ buffer.
 Records per-division metadata — spectrum count, byte ranges within each
 stream, scan numbers, MS levels, retention times. This is the index that
 makes selective extraction O(spectra requested) instead of O(file size).
+
+## mzML index section
+
+An indexedmzML file ends with a wrapper tail after `</mzML>`: `<indexList>`
+with the byte offset of every `<spectrum>` and `<chromatogram>`,
+`<indexListOffset>`, `<fileChecksum>` and `</indexedmzML>`. Those offsets go
+stale as soon as decompression re-encodes a binary or extraction drops a
+spectrum. When an `<indexList>` follows `</mzML>`, compression adds this
+section, flagged by `uint32` `MSZ_INDEX_REBUILD` (`0x1`) at header offset 216
+(`MZML_INDEX_FLAG_OFFSET`, otherwise reserved and zero):
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `magic` | `char[8]` | `"MSZMZIDX"` |
+| `flags` | `uint32` | `0x1` = rebuild the index on decompression |
+| `checksum_len` | `uint32` | Length of `checksum` |
+| `tail_len` | `uint64` | Bytes after `</mzML>` stored at the end of the XML stream |
+| `n_chrom` | `uint64` | Number of chromatograms |
+| `chrom_offsets` | `uint64[n_chrom]` | Source offset of each `<chromatogram` |
+| `checksum` | `char[checksum_len]` | Source `<fileChecksum>` value |
+| `section_pos` | `uint64` | Offset of `magic`; the 8 bytes before the footer |
+
+The source tail is still stored, so the format version is unchanged and
+readers that predate the section write it as before. Readers that know the
+section drop the stored tail and write a fresh one, in the layout
+ProteoWizard uses, from where each element lands in the output: spectrum *k*
+of a division sits at the same distance into XML segment 2*k* as in the
+source. An uncompressed indexedmzML written by ProteoWizard therefore
+round-trips byte-for-byte. `<fileChecksum>` is written back as stored, so it
+is stale whenever the output differs from the source (recomputing it is
+#302). Defined in `src/mzml_index.c`.
 
 ## Data type accessions
 

@@ -21,6 +21,8 @@ endif()
 
 get_filename_component(INPUT_NAME "${INPUT_FILE}" NAME_WE)
 
+include("${CMAKE_CURRENT_LIST_DIR}/mzml_body.cmake")
+
 if("${MODE}" STREQUAL "compress")
     # For compress mode: compress then decompress and verify roundtrip
     # (Compression output is not deterministic across different systems/compilers)
@@ -72,8 +74,8 @@ if("${MODE}" STREQUAL "compress")
     endif()
 
     # Step 3: Verify roundtrip - decompressed should match original input
-    file(MD5 "${INPUT_FILE}" ORIGINAL_MD5)
-    file(MD5 "${DECOMPRESSED_FILE}" ROUNDTRIP_MD5)
+    mzml_body_md5("${INPUT_FILE}" ORIGINAL_MD5)
+    mzml_body_md5("${DECOMPRESSED_FILE}" ROUNDTRIP_MD5)
 
     message(STATUS "Original MD5:  ${ORIGINAL_MD5}")
     message(STATUS "Roundtrip MD5: ${ROUNDTRIP_MD5}")
@@ -158,8 +160,8 @@ elseif("${MODE}" STREQUAL "decompress")
     endif()
 
     # Step 4: Verify roundtrip - both decompressed files should match
-    file(MD5 "${DECOMPRESSED_FILE}" FIRST_MD5)
-    file(MD5 "${DECOMPRESSED_FILE2}" SECOND_MD5)
+    mzml_body_md5("${DECOMPRESSED_FILE}" FIRST_MD5)
+    mzml_body_md5("${DECOMPRESSED_FILE2}" SECOND_MD5)
 
     message(STATUS "First decompress MD5:  ${FIRST_MD5}")
     message(STATUS "Second decompress MD5: ${SECOND_MD5}")

@@ -394,6 +394,14 @@ size_t write_header(int fd, data_format_t* df, long blocksize, char* md5) {
 
    memcpy(header_buff + MD5_OFFSET, md5, MD5_SIZE);
 
+   /* Marks the mzML index section; a reserved byte range, so no version bump
+    * (readers that do not know it write the stored index tail). */
+   if (mzml_index_rebuild(df)) {
+      uint32_t index_flag = MSZ_INDEX_REBUILD;
+      memcpy(header_buff + MZML_INDEX_FLAG_OFFSET, &index_flag,
+             sizeof(index_flag));
+   }
+
    write_to_file(fd, header_buff, HEADER_SIZE);
 
    return HEADER_SIZE;

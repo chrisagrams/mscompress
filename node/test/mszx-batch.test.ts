@@ -22,7 +22,7 @@ import {
   compressBatch,
   resolveMzmlInputs,
 } from "../src/index.js";
-import { MSZX_PATH, TEST_DATA_DIR } from "./fixtures.js";
+import { MSZX_PATH, TEST_DATA_DIR, mzmlBody } from "./fixtures.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -154,9 +154,10 @@ describeCli("MSZXBatchFile", () => {
     }
 
     expect(written.map((p) => path.basename(p))).toEqual(["a.mzML", "b.mzML"]);
-    const original = fs.readFileSync(TEST_MZML);
+    // Up to </mzML>: the index after it is rebuilt (see mzmlBody).
+    const original = mzmlBody(fs.readFileSync(TEST_MZML));
     for (const p of written) {
-      expect(fs.readFileSync(p).equals(original)).toBe(true);
+      expect(mzmlBody(fs.readFileSync(p)).equals(original)).toBe(true);
     }
   });
 
@@ -278,9 +279,10 @@ describe("MSZXBatchWriter", () => {
     } finally {
       archive.close();
     }
-    const original = fs.readFileSync(TEST_MZML);
+    // Up to </mzML>: the index after it is rebuilt (see mzmlBody).
+    const original = mzmlBody(fs.readFileSync(TEST_MZML));
     for (const p of written) {
-      expect(fs.readFileSync(p).equals(original)).toBe(true);
+      expect(mzmlBody(fs.readFileSync(p)).equals(original)).toBe(true);
     }
   });
 
