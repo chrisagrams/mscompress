@@ -11,15 +11,15 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/core/*": ["src/core/*"],
-      "@/files/*": ["src/files/*"],
-      "@/mszx/*": ["src/mszx/*"],
-      "@/spectrum/*": ["src/spectrum/*"],
-      "@/types/*": ["src/types/*"]
+      "@/*": ["./src/*"],
+      "@/core/*": ["./src/core/*"],
+      "@/files/*": ["./src/files/*"],
+      "@/mszx/*": ["./src/mszx/*"],
+      "@/spectrum/*": ["./src/spectrum/*"],
+      "@/types/*": ["./src/types/*"]
     }
   },
   "include": ["src/**/*.ts"],
