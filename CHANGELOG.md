@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.2.3](https://github.com/chrisagrams/mscompress/compare/v1.2.2...v1.2.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* **core:** infer mzML source compression when the CV term is missing ([#294](https://github.com/chrisagrams/mscompress/issues/294)) ([06e476b](https://github.com/chrisagrams/mscompress/commit/06e476bece93e7abbc051b2937d8e204282ccfaa))
+* make blosc2 shuffle init thread-safe ([#312](https://github.com/chrisagrams/mscompress/issues/312)) ([796cdd1](https://github.com/chrisagrams/mscompress/commit/796cdd11e4262e921a0e44fd2bfde88bef181dd5))
+* **node:** give FileHandle a dedicated inflate stream for zlib mzML ([#295](https://github.com/chrisagrams/mscompress/issues/295)) ([a452303](https://github.com/chrisagrams/mscompress/commit/a45230399d0eb6890afcb4d5334fc0d0b4580ef3))
+* **node:** make npm run build rebuild the native addon ([#310](https://github.com/chrisagrams/mscompress/issues/310)) ([73bd757](https://github.com/chrisagrams/mscompress/commit/73bd757da6f7612332a42cc64010728d80bf16a1))
+* **node:** make tsconfig compatible with TypeScript 7 ([#320](https://github.com/chrisagrams/mscompress/issues/320)) ([aea4b5c](https://github.com/chrisagrams/mscompress/commit/aea4b5cdf1d0c406243508a0f9055d2ea1065592))
+* **python:** raise instead of segfaulting on a corrupt .msz footer ([#297](https://github.com/chrisagrams/mscompress/issues/297)) ([ecda660](https://github.com/chrisagrams/mscompress/commit/ecda660688c5c4c680fb4bd2bfa1c611ce219f0e))
+
+
+### Code Refactoring
+
+* **core:** replace error/warning/print with msz_log API ([#296](https://github.com/chrisagrams/mscompress/issues/296)) ([4c01ebc](https://github.com/chrisagrams/mscompress/commit/4c01ebcc9eacdd0d389f46d7e7605e0385630072))
+
+
+### Dependencies
+
+* bump lucide-react from 1.61.0 to 1.62.0 in /electron in the electron-prod group ([#288](https://github.com/chrisagrams/mscompress/issues/288)) ([d984678](https://github.com/chrisagrams/mscompress/commit/d984678b2d305310e9360069f3c6b1b0998b2367))
+* bump lucide-react from 1.62.0 to 1.70.0 in /electron in the electron-prod group ([#317](https://github.com/chrisagrams/mscompress/issues/317)) ([92bf823](https://github.com/chrisagrams/mscompress/commit/92bf82326a70e578dc8cd6351877c4ceb51f06fe))
+* bump the python group across 1 directory with 4 updates ([#318](https://github.com/chrisagrams/mscompress/issues/318)) ([8248fb5](https://github.com/chrisagrams/mscompress/commit/8248fb546a7ba2270132ec6cb2dd6715ba1aa0b6))
+* bump vendor/base64 from `e4cc438` to `5d5074c` ([#282](https://github.com/chrisagrams/mscompress/issues/282)) ([3020bce](https://github.com/chrisagrams/mscompress/commit/3020bce510bf70ac6cd1017bd76b3447d5342ac8))
+* bump vendor/c-blosc2 from `ef92678` to `6c65c5a` ([#283](https://github.com/chrisagrams/mscompress/issues/283)) ([bb75a65](https://github.com/chrisagrams/mscompress/commit/bb75a659f4a50192ca738dfd188f9782412f3d27))
+* bump vendor/lz4 from `2c92108` to `dbfb6d9` ([#291](https://github.com/chrisagrams/mscompress/issues/291)) ([3a9089f](https://github.com/chrisagrams/mscompress/commit/3a9089f240142aa21bebcdcf83e96a678ee668ac))
+
 ## [1.2.2](https://github.com/chrisagrams/mscompress/compare/v1.2.1...v1.2.2) (2026-10-29)
 
 
