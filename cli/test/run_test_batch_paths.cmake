@@ -21,6 +21,8 @@
 #
 # Expected variables: EXECUTABLE, TEST_MZML, TEMP_DIR
 
+include("${CMAKE_CURRENT_LIST_DIR}/mzml_body.cmake")
+
 if(NOT EXISTS "${EXECUTABLE}")
     message(FATAL_ERROR "Executable not found: ${EXECUTABLE}")
 endif()
@@ -69,8 +71,8 @@ foreach(NAME sample.mzML sample__2.mzML)
     if(NOT EXISTS "${TEMP_DIR}/out_coll/${NAME}")
         message(FATAL_ERROR "expanded file missing: ${NAME}")
     endif()
-    file(MD5 "${TEMP_DIR}/out_coll/${NAME}" GOT)
-    file(MD5 "${TEST_MZML}" WANT)
+    mzml_body_md5("${TEMP_DIR}/out_coll/${NAME}" GOT)
+    mzml_body_md5("${TEST_MZML}" WANT)
     if(NOT GOT STREQUAL WANT)
         message(FATAL_ERROR "${NAME} differs from the original mzML")
     endif()

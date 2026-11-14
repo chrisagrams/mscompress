@@ -14,7 +14,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { read, MZMLFile, MSZFile } from "../src/index.js";
-import { MZML_PATH, MSZ_PATH } from "./fixtures.js";
+import { MZML_PATH, MSZ_PATH, mzmlBody } from "./fixtures.js";
 
 const tmpDirs = new Set<string>();
 
@@ -110,8 +110,10 @@ describe("decompression byte fidelity", () => {
       file.close();
     }
 
-    const expected = fs.readFileSync(MZML_PATH);
-    const actual = decompressToBuffer(mszPath, "mscompress-fidelity-roundtrip-out-");
+    // Decompression rebuilds the index after </mzML>, and test.mzML's own
+    // index is stale, so compare the content up to there.
+    const expected = mzmlBody(fs.readFileSync(MZML_PATH));
+    const actual = mzmlBody(decompressToBuffer(mszPath, "mscompress-fidelity-roundtrip-out-"));
 
     expect(actual.equals(expected), describeDifference(expected, actual)).toBe(true);
   });

@@ -60,11 +60,10 @@ if(NOT RT_RESULT EQUAL 0)
     message(FATAL_ERROR "Decompression of shuffled file failed (${RT_RESULT}): ${RT_ERR}")
 endif()
 
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E compare_files "${INPUT_FILE}" "${ROUNDTRIP}"
-    RESULT_VARIABLE CMP_RESULT
-)
-if(NOT CMP_RESULT EQUAL 0)
+include("${CMAKE_CURRENT_LIST_DIR}/mzml_body.cmake")
+mzml_body_md5("${INPUT_FILE}" WANT_MD5)
+mzml_body_md5("${ROUNDTRIP}" GOT_MD5)
+if(NOT GOT_MD5 STREQUAL WANT_MD5)
     message(FATAL_ERROR
         "Shuffled round trip is not byte-identical to the source mzML")
 endif()

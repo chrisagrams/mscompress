@@ -1001,6 +1001,11 @@ int compress_mzml(char* input_map, size_t input_filesize, Arguments* arguments,
    footer->divisions_t_pos = output_pos;
    output_pos += write_divisions(divisions, output_fd);
 
+   // mzML index section: what the rebuilt index needs from the source.
+   if (mzml_index_rebuild(df))
+      output_pos += mzml_index_write_section(df->index_info, output_pos,
+                                             output_fd);
+
    // Write footer to file.
    footer->original_filesize = input_filesize;
    footer->n_divisions =

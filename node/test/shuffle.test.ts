@@ -8,7 +8,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { read, MZMLFile, MSZFile } from "../src/index.js";
-import { MZML_PATH, MSZ_PATH, SHUFFLED_MSZ_PATH } from "./fixtures.js";
+import { MZML_PATH, MSZ_PATH, SHUFFLED_MSZ_PATH, mzmlBody } from "./fixtures.js";
 
 const tmpDirs = new Set<string>();
 
@@ -85,7 +85,10 @@ describe("byte shuffle", () => {
       msz.close();
     }
 
-    expect(fs.readFileSync(restored).equals(fs.readFileSync(MZML_PATH))).toBe(true);
+    // Up to </mzML>: the index after it is rebuilt (see mzmlBody).
+    expect(
+      mzmlBody(fs.readFileSync(restored)).equals(mzmlBody(fs.readFileSync(MZML_PATH))),
+    ).toBe(true);
   });
 
   it("decompresses the checked-in shuffled fixture", () => {
