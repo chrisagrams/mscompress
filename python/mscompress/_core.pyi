@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-from typing import Union, Iterator, Optional, Dict, Any
+from typing import Union, Iterator, Optional, Dict, Any, Self
 from os import PathLike
 from xml.etree.ElementTree import Element
 import numpy as np
@@ -119,7 +119,7 @@ class BaseFile:
     @property
     def arguments(self) -> RuntimeArguments: ...
     
-    def __enter__(self) -> BaseFile: ...
+    def __enter__(self) -> Self: ...
     
     def __exit__(
         self,
