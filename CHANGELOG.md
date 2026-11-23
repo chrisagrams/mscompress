@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/chrisagrams/mscompress/compare/v1.2.3...v1.2.4) (2026-11-23)
+
+
+### Bug Fixes
+
+* **python:** type BaseFile.__enter__ as returning Self ([#330](https://github.com/chrisagrams/mscompress/issues/330)) ([64ce70b](https://github.com/chrisagrams/mscompress/commit/64ce70b7adddefc5414e742b594dea99a0ce162e))
+
 ## [1.2.3](https://github.com/chrisagrams/mscompress/compare/v1.2.2...v1.2.3) (2026-11-20)
 
 
