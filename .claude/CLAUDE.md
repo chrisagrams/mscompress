@@ -174,6 +174,7 @@ release-please itself authenticates as a GitHub App (`actions/create-github-app-
 
 `.github/workflows/build.yml` runs on push to `stage`/`dev`, PRs to `dev`, and via `workflow_dispatch` (from release-please, or manually to re-publish a tag with `publish=true` + `release_tag`):
 1. **build-cli** — CMake build + ctest on Linux/Windows/macOS (x86_64, arm64)
+   - **tsan-cli** — ThreadSanitizer (clang) build of the CLI + ctest on Linux x86_64; fails on any data race
 2. **build-python** — cibuildwheel for CPython 3.11–3.14 + pytest
 3. **build-node** — prebuild + cmake-js compile + vitest on Linux/macOS/Windows (x64, arm64)
 4. **publish-python** — PyPI publish (gated on `inputs.publish`)

@@ -1,6 +1,6 @@
 """A versatile compression tool for efficient management of mass-spectrometry data."""
 
-__version__ = "1.2.2"  # x-release-please-version
+__version__ = "1.2.3"  # x-release-please-version
 
 
 from mscompress._core import (
@@ -23,6 +23,7 @@ from mscompress._core import (
     get_num_threads,
     get_filesize,
     list_algorithms,
+    MSCompressError,
 )
 
 from mscompress.utils import read
@@ -104,6 +105,7 @@ __all__ = [
     "get_num_threads",
     "get_filesize",
     "list_algorithms",
+    "MSCompressError",
     "__version__",
     # Utility functions
     "read",

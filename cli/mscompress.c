@@ -454,13 +454,14 @@ int main(int argc, char* argv[]) {
    if (parse_arguments(argc, argv, &arguments))
       print_usage(stderr, 1);
 
-   verbose = arguments.verbose;
+   if (arguments.verbose)
+      msz_set_log_level(MSZ_LOG_INFO);
 
    abs_start = get_time();
 
-   print("=== %s ===\n", MESSAGE);
+   MSZ_INFO("=== %s ===\n", MESSAGE);
 
-   print("\nPreparing...\n");
+   MSZ_INFO("\nPreparing...\n");
 
    prepare_threads(&arguments);  // Populate threads variable if not set.
 
@@ -537,7 +538,7 @@ int main(int argc, char* argv[]) {
       input_map = get_mapping(local_fds[0]);
       input_filesize = get_filesize(arguments.input_file);
       if (input_filesize == 0) {
-         warning("Error in opening input file. Is it a directory?\n");
+         MSZ_WARN("Error in opening input file. Is it a directory?\n");
          exit(1);
       }
    } else {
@@ -562,14 +563,14 @@ int main(int argc, char* argv[]) {
    // Initialize b64 encoder.
    base64_stream_encode_init(&state, 0);
 
-   print("\tInput file: %s\n\t\tFilesize: %ld bytes\n", arguments.input_file,
+   MSZ_INFO("\tInput file: %s\n\t\tFilesize: %ld bytes\n", arguments.input_file,
          input_filesize);
 
-   print("\tOutput file: %s\n", arguments.output_file);
+   MSZ_INFO("\tOutput file: %s\n", arguments.output_file);
 
    switch (operation) {
       case COMPRESS: {
-         print("\tDetected .mzML file, starting compression...\n");
+         MSZ_INFO("\tDetected .mzML file, starting compression...\n");
 
          // Scan mzML for position of all binary data. Divide the m/z,
          // intensity, and XML data over threads.
@@ -590,7 +591,7 @@ int main(int argc, char* argv[]) {
          break;
       }
       case DECOMPRESS: {
-         print("\nDecompression and encoding...\n");
+         MSZ_INFO("\nDecompression and encoding...\n");
 
          // Start decompress routine.
          if (decompress_msz(input_map, input_filesize, &arguments, local_fds[1])) {
@@ -601,7 +602,7 @@ int main(int argc, char* argv[]) {
          break;
       };
       case EXTRACT: {
-         print("\nExtracting ...\n");
+         MSZ_INFO("\nExtracting ...\n");
 
          arguments.threads = -1,  // force single threaded
              preprocess_mzml(input_map, input_filesize,
@@ -648,7 +649,7 @@ int main(int argc, char* argv[]) {
          break;
       };
       case DECOMPRESS_MSZX: {
-         print("\tDetected .mszx archive, extracting to %s\n",
+         MSZ_INFO("\tDetected .mszx archive, extracting to %s\n",
                arguments.output_file);
          if (decompress_mszx(arguments.input_file, arguments.output_file,
                              &arguments)) {
@@ -665,7 +666,7 @@ int main(int argc, char* argv[]) {
          break;
       };
    }
-   print("\nCleaning up...\n");
+   MSZ_INFO("\nCleaning up...\n");
 
    // free_ddp(xml_divisions, divisions);
    // free_ddp(mz_binary_divisions, divisions);
@@ -677,11 +678,11 @@ int main(int argc, char* argv[]) {
 
    close_file(local_fds[0]);
    close_file(local_fds[1]);
-   print("\tClosed file descriptors\n");
+   MSZ_INFO("\tClosed file descriptors\n");
 
    abs_stop = get_time();
 
-   print("\n=== Operation finished in %1.4fs ===\n", abs_stop - abs_start);
+   MSZ_INFO("\n=== Operation finished in %1.4fs ===\n", abs_stop - abs_start);
 
    if (error_status) {
       // compress_batch already cleans up its own (possibly defaulted) output.

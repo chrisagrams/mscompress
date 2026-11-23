@@ -16,6 +16,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
 #include "../../vendor/c-blosc2/include/blosc2.h"
 #include "../mscompress.h"
 
@@ -23,6 +29,35 @@
  * so a file written by either build reads back on the other. blosc2 takes an
  * int32_t length; anything larger falls back to scalar. */
 #define BLOSC_MAX_LEN ((size_t)0x7fffffff)
+
+/* blosc2's lazy shuffle init isn't thread-safe; run it once before use. */
+static void blosc_shuffle_init(void) {
+   uint8_t src[8] = {0}, dst[8];
+   blosc2_shuffle(4, (int32_t)sizeof(src), src, dst);
+}
+
+#ifdef _WIN32
+static INIT_ONCE blosc_shuffle_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK blosc_shuffle_init_win(PINIT_ONCE once, PVOID param,
+                                            PVOID* ctx) {
+   (void)once;
+   (void)param;
+   (void)ctx;
+   blosc_shuffle_init();
+   return TRUE;
+}
+
+static void blosc_shuffle_init_once(void) {
+   InitOnceExecuteOnce(&blosc_shuffle_once, blosc_shuffle_init_win, NULL, NULL);
+}
+#else
+static pthread_once_t blosc_shuffle_once = PTHREAD_ONCE_INIT;
+
+static void blosc_shuffle_init_once(void) {
+   pthread_once(&blosc_shuffle_once, blosc_shuffle_init);
+}
+#endif
 
 /**
  * @brief Byte-shuffles `src` into `dst`.
@@ -48,10 +83,12 @@ int shuffle_bytes(const void* src, void* dst, size_t len, int elem_size) {
    }
 
    if (len % (size_t)elem_size != 0) {
-      error("shuffle_bytes: length %zu is not a multiple of element size %d.\n",
+      MSZ_ERROR("shuffle_bytes: length %zu is not a multiple of element size %d.\n",
             len, elem_size);
       return 1;
    }
+
+   blosc_shuffle_init_once();
 
    if (len <= BLOSC_MAX_LEN &&
        blosc2_shuffle((int32_t)elem_size, (int32_t)len, src, dst) >= 0)
@@ -91,10 +128,12 @@ int unshuffle_bytes(const void* src, void* dst, size_t len, int elem_size) {
    }
 
    if (len % (size_t)elem_size != 0) {
-      error("unshuffle_bytes: length %zu is not a multiple of element size %d.\n",
+      MSZ_ERROR("unshuffle_bytes: length %zu is not a multiple of element size %d.\n",
             len, elem_size);
       return 1;
    }
+
+   blosc_shuffle_init_once();
 
    if (len <= BLOSC_MAX_LEN &&
        blosc2_unshuffle((int32_t)elem_size, (int32_t)len, src, dst) >= 0)
@@ -148,7 +187,7 @@ static int block_payload_total(const void* block, size_t block_len,
       size_t plen = (size_t)payload_len;
 
       if (off + ZLIB_SIZE_OFFSET + plen > block_len) {
-         error(
+         MSZ_ERROR(
              "block_payload_total: record at offset %zu claims %zu payload "
              "bytes, past the end of a %zu byte block.\n",
              off, plen, block_len);
@@ -210,7 +249,7 @@ static int block_transform(void* block, size_t block_len, int elem_size,
    uint8_t* packed = (uint8_t*)malloc(total * 2);
 
    if (packed == NULL) {
-      error("block_transform: malloc error.\n");
+      MSZ_ERROR("block_transform: malloc error.\n");
       return 1;
    }
 

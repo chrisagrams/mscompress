@@ -26,7 +26,9 @@ This runs:
 
 1. `prebuild-install -r napi` (postinstall) — try to fetch a prebuilt
    binary.
-2. `npm run build` — `tsc && tsc-alias`.
+2. `npm run build` — compiles the native addon (`prebuild` + `cmake-js`),
+   then the TypeScript (`tsc && tsc-alias`). Re-run it after any change to
+   the C sources; `npm run build:ts` rebuilds only the TypeScript.
 
 If the prebuild fetch fails, `cmake-js` is invoked automatically.
 

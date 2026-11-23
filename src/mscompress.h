@@ -1,6 +1,7 @@
 #ifndef MSCOMPRESS_H
 #define MSCOMPRESS_H
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -119,8 +120,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-extern int verbose;
 
 typedef struct {
    const char* name;
@@ -727,20 +726,50 @@ int get_num_threads();
 void prepare_threads(Arguments* args);
 int get_thread_id();
 double get_time(void);
-int print(const char* format, ...);
-int error(const char* format, ...);
-int warning(const char* format, ...);
 long parse_blocksize(char* arg);
 
-/* Callback types for error/warning handling */
-typedef void (*error_callback_t)(const char* message);
-typedef void (*warning_callback_t)(const char* message);
+/* Logging. Every diagnostic goes through msz_log, usually via the MSZ_*
+   macros below. The names are prefixed on purpose: a bare `error` symbol
+   collides with glibc's error(3) when this library is built as a shared
+   object (Python extension, Node addon). */
+typedef enum {
+   MSZ_LOG_DEBUG,
+   MSZ_LOG_INFO,
+   MSZ_LOG_WARN,
+   MSZ_LOG_ERROR,
+} msz_log_level_t;
 
-/* Set custom error/warning callbacks (for Python bindings) */
-void set_error_callback(error_callback_t callback);
-void set_warning_callback(warning_callback_t callback);
-void reset_error_callback(void);
-void reset_warning_callback(void);
+typedef struct {
+   msz_log_level_t level;
+   const char* file;
+   int line;
+   const char* func;
+   const char* message; /* valid only for the duration of the handler call */
+} msz_log_record_t;
+
+typedef void (*msz_log_handler_t)(const msz_log_record_t* rec, void* user);
+
+#if defined(__GNUC__) || defined(__clang__)
+#define MSZ_PRINTF_FORMAT(fmt_idx, args_idx) \
+   __attribute__((format(printf, fmt_idx, args_idx)))
+#else
+#define MSZ_PRINTF_FORMAT(fmt_idx, args_idx)
+#endif
+
+void msz_log(msz_log_level_t level, const char* file, int line,
+             const char* func, const char* format, ...)
+   MSZ_PRINTF_FORMAT(5, 6);
+void msz_default_log_handler(const msz_log_record_t* rec, void* user);
+void msz_set_log_handler(msz_log_handler_t handler, void* user);
+void msz_set_log_level(msz_log_level_t level);
+msz_log_level_t msz_get_log_level(void);
+
+#define MSZ_LOG(level, ...) \
+   msz_log((level), __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define MSZ_ERROR(...) MSZ_LOG(MSZ_LOG_ERROR, __VA_ARGS__)
+#define MSZ_WARN(...) MSZ_LOG(MSZ_LOG_WARN, __VA_ARGS__)
+#define MSZ_INFO(...) MSZ_LOG(MSZ_LOG_INFO, __VA_ARGS__)
+#define MSZ_DEBUG(...) MSZ_LOG(MSZ_LOG_DEBUG, __VA_ARGS__)
 
 /* decode.c */
 

@@ -24,7 +24,7 @@ ZSTD_DCtx* alloc_dctx()
 {
    ZSTD_DCtx* dctx = ZSTD_createDCtx();
    if (dctx == NULL)
-      error("alloc_dctx: ZSTD Context failed.\n");
+      MSZ_ERROR("alloc_dctx: ZSTD Context failed.\n");
    return dctx;
 }
 
@@ -34,7 +34,7 @@ ZSTD_DCtx* alloc_dctx()
 void* alloc_ztsd_dbuff(size_t buff_len) {
    void* r = malloc(buff_len);
    if (r == NULL)
-      error("alloc_ztsd_dbuff: malloc() error.\n");
+      MSZ_ERROR("alloc_ztsd_dbuff: malloc() error.\n");
    return r;
 }
 
@@ -60,14 +60,14 @@ zstd_decompress(
    out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, NULL on error
 
    if (out_buff == NULL) {
-      error("zstd_decompress: error in malloc()\n");
+      MSZ_ERROR("zstd_decompress: error in malloc()\n");
       return NULL;
    }
 
    decmp_len = ZSTD_decompressDCtx(dctx, out_buff, org_len, src_buff, src_len);
 
    if (decmp_len != org_len) {
-      error(
+      MSZ_ERROR(
          "zstd_decompress: ZSTD_decompressDCtx() error: %s\n",
          ZSTD_getErrorName(decmp_len)
       );
@@ -93,28 +93,28 @@ void* lz4_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
    int decompressed_size;
 
    if (src_buff == NULL) {
-      warning("lz4_decompress: src_buff is null.\n");
+      MSZ_WARN("lz4_decompress: src_buff is null.\n");
       return NULL;
    }
    if (src_len < 0) {
-      warning("lz4_decompress: src_len < 0.\n");
+      MSZ_WARN("lz4_decompress: src_len < 0.\n");
       return NULL;
    }
    if (org_len < 0) {
-      warning("lz4_decompress: org_len <0.\n");
+      MSZ_WARN("lz4_decompress: org_len <0.\n");
       return NULL;
    }
 
    out_buff = malloc(org_len);
    if (out_buff == NULL) {
-      warning("lz4_decompress: error in malloc()\n");
+      MSZ_WARN("lz4_decompress: error in malloc()\n");
       return NULL;
    }
 
    decompressed_size =
        LZ4_decompress_safe(src_buff, out_buff, src_len, org_len);
    if (decompressed_size < 0) {
-      warning("lz4_decompress: error in LZ4_decompress_safe\n");
+      MSZ_WARN("lz4_decompress: error in LZ4_decompress_safe\n");
       free(out_buff);
       return NULL;
    }
@@ -140,7 +140,7 @@ void* no_decompress(ZSTD_DCtx* dctx, void* src_buff, size_t src_len,
    out_buff = alloc_ztsd_dbuff(org_len);  // will return buff, NULL on error
 
    if (out_buff == NULL) {
-      error("no_decompress: error in malloc()\n");
+      MSZ_ERROR("no_decompress: error in malloc()\n");
       return NULL;
    }
 
@@ -171,7 +171,7 @@ void* decmp_block(decompression_fun decompress_fun, ZSTD_DCtx* dctx,
    );
 
    if (out_buff == NULL) {
-      error("decmp_block: Decompression failed for block at offset %ld.\n", offset);
+      MSZ_ERROR("decmp_block: Decompression failed for block at offset %ld.\n", offset);
       return NULL;
    }
 
@@ -207,7 +207,7 @@ decompress_args_t* alloc_decompress_args(
 
    r = malloc(sizeof(decompress_args_t));
    if (r == NULL) {
-      error("alloc_decompress_args: malloc() error.\n");
+      MSZ_ERROR("alloc_decompress_args: malloc() error.\n");
       return NULL;
    }
 
@@ -295,7 +295,7 @@ void* decompress_routine(void* args) {
 
    // Check if the input arguments are valid
    if (db_args == NULL) {
-      error("decompress_routine: Decompression arguments are null.\n");
+      MSZ_ERROR("decompress_routine: Decompression arguments are null.\n");
       return NULL;
    }
 
@@ -308,7 +308,7 @@ void* decompress_routine(void* args) {
 
    // Check if the decompression context was successfully allocated
    if (dctx == NULL) {
-      error("decompress_routine: ZSTD Context failed.\n");
+      MSZ_ERROR("decompress_routine: ZSTD Context failed.\n");
       return NULL;
    }
 
@@ -332,7 +332,7 @@ void* decompress_routine(void* args) {
        unshuffle_block_records(decmp_mz_binary,
                                db_args->mz_binary_blk->original_size,
                                db_args->df->mz_shuffle_elem) != 0) {
-      error("decompress_routine: failed to reverse m/z byte shuffle.\n");
+      MSZ_ERROR("decompress_routine: failed to reverse m/z byte shuffle.\n");
       return NULL;
    }
 
@@ -340,7 +340,7 @@ void* decompress_routine(void* args) {
        unshuffle_block_records(decmp_inten_binary,
                                db_args->inten_binary_blk->original_size,
                                db_args->df->inten_shuffle_elem) != 0) {
-      error("decompress_routine: failed to reverse intensity byte shuffle.\n");
+      MSZ_ERROR("decompress_routine: failed to reverse intensity byte shuffle.\n");
       return NULL;
    }
 
@@ -359,7 +359,7 @@ void* decompress_routine(void* args) {
    long len = division->size;
 
    if (len <= 0) {
-      error(
+      MSZ_ERROR(
           "decompress_routine: Error determining decompression buffer size.\n");
       return NULL;
    }
@@ -368,7 +368,7 @@ void* decompress_routine(void* args) {
    char* buff = malloc(buff_cap);
 
    if (buff == NULL) {
-      error(
+      MSZ_ERROR(
           "decompress_routine: Failed to allocate buffer for decompression.\n");
       return NULL;
    }
@@ -380,14 +380,14 @@ void* decompress_routine(void* args) {
    algo_args* a_args = malloc(sizeof(algo_args));
    
    if (a_args == NULL) {
-      error("decompress_routine: Failed to allocate algo_args.\n");
+      MSZ_ERROR("decompress_routine: Failed to allocate algo_args.\n");
       return NULL;
    }
 
    a_args->z = alloc_z_stream();
 
    if (a_args->z == NULL) {
-      error("decompress_routine: Failed to allocate z_stream.\n");
+      MSZ_ERROR("decompress_routine: Failed to allocate z_stream.\n");
       free(a_args);
       return NULL;
    }
@@ -395,7 +395,7 @@ void* decompress_routine(void* args) {
    a_args->z_inflate = alloc_z_stream_inflate();
 
    if (a_args->z_inflate == NULL) {
-      error("decompress_routine: Failed to allocate inflate z_stream.\n");
+      MSZ_ERROR("decompress_routine: Failed to allocate inflate z_stream.\n");
       dealloc_z_stream(a_args->z);
       free(a_args);
       return NULL;
@@ -426,7 +426,7 @@ void* decompress_routine(void* args) {
             }
             assert(curr_len > 0 && curr_len <= len);
             if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
-               error("decompress_routine: Failed to grow output buffer.\n");
+               MSZ_ERROR("decompress_routine: Failed to grow output buffer.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -460,7 +460,7 @@ void* decompress_routine(void* args) {
             a_args->scale_factor = db_args->df->mz_scale_factor;
 
             if (db_args->df->target_mz_fun == NULL) {
-               error("decompress_routine: target_mz_fun is NULL, cannot decode mz block.\n");
+               MSZ_ERROR("decompress_routine: target_mz_fun is NULL, cannot decode mz block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -472,7 +472,7 @@ void* decompress_routine(void* args) {
                                        buff_off);
             db_args->ret = buff;  // may have moved, even on failure
             if (enc_ret) {
-               error("decompress_routine: Failed to encode mz block.\n");
+               MSZ_ERROR("decompress_routine: Failed to encode mz block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -498,7 +498,7 @@ void* decompress_routine(void* args) {
             }
             assert(curr_len > 0 && curr_len < len);
             if (grow_buff(&buff, &buff_cap, buff_off + curr_len)) {
-               error("decompress_routine: Failed to grow output buffer.\n");
+               MSZ_ERROR("decompress_routine: Failed to grow output buffer.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -532,7 +532,7 @@ void* decompress_routine(void* args) {
             a_args->scale_factor = db_args->df->int_scale_factor;
 
             if (db_args->df->target_inten_fun == NULL) {
-               error("decompress_routine: target_inten_fun is NULL, cannot decode intensity block.\n");
+               MSZ_ERROR("decompress_routine: target_inten_fun is NULL, cannot decode intensity block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -544,7 +544,7 @@ void* decompress_routine(void* args) {
                                        buff_off);
             db_args->ret = buff;  // may have moved, even on failure
             if (enc_ret) {
-               error("decompress_routine: Failed to encode intensity block.\n");
+               MSZ_ERROR("decompress_routine: Failed to encode intensity block.\n");
                dealloc_z_stream(a_args->z);
                dealloc_z_stream_inflate(a_args->z_inflate);
                free(a_args);
@@ -594,7 +594,7 @@ int decompress_msz(char* input_map, size_t input_filesize,
    data_format_t* df;
    int threads = arguments->threads;
 
-   print("\tDetected .msz file, reading header and footer...\n");
+   MSZ_INFO("\tDetected .msz file, reading header and footer...\n");
 
    /* Gate decoding, not identification: --describe still reports the version
     * of a file this build cannot decode. */
@@ -609,13 +609,13 @@ int decompress_msz(char* input_map, size_t input_filesize,
       return -1;
 
    if (n_divisions == 0) {
-      warning("No divisions found in file, aborting...\n");
+      MSZ_WARN("No divisions found in file, aborting...\n");
       return -1;
    }
 
    int ret = set_decompress_runtime_variables(df, msz_footer);
    if (ret != 0) {
-      error("decompress_msz: Failed to set decompression runtime variables.\n");
+      MSZ_ERROR("decompress_msz: Failed to set decompression runtime variables.\n");
       return -1;
    }
 
@@ -697,14 +697,14 @@ int decompress_msz(char* input_map, size_t input_filesize,
 
       for (i = divisions_used; i < divisions_used + threads; i++) {
          if (args[i]->ret == NULL || args[i]->ret_len == -1) {
-            error("decompress_msz: Decompression failed for division %d.\n", i);
+            MSZ_ERROR("decompress_msz: Decompression failed for division %d.\n", i);
             return -1;
          }
          start = get_time();
          write_to_file(fd, args[i]->ret, args[i]->ret_len);
          stop = get_time();
 
-         print("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len,
+         MSZ_INFO("\tWrote %ld bytes to disk (%1.2fmb/s)\n", args[i]->ret_len,
                (float)args[i]->ret_len / (stop - start) / 1024 / 1024);
 
          dealloc_decompress_args(args[i]);
@@ -740,7 +740,7 @@ decompression_fun set_decompress_fun(int accession) {
       case _no_comp_:
          return no_decompress;
       default:
-         error("Compression type not supported.");
+         MSZ_ERROR("Compression type not supported.");
          return NULL;
    }
 }

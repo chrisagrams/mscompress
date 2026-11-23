@@ -38,16 +38,16 @@ void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
                    size_t* out_len)
 {
    if (zblk == NULL || zblk->buff == NULL)
-      error("encode_base64: zblk is NULL");
+      MSZ_ERROR("encode_base64: zblk is NULL");
 
    if (dest == NULL)
-      error("encode_base64: dest is NULL");
+      MSZ_ERROR("encode_base64: dest is NULL");
 
    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
-      error("encode_base64: src_len is invalid");
+      MSZ_ERROR("encode_base64: src_len is invalid");
 
    if (out_len == NULL)
-      error("encode_base64: out_len is NULL");
+      MSZ_ERROR("encode_base64: out_len is NULL");
 
    // char* b64_out_buff;
 
@@ -82,19 +82,19 @@ void encode_base64(zlib_block_t* zblk, char* dest, size_t src_len,
 void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
                                char* dest, size_t* out_len) {
    if (src == NULL || *src == NULL)
-      error("encode_zlib_fun: src is NULL");
+      MSZ_ERROR("encode_zlib_fun: src is NULL");
 
    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
-      error("encode_zlib_fun: src_len is invalid");
+      MSZ_ERROR("encode_zlib_fun: src_len is invalid");
 
    if (dest == NULL)
-      error("encode_zlib_fun: dest is NULL");
+      MSZ_ERROR("encode_zlib_fun: dest is NULL");
 
    if (out_len == NULL)
-      error("encode_zlib_fun: out_len is NULL");
+      MSZ_ERROR("encode_zlib_fun: out_len is NULL");
 
    if (z == NULL)
-      error("encode_zlib_fun: z is NULL");
+      MSZ_ERROR("encode_zlib_fun: z is NULL");
 
    Bytef* zlib_encoded;
 
@@ -110,7 +110,7 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
 
    zlib_len = (size_t)zlib_compress(z, ((Bytef*)*src), cmp_output, src_len);
    if (zlib_len == 0) {
-      error("encode_zlib_fun: zlib_compress error\n");
+      MSZ_ERROR("encode_zlib_fun: zlib_compress error\n");
       zlib_dealloc(cmp_output);
       *out_len = 0;
       // Continue to move forward
@@ -146,19 +146,19 @@ void encode_zlib_fun_no_header(z_stream* z, char** src, size_t src_len,
 void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
                               char* dest, size_t* out_len) {
    if (src == NULL || *src == NULL)
-      error("encode_zlib_fun: src is NULL");
+      MSZ_ERROR("encode_zlib_fun: src is NULL");
 
    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
-      error("encode_zlib_fun: src_len is invalid");
+      MSZ_ERROR("encode_zlib_fun: src_len is invalid");
 
    if (dest == NULL)
-      error("encode_zlib_fun: dest is NULL");
+      MSZ_ERROR("encode_zlib_fun: dest is NULL");
 
    if (out_len == NULL)
-      error("encode_zlib_fun: out_len is NULL");
+      MSZ_ERROR("encode_zlib_fun: out_len is NULL");
 
    if (z == NULL)
-      error("encode_zlib_fun: z is NULL");
+      MSZ_ERROR("encode_zlib_fun: z is NULL");
 
    Bytef* zlib_encoded;
 
@@ -184,7 +184,7 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
                                     cmp_output, org_len);
 
    if (zlib_len == 0) {
-      error("encode_zlib_fun: zlib_compress error\n");
+      MSZ_ERROR("encode_zlib_fun: zlib_compress error\n");
       free(decmp_input);
       free(decmp_header);
       zlib_dealloc(cmp_output);
@@ -225,16 +225,16 @@ void encode_zlib_fun_w_header(z_stream* z, char** src, size_t src_len,
 void encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len,
                                  char* dest, size_t* out_len) {
    if (src == NULL || *src == NULL)
-      error("encode_zlib_fun: src is NULL");
+      MSZ_ERROR("encode_zlib_fun: src is NULL");
 
    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
-      error("encode_zlib_fun: src_len is invalid");
+      MSZ_ERROR("encode_zlib_fun: src_len is invalid");
 
    if (dest == NULL)
-      error("encode_zlib_fun: dest is NULL");
+      MSZ_ERROR("encode_zlib_fun: dest is NULL");
 
    if (out_len == NULL)
-      error("encode_zlib_fun: out_len is NULL");
+      MSZ_ERROR("encode_zlib_fun: out_len is NULL");
 
    Bytef* zlib_encoded;
 
@@ -242,7 +242,7 @@ void encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len,
 
    zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
    if (decmp_input == NULL)
-      error("encode_no_comp_fun: malloc failed");
+      MSZ_ERROR("encode_no_comp_fun: malloc failed");
 
    decmp_input->mem = *src;
    decmp_input->offset = ZLIB_SIZE_OFFSET;
@@ -275,16 +275,16 @@ void encode_no_comp_fun_w_header(z_stream* z, char** src, size_t src_len,
 void encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len,
                                   char* dest, size_t* out_len) {
    if (src == NULL || *src == NULL)
-      error("encode_zlib_fun: src is NULL");
+      MSZ_ERROR("encode_zlib_fun: src is NULL");
 
    if (src_len <= 0 || src_len > ZLIB_BUFF_FACTOR)
-      error("encode_zlib_fun: src_len is invalid");
+      MSZ_ERROR("encode_zlib_fun: src_len is invalid");
 
    if (dest == NULL)
-      error("encode_zlib_fun: dest is NULL");
+      MSZ_ERROR("encode_zlib_fun: dest is NULL");
 
    if (out_len == NULL)
-      error("encode_zlib_fun: out_len is NULL");
+      MSZ_ERROR("encode_zlib_fun: out_len is NULL");
 
    Bytef* zlib_encoded;
 
@@ -292,7 +292,7 @@ void encode_no_comp_fun_no_header(z_stream* z, char** src, size_t src_len,
 
    zlib_block_t* decmp_input = malloc(sizeof(zlib_block_t));
    if (decmp_input == NULL)
-      error("encode_no_comp_fun: malloc failed");
+      MSZ_ERROR("encode_no_comp_fun: malloc failed");
 
    decmp_input->mem = *src;
    // decmp_input->offset = ZLIB_SIZE_OFFSET;
@@ -379,7 +379,7 @@ void no_encode_no_header(z_stream* z, char** src, size_t src_len, char* dest,
 */
 encode_fun set_encode_fun(int compression_method, int algo, int accession) {
    if (algo == 0)
-      error("set_encode_fun: lossy is 0");
+      MSZ_ERROR("set_encode_fun: lossy is 0");
    switch (compression_method) {
       case _zlib_:
          if (algo == _lossless_ ||
@@ -400,7 +400,7 @@ encode_fun set_encode_fun(int compression_method, int algo, int accession) {
          else
             assert(0);  // Not yet implemented!
       default:
-         error("Invalid compression method.");
+         MSZ_ERROR("Invalid compression method.");
          return NULL;
    }
 }

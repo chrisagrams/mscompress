@@ -44,7 +44,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_log_2_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for log2_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for log2_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -56,7 +56,7 @@ Algo set_compress_algo(int algo, int accession) {
                return algo_decode_lossless;  // casting 32 to 32 is just
                                              // lossless
             default:
-               error("set_compress_algo: Unknown accession for cast_64_to_32: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for cast_64_to_32: %d\n", accession);
                return NULL;
          }
       };
@@ -67,7 +67,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _32f_:
                return algo_decode_cast16_32f;
             default:
-               error("set_compress_algo: Unknown accession for cast_64_to_16: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for cast_64_to_16: %d\n", accession);
                return NULL;
          }
       };
@@ -78,7 +78,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_delta16_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for delta16_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for delta16_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -89,7 +89,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_delta24_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for delta24_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for delta24_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -100,7 +100,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_delta32_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for delta32_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for delta32_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -111,7 +111,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_vdelta16_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for vdelta16_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for vdelta16_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -122,7 +122,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_vdelta24_transform_64d;
             default:
-               error("set_compress_algo: Unknown accession for vdelta24_transform: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for vdelta24_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -133,7 +133,7 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_vbr_64d;
             default:
-               error("set_compress_algo: Unknown accession for vbr: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for vbr: %d\n", accession);
                return NULL;
          }
       };
@@ -144,12 +144,12 @@ Algo set_compress_algo(int algo, int accession) {
             case _64d_:
                return algo_decode_bitpack_64d;
             default:
-               error("set_compress_algo: Unknown accession for bitpack: %d\n", accession);
+               MSZ_ERROR("set_compress_algo: Unknown accession for bitpack: %d\n", accession);
                return NULL;
          }
       };
       default:
-         error("set_compress_algo: Unknown compression algorithm");
+         MSZ_ERROR("set_compress_algo: Unknown compression algorithm");
          return NULL;
    }
 }
@@ -171,7 +171,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_log_2_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for log2_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for log2_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -183,7 +183,7 @@ Algo set_decompress_algo(int algo, int accession) {
                return algo_encode_lossless;  // casting 32 to 32 is just
                                              // lossless
             default:
-               error("set_decompress_algo: Unknown accession for cast_64_to_32: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for cast_64_to_32: %d\n", accession);
                return NULL;
          }
       };
@@ -194,7 +194,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _32f_:
                return algo_encode_cast16_32f;
             default:
-               error("set_decompress_algo: Unknown accession for cast_64_to_16: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for cast_64_to_16: %d\n", accession);
                return NULL;
          }
       }
@@ -205,7 +205,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_delta16_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for delta16_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for delta16_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -216,7 +216,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_delta24_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for delta24_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for delta24_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -227,7 +227,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_delta32_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for delta32_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for delta32_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -238,7 +238,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_vdelta16_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for vdelta16_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for vdelta16_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -249,7 +249,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_vdelta24_transform_64d;
             default:
-               error("set_decompress_algo: Unknown accession for vdelta24_transform: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for vdelta24_transform: %d\n", accession);
                return NULL;
          }
       };
@@ -260,7 +260,7 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_vbr_64d;
             default:
-               error("set_decompress_algo: Unknown accession for vbr: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for vbr: %d\n", accession);
                return NULL;
          }
       };
@@ -271,12 +271,12 @@ Algo set_decompress_algo(int algo, int accession) {
             case _64d_:
                return algo_encode_bitpack_64d;
             default:
-               error("set_decompress_algo: Unknown accession for bitpack: %d\n", accession);
+               MSZ_ERROR("set_decompress_algo: Unknown accession for bitpack: %d\n", accession);
                return NULL;
          }
       };
       default:
-         error("set_decompress_algo: Unknown compression algorithm");
+         MSZ_ERROR("set_decompress_algo: Unknown compression algorithm");
          return NULL;
    }
 }
@@ -288,14 +288,14 @@ Algo set_decompress_algo(int algo, int accession) {
  */
 int get_algo_type(const char* arg) {
    if (arg == NULL)
-      error("get_algo_type: arg is NULL");
+      MSZ_ERROR("get_algo_type: arg is NULL");
    if (strcmp(arg, "lossless") == 0 || *arg == '\0')
       return _lossless_;
    for (int i = 0; i < algo_registry_size; i++) {
       if (strcmp(arg, algo_registry[i].name) == 0)
          return algo_registry[i].type;
    }
-   error("get_algo_type: Unknown compression algorithm");
+   MSZ_ERROR("get_algo_type: Unknown compression algorithm");
    return -1;
 }
 
@@ -339,6 +339,6 @@ int encode_into_buff(Algo target_fun, algo_args* a_args, char** src,
       if (attempt == 1) break;
       if (grow_buff(buff, cap, off + *a_args->dest_len)) return 1;
    }
-   error("encode_into_buff: encoder output did not fit after growing buffer.\n");
+   MSZ_ERROR("encode_into_buff: encoder output did not fit after growing buffer.\n");
    return 1;
 }

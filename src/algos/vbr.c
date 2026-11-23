@@ -30,13 +30,13 @@ void algo_decode_vbr_32f(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args->src == NULL) {
-      error("algo_decode_vbr_32f: src is NULL");
+      MSZ_ERROR("algo_decode_vbr_32f: src is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_decode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -54,7 +54,7 @@ void algo_decode_vbr_32f(void* args) {
 
    if (decoded_len + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t) >
        UINT32_MAX) {
-      error("algo_decode_vbr_32f: decoded_len > UINT32_MAX");
+      MSZ_ERROR("algo_decode_vbr_32f: decoded_len > UINT32_MAX");
       a_args->ret_code = -1;
       return;
    }
@@ -87,7 +87,7 @@ void algo_decode_vbr_32f(void* args) {
               res_len);  // Allocate space for result and leave room for header
 
    if (res == NULL) {
-      error("algo_decode_vbr_32f: malloc failed");
+      MSZ_ERROR("algo_decode_vbr_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -183,13 +183,13 @@ void algo_decode_vbr_64d(void* args) {
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_decode_vbr_64d: args is NULL");
+      MSZ_ERROR("algo_decode_vbr_64d: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_decode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_decode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -207,7 +207,7 @@ void algo_decode_vbr_64d(void* args) {
 
    if (decoded_len + sizeof(uint32_t) + sizeof(double) + sizeof(uint32_t) >
        UINT32_MAX) {
-      error("algo_decode_vbr_64d: decoded_len > UINT32_MAX");
+      MSZ_ERROR("algo_decode_vbr_64d: decoded_len > UINT32_MAX");
       a_args->ret_code = -1;
       return;
    }
@@ -240,7 +240,7 @@ void algo_decode_vbr_64d(void* args) {
               res_len);  // Allocate space for result and leave room for header
 
    if (res == NULL) {
-      error("algo_decode_vbr_64d: malloc failed");
+      MSZ_ERROR("algo_decode_vbr_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -340,13 +340,13 @@ void algo_encode_vbr_32f(void* args)
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vbr_32f: args is NULL");
+      MSZ_ERROR("algo_encode_vbr_32f: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _32f_) {
-      error("algo_encode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vbr_32f: Unknown data format. Expected _32f_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -361,7 +361,7 @@ void algo_encode_vbr_32f(void* args)
    uint32_t len = *(uint32_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vbr_32f: len is <= 0");
+      MSZ_ERROR("algo_encode_vbr_32f: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -370,7 +370,7 @@ void algo_encode_vbr_32f(void* args)
    void* res = calloc(1, len);
 
    if (res == NULL) {
-      error("algo_encode_vbr_32f: malloc failed");
+      MSZ_ERROR("algo_encode_vbr_32f: malloc failed");
       a_args->ret_code = -1;
       return;
    }
@@ -457,13 +457,13 @@ void algo_encode_vbr_64d(void* args)
    algo_args* a_args = (algo_args*)args;
 
    if (a_args == NULL) {
-      error("algo_encode_vbr_64d: args is NULL");
+      MSZ_ERROR("algo_encode_vbr_64d: args is NULL");
       a_args->ret_code = -1;
       return;
    }
 
    if (a_args->src_format != _64d_) {
-      error("algo_encode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
+      MSZ_ERROR("algo_encode_vbr_64d: Unknown data format. Expected _64d_, got %d", a_args->src_format);
       a_args->ret_code = -1;
       return;
    }
@@ -478,7 +478,7 @@ void algo_encode_vbr_64d(void* args)
    uint32_t len = *(uint32_t*)(*a_args->src);
 
    if (len <= 0) {
-      error("algo_encode_vbr_64d: len is <= 0");
+      MSZ_ERROR("algo_encode_vbr_64d: len is <= 0");
       a_args->ret_code = -1;
       return;
    }
@@ -487,7 +487,7 @@ void algo_encode_vbr_64d(void* args)
    void* res = calloc(1, len);
 
    if (res == NULL) {
-      error("algo_encode_vbr_64d: malloc failed");
+      MSZ_ERROR("algo_encode_vbr_64d: malloc failed");
       a_args->ret_code = -1;
       return;
    }
