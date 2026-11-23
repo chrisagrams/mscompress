@@ -180,7 +180,7 @@ cd node/
 npm install
 ```
 
-3. Build TypeScript sources
+3. Build the native addon and TypeScript sources
 ```
 npm run build
 ```

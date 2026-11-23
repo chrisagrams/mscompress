@@ -14,14 +14,14 @@
  */
 zlib_block_t* zlib_alloc(int offset) {
    if (offset < 0) {
-      error("zlib_alloc: offset must be >= 0");
+      MSZ_ERROR("zlib_alloc: offset must be >= 0");
       return NULL;
    }
 
    zlib_block_t* r = malloc(sizeof(zlib_block_t));
 
    if (r == NULL) {
-      error("zlib_alloc: malloc error");
+      MSZ_ERROR("zlib_alloc: malloc error");
       return NULL;
    }
    r->len = ZLIB_BUFF_FACTOR;
@@ -29,7 +29,7 @@ zlib_block_t* zlib_alloc(int offset) {
    r->offset = offset;
    r->mem = malloc(r->size);
    if (r->mem == NULL) {
-      error("zlib_alloc: malloc error");
+      MSZ_ERROR("zlib_alloc: malloc error");
       return NULL;
    }
    r->buff = r->mem + r->offset;
@@ -48,7 +48,7 @@ int zlib_realloc(zlib_block_t* old_block, size_t new_size) {
    old_block->size = old_block->len + old_block->offset;
    old_block->mem = realloc(old_block->mem, old_block->size);
    if (!old_block->mem) {
-      error("zlib_realloc: realloc error");
+      MSZ_ERROR("zlib_realloc: realloc error");
       return 1;
    }
    old_block->buff = old_block->mem + old_block->offset;
@@ -91,7 +91,7 @@ void* zlib_pop_header(zlib_block_t* blk) {
    void* r;
    r = malloc(blk->offset);
    if (r == NULL) {
-      error("zlib_pop_header: malloc error");
+      MSZ_ERROR("zlib_pop_header: malloc error");
       return NULL;
    }
    memcpy(r, blk->mem, blk->offset);
@@ -109,11 +109,11 @@ z_stream* alloc_z_stream() {
    z = calloc(1, sizeof(z_stream));
 
    if (z == NULL) {
-      error("alloc_z_stream: calloc error\n");
+      MSZ_ERROR("alloc_z_stream: calloc error\n");
       return NULL;
    }
    if (deflateInit(z, Z_DEFAULT_COMPRESSION) != Z_OK) {
-      error("alloc_z_stream: deflateInit error\n");
+      MSZ_ERROR("alloc_z_stream: deflateInit error\n");
       return NULL;
    }
 
@@ -142,11 +142,11 @@ z_stream* alloc_z_stream_inflate() {
    z = calloc(1, sizeof(z_stream));
 
    if (z == NULL) {
-      error("alloc_z_stream_inflate: calloc error\n");
+      MSZ_ERROR("alloc_z_stream_inflate: calloc error\n");
       return NULL;
    }
    if (inflateInit(z) != Z_OK) {
-      error("alloc_z_stream_inflate: inflateInit error\n");
+      MSZ_ERROR("alloc_z_stream_inflate: inflateInit error\n");
       free(z);
       return NULL;
    }
@@ -182,7 +182,7 @@ uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
    uInt output_len = output->len;
 
    if (z == NULL) {
-      error("zlib_compress: z_stream is NULL");
+      MSZ_ERROR("zlib_compress: z_stream is NULL");
       return 0;
    }
 
@@ -207,7 +207,7 @@ uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
       output_len += ZLIB_BUFF_FACTOR;
       zlib_realloc_ret = zlib_realloc(output, output_len);
       if (zlib_realloc_ret != 0) {
-         error("zlib_compress: zlib_realloc error\n");
+         MSZ_ERROR("zlib_compress: zlib_realloc error\n");
          return 0;
       }
 
@@ -220,7 +220,7 @@ uInt zlib_compress(z_stream* z, Bytef* input, zlib_block_t* output,
    zlib_realloc_ret = zlib_realloc(output, r);  // shrink the buffer down to only what is in use
 
    if (zlib_realloc_ret != 0) {
-      error("zlib_compress: zlib_realloc error\n");
+      MSZ_ERROR("zlib_compress: zlib_realloc error\n");
       return 0;
    }
 
@@ -246,14 +246,14 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
    uInt output_len = output->len;
 
    if (z == NULL) {
-      error("zlib_decompress: z_stream is NULL");
+      MSZ_ERROR("zlib_decompress: z_stream is NULL");
       return 0;
    }
 
    /* Reuse the caller's dedicated inflate stream: reset (cheap, keeps the
     * already-allocated window) instead of inflateInit/inflateEnd per block. */
    if (inflateReset(z) != Z_OK) {
-      error("zlib_decompress: inflateReset error\n");
+      MSZ_ERROR("zlib_decompress: inflateReset error\n");
       return 0;
    }
 
@@ -277,7 +277,7 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
       output_len += ZLIB_BUFF_FACTOR;
       zlib_realloc_ret = zlib_realloc(output, output_len);
       if (zlib_realloc_ret != 0) {
-         error("zlib_decompress: zlib_realloc error\n");
+         MSZ_ERROR("zlib_decompress: zlib_realloc error\n");
          return 0;
       }
 
@@ -288,7 +288,7 @@ uInt zlib_decompress(z_stream* z, Bytef* input, zlib_block_t* output,
    zlib_realloc_ret = zlib_realloc(output, r);  // shrink the buffer down to only what is in use
 
    if (zlib_realloc_ret != 0) {
-      error("zlib_decompress: zlib_realloc error\n");
+      MSZ_ERROR("zlib_decompress: zlib_realloc error\n");
       return 0;
    }
 

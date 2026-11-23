@@ -131,7 +131,7 @@ static int walk_dir(const char* dir, int recursive, strlist_t* out) {
    HANDLE h = FindFirstFileA(pattern, &ffd);
    free(pattern);
    if (h == INVALID_HANDLE_VALUE) {
-      warning("batch: cannot open directory '%s'\n", dir);
+      MSZ_WARN("batch: cannot open directory '%s'\n", dir);
       return -1;
    }
 
@@ -157,7 +157,7 @@ static int walk_dir(const char* dir, int recursive, strlist_t* out) {
 static int walk_dir(const char* dir, int recursive, strlist_t* out) {
    DIR* d = opendir(dir);
    if (!d) {
-      warning("batch: cannot open directory '%s': %s\n", dir, strerror(errno));
+      MSZ_WARN("batch: cannot open directory '%s': %s\n", dir, strerror(errno));
       return -1;
    }
    struct dirent* ent;
@@ -196,7 +196,7 @@ static int glob_win32(const char* pattern, int recursive, strlist_t* out) {
    if (slash) {
       size_t dl = (size_t)(slash - pattern);
       if (dl >= sizeof(dirbuf)) {
-         warning("batch: glob pattern too long ('%s')\n", pattern);
+         MSZ_WARN("batch: glob pattern too long ('%s')\n", pattern);
          return -1;
       }
       memcpy(dirbuf, pattern, dl);
@@ -236,7 +236,7 @@ static int resolve_token(const char* tok, int recursive, strlist_t* out) {
       int gr = glob(tok, 0, NULL, &g);
       if (gr == GLOB_NOMATCH) { globfree(&g); return 0; }
       if (gr != 0) {
-         warning("batch: glob('%s') failed\n", tok);
+         MSZ_WARN("batch: glob('%s') failed\n", tok);
          return -1;
       }
       int rc = 0;
@@ -262,7 +262,7 @@ static int resolve_token(const char* tok, int recursive, strlist_t* out) {
 
    if (is_regular_file(tok)) return strlist_push(out, tok);
 
-   warning("batch: input '%s' not found (skipped)\n", tok);
+   MSZ_WARN("batch: input '%s' not found (skipped)\n", tok);
    return 0;
 }
 
@@ -270,7 +270,7 @@ static int resolve_token(const char* tok, int recursive, strlist_t* out) {
 static int read_paths_from_file(const char* path, int recursive, strlist_t* out) {
    FILE* f = (strcmp(path, "-") == 0) ? stdin : fopen(path, "r");
    if (!f) {
-      warning("batch: cannot open --from-file '%s': %s\n", path,
+      MSZ_WARN("batch: cannot open --from-file '%s': %s\n", path,
               strerror(errno));
       return -1;
    }
@@ -652,12 +652,12 @@ batch_writer_t* batch_writer_open(const char* out_path) {
     * header, and under O_APPEND every write would be forced to EOF instead. */
    w->out_fd = open_output_file_rw(w->out_path);
    if (w->out_fd < 0) {
-      error("batch: cannot open output archive '%s'\n", out_path);
+      MSZ_ERROR("batch: cannot open output archive '%s'\n", out_path);
       batch_writer_free(w);
       return NULL;
    }
    if (!fd_is_seekable(w->out_fd)) {
-      error("batch: .mszx output must be a regular file, not a pipe/stdout "
+      MSZ_ERROR("batch: .mszx output must be a regular file, not a pipe/stdout "
             "('%s')\n",
             out_path);
       close_file(w->out_fd);
@@ -686,14 +686,14 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
                           Arguments* args) {
    if (!w || !mapping || !args || filesize == 0) return -1;
    if (w->poisoned) {
-      error("batch: writer is unusable after a mid-entry failure\n");
+      MSZ_ERROR("batch: writer is unusable after a mid-entry failure\n");
       return -1;
    }
 
    const char* label = src_name ? src_name : "(unnamed)";
 
    if (!is_mzml(mapping, filesize)) {
-      warning("batch: '%s' is not an mzML file (skipped)\n", label);
+      MSZ_WARN("batch: '%s' is not an mzML file (skipped)\n", label);
       return -1;
    }
 
@@ -704,7 +704,7 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
 
    tar_entry_t te;
    if (tar_begin_entry(w->out_fd, name, &te) != 0) {
-      error("batch: tar_begin_entry failed for '%s'\n", name);
+      MSZ_ERROR("batch: tar_begin_entry failed for '%s'\n", name);
       free(name);
       return -1;
    }
@@ -726,11 +726,11 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
    args->spectrum_meta = saved_meta;
 
    if (pre_rc) {
-      error("batch: preprocess failed for '%s'\n", label);
+      MSZ_ERROR("batch: preprocess failed for '%s'\n", label);
       fail = 1;
    } else if (compress_mzml((char*)mapping, filesize, args, df, divs,
                             w->out_fd)) {
-      error("batch: compress failed for '%s'\n", label);
+      MSZ_ERROR("batch: compress failed for '%s'\n", label);
       fail = 1;
    }
 
@@ -746,7 +746,7 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
     * the compressed entry. */
    if (!fail && w->index &&
        mszx_index_builder_add(w->index, (uint32_t)w->n_recs, divs) != 0) {
-      error("batch: failed to index '%s'\n", label);
+      MSZ_ERROR("batch: failed to index '%s'\n", label);
       fail = 1;
    }
 
@@ -754,7 +754,7 @@ int batch_writer_add_mzml(batch_writer_t* w, const char* entry_name,
    uint64_t payload_bytes = (uint64_t)(payload_end - payload_start);
 
    if (!fail && tar_end_entry(w->out_fd, &te, payload_bytes) != 0) {
-      error("batch: tar_end_entry failed for '%s'\n", name);
+      MSZ_ERROR("batch: tar_end_entry failed for '%s'\n", name);
       fail = 1;
    }
 
@@ -794,7 +794,7 @@ int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
    if (!w || !archive_name || (!data && len > 0) || !format) return -1;
    if (w->poisoned) return -1;
    if (entry_index < 0 || (size_t)entry_index >= w->n_recs) {
-      error("batch: annotation refers to unknown entry index %d\n", entry_index);
+      MSZ_ERROR("batch: annotation refers to unknown entry index %d\n", entry_index);
       return -1;
    }
 
@@ -810,7 +810,7 @@ int batch_writer_add_annotation(batch_writer_t* w, int entry_index,
 
    /* Known size up front, so this is a plain single-shot tar member. */
    if (tar_add_file(w->out_fd, archive_name, data, len) != 0) {
-      error("batch: failed to write annotation '%s'\n", archive_name);
+      MSZ_ERROR("batch: failed to write annotation '%s'\n", archive_name);
       w->poisoned = 1;
       return -1;
    }
@@ -844,7 +844,7 @@ int batch_writer_set_join_key(batch_writer_t* w, int entry_index,
 int batch_writer_set_index(batch_writer_t* w, int enabled) {
    if (!w) return -1;
    if (w->n_recs > 0) {
-      error("batch: the index must be configured before adding entries\n");
+      MSZ_ERROR("batch: the index must be configured before adding entries\n");
       return -1;
    }
    if (!enabled) {
@@ -879,12 +879,12 @@ int batch_writer_finish(batch_writer_t* w) {
    if (!w) return -1;
 
    if (w->poisoned) {
-      error("batch: refusing to finalize an archive with a failed entry\n");
+      MSZ_ERROR("batch: refusing to finalize an archive with a failed entry\n");
       batch_writer_abort(w);
       return -1;
    }
    if (w->n_recs == 0) {
-      error("batch: no entries were written; nothing to finalize\n");
+      MSZ_ERROR("batch: no entries were written; nothing to finalize\n");
       batch_writer_abort(w);
       return -1;
    }
@@ -896,7 +896,7 @@ int batch_writer_finish(batch_writer_t* w) {
       void* ibuf = mszx_index_builder_serialize(w->index, (uint32_t)w->n_recs,
                                                 &ilen);
       if (!ibuf || tar_add_file(w->out_fd, MSZX_INDEX_ENTRY, ibuf, ilen)) {
-         error("batch: failed to write %s\n", MSZX_INDEX_ENTRY);
+         MSZ_ERROR("batch: failed to write %s\n", MSZX_INDEX_ENTRY);
          rc = -1;
       }
       free(ibuf);
@@ -913,13 +913,13 @@ int batch_writer_finish(batch_writer_t* w) {
     * payload has streamed out. */
    if (rc == 0 &&
        (!manifest || tar_add_file(w->out_fd, "manifest.json", manifest, mlen))) {
-      error("batch: failed to write manifest.json\n");
+      MSZ_ERROR("batch: failed to write manifest.json\n");
       rc = -1;
    }
    free(manifest);
 
    if (rc == 0 && tar_finish(w->out_fd) != 0) {
-      error("batch: failed to finalize archive\n");
+      MSZ_ERROR("batch: failed to finalize archive\n");
       rc = -1;
    }
 
@@ -960,7 +960,7 @@ int compress_batch(Arguments* arguments) {
    sort_and_dedup(&files);
 
    if (files.count == 0) {
-      error("batch: no input mzML files matched. Nothing to do.\n");
+      MSZ_ERROR("batch: no input mzML files matched. Nothing to do.\n");
       strlist_free(&files);
       return -1;
    }
@@ -986,7 +986,7 @@ int compress_batch(Arguments* arguments) {
 
    if (!arguments->index) batch_writer_set_index(w, 0);
 
-   print("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
+   MSZ_INFO("=== Batch compressing %zu mzML file(s) -> %s ===\n", files.count,
          out_path);
 
    /* 3) Stream each file as one tar entry. */
@@ -998,7 +998,7 @@ int compress_batch(Arguments* arguments) {
 
       int in_fd = open_input_file((char*)path);
       if (in_fd < 0) {
-         warning("batch: cannot open '%s'\n", path);
+         MSZ_WARN("batch: cannot open '%s'\n", path);
          n_skipped++;
          if (arguments->continue_on_error) continue;
          fatal = 1;
@@ -1008,7 +1008,7 @@ int compress_batch(Arguments* arguments) {
       void* map = get_mapping(in_fd);
       long fsize = (long)get_filesize((char*)path);
       if (!map || fsize <= 0) {
-         warning("batch: cannot map '%s'\n", path);
+         MSZ_WARN("batch: cannot map '%s'\n", path);
          if (map) remove_mapping(map, fsize);
          close_file(in_fd);
          n_skipped++;
@@ -1017,7 +1017,7 @@ int compress_batch(Arguments* arguments) {
          break;
       }
 
-      print("\t[%zu/%zu] %s\n", i + 1, files.count, base_name(path));
+      MSZ_INFO("\t[%zu/%zu] %s\n", i + 1, files.count, base_name(path));
 
       int idx = batch_writer_add_mzml(w, NULL, path, map, (size_t)fsize,
                                       arguments);
@@ -1030,7 +1030,7 @@ int compress_batch(Arguments* arguments) {
           * cannot rescue it; only pre-entry rejections (a non-mzML input) are
           * skippable. */
          if (w->poisoned) {
-            error("batch: cannot continue after a mid-entry failure; "
+            MSZ_ERROR("batch: cannot continue after a mid-entry failure; "
                   "aborting archive.\n");
             fatal = 1;
             break;
@@ -1045,7 +1045,7 @@ int compress_batch(Arguments* arguments) {
 
    if (fatal || n_ok == 0) {
       if (n_ok == 0 && !fatal)
-         error("batch: no input mzML files could be compressed.\n");
+         MSZ_ERROR("batch: no input mzML files could be compressed.\n");
       batch_writer_abort(w);
       if (out_path_owned) free(out_path);
       strlist_free(&files);
@@ -1056,9 +1056,9 @@ int compress_batch(Arguments* arguments) {
    int frc = batch_writer_finish(w);
 
    if (frc == 0) {
-      print("=== Batch wrote %zu entries to %s ===\n", n_ok, out_path);
+      MSZ_INFO("=== Batch wrote %zu entries to %s ===\n", n_ok, out_path);
       if (n_skipped)
-         warning("batch: skipped %zu input(s); see warnings above.\n",
+         MSZ_WARN("batch: skipped %zu input(s); see warnings above.\n",
                  n_skipped);
    }
 

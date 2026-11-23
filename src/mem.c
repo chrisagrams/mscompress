@@ -10,21 +10,21 @@
 data_block_t* alloc_data_block(size_t max_size)
 {
    if (max_size <= 0) {
-      error("alloc_data_block: invalid max_size for data block.\n");
+      MSZ_ERROR("alloc_data_block: invalid max_size for data block.\n");
       return NULL;
    }
 
    data_block_t* r = malloc(sizeof(data_block_t));
 
    if (r == NULL) {
-      error("alloc_data_block: Failed to allocate data block.\n");
+      MSZ_ERROR("alloc_data_block: Failed to allocate data block.\n");
       return NULL;
    }
 
    r->mem = malloc(sizeof(char) * max_size);
 
    if (r->mem == NULL) {
-      error("alloc_data_block: Failed to allocate data block memory.\n");
+      MSZ_ERROR("alloc_data_block: Failed to allocate data block memory.\n");
       free(r);
       return NULL;
    }
@@ -43,11 +43,11 @@ data_block_t* alloc_data_block(size_t max_size)
  */
 data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
    if (db == NULL) {
-      error("realloc_data_block: db is NULL.\n");
+      MSZ_ERROR("realloc_data_block: db is NULL.\n");
       return NULL;
    }
    if (new_size <= 0) {
-      error("realloc_data_block: invalid new_size for data block.\n");
+      MSZ_ERROR("realloc_data_block: invalid new_size for data block.\n");
       return NULL;
    }
 
@@ -59,7 +59,7 @@ data_block_t* realloc_data_block(data_block_t* db, size_t new_size) {
    db->mem = realloc(db->mem, new_size);
 
    if (db->mem == NULL) {
-      error("realloc_data_block: Failed to reallocate data block memory.\n");
+      MSZ_ERROR("realloc_data_block: Failed to reallocate data block memory.\n");
       return NULL;
    }
 
@@ -79,13 +79,13 @@ int dealloc_data_block(data_block_t* db)
       if (db->mem)
          free(db->mem);
       else {
-         error("dealloc_data_block: db's mem is NULL\n");
+         MSZ_ERROR("dealloc_data_block: db's mem is NULL\n");
          return -1;
       }
       free(db);
    }
    else {
-      error("dealloc_data_block: NULL pointer passed to dealloc_data_block.\n");
+      MSZ_ERROR("dealloc_data_block: NULL pointer passed to dealloc_data_block.\n");
       return -1;
    }
    return 0;
@@ -105,7 +105,7 @@ cmp_block_t* alloc_cmp_block(char* mem, size_t size, size_t original_size)
    cmp_block_t* r = malloc(sizeof(cmp_block_t));
 
    if (r == NULL) {
-      error("alloc_cmp_block: Failed to allocate cmp block.\n");
+      MSZ_ERROR("alloc_cmp_block: Failed to allocate cmp block.\n");
       return NULL;
    }
 
@@ -127,7 +127,7 @@ int dealloc_cmp_block(cmp_block_t* blk) {
          free(blk->mem);
       free(blk);
    } else {
-      error("dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
+      MSZ_ERROR("dealloc_cmp_block: NULL pointer passed to dealloc_cmp_block.\n");
       return -1;
    }
    return 0;

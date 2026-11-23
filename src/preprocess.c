@@ -38,6 +38,8 @@ static void* memmem(const void* haystack, size_t hay_len, const void* needle,
 }
 #endif
 
+#include "../vendor/zlib/zlib.h"
+#include "libbase64.h"
 #include "mscompress.h"
 #include "yxml.h"
 
@@ -45,20 +47,29 @@ static void* memmem(const void* haystack, size_t hay_len, const void* needle,
    atoi(attrbuff + 3) /* Convert an accession to an integer by removing 'MS:' \
                          substring and calling atoi() */
 
+/* Maximum number of spectra infer_source_compression() will skip over when
+   their binary arrays are all empty, before giving up. */
+#define INFER_MAX_SPECTRA 10
+
+/* Verdicts for a single binary array in infer_source_compression(). */
+#define INFER_UNKNOWN 0
+#define INFER_ZLIB 1
+#define INFER_NO_COMP 2
+
 /* === Start of allocation and deallocation helper functions === */
 
 /**
  * @brief Allocates and initializes a yxml parser instance with an internal buffer.
  * @return A pointer to the initialized yxml_t parser.
  * @note The caller is responsible for freeing the returned pointer with `free()`.
- * @warning Calls `error()` and aborts on `malloc` failure.
+ * @warning Calls `MSZ_ERROR()` and aborts on `malloc` failure.
  */
 // TODO: Remove yxml dependency since we no longer use it.
 yxml_t* alloc_yxml() {
    yxml_t* xml = malloc(sizeof(yxml_t) + BUFSIZE);
 
    if (xml == NULL)
-      error("malloc failure in alloc_yxml().\n");
+      MSZ_ERROR("malloc failure in alloc_yxml().\n");
 
    yxml_init(xml, xml + 1, BUFSIZE);
    return xml;
@@ -68,13 +79,15 @@ yxml_t* alloc_yxml() {
  * @brief Allocates a zeroed data_format_t struct with populated field set to 0.
  * @return A pointer to the newly allocated `data_format_t` struct.
  * @note The caller is responsible for freeing the returned pointer with `dealloc_df()`.
- * @warning Calls `error()` and aborts on `malloc` failure.
+ * @warning Calls `MSZ_ERROR()` and aborts on `malloc` failure.
  */
 data_format_t* alloc_df() {
-   data_format_t* df = malloc(sizeof(data_format_t));
+   /* calloc so fields that pattern_detect() never sees (e.g. a missing
+      compression accession) are reliably 0 instead of garbage. */
+   data_format_t* df = calloc(1, sizeof(data_format_t));
 
    if (df == NULL)
-      error("alloc_df: malloc failure.\n");
+      MSZ_ERROR("alloc_df: malloc failure.\n");
    df->populated = 0;
    return df;
 }
@@ -89,7 +102,7 @@ void dealloc_df(data_format_t* df) {
    if (df)
       free(df);
    else
-      error("dealloc_df: df is NULL.\n");
+      MSZ_ERROR("dealloc_df: df is NULL.\n");
 }
 
 /**
@@ -113,16 +126,16 @@ void populate_df_target(data_format_t* df, int target_xml_format,
  */
 data_positions_t* alloc_dp(int total_spec) {
    if (total_spec < 0)
-      error("alloc_dp: total_spec is less than 0!\n");
+      MSZ_ERROR("alloc_dp: total_spec is less than 0!\n");
    if (total_spec > 1000000)  // Realistically, this should never happen
-      warning("alloc_dp: total_spec is greater than 1,000,000!\n");
+      MSZ_WARN("alloc_dp: total_spec is greater than 1,000,000!\n");
    if (total_spec < 0)
-      error("alloc_dp: total_spec is less than 0!\n");
+      MSZ_ERROR("alloc_dp: total_spec is less than 0!\n");
 
    data_positions_t* dp = malloc(sizeof(data_positions_t));
 
    if (dp == NULL)
-      error("alloc_dp: malloc failure.\n");
+      MSZ_ERROR("alloc_dp: malloc failure.\n");
 
    if (total_spec == 0) {
       dp->total_spec = 0;
@@ -137,7 +150,7 @@ data_positions_t* alloc_dp(int total_spec) {
    dp->end_positions = malloc(sizeof(uint64_t) * total_spec * 2);
 
    if (dp->start_positions == NULL || dp->end_positions == NULL) {
-      error("alloc_dp: malloc failure.\n");
+      MSZ_ERROR("alloc_dp: malloc failure.\n");
       return NULL;
    }
 
@@ -153,14 +166,14 @@ void dealloc_dp(data_positions_t* dp) {
       if (dp->start_positions)
          free(dp->start_positions);
       else
-         error("dealloc_dp: dp->start_positions is null.\n");
+         MSZ_ERROR("dealloc_dp: dp->start_positions is null.\n");
       if (dp->end_positions)
          free(dp->end_positions);
       else
-         error("dealloc_dp: dp->end_positions is null.\n");
+         MSZ_ERROR("dealloc_dp: dp->end_positions is null.\n");
       free(dp);
    } else
-      error("dealloc_dp: dp is null.\n");
+      MSZ_ERROR("dealloc_dp: dp is null.\n");
 }
 
 /**
@@ -236,16 +249,16 @@ void dealloc_read_divisions(divisions_t* divisions) {
  * @param total_spec The capacity of each data_positions_t (must be >= 1).
  * @return A pointer to the array of `data_positions_t` pointers.
  * @note The caller is responsible for freeing the returned array with `free_ddp()`.
- * @warning Calls `error()` and aborts on invalid arguments or `malloc` failure.
+ * @warning Calls `MSZ_ERROR()` and aborts on invalid arguments or `malloc` failure.
  * TODO: This should return an error, caught be caller. It no longer aborts.
  */
 data_positions_t** alloc_ddp(int len, int total_spec) {
    if (len < 1)
-      error("alloc_ddp: len is less than 1.\n");
+      MSZ_ERROR("alloc_ddp: len is less than 1.\n");
    if (total_spec < 1)
-      error("alloc_ddp: total_spec is less than 1.\n");
+      MSZ_ERROR("alloc_ddp: total_spec is less than 1.\n");
    if (total_spec > 1000000)  // Realistically, this should never happen
-      warning("alloc_ddp: total_spec is greater than 1,000,000!\n");
+      MSZ_WARN("alloc_ddp: total_spec is greater than 1,000,000!\n");
 
    data_positions_t** r;
 
@@ -254,7 +267,7 @@ data_positions_t** alloc_ddp(int len, int total_spec) {
    r = malloc(len * sizeof(data_positions_t*));
 
    if (r == NULL)
-      error("alloc_ddp: malloc failure.\n");
+      MSZ_ERROR("alloc_ddp: malloc failure.\n");
 
    for (i = 0; i < len; i++) {
       r[i] = alloc_dp(total_spec);
@@ -268,21 +281,21 @@ data_positions_t** alloc_ddp(int len, int total_spec) {
  * @brief Frees an array of `data_positions_t` pointers and their contents.
  * @param ddp The array of `data_positions_t` pointers to free.
  * @param divisions The number of elements in the `ddp` array (must be >= 1).
- * @warning Calls `error()` and aborts if `ddp` is `NULL` or `divisions` < 1.
+ * @warning Calls `MSZ_ERROR()` and aborts if `ddp` is `NULL` or `divisions` < 1.
  * TODO: This should return an error, caught be caller. It no longer aborts.
  */
 void free_ddp(data_positions_t** ddp, int divisions) {
    int i;
 
    if (divisions < 1)
-      error("free_ddp: divisions is less than 1.\n");
+      MSZ_ERROR("free_ddp: divisions is less than 1.\n");
 
    if (ddp) {
       for (i = 0; i < divisions; i++) dealloc_dp(ddp[i]);
 
       free(ddp);
    } else
-      error("free_ddp: ddp is null.\n");
+      MSZ_ERROR("free_ddp: ddp is null.\n");
 }
 
 /**
@@ -293,14 +306,14 @@ void free_ddp(data_positions_t** ddp, int divisions) {
  * @return A pointer to the newly allocated `division_t` struct with all total_spec counters set to 0.
  * @note The caller is responsible for freeing the returned struct with `dealloc_division()`.
  * @note `ret_times` is initialized to `NULL`; the caller must allocate it separately if needed.
- * @warning Calls `error()` and aborts on `malloc` failure.
+ * @warning Calls `MSZ_ERROR()` and aborts on `malloc` failure.
  * TODO: This should return an error, caught be caller. It no longer aborts.
  */
 division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
    division_t* d = malloc(sizeof(division_t));
 
    if (d == NULL)
-      error("alloc_division: malloc failure.\n");
+      MSZ_ERROR("alloc_division: malloc failure.\n");
 
    d->spectra = alloc_dp(n_mz);
    d->xml = alloc_dp(n_xml);
@@ -315,7 +328,7 @@ division_t* alloc_division(size_t n_xml, size_t n_mz, size_t n_inten) {
 
    if (d->spectra == NULL || d->xml == NULL || d->mz == NULL ||
        d->inten == NULL)
-      error("alloc_division: malloc failure.\n");
+      MSZ_ERROR("alloc_division: malloc failure.\n");
 
    d->spectra->total_spec = 0;
    d->xml->total_spec = 0;
@@ -398,6 +411,111 @@ int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
 }
 
 /**
+ * @brief Classify a single base64 binary array as zlib-compressed or
+ *        uncompressed.
+ *
+ * The array is zlib-compressed if its decoded bytes are exactly one complete
+ * zlib stream: inflate() reaches Z_STREAM_END and consumes all of the input.
+ * Anything else is treated as uncompressed.
+ *
+ * @param b64 Pointer to the base64 text.
+ * @param b64_len Length of the base64 text.
+ * @return INFER_ZLIB, INFER_NO_COMP, or INFER_UNKNOWN if the text is not
+ *         valid base64.
+ */
+static int classify_binary_array(char* b64, size_t b64_len) {
+   unsigned char* decoded = malloc(b64_len + 4);
+   unsigned char scratch[16384];
+   size_t n = 0;
+   z_stream zs = {0};
+   int ret;
+
+   if (decoded == NULL)
+      return INFER_UNKNOWN;
+
+   if (base64_decode(b64, b64_len, (char*)decoded, &n, 0) != 1 ||
+       inflateInit(&zs) != Z_OK) {
+      free(decoded);
+      return INFER_UNKNOWN;
+   }
+
+   /* The inflated size is unknown, so inflate into a scratch buffer and
+      discard the output. Stops on Z_STREAM_END, an error, or Z_BUF_ERROR
+      once the input runs out without the stream ending. */
+   zs.next_in = decoded;
+   zs.avail_in = (uInt)n;
+   do {
+      zs.next_out = scratch;
+      zs.avail_out = sizeof(scratch);
+      ret = inflate(&zs, Z_NO_FLUSH);
+   } while (ret == Z_OK);
+
+   int is_zlib = (ret == Z_STREAM_END && zs.avail_in == 0);
+   inflateEnd(&zs);
+   free(decoded);
+
+   return is_zlib ? INFER_ZLIB : INFER_NO_COMP;
+}
+
+/**
+ * @brief Infer the source compression (zlib vs. none) of an mzML file whose
+ *        binaryDataArrays lack a compression accession (MS:1000574 /
+ *        MS:1000576).
+ *
+ * The first spectrum with a non-empty <binary> element decides; spectra whose
+ * arrays are all empty are skipped (at most INFER_MAX_SPECTRA). Each of its
+ * non-empty arrays is classified with classify_binary_array(), and they must
+ * agree, since a file has a single source compression.
+ *
+ * @param input_map Pointer to the start of the (null-terminated) mzML contents.
+ * @return `_zlib_` or `_no_comp_` on success, 0 if the compression could not
+ *         be determined.
+ */
+static int infer_source_compression(char* input_map) {
+   char* spec = input_map;
+   int checked_spectra = 0;
+
+   while (checked_spectra < INFER_MAX_SPECTRA &&
+          (spec = strstr(spec, "<spectrum ")) != NULL) {
+      char* spec_end = strstr(spec, "</spectrum>");
+      if (spec_end == NULL)
+         break;
+      checked_spectra++;
+
+      int verdict = INFER_UNKNOWN;
+      char* bin = spec;
+
+      while (bin < spec_end &&
+             (bin = memmem(bin, (size_t)(spec_end - bin), "<binary>", 8)) !=
+                 NULL) {
+         bin += 8;
+         char* bin_end = memmem(bin, (size_t)(spec_end - bin), "</binary>", 9);
+         if (bin_end == NULL)
+            break;
+
+         size_t len = (size_t)(bin_end - bin);
+         bin = bin_end;
+         if (len == 0)
+            continue; /* Empty array: nothing to learn from it. */
+
+         int v = classify_binary_array(bin_end - len, len);
+         if (v == INFER_UNKNOWN)
+            return 0;
+         if (verdict != INFER_UNKNOWN && verdict != v)
+            return 0; /* Arrays disagree (mixed compression unsupported). */
+         verdict = v;
+      }
+
+      if (verdict != INFER_UNKNOWN)
+         return verdict == INFER_ZLIB ? _zlib_ : _no_comp_;
+
+      spec = spec_end;
+   }
+
+   return 0;
+}
+
+/**
  * @brief Detect the data type and encoding within a .mzML file.
  *
  * Traverses the XML structure of the mzML file using yxml to identify the source
@@ -413,6 +531,7 @@ int map_to_df(int acc, int* current_type, int* pending_fmt, data_format_t* df)
  */
 data_format_t* pattern_detect(char* input_map)
 {
+   char* map_start = input_map;
    data_format_t* df = alloc_df();
 
    yxml_t* xml = alloc_yxml();
@@ -477,6 +596,25 @@ data_format_t* pattern_detect(char* input_map)
             } else if (in_cvParam && attrcur) {
                if (map_to_df(parse_acc_to_int(attrbuf), &current_type, &pending_fmt, df)) {
                   free(xml);
+                  if (df->source_compression == 0) {
+                     /* No MS:1000574 / MS:1000576 seen; infer it from the
+                        binary data of the first non-empty spectrum. */
+                     df->source_compression =
+                         infer_source_compression(map_start);
+                     if (df->source_compression == 0) {
+                        MSZ_ERROR("pattern_detect: binary data arrays have no "
+                              "compression accession (MS:1000574 or "
+                              "MS:1000576) and the compression could not be "
+                              "inferred from the data.\n");
+                        free(df);
+                        return NULL;
+                     }
+                     MSZ_WARN("pattern_detect: no compression accession "
+                             "found; inferred %s from spectrum data.\n",
+                             df->source_compression == _zlib_
+                                 ? "zlib compression (MS:1000574)"
+                                 : "no compression (MS:1000576)");
+                  }
                   return df;
                }
                attrcur = NULL;
@@ -503,18 +641,18 @@ int validate_positions(uint64_t* arr, int len) {
    int i;
    for (i = 0; i < len; i++) {
       if (arr[i] < 0) {
-         warning("validate_positions: negative position detected.\n");
+         MSZ_WARN("validate_positions: negative position detected.\n");
          return 1;
       }
       if (i > len) {
-         warning("validate_positions: position %d out of bounds out of %d\n", i,
+         MSZ_WARN("validate_positions: position %d out of bounds out of %d\n", i,
                  len);
          return 1;
       }
       if ((i + 1 < len) && arr[i] > arr[i + 1]) {
-         warning("validate_positions: position %d is greater than %d\n", i,
+         MSZ_WARN("validate_positions: position %d is greater than %d\n", i,
                  i + 1);
-         warning("validate_positions: arr[i] = %d | arr[i+1] = %d\n", arr[i],
+         MSZ_WARN("validate_positions: arr[i] = %" PRIu64 " | arr[i+1] = %" PRIu64 "\n", arr[i],
                  arr[i + 1]);
          return 1;
       }
@@ -530,7 +668,7 @@ int validate_positions(uint64_t* arr, int len) {
 char* get_spectrum_start(char* ptr) {
    char* res = strstr(ptr, "<spectrum ");
    if (res == NULL)
-      warning("Could not find next spectrum.\n");
+      MSZ_WARN("Could not find next spectrum.\n");
    return res;
 }
 
@@ -542,7 +680,7 @@ char* get_spectrum_start(char* ptr) {
 char* get_spectrum_end(char* ptr) {
    char* res = strstr(ptr, "</spectrum>");
    if (res == NULL) {
-      warning("Could not find end of spectrum.\n");
+      MSZ_WARN("Could not find end of spectrum.\n");
       return NULL;
    }
    return res + strlen("</spectrum>");
@@ -556,7 +694,7 @@ char* get_spectrum_end(char* ptr) {
 char* get_binary_start(char* ptr) {
    char* res = strstr(ptr, "<binary>");
    if (res == NULL) {
-      warning("Could not find start of binary.\n");
+      MSZ_WARN("Could not find start of binary.\n");
       return NULL;
    }
    return res + strlen("<binary>");
@@ -570,7 +708,7 @@ char* get_binary_start(char* ptr) {
 char* get_binary_end(char* ptr) {
    char* res = strstr(ptr, "</binary>");
    if (res == NULL)
-      warning("Could not find end of binary.\n");
+      MSZ_WARN("Could not find end of binary.\n");
    return res;
 }
 
@@ -738,11 +876,11 @@ static void scan_spectrum_meta(const char* p, const char* end, int flags,
  */
 division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
    if (input_map == NULL || df == NULL) {
-      warning("scan_mzml: NULL pointer passed in.\n");
+      MSZ_WARN("scan_mzml: NULL pointer passed in.\n");
       return NULL;
    }
    if (end < 0) {
-      error("scan_mzml: end position is negative.\n");
+      MSZ_ERROR("scan_mzml: end position is negative.\n");
       return NULL;
    }
 
@@ -763,7 +901,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
            : NULL;
 
    if (xml_dp == NULL || mz_dp == NULL || inten_dp == NULL) {
-      warning("scan_mzml: failed to allocate memory.\n");
+      MSZ_WARN("scan_mzml: failed to allocate memory.\n");
       return NULL;
    }
 
@@ -789,7 +927,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
           inten_curr >= df->source_total_spec)  // We cannot continue if we have
                                                 // reached the end of the array
       {
-         warning(
+         MSZ_WARN(
              "scan_mzml: index out of bounds. xml_curr: %d, mz_curr: %d, "
              "inten_curr: %d\n",
              xml_curr, mz_curr, inten_curr);
@@ -868,11 +1006,11 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
                                    // we have an incomplete mzML file. Treat the
                                    // rest as text.
    {
-      warning(
+      MSZ_WARN(
           "scan_mzml: did not find all binary data. xml_curr: %d, mz_curr: %d, "
           "inten_curr: %d\n",
           xml_curr, mz_curr, inten_curr);
-      warning("Expected %d spectra, found %d. Continuing...\n",
+      MSZ_WARN("Expected %d spectra, found %d. Continuing...\n",
               df->source_total_spec, spec_curr);
       df->source_total_spec =
           spec_curr;  // Reset source_total_spec to the value actually found.
@@ -894,7 +1032,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
        validate_positions(inten_dp->end_positions, inten_dp->total_spec) ||
        validate_positions(xml_dp->start_positions, xml_dp->total_spec) ||
        validate_positions(xml_dp->end_positions, xml_dp->total_spec)) {
-      warning("scan_mzml: validate_positions failed.\n");
+      MSZ_WARN("scan_mzml: validate_positions failed.\n");
       return NULL;
    }
 
@@ -902,7 +1040,7 @@ division_t* scan_mzml(char* input_map, data_format_t* df, long end, int flags) {
 
    division_t* div = (division_t*)malloc(sizeof(division_t));
    if (div == NULL) {
-      warning("scan_mzml: failed to allocate division_t.\n");
+      MSZ_WARN("scan_mzml: failed to allocate division_t.\n");
       return NULL;
    }
    div->spectra = spectra_dp;
@@ -940,7 +1078,7 @@ division_t* extract_one_spectra(division_t* div, long index) {
    // calloc: size is accumulated with += below and must start at zero.
    division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
-      error("extract_one_spectra: failed to allocate division_t.\n");
+      MSZ_ERROR("extract_one_spectra: failed to allocate division_t.\n");
 
    xml_dp = alloc_dp(6);
    mz_dp = alloc_dp(2);
@@ -1021,7 +1159,7 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
    // calloc: size is accumulated with += below and must start at zero.
    division_t* new_div = (division_t*)calloc(1, sizeof(division_t));
    if (new_div == NULL)
-      error("extract_one_spectra: failed to allocate division_t.\n");
+      MSZ_ERROR("extract_one_spectra: failed to allocate division_t.\n");
 
    xml_dp = alloc_dp(((n * 5) + 3));
    mz_dp = alloc_dp(n * 2);
@@ -1133,7 +1271,7 @@ division_t* extract_n_spectra(division_t* div, long* indicies, long n)
  */
 long encodedLength_sum(data_positions_t* dp) {
    if (dp == NULL)
-      error("encodedLength_sum: NULL pointer passed in.\n");
+      MSZ_ERROR("encodedLength_sum: NULL pointer passed in.\n");
 
    int i = 0;
    long res = 0;
@@ -1160,20 +1298,20 @@ data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize,
    if (*divisions < *threads && *threads > 0) {
       *divisions = *threads;
       *blocksize = dp->file_end / (*threads);
-      print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
+      MSZ_INFO("\tUsing new blocksize: %ld bytes.\n", *blocksize);
    }
 
-   print("\tUsing %d divisions over %d threads.\n", *divisions, *threads);
+   MSZ_INFO("\tUsing %d divisions over %d threads.\n", *divisions, *threads);
 
    r = alloc_ddp(*divisions, (dp->total_spec * 2));
 
    i = 0;
 
-   print("\t=== Divisions distribution (bytes%%/spec%%) ===\n\t");
+   MSZ_INFO("\t=== Divisions distribution (bytes%%/spec%%) ===\n\t");
 
    for (; i < dp->total_spec * 2; i++) {
       if (curr_size > (*blocksize)) {
-         print("(%2.4f%%/%2.2f%%) ", (double)curr_size / dp->file_end * 100,
+         MSZ_INFO("(%2.4f%%/%2.2f%%) ", (double)curr_size / dp->file_end * 100,
                (double)(r[curr_div]->total_spec) / dp->total_spec * 100);
          curr_div++;
          curr_div_i = 0;
@@ -1195,19 +1333,19 @@ data_positions_t** get_binary_divisions(data_positions_t* dp, long* blocksize,
       curr_div_i++;
    }
 
-   print("(%2.4f%%/%2.2f%%) ", (double)curr_size / dp->file_end * 100,
+   MSZ_INFO("(%2.4f%%/%2.2f%%) ", (double)curr_size / dp->file_end * 100,
          (double)(r[curr_div]->total_spec) / dp->total_spec * 100);
-   print("\n");
+   MSZ_INFO("\n");
 
    if (curr_div != *divisions)
       *divisions = curr_div + 1;
 
    if (*divisions < *threads) {
       *threads = *divisions;
-      print("\tNEW: Using %d divisions over %d threads.\n", *divisions,
+      MSZ_INFO("\tNEW: Using %d divisions over %d threads.\n", *divisions,
             *threads);
       *blocksize = dp->file_end / (*threads);
-      print("\tUsing new blocksize: %ld bytes.\n", *blocksize);
+      MSZ_INFO("\tUsing new blocksize: %ld bytes.\n", *blocksize);
    }
 
    return r;
@@ -1217,16 +1355,16 @@ data_positions_t*** new_get_binary_divisions(data_positions_t** ddp,
                                              int ddp_len, long* blocksize,
                                              int* divisions, long* threads) {
    if (ddp == NULL)
-      error("new_get_binary_divisions: NULL pointer passed in.\n");
+      MSZ_ERROR("new_get_binary_divisions: NULL pointer passed in.\n");
    if (ddp_len < 1)
-      error("new_get_binary_divisions: ddp_len < 1.\n");
+      MSZ_ERROR("new_get_binary_divisions: ddp_len < 1.\n");
    if (*threads < 1)
-      error("new_get_binary_divisions: threads < 1.\n");
+      MSZ_ERROR("new_get_binary_divisions: threads < 1.\n");
 
    data_positions_t*** r = malloc(sizeof(data_positions_t**) * ddp_len);
 
    if (r == NULL)
-      error("new_get_binary_divisions: malloc failed.\n");
+      MSZ_ERROR("new_get_binary_divisions: malloc failed.\n");
 
    int i = 0, j = 0, curr_div = 0, curr_div_i = 0, curr_size = 0;
 
@@ -1238,17 +1376,17 @@ data_positions_t*** new_get_binary_divisions(data_positions_t** ddp,
 
    long encoded_sum = encodedLength_sum(ddp[0]);
    if (encoded_sum <= 0)
-      error("new_get_binary_divisions: encoded_sum <= 0.\n");
+      MSZ_ERROR("new_get_binary_divisions: encoded_sum <= 0.\n");
 
    long bs = encoded_sum / (*divisions);
 
    int bound = ddp[0]->total_spec;
    if (bound <= 0)
-      error("new_get_binary_divisions: bound <= 0.\n");
+      MSZ_ERROR("new_get_binary_divisions: bound <= 0.\n");
 
    for (; i < bound; i++) {
       // if(curr_div_i >= r[0][curr_div]->total_spec)
-      //     error("new_get_binary_divisions: curr_div_i >=
+      //     MSZ_ERROR("new_get_binary_divisions: curr_div_i >=
       //     r[0][curr_div]->total_spec.\n");
       if (curr_size >= bs) {
          curr_div++;
@@ -1981,9 +2119,9 @@ divisions_t* create_divisions(division_t* div, long n_divisions) {
  */
 long determine_n_divisions(long filesize, long blocksize) {
    if (blocksize == 0)
-      error("Blocksize cannot be 0.\n");
+      MSZ_ERROR("Blocksize cannot be 0.\n");
    if (filesize == 0)
-      error("Filesize cannot be 0.\n");
+      MSZ_ERROR("Filesize cannot be 0.\n");
 
    long n_divisions = filesize / blocksize;
 
@@ -2060,7 +2198,7 @@ int is_valid_input(char* str) {
  */
 long* string_to_array(char* str, long* size) {
    if (!is_valid_input(str))
-      error("Invalid input.\n");
+      MSZ_ERROR("Invalid input.\n");
 
    int max = 1000000;  // No more than 1,000,000 spectra
    int i, j;
@@ -2124,7 +2262,7 @@ long* string_to_array(char* str, long* size) {
          // Add all numbers in the range [start, end]
          for (long num = start; num <= end; num++) {
             if (*size >= max)
-               error("Too many spectra specified.\n");
+               MSZ_ERROR("Too many spectra specified.\n");
             arr[*size] = num;
             (*size)++;
          }
@@ -2134,7 +2272,7 @@ long* string_to_array(char* str, long* size) {
    }
 
    if (!is_monotonically_increasing(arr, *size))
-      error("Scans must be monotonically increasing.\n");
+      MSZ_ERROR("Scans must be monotonically increasing.\n");
 
    return arr;
 }
@@ -2159,14 +2297,14 @@ uint32_t* string_to_scan_array(char* str, long* size) {
    // Allocate at least one element: malloc(0) may legitimately return NULL.
    uint32_t* scans = malloc((*size > 0 ? *size : 1) * sizeof(uint32_t));
    if (scans == NULL) {
-      error("string_to_scan_array: failed to allocate scan array.\n");
+      MSZ_ERROR("string_to_scan_array: failed to allocate scan array.\n");
       free(parsed);
       return NULL;
    }
 
    for (long i = 0; i < *size; i++) {
       if (parsed[i] < 0 || parsed[i] > UINT32_MAX) {
-         error("Scan number out of range: %ld\n", parsed[i]);
+         MSZ_ERROR("Scan number out of range: %ld\n", parsed[i]);
          free(parsed);
          free(scans);
          return NULL;
@@ -2206,11 +2344,11 @@ long* map_scan_to_index(uint32_t* scans, long scans_length, division_t* div,
          }
       }
       // if(k == div->spectra->total_spec)
-      //     error("Scan %ld not found in file.\n", scans[i]);
+      //     MSZ_ERROR("Scan %ld not found in file.\n", scans[i]);
    }
 
    if (!is_monotonically_increasing(indicies, j)) {
-      warning("map_scan_to_index: Scans must be monotonically increasing.\n");
+      MSZ_WARN("map_scan_to_index: Scans must be monotonically increasing.\n");
       *indices_length = 0;
       return NULL;
    }
@@ -2251,7 +2389,7 @@ long* map_ms_level_to_index(uint16_t ms_level, division_t* div,
    }
 
    if (!is_monotonically_increasing(indicies, j))
-      error("map_ms_level_to_index: Scans must be monotonically increasing.\n");
+      MSZ_ERROR("map_ms_level_to_index: Scans must be monotonically increasing.\n");
 
    *indices_length = j;
 
@@ -2309,7 +2447,7 @@ long* map_ms_level_to_index_from_divisions(uint16_t ms_level,
    free(indicies_lens);
 
    if (!is_monotonically_increasing(result, total_len)) {
-      warning(
+      MSZ_WARN(
           "map_ms_level_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
@@ -2376,7 +2514,7 @@ long* map_scans_to_index_from_divisions(uint32_t* scans, long scans_length,
    free(indicies_lens);
 
    if (!is_monotonically_increasing(result, total_len)) {
-      warning(
+      MSZ_WARN(
           "map_scans_to_index_from_divisions: Scans must be monotonically "
           "increasing.\n");
       *indicies_length = 0;
@@ -2428,7 +2566,7 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
 
    start = get_time();
 
-   print("\nPreprocessing...\n");
+   MSZ_INFO("\nPreprocessing...\n");
 
    *df = pattern_detect((char*)input_map);
 
@@ -2474,7 +2612,7 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
           (char*)input_map, *df, input_filesize,
           scan_flags);  // A division encapsulating the entire file
    } else
-      error("Invalid indicies_size: %ld\n", arguments->indices_length);
+      MSZ_ERROR("Invalid indicies_size: %ld\n", arguments->indices_length);
 
    if (div == NULL)
       return 1;
@@ -2494,8 +2632,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
           div->mz->total_spec)  // If we have more divisions than spectra, we
                                 // need to decrease the number of divisions
       {
-         print(
-             "Warning: n_divisions (%ld) > total_spec (%ld). Setting "
+         MSZ_INFO(
+             "Warning: n_divisions (%ld) > total_spec (%d). Setting "
              "n_divisions to total_spec)\n",
              n_divisions, div->mz->total_spec);
          n_divisions = div->mz->total_spec;
@@ -2507,8 +2645,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
                                           // selected specta, we need to
                                           // decrease the number of divisions
       {
-         print(
-             "Warning: n_threads (%ld) > indices_length (%ld). Setting "
+         MSZ_INFO(
+             "Warning: n_threads (%d) > indices_length (%ld). Setting "
              "n_divisions to indices_length)\n",
              arguments->threads, arguments->indices_length);
          n_divisions = arguments->indices_length;
@@ -2520,8 +2658,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
       else {
          long effective_divisions = arguments->threads;
          if (effective_divisions > div->mz->total_spec) {
-            print(
-                "Warning: n_threads (%ld) > total_spec (%ld). Setting "
+            MSZ_INFO(
+                "Warning: n_threads (%ld) > total_spec (%d). Setting "
                 "n_divisions to total_spec)\n",
                 effective_divisions, div->mz->total_spec);
             effective_divisions = div->mz->total_spec;
@@ -2547,8 +2685,8 @@ int preprocess_mzml(char* input_map, long input_filesize, long* blocksize,
 
    end = get_time();
 
-   print("Preprocessing time: %1.4fs\n", end - start);
-   print("Using %ld divisions over %ld threads.\n", (*divisions)->n_divisions,
+   MSZ_INFO("Preprocessing time: %1.4fs\n", end - start);
+   MSZ_INFO("Using %d divisions over %d threads.\n", (*divisions)->n_divisions,
          arguments->threads);
 
    return 0;
@@ -2631,14 +2769,14 @@ int preprocess_external(char* input_map, long input_filesize, long* blocksize,
 
    start = get_time();
 
-   print("\nPreprocessing...\n");
+   MSZ_INFO("\nPreprocessing...\n");
 
    *df = create_external_df();
 
    divisions_t* div = divide_external(input_filesize, arguments->threads);
 
    if (set_compress_runtime_variables(arguments, *df)) {
-      error("preprocess_external: Failed to set compression runtime variables.\n");
+      MSZ_ERROR("preprocess_external: Failed to set compression runtime variables.\n");
       dealloc_divisions(div);
       return 1;
    }
@@ -2678,16 +2816,16 @@ int parse_footer(footer_t** footer, void* input_map, long input_filesize,
       return 1;
    }
 
-   print("\tXML position: %ld\n", (*footer)->xml_pos);
-   print("\tm/z binary position: %ld\n", (*footer)->mz_binary_pos);
-   print("\tint binary position: %ld\n", (*footer)->inten_binary_pos);
-   print("\tXML blocks position: %ld\n", (*footer)->xml_blk_pos);
-   print("\tm/z binary blocks position: %ld\n", (*footer)->mz_binary_blk_pos);
-   print("\tinten binary blocks position: %ld\n",
+   MSZ_INFO("\tXML position: %" PRIu64 "\n", (*footer)->xml_pos);
+   MSZ_INFO("\tm/z binary position: %" PRIu64 "\n", (*footer)->mz_binary_pos);
+   MSZ_INFO("\tint binary position: %" PRIu64 "\n", (*footer)->inten_binary_pos);
+   MSZ_INFO("\tXML blocks position: %" PRIu64 "\n", (*footer)->xml_blk_pos);
+   MSZ_INFO("\tm/z binary blocks position: %" PRIu64 "\n", (*footer)->mz_binary_blk_pos);
+   MSZ_INFO("\tinten binary blocks position: %" PRIu64 "\n",
          (*footer)->inten_binary_blk_pos);
-   print("\tdivisions position: %ld\n", (*footer)->divisions_t_pos);
-   print("\tEOF position: %ld\n", input_filesize);
-   print("\tOriginal filesize: %ld\n", (*footer)->original_filesize);
+   MSZ_INFO("\tdivisions position: %" PRIu64 "\n", (*footer)->divisions_t_pos);
+   MSZ_INFO("\tEOF position: %ld\n", input_filesize);
+   MSZ_INFO("\tOriginal filesize: %" PRIu64 "\n", (*footer)->original_filesize);
 
    *xml_block_lens = read_block_len_queue(input_map, (*footer)->xml_blk_pos,
                                           (*footer)->mz_binary_blk_pos);

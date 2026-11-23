@@ -31,7 +31,7 @@ char* base64_alloc(size_t size) {
    r = malloc(sizeof(char) * size);
 
    if (r == NULL)
-      error("base64_alloc: failed to allocate memory.\n");
+      MSZ_ERROR("base64_alloc: failed to allocate memory.\n");
 
    return r;
 }
@@ -49,7 +49,7 @@ void decode_base64(char* src, char* dest, size_t src_len, size_t* out_len)
    int b64_ret = base64_decode(src, src_len, dest, out_len, 0);
 
    if (b64_ret == 0) {
-      warning("decode_base64: base64_decode failed (len=%zu). "
+      MSZ_WARN("decode_base64: base64_decode failed (len=%zu). "
               "Input may contain invalid characters.\n", src_len);
       *out_len = 0;
    }
@@ -78,22 +78,22 @@ void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
                      size_t* out_len, data_block_t* tmp)
 {
    if (src == NULL)
-      error("decode_zlib_fun: src is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: src is NULL.\n");
 
    if (src_len <= 0)
-      error("decode_zlib_fun: src_len is <= 0.\n");
+      MSZ_ERROR("decode_zlib_fun: src_len is <= 0.\n");
 
    if (dest == NULL)
-      error("decode_zlib_fun: dest is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: dest is NULL.\n");
 
    if (out_len == NULL)
-      error("decode_zlib_fun: out_len is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: out_len is NULL.\n");
 
    if (tmp == NULL)
-      error("decode_zlib_fun: tmp is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: tmp is NULL.\n");
 
    if (z == NULL)
-      error("decode_zlib_fun: z is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: z is NULL.\n");
 
    size_t b64_out_len = 0;
 
@@ -107,7 +107,7 @@ void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
    decode_base64(src, b64_out_buff, src_len, &b64_out_len);
 
    if (b64_out_buff == NULL)
-      error("decode_zlib_fun: base64_decode returned with an error.\n");
+      MSZ_ERROR("decode_zlib_fun: base64_decode returned with an error.\n");
 
    zlib_block_t* decmp_output = zlib_alloc(ZLIB_SIZE_OFFSET);
 
@@ -116,7 +116,7 @@ void decode_zlib_fun(z_stream* z, char* src, size_t src_len, char** dest,
 
    int zlib_ret = zlib_append_header(decmp_output, &decmp_size, ZLIB_SIZE_OFFSET);
    if (zlib_ret != 0)
-      error("decode_zlib_fun: zlib_append_header returned with an error.\n");
+      MSZ_ERROR("decode_zlib_fun: zlib_append_header returned with an error.\n");
 
    // free(b64_out_buff);
 
@@ -147,19 +147,19 @@ void decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len,
                                char** dest, size_t* out_len,
                                data_block_t* tmp) {
    if (src == NULL)
-      error("decode_zlib_fun_no_header: src is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun_no_header: src is NULL.\n");
 
    if (src_len <= 0)
-      error("decode_zlib_fun_no_header: src_len is <= 0.\n");
+      MSZ_ERROR("decode_zlib_fun_no_header: src_len is <= 0.\n");
 
    if (dest == NULL)
-      error("decode_zlib_fun_no_header: dest is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun_no_header: dest is NULL.\n");
 
    if (out_len == NULL)
-      error("decode_zlib_fun_no_header: out_len is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun_no_header: out_len is NULL.\n");
 
    if (z == NULL)
-      error("decode_zlib_fun: z is NULL.\n");
+      MSZ_ERROR("decode_zlib_fun: z is NULL.\n");
 
    size_t b64_out_len = 0;
 
@@ -171,7 +171,7 @@ void decode_zlib_fun_no_header(z_stream* z, char* src, size_t src_len,
    decode_base64(src, b64_out_buff, src_len, &b64_out_len);
 
    if (b64_out_buff == NULL)
-      error(
+      MSZ_ERROR(
           "decode_zlib_fun_no_header: base64_decode returned with an error.\n");
 
    zlib_block_t* decmp_output = zlib_alloc(0);
@@ -270,7 +270,7 @@ void decode_no_comp_fun_no_header(z_stream* z, char* src, size_t src_len,
 decode_fun set_decode_fun(int compression_method, int algo, int accession)
 {
    if (algo == 0) {
-      error("set_decode_fun: lossy is 0.\n");
+      MSZ_ERROR("set_decode_fun: lossy is 0.\n");
       return NULL;
    }
    switch (compression_method) {
@@ -287,7 +287,7 @@ decode_fun set_decode_fun(int compression_method, int algo, int accession)
          else
             return decode_no_comp_fun_no_header;
       default:
-         error("set_decode_fun: Unknown source compression method.\n");
+         MSZ_ERROR("set_decode_fun: Unknown source compression method.\n");
          return NULL;
    }
 }

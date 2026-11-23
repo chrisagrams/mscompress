@@ -265,3 +265,48 @@ describe("Sciex TTOF6600 dtype handling (issue #105)", () => {
     }
   });
 });
+
+// Regression: FileHandle used to hand zlib_decompress() a deflate-initialized
+// z_stream, so inflateReset() failed and every spectrum of a zlib-compressed
+// mzML (MS:1000574) decoded to an empty array.
+describe("zlib-compressed mzML decoding", () => {
+  it("decodes every spectrum to its defaultArrayLength", () => {
+    const expected = [
+      ...fs.readFileSync(SCIEX_MZML_PATH, "utf8").matchAll(/defaultArrayLength="(\d+)"/g),
+    ].map((m) => Number(m[1]));
+    const mzml = read(SCIEX_MZML_PATH) as MZMLFile;
+    try {
+      expect(mzml.format.sourceCompression).toBe(1000574);
+      expect(mzml.spectra.length).toBe(expected.length);
+      for (let i = 0; i < expected.length; i++) {
+        const spectrum = mzml.spectra.get(i);
+        expect(spectrum.mz.length).toBe(expected[i]);
+        expect(spectrum.intensity.length).toBe(expected[i]);
+      }
+    } finally {
+      mzml.close();
+    }
+  });
+
+  it("matches the arrays read back from the compressed MSZ", () => {
+    const mzml = read(SCIEX_MZML_PATH) as MZMLFile;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mscompress-test-"));
+    try {
+      const msz = mzml.compress(path.join(tmpDir, "sciex.msz"));
+      try {
+        for (const i of [0, 49, mzml.spectra.length - 1]) {
+          const a = mzml.spectra.get(i);
+          const b = msz.spectra.get(i);
+          expect(a.mz.length).toBeGreaterThan(0);
+          expect(Array.from(a.mz)).toEqual(Array.from(b.mz));
+          expect(Array.from(a.intensity)).toEqual(Array.from(b.intensity));
+        }
+      } finally {
+        msz.close();
+      }
+    } finally {
+      mzml.close();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

@@ -193,6 +193,28 @@ add_test(NAME CompressNonIndexedMzMLLossy
     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
 )
 
+# mzML without a compression accession (MS:1000574 / MS:1000576) - the
+# compression is inferred from the first non-empty spectrum's binary data.
+# Previously source_compression was left uninitialized, leaving NULL decode
+# function pointers that segfaulted the Python and Node bindings.
+add_test(NAME CompressInferNoCompression
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    -DMODE=compress
+    -DINPUT_FILE=${TEST_DATA_DIR}/no_compression_term/none.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_infer_none
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test.cmake
+)
+
+add_test(NAME CompressInferZlib
+    COMMAND ${CMAKE_COMMAND}
+    -DEXECUTABLE=$<TARGET_FILE:mscompress>
+    "-DARGS="
+    -DINPUT_FILE=${TEST_DATA_DIR}/no_compression_term/zlib.mzML
+    -DTEMP_DIR=${CMAKE_CURRENT_BINARY_DIR}/tmp_infer_zlib
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_test_simple.cmake
+)
+
 # --extract with --extract-scans / --extract-indices on mzML and msz input -
 # regression test for GitHub issue #195 (only the first ceil(N/2) scans were
 # extracted; extracting an mzML's final spectrum crashed).

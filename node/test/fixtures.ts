@@ -10,3 +10,6 @@ export const SHUFFLED_MSZ_PATH = path.join(TEST_DATA_DIR, "test_shuffled.msz");
 export const MSZX_PATH = path.join(TEST_DATA_DIR, "mszx", "test.mszx");
 export const SCIEX_MZML_PATH = path.join(TEST_DATA_DIR, "sciex_ttof6600_100.mzML");
 export const CORRUPT_BASE64_MZML_PATH = path.join(TEST_DATA_DIR, "corrupt_base64.mzML");
+export const NONINDEXED_MZML_PATH = path.join(TEST_DATA_DIR, "nonindexed_test.mzML");
+/** mzML files whose binaryDataArrays lack MS:1000574 / MS:1000576. */
+export const NO_COMPRESSION_TERM_DIR = path.join(TEST_DATA_DIR, "no_compression_term");

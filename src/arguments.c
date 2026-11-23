@@ -295,19 +295,19 @@ int validate_args(Arguments* args, char* err_buf, size_t err_buf_size) {
  */
 int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    if (args == NULL || df == NULL) {
-      error("NULL passed to set_compress_runtime_variables\n");
+      MSZ_ERROR("NULL passed to set_compress_runtime_variables\n");
       return 1;
    }
    int mz_fmt = get_algo_type(args->mz_lossy);
    int inten_fmt = get_algo_type(args->int_lossy);
 
    if (mz_fmt == -1) {
-      error("set_compress_runtime_variables: Invalid mz lossy compression type: %s\n",
+      MSZ_ERROR("set_compress_runtime_variables: Invalid mz lossy compression type: %s\n",
               args->mz_lossy);
       return 1;
    }
    if (inten_fmt == -1) {
-      error("set_compress_runtime_variables: Invalid inten lossy compression type: %s\n",
+      MSZ_ERROR("set_compress_runtime_variables: Invalid inten lossy compression type: %s\n",
               args->int_lossy);
       return 1;
    }
@@ -317,7 +317,7 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
    df->target_inten_fun = set_compress_algo(inten_fmt, df->source_inten_fmt);
 
    if (df->target_mz_fun == NULL || df->target_inten_fun == NULL) {
-      error("set_compress_runtime_variables: Failed to set target compression functions.\n");
+      MSZ_ERROR("set_compress_runtime_variables: Failed to set target compression functions.\n");
       return 1;
    }
 
@@ -329,7 +329,7 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
 
    if (df->decode_source_compression_mz_fun == NULL ||
        df->decode_source_compression_inten_fun == NULL) {
-      error("set_compress_runtime_variables: Failed to set decode functions.\n");
+      MSZ_ERROR("set_compress_runtime_variables: Failed to set decode functions.\n");
       return 1;
    }
 
@@ -345,7 +345,7 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
 
    if (df->xml_compression_fun == NULL || df->mz_compression_fun == NULL ||
        df->inten_compression_fun == NULL) {
-      error("set_compress_runtime_variables: Failed to set compression functions.\n");
+      MSZ_ERROR("set_compress_runtime_variables: Failed to set compression functions.\n");
       return 1;
    }
 
@@ -372,13 +372,13 @@ int set_compress_runtime_variables(Arguments* args, data_format_t* df) {
          would fire on every lossy run for something they never requested. */
       if (args->shuffle_explicit) {
          if (mz_fmt != _lossless_ || inten_fmt != _lossless_)
-            warning(
+            MSZ_WARN(
                 "--shuffle only applies to losslessly stored streams; skipped "
                 "for the stream(s) using a lossy transform.\n");
 
          if ((mz_fmt == _lossless_ && df->mz_shuffle_elem == 0) ||
              (inten_fmt == _lossless_ && df->inten_shuffle_elem == 0))
-            warning(
+            MSZ_WARN(
                 "--shuffle skipped for a stream whose source data type has no "
                 "fixed element width.\n");
       }
@@ -410,7 +410,7 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    if ((MSZ_HAS_SHUFFLE(msz_footer->mz_fmt) && df->mz_shuffle_elem == 0) ||
        (MSZ_HAS_SHUFFLE(msz_footer->inten_fmt) &&
         df->inten_shuffle_elem == 0)) {
-      error(
+      MSZ_ERROR(
           "set_decompress_runtime_variables: file is byte-shuffled but the "
           "source data type has no fixed element width; cannot reverse it.\n");
       return 1;
@@ -424,7 +424,7 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
 
    if (df->encode_source_compression_mz_fun == NULL ||
        df->encode_source_compression_inten_fun == NULL) {
-      error("set_decompress_runtime_variables: Failed to set encode functions.\n");
+      MSZ_ERROR("set_decompress_runtime_variables: Failed to set encode functions.\n");
       return 1;
    }
 
@@ -433,7 +433,7 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
    df->target_inten_fun = set_decompress_algo(inten_fmt, df->source_inten_fmt);
 
    if (df->target_mz_fun == NULL || df->target_inten_fun == NULL) {
-      error("set_decompress_runtime_variables: Failed to set target decompression functions.\n");
+      MSZ_ERROR("set_decompress_runtime_variables: Failed to set target decompression functions.\n");
       return 1;
    }
 
@@ -444,7 +444,7 @@ int set_decompress_runtime_variables(data_format_t* df, footer_t* msz_footer) {
 
    if (df->xml_decompression_fun == NULL || df->mz_decompression_fun == NULL ||
        df->inten_decompression_fun == NULL) {
-      error("set_decompress_runtime_variables: Failed to set decompression functions.\n");
+      MSZ_ERROR("set_decompress_runtime_variables: Failed to set decompression functions.\n");
       return 1;
    }
 
