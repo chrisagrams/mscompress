@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.5](https://github.com/chrisagrams/mscompress/compare/v1.2.4...v1.2.5) (2026-11-24)
+
+
+### Dependencies
+
+* bump the electron-prod group in /electron with 3 updates ([#337](https://github.com/chrisagrams/mscompress/issues/337)) ([508c380](https://github.com/chrisagrams/mscompress/commit/508c38006109102339bd58e4f56d31196f97e9ff))
+
 ## [1.2.4](https://github.com/chrisagrams/mscompress/compare/v1.2.3...v1.2.4) (2026-11-23)
 
 
